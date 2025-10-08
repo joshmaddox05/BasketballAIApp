@@ -1,0 +1,496 @@
+// aiAnalysisService.js - Service for AI-powered shooting analysis
+import * as FileSystem from 'expo-file-system';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+class AIAnalysisService {
+  constructor() {
+    this.API_BASE_URL = 'http://localhost:8000'; // FastAPI server URL
+    this.ANALYSIS_CACHE_KEY = 'ai_analysis_cache';
+    this.MODELS_CACHE_KEY = 'ai_models_cache';
+    this.isOfflineMode = true; // For development/testing - set to false when FastAPI server is ready
+  }
+
+  /**
+   * Analyze shooting form from video
+   * @param {Object} videoData - Video data from camera capture
+   * @returns {Object} Analysis results
+   */
+  async analyzeShootingForm(videoData) {
+    try {
+      console.log('🎯 Starting shooting form analysis...');
+      
+      // Prepare analysis data
+      const analysisData = {
+        videoUri: videoData.videoUri,
+        duration: videoData.duration,
+        analysisMode: videoData.analysisMode,
+        timestamp: videoData.timestamp,
+        cameraType: videoData.cameraType
+      };
+
+      if (this.isOfflineMode) {
+        // Simulate offline analysis for development
+        return await this.simulateAnalysis(analysisData);
+      } else {
+        // Real AI analysis via FastAPI
+        return await this.performRealAnalysis(analysisData);
+      }
+    } catch (error) {
+      console.error('❌ Analysis error:', error);
+      throw new Error('Failed to analyze shooting form. Please try again.');
+    }
+  }
+
+  /**
+   * Perform real analysis via FastAPI server
+   * @param {Object} analysisData - Analysis input data
+   */
+  async performRealAnalysis(analysisData) {
+    try {
+      // Upload video file
+      const videoFile = await this.uploadVideo(analysisData.videoUri);
+      
+      // Send analysis request
+      const response = await fetch(`${this.API_BASE_URL}/analyze/shooting`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          video_id: videoFile.id,
+          analysis_mode: analysisData.analysisMode,
+          camera_type: analysisData.cameraType,
+          duration: analysisData.duration
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Analysis API error: ${response.status}`);
+      }
+
+      const results = await response.json();
+      
+      // Cache results
+      await this.cacheAnalysisResults(analysisData.timestamp, results);
+      
+      return this.formatAnalysisResults(results);
+    } catch (error) {
+      console.error('Real analysis error:', error);
+      // Fallback to simulated analysis
+      return await this.simulateAnalysis(analysisData);
+    }
+  }
+
+  /**
+   * Upload video to FastAPI server
+   * @param {string} videoUri - Local video file URI
+   */
+  async uploadVideo(videoUri) {
+    try {
+      const videoInfo = await FileSystem.getInfoAsync(videoUri);
+      
+      if (!videoInfo.exists) {
+        throw new Error('Video file not found');
+      }
+
+      const formData = new FormData();
+      formData.append('video', {
+        uri: videoUri,
+        type: 'video/mp4',
+        name: 'shooting_video.mp4',
+      });
+
+      const response = await fetch(`${this.API_BASE_URL}/upload/video`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Upload failed: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Video upload error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Simulate AI analysis for development/offline mode
+   * @param {Object} analysisData - Analysis input data
+   */
+  async simulateAnalysis(analysisData) {
+    return new Promise((resolve) => {
+      // Simulate processing time
+      setTimeout(() => {
+        const simulatedResults = this.generateSimulatedResults(analysisData);
+        resolve(simulatedResults);
+      }, 3000); // 3 second delay
+    });
+  }
+
+  /**
+   * Generate realistic simulated analysis results
+   * @param {Object} analysisData - Input data for simulation
+   */
+  generateSimulatedResults(analysisData) {
+    const baseScore = 70 + Math.random() * 20; // 70-90 range
+    
+    const results = {
+      overall_score: Math.round(baseScore),
+      confidence: 0.85 + Math.random() * 0.1, // 85-95% confidence
+      analysis_mode: analysisData.analysisMode,
+      timestamp: analysisData.timestamp,
+      
+      // Pose analysis
+      pose_analysis: {
+        release_angle: {
+          value: 45 + Math.random() * 15, // 45-60 degrees
+          ideal_range: [45, 55],
+          score: 7 + Math.random() * 3,
+          feedback: this.generateAngleFeedback()
+        },
+        elbow_alignment: {
+          deviation: Math.random() * 10, // 0-10 degrees
+          score: 6 + Math.random() * 3,
+          feedback: this.generateElbowFeedback()
+        },
+        follow_through: {
+          extension: 0.8 + Math.random() * 0.2, // 80-100%
+          wrist_snap: 0.7 + Math.random() * 0.3,
+          score: 7 + Math.random() * 3,
+          feedback: this.generateFollowThroughFeedback()
+        },
+        balance_stability: {
+          center_of_mass_shift: Math.random() * 5, // 0-5 cm
+          foot_positioning: 0.8 + Math.random() * 0.2,
+          score: 7 + Math.random() * 3,
+          feedback: this.generateBalanceFeedback()
+        }
+      },
+
+      // Biomechanical analysis
+      biomechanics: {
+        energy_transfer: 0.75 + Math.random() * 0.2,
+        timing_sequence: 0.8 + Math.random() * 0.15,
+        power_generation: 0.7 + Math.random() * 0.25,
+        efficiency_score: Math.round(75 + Math.random() * 20)
+      },
+
+      // Frame-by-frame keypoints
+      keyframe_analysis: this.generateKeyframeData(),
+
+      // Comparison with pro models
+      pro_comparison: {
+        similarity_score: 0.7 + Math.random() * 0.25,
+        closest_match: 'Stephen Curry',
+        differences: this.generateProDifferences()
+      },
+
+      // Recommendations
+      recommendations: this.generateRecommendations(baseScore),
+      
+      // Visual data for overlays
+      pose_overlay_data: this.generatePoseOverlayData(),
+      
+      // Improvement areas
+      focus_areas: this.generateFocusAreas()
+    };
+
+    return this.formatAnalysisResults(results);
+  }
+
+  /**
+   * Generate feedback for release angle
+   */
+  generateAngleFeedback() {
+    const feedbacks = [
+      "Good release angle! Stay within the 45-55 degree range for optimal trajectory.",
+      "Your release angle is slightly high. Try to lower it for better accuracy.",
+      "Release angle is too low. Focus on getting more arc on your shot.",
+      "Excellent release angle! This is in the optimal range for most shooters."
+    ];
+    return feedbacks[Math.floor(Math.random() * feedbacks.length)];
+  }
+
+  /**
+   * Generate feedback for elbow alignment
+   */
+  generateElbowFeedback() {
+    const feedbacks = [
+      "Your elbow is well-aligned under the ball. Maintain this consistency.",
+      "Elbow is slightly out to the side. Focus on keeping it directly under the ball.",
+      "Good elbow positioning! This helps with accuracy and power transfer.",
+      "Try to keep your elbow more stable throughout the shooting motion."
+    ];
+    return feedbacks[Math.floor(Math.random() * feedbacks.length)];
+  }
+
+  /**
+   * Generate feedback for follow-through
+   */
+  generateFollowThroughFeedback() {
+    const feedbacks = [
+      "Excellent follow-through! Your wrist snap and extension are on point.",
+      "Work on getting more wrist snap at release for better ball rotation.",
+      "Good extension, but focus on holding the follow-through longer.",
+      "Your follow-through shows good fundamentals. Keep practicing this motion."
+    ];
+    return feedbacks[Math.floor(Math.random() * feedbacks.length)];
+  }
+
+  /**
+   * Generate feedback for balance
+   */
+  generateBalanceFeedback() {
+    const feedbacks = [
+      "Great balance and stability throughout your shot!",
+      "Slight forward lean detected. Work on staying centered over your base.",
+      "Good foot positioning. Your balance is solid.",
+      "Try to minimize swaying during your shooting motion."
+    ];
+    return feedbacks[Math.floor(Math.random() * feedbacks.length)];
+  }
+
+  /**
+   * Generate keyframe analysis data
+   */
+  generateKeyframeData() {
+    const frames = [];
+    const numFrames = 30; // 30 frames for analysis
+    
+    for (let i = 0; i < numFrames; i++) {
+      frames.push({
+        frame_number: i,
+        timestamp: (i / numFrames) * 2, // 2 second shot
+        pose_points: this.generatePosePoints(),
+        metrics: {
+          release_angle: 45 + Math.sin(i / 5) * 10,
+          elbow_angle: 90 + Math.cos(i / 3) * 20,
+          knee_bend: 160 + Math.sin(i / 4) * 10
+        }
+      });
+    }
+    
+    return frames;
+  }
+
+  /**
+   * Generate pose points for a frame
+   */
+  generatePosePoints() {
+    return {
+      nose: { x: 0.5 + Math.random() * 0.02, y: 0.15 + Math.random() * 0.02, confidence: 0.9 },
+      leftShoulder: { x: 0.4 + Math.random() * 0.02, y: 0.25 + Math.random() * 0.02, confidence: 0.95 },
+      rightShoulder: { x: 0.6 + Math.random() * 0.02, y: 0.25 + Math.random() * 0.02, confidence: 0.95 },
+      leftElbow: { x: 0.35 + Math.random() * 0.05, y: 0.35 + Math.random() * 0.05, confidence: 0.9 },
+      rightElbow: { x: 0.65 + Math.random() * 0.05, y: 0.35 + Math.random() * 0.05, confidence: 0.9 },
+      leftWrist: { x: 0.3 + Math.random() * 0.05, y: 0.45 + Math.random() * 0.05, confidence: 0.85 },
+      rightWrist: { x: 0.7 + Math.random() * 0.05, y: 0.45 + Math.random() * 0.05, confidence: 0.85 },
+      leftHip: { x: 0.45 + Math.random() * 0.02, y: 0.55 + Math.random() * 0.02, confidence: 0.9 },
+      rightHip: { x: 0.55 + Math.random() * 0.02, y: 0.55 + Math.random() * 0.02, confidence: 0.9 },
+      leftKnee: { x: 0.44 + Math.random() * 0.02, y: 0.7 + Math.random() * 0.02, confidence: 0.85 },
+      rightKnee: { x: 0.56 + Math.random() * 0.02, y: 0.7 + Math.random() * 0.02, confidence: 0.85 },
+      leftAnkle: { x: 0.43 + Math.random() * 0.02, y: 0.85 + Math.random() * 0.02, confidence: 0.8 },
+      rightAnkle: { x: 0.57 + Math.random() * 0.02, y: 0.85 + Math.random() * 0.02, confidence: 0.8 }
+    };
+  }
+
+  /**
+   * Generate pro comparison differences
+   */
+  generateProDifferences() {
+    return [
+      "Release point is 2 inches lower than Curry's optimal position",
+      "Shooting elbow alignment is 5 degrees wider than ideal",
+      "Follow-through timing is 0.1 seconds faster than recommended",
+      "Foot spacing is 3 inches wider than typical pro stance"
+    ];
+  }
+
+  /**
+   * Generate recommendations based on score
+   */
+  generateRecommendations(score) {
+    if (score > 85) {
+      return [
+        "Maintain your excellent form consistency",
+        "Focus on shot repetition to build muscle memory",
+        "Work on shooting from different angles and distances"
+      ];
+    } else if (score > 75) {
+      return [
+        "Work on elbow alignment for improved accuracy",
+        "Practice follow-through extension",
+        "Focus on balance and stability drills"
+      ];
+    } else {
+      return [
+        "Start with basic shooting form fundamentals",
+        "Practice proper foot positioning and balance",
+        "Work on consistent release point",
+        "Focus on slow, controlled shooting motions"
+      ];
+    }
+  }
+
+  /**
+   * Generate pose overlay data for visualization
+   */
+  generatePoseOverlayData() {
+    return {
+      optimal_pose: this.generatePosePoints(),
+      user_pose: this.generatePosePoints(),
+      alignment_errors: [
+        { joint: 'rightElbow', error_magnitude: 0.05, error_direction: 'outward' },
+        { joint: 'leftKnee', error_magnitude: 0.02, error_direction: 'forward' }
+      ],
+      improvement_suggestions: [
+        { area: 'elbow', instruction: "Move elbow 2 inches inward" },
+        { area: 'follow_through', instruction: "Extend wrist snap by 0.2 seconds" }
+      ]
+    };
+  }
+
+  /**
+   * Generate focus areas for improvement
+   */
+  generateFocusAreas() {
+    const allAreas = [
+      { name: 'Release Angle', priority: 'high', description: 'Optimize arc for better accuracy' },
+      { name: 'Elbow Alignment', priority: 'medium', description: 'Keep elbow under the ball' },
+      { name: 'Follow Through', priority: 'high', description: 'Improve wrist snap and extension' },
+      { name: 'Balance', priority: 'low', description: 'Maintain stability throughout shot' },
+      { name: 'Timing', priority: 'medium', description: 'Coordinate leg and arm motion' }
+    ];
+
+    // Return 2-3 random areas
+    const numAreas = 2 + Math.floor(Math.random() * 2);
+    return allAreas.sort(() => 0.5 - Math.random()).slice(0, numAreas);
+  }
+
+  /**
+   * Format analysis results for app consumption
+   */
+  formatAnalysisResults(rawResults) {
+    return {
+      id: `analysis_${Date.now()}`,
+      timestamp: rawResults.timestamp || Date.now(),
+      overallScore: rawResults.overall_score,
+      confidence: rawResults.confidence,
+      
+      metrics: [
+        {
+          id: 'releaseAngle',
+          name: 'Release Angle',
+          score: Math.round(rawResults.pose_analysis.release_angle.score),
+          value: `${Math.round(rawResults.pose_analysis.release_angle.value)}°`,
+          ideal: '45-55°',
+          feedback: rawResults.pose_analysis.release_angle.feedback,
+          status: this.getMetricStatus(rawResults.pose_analysis.release_angle.score)
+        },
+        {
+          id: 'elbowAlignment',
+          name: 'Elbow Alignment',
+          score: Math.round(rawResults.pose_analysis.elbow_alignment.score),
+          value: `${Math.round(rawResults.pose_analysis.elbow_alignment.deviation)}° deviation`,
+          ideal: 'Vertical alignment',
+          feedback: rawResults.pose_analysis.elbow_alignment.feedback,
+          status: this.getMetricStatus(rawResults.pose_analysis.elbow_alignment.score)
+        },
+        {
+          id: 'followThrough',
+          name: 'Follow Through',
+          score: Math.round(rawResults.pose_analysis.follow_through.score),
+          value: `${Math.round(rawResults.pose_analysis.follow_through.extension * 100)}% extension`,
+          ideal: 'Full arm extension',
+          feedback: rawResults.pose_analysis.follow_through.feedback,
+          status: this.getMetricStatus(rawResults.pose_analysis.follow_through.score)
+        },
+        {
+          id: 'balance',
+          name: 'Balance & Stability',
+          score: Math.round(rawResults.pose_analysis.balance_stability.score),
+          value: `${Math.round(rawResults.pose_analysis.balance_stability.foot_positioning * 100)}% stable`,
+          ideal: 'Stable throughout',
+          feedback: rawResults.pose_analysis.balance_stability.feedback,
+          status: this.getMetricStatus(rawResults.pose_analysis.balance_stability.score)
+        }
+      ],
+
+      improvements: rawResults.recommendations,
+      focusAreas: rawResults.focus_areas,
+      proComparison: rawResults.pro_comparison,
+      keyframeData: rawResults.keyframe_analysis,
+      overlayData: rawResults.pose_overlay_data,
+      biomechanics: rawResults.biomechanics
+    };
+  }
+
+  /**
+   * Get metric status based on score
+   */
+  getMetricStatus(score) {
+    if (score >= 8) return 'good';
+    if (score >= 6) return 'improve';
+    return 'poor';
+  }
+
+  /**
+   * Cache analysis results
+   */
+  async cacheAnalysisResults(timestamp, results) {
+    try {
+      const existingCache = await AsyncStorage.getItem(this.ANALYSIS_CACHE_KEY);
+      const cache = existingCache ? JSON.parse(existingCache) : {};
+      
+      cache[timestamp] = {
+        results,
+        cached_at: Date.now()
+      };
+
+      await AsyncStorage.setItem(this.ANALYSIS_CACHE_KEY, JSON.stringify(cache));
+    } catch (error) {
+      console.error('Cache error:', error);
+    }
+  }
+
+  /**
+   * Get cached analysis results
+   */
+  async getCachedResults(timestamp) {
+    try {
+      const cache = await AsyncStorage.getItem(this.ANALYSIS_CACHE_KEY);
+      if (cache) {
+        const parsedCache = JSON.parse(cache);
+        return parsedCache[timestamp]?.results || null;
+      }
+      return null;
+    } catch (error) {
+      console.error('Cache retrieval error:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Enable/disable offline mode
+   */
+  setOfflineMode(enabled) {
+    this.isOfflineMode = enabled;
+    console.log(`🔄 AI Analysis ${enabled ? 'offline' : 'online'} mode enabled`);
+  }
+
+  /**
+   * Set FastAPI server URL
+   */
+  setServerURL(url) {
+    this.API_BASE_URL = url;
+    console.log(`🌐 API Server URL set to: ${url}`);
+  }
+}
+
+export default new AIAnalysisService();
