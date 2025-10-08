@@ -173,6 +173,139 @@ async def analyze_shooting_form(request: Dict[str, Any]):
         logger.error(f"❌ Analysis error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
+@app.post("/analyze/compare-to-curry")
+async def compare_to_curry(video: UploadFile = File(...)):
+    """
+    Upload a video and immediately compare it to Steph Curry's shooting form.
+    This is a streamlined endpoint that handles upload, analysis, and comparison in one call.
+    """
+    try:
+        # Step 1: Upload and save video
+        video_id = str(uuid.uuid4())
+        
+        # Validate file type
+        if not video.filename.lower().endswith(('.mp4', '.mov', '.avi', '.mkv')):
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid file type. Supported: mp4, mov, avi, mkv"
+            )
+        
+        # Save video file
+        file_path = UPLOAD_DIR / f"{video_id}.mp4"
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(video.file, buffer)
+        
+        logger.info(f"📹 Video uploaded for Curry comparison: {video_id}")
+        
+        # Store video metadata
+        video_storage[video_id] = {
+            "id": video_id,
+            "filename": video.filename,
+            "filepath": str(file_path),
+            "uploaded_at": datetime.now().isoformat()
+        }
+        
+        # Step 2: Analyze user's shooting form
+        logger.info(f"🎯 Analyzing user's shooting form...")
+        user_analysis = video_processor.analyze_shooting_video(str(file_path))
+        
+        # Step 3: Compare to Steph Curry's baseline
+        logger.info(f"🏀 Comparing to Steph Curry's form...")
+        comparison = shot_comparator.compare_to_baseline(
+            user_analysis,
+            "stephen_curry"
+        )
+        
+        # Step 4: Generate comprehensive results
+        overall_score = _calculate_overall_score(user_analysis)
+        
+        results = {
+            "video_id": video_id,
+            "analysis_mode": "curry_comparison",
+            "overall_score": overall_score,
+            "similarity_to_curry": comparison['overall_similarity'],
+            "confidence": user_analysis.get('confidence', 0.85),
+            
+            # User's metrics formatted for the app
+            "your_metrics": _format_metrics_for_app(user_analysis['metrics']),
+            
+            # Comparison details
+            "comparison": {
+                "player": "Stephen Curry",
+                "position": "Point Guard",
+                "team": "Golden State Warriors",
+                "overall_similarity": comparison['overall_similarity'],
+                "metric_comparisons": comparison['metric_comparisons'],
+                "strengths": comparison.get('strengths', []),
+                "areas_for_improvement": comparison.get('areas_for_improvement', []),
+            },
+            
+            # Specific recommendations based on comparison
+            "recommendations": comparison.get('specific_feedback', [])[:5],
+            
+            # Biomechanics comparison
+            "biomechanics_comparison": {
+                "your_form": _format_biomechanics(user_analysis),
+                "curry_form": {
+                    "release_angle": "48.5°",
+                    "arc_angle": "47.0°",
+                    "follow_through_extension": "Excellent",
+                    "stance_width": "Optimal"
+                }
+            },
+            
+            # Visual data for charts
+            "visual_data": {
+                "similarity_breakdown": [
+                    {
+                        "metric": "Release Angle",
+                        "similarity": comparison['metric_comparisons']['release_angle']['similarity'] * 100,
+                        "your_value": user_analysis['metrics']['release_angle']['trajectory_angle'],
+                        "curry_value": 48.5
+                    },
+                    {
+                        "metric": "Elbow Alignment",
+                        "similarity": comparison['metric_comparisons']['elbow_alignment']['similarity'] * 100,
+                        "your_value": user_analysis['metrics']['elbow_alignment']['consistency'] * 100,
+                        "curry_value": 95.0
+                    },
+                    {
+                        "metric": "Follow Through",
+                        "similarity": comparison['metric_comparisons']['follow_through']['similarity'] * 100,
+                        "your_value": user_analysis['metrics']['follow_through']['quality_score'] * 10,
+                        "curry_value": 95.0
+                    },
+                    {
+                        "metric": "Balance",
+                        "similarity": comparison['metric_comparisons']['balance']['similarity'] * 100,
+                        "your_value": user_analysis['metrics']['balance']['stability_score'] * 10,
+                        "curry_value": 90.0
+                    }
+                ]
+            },
+            
+            "analyzed_at": datetime.now().isoformat()
+        }
+        
+        # Cache results
+        analysis_cache[video_id] = results
+        
+        logger.info(f"✅ Curry comparison complete - Similarity: {comparison['overall_similarity']:.1f}%")
+        
+        return results
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Curry comparison error: {str(e)}")
+        # Clean up file if it was created
+        if 'file_path' in locals() and os.path.exists(file_path):
+            os.remove(file_path)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Analysis failed: {str(e)}"
+        )
+
 @app.get("/analysis/{video_id}")
 async def get_analysis(video_id: str):
     """Get cached analysis results"""

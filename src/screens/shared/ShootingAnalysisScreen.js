@@ -61,8 +61,14 @@ const ShootingAnalysisScreen = ({ navigation }) => {
                 useNativeDriver: false,
             }).start();
 
-            // Perform AI analysis
-            const results = await aiAnalysisService.analyzeShootingForm(videoData);
+            // Perform AI analysis - Use Curry comparison if Steph Curry is selected
+            let results;
+            if (selectedProModel.name === 'Stephen Curry') {
+                console.log('🏀 Using Steph Curry comparison...');
+                results = await aiAnalysisService.compareWithStephCurry(videoData);
+            } else {
+                results = await aiAnalysisService.analyzeShootingForm(videoData);
+            }
             
             setAnalysisResults(results);
             setCurrentStage('results');
@@ -74,7 +80,7 @@ const ShootingAnalysisScreen = ({ navigation }) => {
 
             // Add to activities
             addActivity({
-                title: 'AI Shooting Analysis',
+                title: `AI Shooting Analysis ${selectedProModel.name === 'Stephen Curry' ? '(vs Curry)' : ''}`,
                 progress: results.overallScore,
                 date: 'Today'
             });
@@ -404,6 +410,92 @@ const ShootingAnalysisScreen = ({ navigation }) => {
                             </Text>
                         </View>
                     </View>
+
+                    {/* Curry Comparison Section - Only show if comparing with Steph Curry */}
+                    {selectedProModel.name === 'Stephen Curry' && analysisResults.similarityScore && (
+                        <View style={styles.curryComparisonContainer}>
+                            <View style={styles.curryComparisonHeader}>
+                                <Ionicons name="trophy" size={24} color="#FFD700" />
+                                <Text style={styles.curryComparisonTitle}>Comparison with Steph Curry</Text>
+                            </View>
+                            
+                            <View style={styles.similarityScoreCard}>
+                                <Text style={styles.similarityLabel}>Form Similarity</Text>
+                                <Text style={styles.similarityScore}>
+                                    {Math.round(analysisResults.similarityScore)}%
+                                </Text>
+                                <Text style={styles.similarityDescription}>
+                                    {analysisResults.similarityScore >= 80 
+                                        ? "Exceptional! Your form closely matches Curry's mechanics."
+                                        : analysisResults.similarityScore >= 70
+                                        ? "Great! You're on the right track to matching Curry's form."
+                                        : "Good start! Focus on the areas below to improve."}
+                                </Text>
+                            </View>
+
+                            {/* Metric Breakdown */}
+                            {analysisResults.visualData?.similarity_breakdown && (
+                                <View style={styles.metricBreakdownContainer}>
+                                    <Text style={styles.metricBreakdownTitle}>Metric Comparison</Text>
+                                    {analysisResults.visualData.similarity_breakdown.map((metric, index) => (
+                                        <View key={`metric-${index}`} style={styles.metricComparisonRow}>
+                                            <Text style={styles.metricName}>{metric.metric}</Text>
+                                            <View style={styles.metricBarContainer}>
+                                                <View style={styles.metricBar}>
+                                                    <View 
+                                                        style={[
+                                                            styles.metricBarFill, 
+                                                            { 
+                                                                width: `${metric.similarity}%`,
+                                                                backgroundColor: metric.similarity >= 80 ? '#4CAF50' : 
+                                                                                 metric.similarity >= 70 ? '#FFC107' : '#FF6B00'
+                                                            }
+                                                        ]} 
+                                                    />
+                                                </View>
+                                                <Text style={styles.metricPercentage}>
+                                                    {Math.round(metric.similarity)}%
+                                                </Text>
+                                            </View>
+                                        </View>
+                                    ))}
+                                </View>
+                            )}
+
+                            {/* Strengths and Improvements */}
+                            {analysisResults.comparison && (
+                                <View style={styles.curryFeedbackContainer}>
+                                    {analysisResults.comparison.strengths?.length > 0 && (
+                                        <View style={styles.feedbackSection}>
+                                            <View style={styles.feedbackHeader}>
+                                                <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                                                <Text style={styles.feedbackHeaderText}>Your Strengths</Text>
+                                            </View>
+                                            {analysisResults.comparison.strengths.map((strength, index) => (
+                                                <Text key={`strength-${index}`} style={styles.feedbackItem}>
+                                                    • {strength}
+                                                </Text>
+                                            ))}
+                                        </View>
+                                    )}
+                                    
+                                    {analysisResults.comparison.areas_for_improvement?.length > 0 && (
+                                        <View style={styles.feedbackSection}>
+                                            <View style={styles.feedbackHeader}>
+                                                <Ionicons name="alert-circle" size={20} color="#FF6B00" />
+                                                <Text style={styles.feedbackHeaderText}>Areas to Improve</Text>
+                                            </View>
+                                            {analysisResults.comparison.areas_for_improvement.map((area, index) => (
+                                                <Text key={`improve-${index}`} style={styles.feedbackItem}>
+                                                    • {area}
+                                                </Text>
+                                            ))}
+                                        </View>
+                                    )}
+                                </View>
+                            )}
+                        </View>
+                    )}
 
                     {/* Video Comparison */}
                     <View style={styles.resultVideoContainer}>
@@ -1270,6 +1362,116 @@ const styles = StyleSheet.create({
     proModelDetails: {
         fontSize: 14,
         color: '#666',
+    },
+
+    // Curry Comparison Styles
+    curryComparisonContainer: {
+        backgroundColor: '#FFF',
+        padding: 16,
+        marginTop: 8,
+        borderRadius: 12,
+        borderWidth: 2,
+        borderColor: '#FFD700',
+    },
+    curryComparisonHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    curryComparisonTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#333',
+        marginLeft: 8,
+    },
+    similarityScoreCard: {
+        backgroundColor: '#F8F9FA',
+        padding: 20,
+        borderRadius: 12,
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    similarityLabel: {
+        fontSize: 14,
+        color: '#666',
+        marginBottom: 8,
+    },
+    similarityScore: {
+        fontSize: 48,
+        fontWeight: 'bold',
+        color: '#FF6B00',
+        marginBottom: 8,
+    },
+    similarityDescription: {
+        fontSize: 14,
+        color: '#666',
+        textAlign: 'center',
+        lineHeight: 20,
+    },
+    metricBreakdownContainer: {
+        marginBottom: 16,
+    },
+    metricBreakdownTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#333',
+        marginBottom: 12,
+    },
+    metricComparisonRow: {
+        marginBottom: 16,
+    },
+    metricName: {
+        fontSize: 14,
+        color: '#333',
+        marginBottom: 6,
+        fontWeight: '500',
+    },
+    metricBarContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    metricBar: {
+        flex: 1,
+        height: 8,
+        backgroundColor: '#E0E0E0',
+        borderRadius: 4,
+        marginRight: 12,
+        overflow: 'hidden',
+    },
+    metricBarFill: {
+        height: '100%',
+        borderRadius: 4,
+    },
+    metricPercentage: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#333',
+        width: 45,
+        textAlign: 'right',
+    },
+    curryFeedbackContainer: {
+        marginTop: 8,
+    },
+    feedbackSection: {
+        marginBottom: 16,
+    },
+    feedbackHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    feedbackHeaderText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#333',
+        marginLeft: 8,
+    },
+    feedbackItem: {
+        fontSize: 14,
+        color: '#666',
+        marginLeft: 28,
+        marginBottom: 6,
+        lineHeight: 20,
     },
 });
 
