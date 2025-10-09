@@ -15,9 +15,10 @@ class VideoProcessor:
     
     def __init__(self):
         self.mp_pose = mp.solutions.pose
+        # Use lite model (model_complexity=0) to save memory
         self.pose = self.mp_pose.Pose(
             static_image_mode=False,
-            model_complexity=2,
+            model_complexity=0,  # 0=Lite (150MB less memory)
             enable_segmentation=False,
             min_detection_confidence=0.5,
             min_tracking_confidence=0.5
@@ -77,10 +78,18 @@ class VideoProcessor:
         
         logger.info(f"Processing {total_frames} frames at {fps:.2f} fps...")
         
+        # Process frames with memory optimization (skip frames)
+        frame_skip = 2  # Process every 2nd frame to save memory
+        
         while cap.isOpened():
             ret, frame = cap.read()
             if not ret:
                 break
+            
+            # Skip frames to reduce memory usage
+            if frame_number % frame_skip != 0:
+                frame_number += 1
+                continue
             
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             results = self.pose.process(rgb_frame)

@@ -11,6 +11,7 @@ import shutil
 from pathlib import Path
 import numpy as np
 import logging
+import gc  # For garbage collection
 
 from services.baseline_analyzer import BaselineAnalyzer
 from services.shot_comparator import ShotComparator
@@ -34,10 +35,53 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize services
-baseline_analyzer = BaselineAnalyzer()
-shot_comparator = ShotComparator()
-video_processor = VideoProcessor()
+# Memory management: Limit concurrent video processing
+active_requests = 0
+MAX_CONCURRENT_REQUESTS = 1  # Only process 1 video at a time to save memory
+
+@app.middleware("http")
+async def limit_concurrent_processing(request, call_next):
+    """Limit concurrent video processing to prevent OOM"""
+    global active_requests
+    
+    # Only limit video analysis endpoints
+    if "/analyze" in request.url.path:
+        if active_requests >= MAX_CONCURRENT_REQUESTS:
+            return JSONResponse(
+                status_code=503,
+                content={"detail": "Server is busy processing another video. Please try again in a moment."}
+            )
+        active_requests += 1
+        try:
+            response = await call_next(request)
+            return response
+        finally:
+            active_requests -= 1
+    else:
+        return await call_next(request)
+
+# Initialize services lazily to save memory
+baseline_analyzer = None
+shot_comparator = None
+video_processor = None
+
+def get_baseline_analyzer():
+    global baseline_analyzer
+    if baseline_analyzer is None:
+        baseline_analyzer = BaselineAnalyzer()
+    return baseline_analyzer
+
+def get_shot_comparator():
+    global shot_comparator
+    if shot_comparator is None:
+        shot_comparator = ShotComparator()
+    return shot_comparator
+
+def get_video_processor():
+    global video_processor
+    if video_processor is None:
+        video_processor = VideoProcessor()
+    return video_processor
 
 # Storage directories
 UPLOAD_DIR = Path("uploads")
@@ -53,6 +97,7 @@ analysis_cache = {}
 
 @app.get("/")
 async def root():
+    analyzer = get_baseline_analyzer()
     return {
         "message": "Basketball AI Analysis API",
         "status": "running",
@@ -63,7 +108,7 @@ async def root():
             "Detailed shooting form analysis",
             "Personalized feedback generation"
         ],
-        "available_baselines": baseline_analyzer.list_available_baselines()
+        "available_baselines": analyzer.list_available_baselines()
     }
 
 @app.post("/upload/video")
@@ -119,6 +164,10 @@ async def upload_video(video: UploadFile = File(...)):
 async def analyze_shooting_form(request: Dict[str, Any]):
     """Analyze shooting form from uploaded video with optional pro player comparison"""
     try:
+        # Get services lazily
+        processor = get_video_processor()
+        comparator = get_shot_comparator()
+        
         video_id = request.get("video_id")
         analysis_mode = request.get("analysis_mode", "shooting")
         camera_type = request.get("camera_type", "back")
@@ -134,13 +183,13 @@ async def analyze_shooting_form(request: Dict[str, Any]):
         logger.info(f"🎯 Analyzing video: {video_id}")
         
         # Process video and extract pose data
-        user_analysis = video_processor.analyze_shooting_video(video_path)
+        user_analysis = processor.analyze_shooting_video(video_path)
         
         # If comparison player specified, compare forms
         comparison = None
         if comparison_player:
             try:
-                comparison = shot_comparator.compare_to_baseline(
+                comparison = comparator.compare_to_baseline(
                     user_analysis,
                     comparison_player
                 )
@@ -167,10 +216,14 @@ async def analyze_shooting_form(request: Dict[str, Any]):
         
         logger.info(f"✅ Analysis complete - Score: {results['overall_score']}")
         
+        # Force garbage collection
+        gc.collect()
+        
         return results
         
     except Exception as e:
         logger.error(f"❌ Analysis error: {str(e)}")
+        gc.collect()  # Clean up memory even on error
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
 @app.post("/analyze/compare-to-curry")
@@ -179,7 +232,12 @@ async def compare_to_curry(video: UploadFile = File(...)):
     Upload a video and immediately compare it to Steph Curry's shooting form.
     This is a streamlined endpoint that handles upload, analysis, and comparison in one call.
     """
+    file_path = None
     try:
+        # Get services lazily (don't load on startup)
+        processor = get_video_processor()
+        comparator = get_shot_comparator()
+        
         # Step 1: Upload and save video
         video_id = str(uuid.uuid4())
         
@@ -207,11 +265,11 @@ async def compare_to_curry(video: UploadFile = File(...)):
         
         # Step 2: Analyze user's shooting form
         logger.info(f"🎯 Analyzing user's shooting form...")
-        user_analysis = video_processor.analyze_shooting_video(str(file_path))
+        user_analysis = processor.analyze_shooting_video(str(file_path))
         
         # Step 3: Compare to Steph Curry's baseline
         logger.info(f"🏀 Comparing to Steph Curry's form...")
-        comparison = shot_comparator.compare_to_baseline(
+        comparison = comparator.compare_to_baseline(
             user_analysis,
             "stephen_curry"
         )
@@ -292,6 +350,9 @@ async def compare_to_curry(video: UploadFile = File(...)):
         
         logger.info(f"✅ Curry comparison complete - Similarity: {comparison['overall_similarity']:.1f}%")
         
+        # Force garbage collection to free memory
+        gc.collect()
+        
         return results
         
     except HTTPException:
@@ -299,12 +360,15 @@ async def compare_to_curry(video: UploadFile = File(...)):
     except Exception as e:
         logger.error(f"❌ Curry comparison error: {str(e)}")
         # Clean up file if it was created
-        if 'file_path' in locals() and os.path.exists(file_path):
+        if file_path and os.path.exists(file_path):
             os.remove(file_path)
         raise HTTPException(
             status_code=500,
             detail=f"Analysis failed: {str(e)}"
         )
+    finally:
+        # Always try to clean up memory
+        gc.collect()
 
 @app.get("/analysis/{video_id}")
 async def get_analysis(video_id: str):
