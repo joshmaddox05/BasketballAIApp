@@ -3,8 +3,9 @@
 
 echo "🏀 Building Basketball AI API for Render..."
 
-# Navigate to backend directory
-cd backend || exit 1
+# Check Python version
+echo "🐍 Checking Python version..."
+python --version
 
 # Upgrade pip
 echo "📦 Upgrading pip..."
