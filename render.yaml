@@ -6,15 +6,13 @@ services:
     env: python
     region: oregon  # Choose closest to your users
     plan: starter  # Free tier - upgrade to standard for production
+    rootDirectory: backend  # Set backend as root directory
     
     # Build settings
-    buildCommand: |
-      cd backend
-      pip install --upgrade pip
-      pip install -r requirements.txt
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
     
     # Start command
-    startCommand: cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     
     # Environment variables
     envVars:
