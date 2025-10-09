@@ -16,11 +16,20 @@
     },
     "preview": {
       "distribution": "internal",
+      "env": {
+        "EXPO_USE_COMMUNITY_AUTOLINKING": "0"
+      },
       "ios": {
-        "simulator": false
+        "simulator": false,
+        "cache": {
+          "clear": true
+        }
       },
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "cache": {
+          "clear": true
+        }
       }
     },
     "preview-simulator": {
