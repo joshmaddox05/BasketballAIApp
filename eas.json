@@ -20,16 +20,10 @@
         "EXPO_USE_COMMUNITY_AUTOLINKING": "0"
       },
       "ios": {
-        "simulator": false,
-        "cache": {
-          "clear": true
-        }
+        "simulator": false
       },
       "android": {
-        "buildType": "apk",
-        "cache": {
-          "clear": true
-        }
+        "buildType": "apk"
       }
     },
     "preview-simulator": {

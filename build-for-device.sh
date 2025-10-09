@@ -57,7 +57,8 @@ case $choice in
         read -p "Continue? (y/n) " -n 1 -r
         echo ""
         if [[ $REPLY =~ ^[Yy]$ ]]; then
-            npx eas build --profile preview --platform android
+            echo "🧹 Clearing cache for clean build..."
+            npx eas build --profile preview --platform android --clear-cache
         fi
         ;;
     2)
@@ -74,7 +75,8 @@ case $choice in
         read -p "Continue? (y/n) " -n 1 -r
         echo ""
         if [[ $REPLY =~ ^[Yy]$ ]]; then
-            npx eas build --profile preview --platform ios
+            echo "🧹 Clearing cache for clean build..."
+            npx eas build --profile preview --platform ios --clear-cache
         fi
         ;;
     3)
@@ -89,7 +91,8 @@ case $choice in
         read -p "Continue? (y/n) " -n 1 -r
         echo ""
         if [[ $REPLY =~ ^[Yy]$ ]]; then
-            npx eas build --profile preview --platform all
+            echo "🧹 Clearing cache for clean build..."
+            npx eas build --profile preview --platform all --clear-cache
         fi
         ;;
     *)
