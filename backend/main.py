@@ -1,7 +1,7 @@
 # FastAPI Backend for Basketball AI Analysis with Pro Player Baselines
 from fastapi import FastAPI, File, UploadFile, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 import uuid
 import os
 from typing import Dict, Any, Optional, List
@@ -479,6 +479,51 @@ async def list_baselines():
         }
     except Exception as e:
         logger.error(f"❌ Error listing baselines: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/baselines/video/{player_name}")
+async def get_baseline_video(player_name: str):
+    """Serve baseline video for a specific player"""
+    try:
+        # Normalize player name
+        player_name = player_name.lower().replace(" ", "").replace("stephen", "steph")
+        
+        # Map player names to video files
+        video_files = {
+            "stephcurry": "StephCurryShot.mp4",
+            "stephenurry": "StephCurryShot.mp4",
+            "curry": "StephCurryShot.mp4"
+        }
+        
+        if player_name not in video_files:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Baseline video not found for player: {player_name}"
+            )
+        
+        video_file = video_files[player_name]
+        video_path = Path(__file__).parent / "baselines" / video_file
+        
+        if not video_path.exists():
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Video file not found: {video_file}"
+            )
+        
+        return FileResponse(
+            path=str(video_path),
+            media_type="video/mp4",
+            filename=video_file,
+            headers={
+                "Accept-Ranges": "bytes",
+                "Content-Disposition": f"inline; filename={video_file}"
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error serving baseline video: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/video/{video_id}")
