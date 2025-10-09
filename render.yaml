@@ -1,0 +1,47 @@
+services:
+  # FastAPI Backend Service
+  - type: web
+    name: basketball-ai-api
+    runtime: python
+    env: python
+    region: oregon  # Choose closest to your users
+    plan: starter  # Free tier - upgrade to standard for production
+    
+    # Build settings
+    buildCommand: |
+      cd backend
+      pip install --upgrade pip
+      pip install -r requirements.txt
+    
+    # Start command
+    startCommand: cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
+    
+    # Environment variables
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: PORT
+        generateValue: true
+      - key: ENVIRONMENT
+        value: production
+      - key: LOG_LEVEL
+        value: info
+    
+    # Health check endpoint
+    healthCheckPath: /health
+    
+    # Auto-deploy from main branch
+    autoDeploy: true
+    
+    # Disk storage for uploads (1GB free tier)
+    disk:
+      name: basketball-ai-storage
+      mountPath: /opt/render/project/src/backend/uploads
+      sizeGB: 1
+
+# Optional: If you want to add a PostgreSQL database later
+# databases:
+#   - name: basketball-ai-db
+#     databaseName: basketball_ai
+#     user: basketball_ai_user
+#     plan: starter  # Free tier

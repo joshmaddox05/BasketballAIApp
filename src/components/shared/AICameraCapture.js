@@ -7,11 +7,13 @@ import {
   Dimensions,
   Alert,
   Animated,
-  ActivityIndicator
+  ActivityIndicator,
+  Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as MediaLibrary from 'expo-media-library';
+import * as Device from 'expo-device';
 import { Svg, Circle, Line, Path } from 'react-native-svg';
 
 const { width, height } = Dimensions.get('window');
@@ -79,10 +81,26 @@ const AICameraCapture = ({
   const [detectedPose, setDetectedPose] = useState(POSE_POINTS);
   const [analysisPhase, setAnalysisPhase] = useState('setup'); // setup, ready, recording, processing
   const [cameraType, setCameraType] = useState('back');
+  const [isSimulator, setIsSimulator] = useState(false);
   
   const cameraRef = useRef(null);
   const recordingTimer = useRef(null);
   const poseAnimation = useRef(new Animated.Value(1)).current;
+
+  // Check if running on simulator/emulator
+  useEffect(() => {
+    const checkDevice = async () => {
+      // Check if device is physical or simulator
+      const isPhysical = await Device.isDevice;
+      setIsSimulator(!isPhysical);
+      
+      if (!isPhysical) {
+        console.log('⚠️ Running on simulator - Camera features will be simulated');
+      }
+    };
+    
+    checkDevice();
+  }, []);
 
   useEffect(() => {
     if (isRecording) {
@@ -146,6 +164,26 @@ const AICameraCapture = ({
   };
 
   const startRecording = async () => {
+    // Check if running on simulator
+    if (isSimulator) {
+      Alert.alert(
+        'Simulator Detected',
+        'Camera recording is not available on simulators/emulators. This feature requires a physical device.\n\nFor testing purposes, we\'ll simulate a recording.',
+        [
+          { 
+            text: 'Cancel', 
+            style: 'cancel',
+            onPress: () => setAnalysisPhase('ready')
+          },
+          {
+            text: 'Simulate Recording',
+            onPress: () => simulateRecording()
+          }
+        ]
+      );
+      return;
+    }
+
     if (!cameraRef.current) return;
 
     const hasPermissions = await requestPermissions();
@@ -165,10 +203,68 @@ const AICameraCapture = ({
       return video;
     } catch (error) {
       console.error('Recording error:', error);
-      Alert.alert('Recording Error', 'Failed to start recording. Please try again.');
-      setIsRecording(false);
-      setAnalysisPhase('ready');
+      Alert.alert(
+        'Recording Error', 
+        'Failed to start recording. This typically happens on simulators/emulators which don\'t have camera access.\n\nPlease test on a physical device.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              setIsRecording(false);
+              setAnalysisPhase('ready');
+            }
+          }
+        ]
+      );
     }
+  };
+
+  // Simulate recording for testing on simulators
+  const simulateRecording = () => {
+    setIsRecording(true);
+    setRecordingDuration(0);
+    setAnalysisPhase('recording');
+
+    // Simulate 5 second recording
+    const simulatedTimer = setInterval(() => {
+      setRecordingDuration(prev => {
+        const newDuration = prev + 0.1;
+        if (newDuration >= 5.0) {
+          clearInterval(simulatedTimer);
+          stopSimulatedRecording();
+          return 5.0;
+        }
+        return newDuration;
+      });
+    }, 100);
+  };
+
+  const stopSimulatedRecording = () => {
+    setIsRecording(false);
+    setAnalysisPhase('processing');
+
+    // Create fake video data for testing
+    const simulatedVideoData = {
+      videoUri: 'simulated://video.mp4',
+      duration: 5.0,
+      analysisMode: analysisMode,
+      timestamp: new Date().toISOString(),
+      cameraType: cameraType,
+      isSimulated: true
+    };
+
+    setTimeout(() => {
+      setAnalysisPhase('ready');
+      setRecordingDuration(0);
+      
+      if (onCapture) {
+        onCapture(simulatedVideoData);
+      }
+      
+      if (onClose) {
+        onClose();
+      }
+    }, 1000);
   };
 
   const stopRecording = async () => {

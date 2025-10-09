@@ -44,6 +44,18 @@ backend/__pycache__/
 *.pyd
 .Python
 
+# Backend uploads and temp files
+backend/uploads/*
+!backend/uploads/.gitkeep
+backend/processed/*
+!backend/processed/.gitkeep
+
+# Environment files
+.env
+.env.local
+.env.production
+backend/.env
+
 # IDEs
 .idea/
 .vscode/
