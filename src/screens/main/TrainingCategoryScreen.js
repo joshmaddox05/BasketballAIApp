@@ -50,7 +50,7 @@ const TrainingCategoryScreen = ({ route, navigation }) => {
             case 'strategy':
                 return 'clipboard-outline';
             case 'mental':
-                return 'brain-outline';
+                return 'fitness-outline';
             case 'nutrition':
                 return 'nutrition-outline';
             default:

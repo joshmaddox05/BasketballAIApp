@@ -31,7 +31,7 @@ const TrainingScreen = ({ navigation }) => {
         { id: '2', title: 'Dribbling', icon: 'hand-left-outline', color: '#4CAF50' },
         { id: '3', title: 'Physical', icon: 'fitness-outline', color: '#2196F3' },
         { id: '4', title: 'Strategy', icon: 'clipboard-outline', color: '#9C27B0' },
-        { id: '5', title: 'Mental', icon: 'brain-outline', color: '#FF9800' },
+        { id: '5', title: 'Mental', icon: 'fitness-outline', color: '#FF9800' },
         { id: '6', title: 'Nutrition', icon: 'nutrition-outline', color: '#00BCD4' },
     ];
 

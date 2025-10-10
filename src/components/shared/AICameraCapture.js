@@ -108,6 +108,7 @@ const AICameraCapture = ({
         setRecordingDuration(prev => {
           const newDuration = prev + 0.1;
           if (newDuration >= 5.0) { // Auto-stop at 5 seconds
+            console.log('⏰ Auto-stopping recording at 5 seconds...');
             stopRecording();
             return 5.0;
           }
@@ -190,19 +191,33 @@ const AICameraCapture = ({
     if (!hasPermissions) return;
 
     try {
+      console.log('🎬 Starting camera recording...');
       setIsRecording(true);
       setRecordingDuration(0);
       setAnalysisPhase('recording');
 
+      // Start recording - this will complete when maxDuration is reached or stopRecording is called
       const video = await cameraRef.current.recordAsync({
         quality: '720p',
         maxDuration: 5,
         mute: false,
       });
 
-      return video;
+      console.log('✅ Recording completed:', video);
+      
+      // Process the completed recording
+      if (video && video.uri) {
+        await handleRecordingEnd(video);
+      } else {
+        console.error('❌ No video returned from recording');
+        setAnalysisPhase('ready');
+        Alert.alert('Recording Error', 'Video recording failed. Please try again.');
+      }
+
     } catch (error) {
-      console.error('Recording error:', error);
+      console.error('❌ Recording error:', error);
+      setIsRecording(false);
+      setAnalysisPhase('ready');
       Alert.alert(
         'Recording Error', 
         'Failed to start recording. This typically happens on simulators/emulators which don\'t have camera access.\n\nPlease test on a physical device.',
@@ -221,6 +236,7 @@ const AICameraCapture = ({
 
   // Simulate recording for testing on simulators
   const simulateRecording = () => {
+    console.log('🎬 Starting simulated recording...');
     setIsRecording(true);
     setRecordingDuration(0);
     setAnalysisPhase('recording');
@@ -231,6 +247,7 @@ const AICameraCapture = ({
         const newDuration = prev + 0.1;
         if (newDuration >= 5.0) {
           clearInterval(simulatedTimer);
+          console.log('⏰ Simulated recording complete, calling stopSimulatedRecording...');
           stopSimulatedRecording();
           return 5.0;
         }
@@ -239,60 +256,73 @@ const AICameraCapture = ({
     }, 100);
   };
 
-  const stopSimulatedRecording = () => {
+  const stopSimulatedRecording = async () => {
+    console.log('🛑 Stopping simulated recording...');
     setIsRecording(false);
-    setAnalysisPhase('processing');
-
-    // Create fake video data for testing
-    const simulatedVideoData = {
-      videoUri: 'simulated://video.mp4',
+    
+    const simulatedVideo = {
+      uri: `file://simulated_recording_${Date.now()}.mp4`,
       duration: 5.0,
-      analysisMode: analysisMode,
-      timestamp: new Date().toISOString(),
-      cameraType: cameraType,
-      isSimulated: true
+      timestamp: Date.now()
     };
-
-    setTimeout(() => {
-      setAnalysisPhase('ready');
-      setRecordingDuration(0);
-      
-      if (onCapture) {
-        onCapture(simulatedVideoData);
-      }
-      
-      if (onClose) {
-        onClose();
-      }
-    }, 1000);
+    
+    console.log('📹 Simulated video created:', simulatedVideo);
+    await handleRecordingEnd(simulatedVideo);
   };
 
   const stopRecording = async () => {
-    if (!cameraRef.current || !isRecording) return;
+    if (!cameraRef.current || !isRecording) {
+      console.log('❌ Cannot stop recording - no camera ref or not recording');
+      return;
+    }
 
     try {
+      console.log('🛑 Stopping recording manually...');
+      
+      // Stop the camera recording - this should return the video object
+      const video = await cameraRef.current.stopRecording();
+      
       setIsRecording(false);
-      setAnalysisPhase('processing');
+      console.log('✅ Recording stopped, video object:', video);
       
-      cameraRef.current.stopRecording();
-      
-      // Simulate processing delay
-      setTimeout(() => {
+      if (video && video.uri) {
+        await handleRecordingEnd(video);
+      } else {
+        console.error('❌ No video returned from stopRecording');
         setAnalysisPhase('ready');
-        setRecordingDuration(0);
-      }, 1000);
+        Alert.alert('Recording Error', 'Failed to complete recording. Please try again.');
+      }
       
     } catch (error) {
-      console.error('Stop recording error:', error);
+      console.error('❌ Stop recording error:', error);
+      setIsRecording(false);
       setAnalysisPhase('ready');
+      setRecordingDuration(0);
+      Alert.alert('Recording Error', `Stop recording failed: ${error.message}`);
     }
   };
 
   const handleRecordingEnd = async (video) => {
     try {
-      if (video) {
-        // Save to media library
-        const asset = await MediaLibrary.createAssetAsync(video.uri);
+      console.log('🎬 Recording ended, processing video...');
+      console.log('📹 Video object:', video);
+      
+      // Set processing phase to show loading overlay
+      setAnalysisPhase('processing');
+      
+      if (video && video.uri) {
+        console.log('💾 Attempting to save to media library...');
+        
+        let asset = null;
+        try {
+          // Try to save to media library (may fail in some environments)
+          asset = await MediaLibrary.createAssetAsync(video.uri);
+          console.log('✅ Saved to media library:', asset);
+        } catch (mediaError) {
+          console.warn('⚠️ Media library save failed:', mediaError.message);
+          console.warn('📝 Proceeding with video URI directly...');
+          // Continue anyway - we can still analyze the video using the URI
+        }
         
         // Prepare data for analysis
         const analysisData = {
@@ -301,14 +331,30 @@ const AICameraCapture = ({
           timestamp: Date.now(),
           analysisMode,
           pose: detectedPose,
-          cameraType
+          cameraType,
+          mediaAsset: asset // Include asset if available
         };
 
+        console.log('📤 Calling onCapture with data:', analysisData);
+        
+        // Call onCapture - this triggers the parent's analysis and stage transition
         onCapture(analysisData);
+        
+        console.log('✅ onCapture called successfully - parent should handle stage transition');
+        
+      } else {
+        console.error('❌ No video or video.uri found:', video);
+        setAnalysisPhase('ready'); // Reset phase
+        Alert.alert('Recording Error', 'Video was not recorded properly. Please try again.');
       }
     } catch (error) {
-      console.error('Save video error:', error);
-      Alert.alert('Save Error', 'Failed to save video. Please try again.');
+      console.error('❌ Save video error:', error);
+      console.error('❌ Error details:', {
+        message: error.message,
+        stack: error.stack
+      });
+      setAnalysisPhase('ready'); // Reset phase on error
+      Alert.alert('Save Error', `Failed to save video: ${error.message}\n\nPlease try again.`);
     }
   };
 
@@ -477,11 +523,6 @@ const AICameraCapture = ({
         style={styles.camera}
         facing={cameraType}
         mode="video"
-        onRecordingStatusUpdate={(status) => {
-          if (!status.isRecording && isRecording) {
-            handleRecordingEnd(status);
-          }
-        }}
       >
         {/* Pose Overlay */}
         {renderPoseOverlay()}
@@ -564,11 +605,25 @@ const AICameraCapture = ({
           <TouchableOpacity 
             style={styles.settingsButton}
             onPress={() => {
-              // Could open settings modal
-              console.log('Settings pressed');
+              // Debug: Force trigger analysis with fake data
+              console.log('🧪 Debug: Simulating video capture...');
+              const testData = {
+                videoUri: 'test://fake-video.mp4',
+                duration: 3.5,
+                timestamp: Date.now(),
+                analysisMode: analysisMode,
+                pose: detectedPose,
+                cameraType: cameraType,
+                isDebugMode: true
+              };
+              
+              setAnalysisPhase('processing');
+              setTimeout(() => {
+                onCapture(testData);
+              }, 1000);
             }}
           >
-            <Ionicons name="settings" size={24} color="#FFF" />
+            <Ionicons name="bug" size={24} color="#FFF" />
           </TouchableOpacity>
         </View>
       </View>

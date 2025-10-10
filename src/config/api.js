@@ -11,9 +11,9 @@ const API_CONFIG = {
   
   // Production (Render deployment)
   production: {
-    API_BASE_URL: 'https://basketball-ai-api-XXXXX.onrender.com', // Replace with your actual Render URL
+    API_BASE_URL: 'https://basketballaiapp.onrender.com',
     isOfflineMode: false,
-    timeout: 15000, // Longer timeout for cold starts
+    timeout: 30000, // Longer timeout for cold starts and video processing
   },
   
   // Offline mode (for testing without backend)
@@ -26,7 +26,7 @@ const API_CONFIG = {
 
 // Set current environment
 // Change this to switch between environments
-const CURRENT_ENV = 'development'; // 'development' | 'production' | 'offline'
+const CURRENT_ENV = 'production'; // 'development' | 'production' | 'offline'
 
 // Export current configuration
 export const CONFIG = API_CONFIG[CURRENT_ENV];

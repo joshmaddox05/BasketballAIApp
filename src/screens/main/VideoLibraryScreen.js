@@ -35,7 +35,7 @@ const VideoLibraryScreen = ({ navigation }) => {
     { id: 'dribbling', name: 'Dribbling', icon: 'hand-left-outline' },
     { id: 'physical', name: 'Physical', icon: 'fitness-outline' },
     { id: 'strategy', name: 'Strategy', icon: 'clipboard-outline' },
-    { id: 'mental', name: 'Mental', icon: 'brain-outline' },
+    { id: 'mental', name: 'Mental', icon: 'fitness-outline' },
     { id: 'nutrition', name: 'Nutrition', icon: 'nutrition-outline' }
   ];
 
