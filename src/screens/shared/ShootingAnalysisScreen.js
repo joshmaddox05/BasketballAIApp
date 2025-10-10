@@ -20,7 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { useAppContext } from '../../context/AppContext';
 import AICameraCapture from '../../components/shared/AICameraCapture';
-import ComprehensiveAnalysisResults from '../../components/shared/ComprehensiveAnalysisResults';
+import ShotAnalysisResultsSimple from '../../components/shared/ShotAnalysisResultsSimple';
 import aiAnalysisService from '../../services/aiAnalysisService';
 
 const { width } = Dimensions.get('window');
@@ -552,13 +552,16 @@ const ShootingAnalysisScreen = ({ navigation }) => {
             {/* Results Screen */}
             {currentStage === 'results' && analysisResults && (
                 <ScrollView style={styles.container}>
-                    {/* Comprehensive Analysis Results */}
-                    <ComprehensiveAnalysisResults 
+                    {/* Simple Progressive Disclosure Analysis Results */}
+                    <ShotAnalysisResultsSimple 
                         results={analysisResults}
-                        selectedPlayer={selectedProModel.name}
+                        onClose={() => navigation.goBack()}
+                        onTryAgain={resetAnalysis}
+                        history={historicalData}
                     />
 
-                    {/* Video Comparison Section */}
+                    {/* Video Comparison Section - Only show if comprehensive analysis available */}
+                    {analysisResults.similarityScore && (
                         <View style={styles.curryComparisonContainer}>
                             <View style={styles.curryComparisonHeader}>
                                 <Ionicons name="trophy" size={24} color="#FFD700" />
