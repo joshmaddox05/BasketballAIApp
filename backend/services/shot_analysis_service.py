@@ -10,6 +10,7 @@ import logging
 from .pose_processor import PoseProcessor
 from .phase_detector import PhaseDetector
 from .metrics_calculator import MetricsCalculator
+from .video_comparator import VideoComparator
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,7 @@ class ShotAnalysisService:
         self.pose_processor = PoseProcessor(model_complexity=1)
         self.phase_detector = PhaseDetector()
         self.metrics_calculator = MetricsCalculator()
+        self.video_comparator = VideoComparator()
         
         # Load NBA baselines
         self.baselines = self._load_baselines()
@@ -126,6 +128,70 @@ class ShotAnalysisService:
                 'error': str(e),
                 'confidence': 0.0
             }
+    
+    def analyze_with_comparison_video(
+        self,
+        video_path: str,
+        baseline_player: Optional[str] = "Stephen Curry",
+        comparison_mode: str = 'split',
+        generate_video: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Complete analysis with optional comparison video generation
+        
+        Args:
+            video_path: Path to user's video
+            baseline_player: NBA player to compare against
+            comparison_mode: 'split', 'overlay', or 'ghost'
+            generate_video: Whether to generate comparison video
+            
+        Returns:
+            Analysis results with comparison_video_path if generated
+        """
+        logger.info(f"🎬 Analysis with comparison video: {comparison_mode} mode")
+        
+        # Run standard analysis
+        results = self.analyze_shot(video_path, baseline_player)
+        
+        if not results.get('success'):
+            return results
+        
+        # Generate comparison video if requested
+        if generate_video:
+            try:
+                # Get baseline data
+                baseline_data = self.baselines.get(baseline_player)
+                baseline_video_path = None
+                baseline_keypoints = None
+                baseline_phases = None
+                
+                if baseline_data:
+                    baseline_video_path = baseline_data.get('video_path')
+                    baseline_keypoints = baseline_data.get('keypoints_sequence')
+                    baseline_phases = baseline_data.get('phases')
+                
+                # Get user keypoints from pose processor cache
+                pose_data = self.pose_processor.process_video(video_path, frame_skip=1)
+                
+                # Generate comparison video
+                comparison_video_path = self.video_comparator.create_comparison_video(
+                    user_video_path=video_path,
+                    user_keypoints=pose_data['keypoints_sequence'],
+                    user_phases=results['phases'],
+                    baseline_video_path=baseline_video_path,
+                    baseline_keypoints=baseline_keypoints,
+                    baseline_phases=baseline_phases,
+                    mode=comparison_mode
+                )
+                
+                results['comparison_video_path'] = comparison_video_path
+                logger.info(f"✅ Comparison video generated: {comparison_video_path}")
+                
+            except Exception as e:
+                logger.error(f"❌ Comparison video generation failed: {e}", exc_info=True)
+                results['comparison_video_error'] = str(e)
+        
+        return results
     
     def _load_baselines(self) -> Dict[str, Dict]:
         """Load NBA baseline data from JSON files"""
