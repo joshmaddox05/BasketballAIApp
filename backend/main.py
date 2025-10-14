@@ -19,7 +19,6 @@ from services.video_processor import VideoProcessor
 from services.shot_analysis_service import ShotAnalysisService
 from routes.comprehensive_analysis import setup_comprehensive_analysis_routes
 from routes.shot_comparison import setup_comparison_routes
-from routes.shot_comparison import setup_comparison_routes
 from services.shot_analysis_service import ShotAnalysisService
 
 logging.basicConfig(level=logging.INFO)
@@ -100,8 +99,8 @@ UPLOAD_DIR = Path("uploads")
 BASELINES_DIR = Path("baselines")
 OUTPUT_DIR = Path("output")
 PROCESSED_DIR = Path("processed")
+
 for dir in [UPLOAD_DIR, BASELINES_DIR, PROCESSED_DIR, OUTPUT_DIR]:
-for dir in [UPLOAD_DIR, BASELINES_DIR, PROCESSED_DIR]:
     dir.mkdir(exist_ok=True)
 
 # In-memory storage (use database in production)
@@ -109,9 +108,8 @@ video_storage = {}
 analysis_cache = {}
 
 # Setup comprehensive analysis routes
-setup_comparison_routes(app, UPLOAD_DIR, OUTPUT_DIR)
 setup_comprehensive_analysis_routes(app, UPLOAD_DIR, get_shot_analysis_service)
-setup_comparison_routes(app, get_shot_comparator)
+setup_comparison_routes(app, UPLOAD_DIR, OUTPUT_DIR)
 
 @app.get("/")
 async def root():
