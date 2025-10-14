@@ -127,12 +127,19 @@ def analyze_shot_simple(video_path: str, name: str, silent: bool = False):
 
     try:
         # Initialize processors
-        pose_processor = PoseProcessor(model_complexity=1)
+        pose_processor = PoseProcessor(model_complexity=0)  # Use lite model for speed
 
         # Extract pose data
-        pose_data = pose_processor.process_video(video_path, frame_skip=1)
+        pose_data = pose_processor.process_video(video_path, frame_skip=3)  # Skip frames for speed
+
+        if not pose_data or 'keypoints_sequence' not in pose_data:
+            raise ValueError("Failed to extract pose data from video")
+
         keypoints_seq = pose_data['keypoints_sequence']
         metadata = pose_data['metadata']
+
+        if not keypoints_seq or len(keypoints_seq) == 0:
+            raise ValueError("No valid keypoints detected in video")
 
         if not silent:
             print(f"      ✓ {metadata['processed_frames']} frames @ {metadata['fps']:.1f} fps")
@@ -159,7 +166,20 @@ def analyze_shot_simple(video_path: str, name: str, silent: bool = False):
     except Exception as e:
         if not silent:
             print(f"      ✗ Error: {str(e)}")
-        return None
+        logger.error(f"Error analyzing shot: {str(e)}", exc_info=True)
+        # Return minimal valid structure instead of None
+        return {
+            'video_name': name,
+            'frames': 0,
+            'fps': 30.0,
+            'release_frame': 0,
+            'load_frame': 0,
+            'wrist': {'release_height': None, 'elbow_angle_at_release': None, 'wrist_speed': None},
+            'head': {'head_tilt': None, 'head_movement': None},
+            'body': {'shoulder_level': None, 'hip_level': None, 'knee_bend': None},
+            'quality': 0.0,
+            'error': str(e)
+        }
 
 
 def find_release_frame(keypoints_seq):
@@ -333,10 +353,18 @@ def aggregate_baseline_metrics(baseline_metrics_list):
     """Aggregate metrics from multiple baseline videos"""
 
     if not baseline_metrics_list:
+        logger.warning("No baseline metrics to aggregate")
+        return None
+
+    # Filter out any None or error entries
+    valid_metrics = [m for m in baseline_metrics_list if m and 'error' not in m]
+
+    if not valid_metrics:
+        logger.error("No valid baseline metrics found")
         return None
 
     aggregated = {
-        'videos_analyzed': len(baseline_metrics_list),
+        'videos_analyzed': len(valid_metrics),
         'wrist': {},
         'head': {},
         'body': {}
@@ -344,26 +372,53 @@ def aggregate_baseline_metrics(baseline_metrics_list):
 
     # Aggregate each metric category
     for category in ['wrist', 'head', 'body']:
-        for metric_name in baseline_metrics_list[0][category].keys():
+        # Get all metric names from first valid entry
+        if category not in valid_metrics[0]:
+            logger.warning(f"Category {category} not found in baseline metrics")
+            continue
+
+        for metric_name in valid_metrics[0][category].keys():
             values = []
-            for baseline in baseline_metrics_list:
-                value = baseline[category].get(metric_name)
-                if value is not None:
-                    values.append(value)
+            for baseline in valid_metrics:
+                if category in baseline:
+                    value = baseline[category].get(metric_name)
+                    if value is not None:
+                        values.append(value)
 
             if values:
                 aggregated[category][metric_name] = {
                     'mean': float(np.mean(values)),
-                    'std': float(np.std(values)),
+                    'std': float(np.std(values)) if len(values) > 1 else 0.1,  # Small std for single value
                     'min': float(np.min(values)),
                     'max': float(np.max(values))
                 }
+            else:
+                logger.warning(f"No values found for {category}.{metric_name}")
 
     return aggregated
 
 
 def compare_metrics(user_metrics, baseline_metrics):
-    """Compare user metrics to baseline"""
+    """Compare user metrics to baseline with error handling"""
+
+    # Validate inputs
+    if not user_metrics:
+        logger.error("No user metrics provided")
+        return {
+            'overall_similarity': 0.0,
+            'overall_grade': 'F',
+            'categories': {},
+            'error': 'No user metrics available'
+        }
+
+    if not baseline_metrics:
+        logger.error("No baseline metrics provided")
+        return {
+            'overall_similarity': 0.0,
+            'overall_grade': 'F',
+            'categories': {},
+            'error': 'No baseline metrics available'
+        }
 
     comparison = {
         'overall_similarity': 0.0,
@@ -375,7 +430,17 @@ def compare_metrics(user_metrics, baseline_metrics):
     for category in ['wrist', 'head', 'body']:
         category_comparison = {}
 
+        # Check if category exists in baseline
+        if category not in baseline_metrics or not baseline_metrics[category]:
+            logger.warning(f"Category {category} not found in baseline metrics")
+            continue
+
         for metric_name, baseline_data in baseline_metrics[category].items():
+            # Check if user has this metric
+            if category not in user_metrics or metric_name not in user_metrics[category]:
+                logger.debug(f"Metric {category}.{metric_name} not found in user metrics")
+                continue
+
             user_value = user_metrics[category].get(metric_name)
 
             if user_value is not None:
@@ -400,11 +465,16 @@ def compare_metrics(user_metrics, baseline_metrics):
 
                 similarities.append(similarity)
 
-        comparison['categories'][category] = category_comparison
+        if category_comparison:
+            comparison['categories'][category] = category_comparison
 
     if similarities:
         comparison['overall_similarity'] = np.mean(similarities)
         comparison['overall_grade'] = 'A' if comparison['overall_similarity'] > 0.9 else 'B' if comparison['overall_similarity'] > 0.75 else 'C' if comparison['overall_similarity'] > 0.5 else 'D'
+    else:
+        comparison['overall_similarity'] = 0.0
+        comparison['overall_grade'] = 'F'
+        comparison['error'] = 'No valid metrics to compare'
 
     return comparison
 
