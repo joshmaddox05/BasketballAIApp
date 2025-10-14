@@ -1,6 +1,6 @@
 """
 Pose Processor - Extract pose data from videos using MediaPipe
-OPTIMIZED for low-memory environments (Render free tier)
+OPTIMIZED for Standard Plan (2GB RAM, 1 CPU)
 """
 import cv2
 import mediapipe as mp
@@ -10,8 +10,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Global model cache to avoid reloading on every request
-_pose_model_cache = {}
 
 class PoseProcessor:
     """Extract pose data from videos using MediaPipe with optimization"""
@@ -26,24 +24,18 @@ class PoseProcessor:
         """
         self.model_complexity = model_complexity
 
-        # Use cached model if available
-        cache_key = f"pose_model_{model_complexity}"
-        if cache_key not in _pose_model_cache:
-            logger.info(f"🔧 Loading MediaPipe Pose model (complexity={model_complexity})...")
-            self.mp_pose = mp.solutions.pose
-            self.pose = self.mp_pose.Pose(
-                static_image_mode=False,
-                model_complexity=model_complexity,  # 1=Full model for better accuracy on Standard plan
-                enable_segmentation=False,  # Still disabled to save memory
-                smooth_landmarks=True,
-                min_detection_confidence=0.5,
-                min_tracking_confidence=0.5
-            )
-            _pose_model_cache[cache_key] = (self.mp_pose, self.pose)
-            logger.info("✅ Model loaded and cached")
-        else:
-            logger.info(f"♻️ Using cached MediaPipe model")
-            self.mp_pose, self.pose = _pose_model_cache[cache_key]
+        # Create a fresh model instance (don't cache - causes internal state issues)
+        logger.info(f"🔧 Loading MediaPipe Pose model (complexity={model_complexity})...")
+        self.mp_pose = mp.solutions.pose
+        self.pose = self.mp_pose.Pose(
+            static_image_mode=False,
+            model_complexity=model_complexity,  # 1=Full model for better accuracy on Standard plan
+            enable_segmentation=False,  # Disabled to save memory
+            smooth_landmarks=True,
+            min_detection_confidence=0.5,
+            min_tracking_confidence=0.5
+        )
+        logger.info("✅ Model loaded")
 
     def process_video(self, video_path: str, frame_skip: int = 2) -> Dict[str, Any]:
         """
@@ -101,10 +93,15 @@ class PoseProcessor:
             # Convert to RGB for MediaPipe
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-            # Process pose
-            results = self.pose.process(rgb_frame)
-            
-            if results.pose_landmarks:
+            # Process pose with error handling
+            try:
+                results = self.pose.process(rgb_frame)
+            except Exception as e:
+                logger.warning(f"Frame {frame_number} processing error: {e}")
+                frame_number += 1
+                continue
+
+            if results and results.pose_landmarks:
                 keypoints = self._extract_keypoints(results.pose_landmarks)
 
                 # Track confidence
@@ -159,12 +156,28 @@ class PoseProcessor:
         """Extract keypoints from MediaPipe landmarks"""
         keypoints = {}
 
-        for lm in landmarks.landmark:
+        # MediaPipe landmark names mapping
+        landmark_names = [
+            'nose', 'left_eye_inner', 'left_eye', 'left_eye_outer',
+            'right_eye_inner', 'right_eye', 'right_eye_outer',
+            'left_ear', 'right_ear', 'mouth_left', 'mouth_right',
+            'left_shoulder', 'right_shoulder', 'left_elbow', 'right_elbow',
+            'left_wrist', 'right_wrist', 'left_pinky', 'right_pinky',
+            'left_index', 'right_index', 'left_thumb', 'right_thumb',
+            'left_hip', 'right_hip', 'left_knee', 'right_knee',
+            'left_ankle', 'right_ankle', 'left_heel', 'right_heel',
+            'left_foot_index', 'right_foot_index'
+        ]
+
+        for idx, lm in enumerate(landmarks.landmark):
             if lm.visibility < 0.5:
                 continue
 
-            # Keypoint name by index
-            name = mp.solutions.pose.PoseLandmark(lm).name.lower()
+            # Get landmark name by index
+            if idx < len(landmark_names):
+                name = landmark_names[idx]
+            else:
+                continue  # Skip unknown landmarks
 
             keypoints[name] = {
                 'x': lm.x,

@@ -76,8 +76,8 @@ def setup_comparison_routes(app, upload_dir: Path, output_dir: Path):
 
             if not comparison_results:
                 raise HTTPException(
-                    status_code=500,
-                    detail="Comparison analysis failed"
+                    status_code=422,
+                    detail="Failed to analyze video. Please ensure: (1) Person is clearly visible, (2) Good lighting, (3) Video is at least 2 seconds long, (4) Person performs a complete shooting motion"
                 )
 
             # Step 3: Generate annotated videos
@@ -333,4 +333,3 @@ def _get_priority_score(grade: str, similarity: float):
     """Calculate priority score (lower = higher priority)"""
     grade_scores = {'A': 4, 'B': 3, 'C': 2, 'D': 1, 'F': 0}
     return grade_scores.get(grade, 0) + similarity
-

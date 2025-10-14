@@ -38,6 +38,17 @@ def compare_to_baseline(user_video: str, baseline_dir: str = "baselines"):
     print("🔍 Step 1: Analyzing your shot...")
     user_metrics = analyze_shot_simple(user_video, "Your Shot")
 
+    # Check if user analysis failed
+    if not user_metrics or 'error' in user_metrics or user_metrics.get('frames', 0) == 0:
+        error_msg = user_metrics.get('error', 'Unknown error') if user_metrics else 'Failed to analyze video'
+        print(f"   ❌ Failed to analyze user video: {error_msg}")
+        print("\n⚠️  Possible issues:")
+        print("   - Video quality too low")
+        print("   - Person not clearly visible")
+        print("   - Video too short or corrupted")
+        print("   - Lighting conditions poor")
+        return None
+
     # Detect orientation and get matching baselines
     print("\n🔍 Step 2: Analyzing Steph Curry baseline...")
     user_orientation = VideoHandler.detect_orientation(user_video)
