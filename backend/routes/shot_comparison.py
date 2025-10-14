@@ -219,8 +219,8 @@ def setup_comparison_routes(app, upload_dir: Path, output_dir: Path):
                 )
 
                 # Set Content-Range header
-                response.headers.set('Content-Range', f'bytes {range_start}-{range_end}/{os.path.getsize(video_path)}')
-                response.headers.set('Accept-Ranges', 'bytes')
+                response.headers['Content-Range'] = f'bytes {range_start}-{range_end}/{os.path.getsize(video_path)}'
+                response.headers['Accept-Ranges'] = 'bytes'
 
                 return response
 
