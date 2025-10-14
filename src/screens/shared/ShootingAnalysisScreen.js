@@ -21,6 +21,7 @@ import { VideoView, useVideoPlayer } from 'expo-video';
 import { useAppContext } from '../../context/AppContext';
 import AICameraCapture from '../../components/shared/AICameraCapture';
 import ShotAnalysisResultsSimple from '../../components/shared/ShotAnalysisResultsSimple';
+import ShotComparisonResults from '../../components/shared/ShotComparisonResults';
 import aiAnalysisService from '../../services/aiAnalysisService';
 
 const { width } = Dimensions.get('window');
@@ -111,7 +112,7 @@ const ShootingAnalysisScreen = ({ navigation }) => {
             // Start analysis progress animation
             Animated.timing(analysisProgressAnim, {
                 toValue: 100,
-                duration: 8000, // 8 seconds for realistic analysis time
+                duration: 120000, // 2 minutes animation to match longer processing time
                 useNativeDriver: false,
             }).start();
 
@@ -551,17 +552,26 @@ const ShootingAnalysisScreen = ({ navigation }) => {
 
             {/* Results Screen */}
             {currentStage === 'results' && analysisResults && (
-                <ScrollView style={styles.container}>
-                    {/* Simple Progressive Disclosure Analysis Results */}
-                    <ShotAnalysisResultsSimple 
-                        results={analysisResults}
-                        onClose={() => navigation.goBack()}
-                        onTryAgain={resetAnalysis}
-                        history={historicalData}
-                    />
+                <>
+                    {/* Use new ShotComparisonResults if we have video URLs from backend */}
+                    {analysisResults.videos?.userVideo && analysisResults.videos?.baselineVideo ? (
+                        <ShotComparisonResults
+                            results={analysisResults}
+                            onClose={() => navigation.goBack()}
+                            onTryAgain={resetAnalysis}
+                        />
+                    ) : (
+                        <ScrollView style={styles.container}>
+                            {/* Fallback to Simple Analysis Results for simulated/legacy data */}
+                            <ShotAnalysisResultsSimple
+                                results={analysisResults}
+                                onClose={() => navigation.goBack()}
+                                onTryAgain={resetAnalysis}
+                                history={historicalData}
+                            />
 
-                    {/* Video Comparison Section - Only show if comprehensive analysis available */}
-                    {analysisResults.similarityScore && (
+                            {/* Video Comparison Section - Only show if comprehensive analysis available */}
+                            {analysisResults.similarityScore && (
                         <View style={styles.curryComparisonContainer}>
                             <View style={styles.curryComparisonHeader}>
                                 <Ionicons name="trophy" size={24} color="#FFD700" />
@@ -883,7 +893,9 @@ const ShootingAnalysisScreen = ({ navigation }) => {
                             <Ionicons name="chevron-forward" size={24} color="#666" />
                         </TouchableOpacity>
                     </View>
-                </ScrollView>
+                        </ScrollView>
+                    )}
+                </>
             )}
 
             {/* Pro Model Selection Modal */}

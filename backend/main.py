@@ -100,8 +100,9 @@ BASELINES_DIR = Path("baselines")
 OUTPUT_DIR = Path("output")
 PROCESSED_DIR = Path("processed")
 
-for dir in [UPLOAD_DIR, BASELINES_DIR, PROCESSED_DIR, OUTPUT_DIR]:
-    dir.mkdir(exist_ok=True)
+# Create directories
+for dir_path in [UPLOAD_DIR, BASELINES_DIR, PROCESSED_DIR, OUTPUT_DIR]:
+    dir_path.mkdir(exist_ok=True)
 
 # In-memory storage (use database in production)
 video_storage = {}
@@ -844,4 +845,13 @@ def _format_biomechanics(analysis: Dict) -> Dict:
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # Increased timeout for long-running AI model processing
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=8000,
+        timeout_keep_alive=600,  # 10 minutes keep-alive
+        timeout_notify=600,       # 10 minutes before timeout notification
+        limit_concurrency=10,
+        limit_max_requests=1000
+    )

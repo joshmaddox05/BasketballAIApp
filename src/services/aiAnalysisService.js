@@ -9,12 +9,12 @@ class AIAnalysisService {
     this.ANALYSIS_CACHE_KEY = 'ai_analysis_cache';
     this.MODELS_CACHE_KEY = 'ai_models_cache';
     this.isOfflineMode = CONFIG.isOfflineMode || false; // Use config setting
-    this.timeout = CONFIG.timeout || 30000; // 30 second timeout for video processing
-    
+    this.timeout = CONFIG.timeout || 600000; // 10 minutes timeout (increased from 5 for optimized backend)
+
     console.log('🔧 AI Service initialized:', {
       url: this.API_BASE_URL,
       offline: this.isOfflineMode,
-      timeout: this.timeout
+      timeout: `${this.timeout / 1000}s`
     });
 
     // Wake up the backend to reduce cold start delays
@@ -29,11 +29,16 @@ class AIAnalysisService {
     
     try {
       console.log('☕ Waking up backend server...');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout for health check
+
       const response = await fetch(`${this.API_BASE_URL}/health`, {
         method: 'GET',
-        timeout: 5000 // Short timeout for wake-up call
+        signal: controller.signal
       });
-      
+
+      clearTimeout(timeoutId);
+
       if (response.ok) {
         console.log('✅ Backend is awake and ready');
       } else {
@@ -852,14 +857,14 @@ class AIAnalysisService {
   }
 
   /**
-   * Comprehensive shooting analysis with phase detection, biomechanics, and NBA comparison
+   * Comprehensive shooting analysis with shot comparison and visualization videos
    * @param {Object} videoData - Video data from camera capture
    * @param {String} baselinePlayer - NBA player name for comparison (default: Stephen Curry)
-   * @returns {Object} Comprehensive analysis results
+   * @returns {Object} Comprehensive analysis results with video visualizations
    */
   async analyzeComprehensive(videoData, baselinePlayer = 'Stephen Curry') {
     try {
-      console.log('🎯 Starting comprehensive analysis...');
+      console.log('🎯 Starting comprehensive analysis with shot comparison...');
       console.log('📹 Video URI:', videoData.videoUri);
       console.log('🏀 Baseline Player:', baselinePlayer);
       
@@ -883,23 +888,21 @@ class AIAnalysisService {
       }
 
       console.log('📁 Video file URI validated:', videoData.videoUri);
-      console.log('📤 Uploading video to backend for comprehensive analysis...');
-      
+      console.log('📤 Uploading video to backend for shot comparison analysis...');
+
       const formData = new FormData();
       formData.append('video', {
         uri: videoData.videoUri,
         type: 'video/mp4',
         name: 'shooting_video.mp4',
       });
-      
-      // Add baseline player parameter
-      formData.append('baseline_player', baselinePlayer);
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 40000); // 40 seconds for comprehensive analysis
+      const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 minutes for long-running model processing
 
       try {
-        const response = await fetch(`${this.API_BASE_URL}/analyze/comprehensive`, {
+        // Call the shot-comparison endpoint that returns JSON + 2 videos
+        const response = await fetch(`${this.API_BASE_URL}/analyze/shot-comparison`, {
           method: 'POST',
           body: formData,
           headers: {
@@ -913,21 +916,22 @@ class AIAnalysisService {
         if (!response.ok) {
           const errorText = await response.text();
           console.error('❌ API error response:', errorText);
-          throw new Error(`Comprehensive analysis API error: ${response.status}`);
+          throw new Error(`Shot comparison API error: ${response.status}`);
         }
 
         const results = await response.json();
-        console.log('✅ Received comprehensive analysis results from backend');
-        
+        console.log('✅ Received shot comparison results from backend');
+        console.log('📊 Result keys:', Object.keys(results));
+
         // Cache results
         await this.cacheAnalysisResults(videoData.timestamp, results);
         
-        return this.formatComprehensiveResults(results);
+        return this.formatShotComparisonResults(results);
       } catch (fetchError) {
         clearTimeout(timeoutId);
         if (fetchError.name === 'AbortError') {
           console.error('❌ Request timeout - backend took too long');
-          throw new Error('Analysis timed out. The server might be processing or cold starting.');
+          throw new Error('Analysis timed out after 10 minutes. The model may be processing a very complex video. Please try again with a shorter video.');
         }
         throw fetchError;
       }
@@ -940,219 +944,73 @@ class AIAnalysisService {
   }
 
   /**
-   * Simulate comprehensive analysis for development/offline mode
+   * Format shot comparison results from backend API
+   * Maps backend response to app's expected format
    */
-  async simulateComprehensiveAnalysis(videoData, baselinePlayer = 'Stephen Curry') {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const overallScore = 70 + Math.random() * 20; // 70-90
-        
-        const results = {
-          videoId: 'simulated_' + Date.now(),
-          overallScore: Math.round(overallScore),
-          confidence: 0.85 + Math.random() * 0.12,
-          
-          // Shot phases with detection
-          phases: {
-            dip: {
-              detected: true,
-              start_frame: 5,
-              end_frame: 15,
-              timestamp_ms: 167,
-              duration_ms: 333,
-              quality_score: 7.2 + Math.random() * 1.5
-            },
-            load: {
-              detected: true,
-              start_frame: 15,
-              end_frame: 25,
-              timestamp_ms: 500,
-              duration_ms: 333,
-              quality_score: 7.8 + Math.random() * 1.2
-            },
-            release: {
-              detected: true,
-              start_frame: 25,
-              end_frame: 35,
-              timestamp_ms: 833,
-              duration_ms: 333,
-              quality_score: 8.1 + Math.random() * 1.0
-            },
-            follow_through: {
-              detected: true,
-              start_frame: 35,
-              end_frame: 50,
-              timestamp_ms: 1167,
-              duration_ms: 500,
-              quality_score: 7.5 + Math.random() * 1.3
-            },
-            landing: {
-              detected: true,
-              start_frame: 50,
-              end_frame: 60,
-              timestamp_ms: 1667,
-              duration_ms: 333,
-              quality_score: 7.0 + Math.random() * 1.5
-            }
-          },
-          
-          // 7 Biomechanical metrics
-          metrics: [
-            {
-              id: 'release_angle',
-              name: 'Release Angle',
-              value: (45 + Math.random() * 8).toFixed(1),
-              unit: '°',
-              quality_score: 7.2 + Math.random() * 2.0,
-              baseline_value: '48.5',
-              deviation: (Math.random() * 6 - 3).toFixed(1),
-              status: Math.random() > 0.4 ? 'good' : 'improve',
-              feedback: 'Your release angle is within the optimal range for high-arc shots. Curry releases at 48.5°. Try to be more consistent by focusing on your wrist snap at the peak of your shot.'
-            },
-            {
-              id: 'elbow_flare',
-              name: 'Elbow Flare',
-              value: (8 + Math.random() * 12).toFixed(1),
-              unit: '°',
-              quality_score: 6.8 + Math.random() * 2.2,
-              baseline_value: '5.0',
-              deviation: (Math.random() * 8).toFixed(1),
-              status: Math.random() > 0.5 ? 'good' : 'improve',
-              feedback: 'Keep your shooting elbow tucked in closer to your body. Curry maintains minimal elbow flare (5°) throughout his shot motion. Practice with elbow alignment drills.'
-            },
-            {
-              id: 'knee_flexion',
-              name: 'Knee Flexion (Load)',
-              value: (35 + Math.random() * 20).toFixed(1),
-              unit: '°',
-              quality_score: 7.5 + Math.random() * 1.8,
-              baseline_value: '45.0',
-              deviation: (Math.random() * 15 - 7).toFixed(1),
-              status: Math.random() > 0.4 ? 'good' : 'improve',
-              feedback: 'Good power generation from your legs. Curry uses 45° knee flexion for consistent power. Try to load your legs consistently on every shot.'
-            },
-            {
-              id: 'hip_shoulder_alignment',
-              name: 'Hip-Shoulder Alignment',
-              value: (Math.random() * 10).toFixed(1),
-              unit: '°',
-              quality_score: 7.0 + Math.random() * 2.0,
-              baseline_value: '2.0',
-              deviation: (Math.random() * 8).toFixed(1),
-              status: Math.random() > 0.5 ? 'good' : 'improve',
-              feedback: 'Your hips and shoulders are fairly well aligned. Curry maintains near-perfect alignment (2° deviation). Focus on keeping your shooting shoulder square to the basket.'
-            },
-            {
-              id: 'stance_width',
-              name: 'Stance Width',
-              value: (0.45 + Math.random() * 0.15).toFixed(2),
-              unit: 'x shoulder width',
-              quality_score: 7.3 + Math.random() * 1.9,
-              baseline_value: '0.52',
-              deviation: ((Math.random() * 0.14 - 0.07)).toFixed(2),
-              status: Math.random() > 0.4 ? 'good' : 'improve',
-              feedback: 'Maintain a stable, balanced base. Curry keeps his feet shoulder-width apart (0.52x). Practice shooting from a consistent stance width.'
-            },
-            {
-              id: 'lateral_sway',
-              name: 'Lateral Movement',
-              value: (2 + Math.random() * 6).toFixed(1),
-              unit: 'cm',
-              quality_score: 6.5 + Math.random() * 2.3,
-              baseline_value: '3.0',
-              deviation: (Math.random() * 4).toFixed(1),
-              status: Math.random() > 0.5 ? 'good' : 'improve',
-              feedback: 'Minimize unnecessary lateral movement. Curry keeps his body centered with minimal sway (3cm). Work on maintaining vertical alignment throughout your shot.'
-            },
-            {
-              id: 'arc_trajectory',
-              name: 'Shot Arc',
-              value: (43 + Math.random() * 8).toFixed(1),
-              unit: '°',
-              quality_score: 7.1 + Math.random() * 2.0,
-              baseline_value: '47.0',
-              deviation: (Math.random() * 6 - 3).toFixed(1),
-              status: Math.random() > 0.4 ? 'good' : 'improve',
-              feedback: 'Curry\'s shots have a perfect 47° arc. Higher arc gives you a better angle into the basket. Practice shooting with more upward trajectory on your release.'
-            }
-          ],
-          
-          // NBA baseline comparison
-          baselineComparison: {
-            player: baselinePlayer,
-            position: baselinePlayer === 'Stephen Curry' ? 'Point Guard' : 'Guard',
-            team: baselinePlayer === 'Stephen Curry' ? 'Golden State Warriors' : 'NBA',
-            similarity_percentage: Math.round(65 + Math.random() * 25),
-            biomechanics_match: [
-              { metric: 'Release Angle', match: 70 + Math.random() * 25 },
-              { metric: 'Elbow Alignment', match: 65 + Math.random() * 30 },
-              { metric: 'Follow Through', match: 75 + Math.random() * 20 },
-              { metric: 'Balance', match: 70 + Math.random() * 20 },
-              { metric: 'Shot Arc', match: 68 + Math.random() * 22 }
-            ],
-            stronger_areas: [
-              'Good follow-through extension',
-              'Consistent release timing',
-              'Balanced stance'
-            ],
-            improvement_areas: [
-              'Elbow alignment consistency',
-              'Shot arc optimization',
-              'Knee load depth'
-            ]
-          },
-          
-          // Top 3 coaching cues
-          coachingCues: [
-            {
-              priority: 1,
-              title: 'Improve Release Angle Consistency',
-              description: 'Your release angle varies between shots. Focus on consistent wrist snap and follow-through to maintain the optimal 45-50° release angle.',
-              impact: 'high',
-              drill: 'Wall shooting drill: Stand 3 feet from a wall and practice your shooting motion, focusing on consistent release angle. Aim for the same spot on the wall every time.'
-            },
-            {
-              priority: 2,
-              title: 'Tighten Elbow Alignment',
-              description: 'Your elbow tends to flare out during the shot. Keep your shooting elbow directly under the ball throughout your motion for better accuracy.',
-              impact: 'high',
-              drill: 'Chair drill: Sit in a chair and practice your shooting motion. This forces proper elbow alignment and eliminates lower body compensation.'
-            },
-            {
-              priority: 3,
-              title: 'Increase Shot Arc',
-              description: 'Your shot arc is slightly flat. A higher arc (45-50°) gives you a better angle into the basket and more room for error.',
-              impact: 'medium',
-              drill: 'High-arc shooting: Practice shooting over an obstacle or imaginary barrier to develop a higher, softer arc on your shots.'
-            }
-          ],
-          
-          analyzed_at: new Date().toISOString()
-        };
-        
-        resolve(results);
-      }, 4000); // 4 seconds for realistic comprehensive processing
-    });
+  formatShotComparisonResults(apiResults) {
+    console.log('📝 Formatting shot comparison results...');
+
+    return {
+      videoId: apiResults.video_id,
+      overallScore: Math.round(apiResults.overall_similarity),
+      grade: apiResults.overall_grade,
+      confidence: 0.90, // High confidence from real analysis
+      baselinePlayer: apiResults.baseline_player,
+      orientation: apiResults.orientation,
+
+      // Video visualization URLs
+      videos: {
+        userVideo: `${this.API_BASE_URL}${apiResults.videos.user_video}`,
+        baselineVideo: `${this.API_BASE_URL}${apiResults.videos.baseline_video}`
+      },
+
+      // Detailed metrics by category
+      metrics: {
+        wrist: this._formatMetricsCategory(apiResults.wrist_metrics, 'Wrist & Release'),
+        head: this._formatMetricsCategory(apiResults.head_metrics, 'Head Position'),
+        body: this._formatMetricsCategory(apiResults.body_metrics, 'Body Mechanics')
+      },
+
+      // Top recommendations
+      recommendations: apiResults.top_recommendations.map((rec, idx) => ({
+        priority: idx + 1,
+        title: rec.title,
+        category: rec.category,
+        grade: rec.grade,
+        tip: rec.tip,
+        drill: rec.drill
+      })),
+
+      analyzedAt: apiResults.analyzed_at
+    };
   }
 
   /**
-   * Format comprehensive analysis results for the app
+   * Helper to format a metrics category
    */
-  formatComprehensiveResults(apiResults) {
+  _formatMetricsCategory(categoryMetrics, categoryName) {
+    const metrics = [];
+
+    for (const [metricKey, metricData] of Object.entries(categoryMetrics)) {
+      metrics.push({
+        id: metricKey,
+        name: metricKey.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
+        yourValue: metricData.your_value,
+        curryAverage: metricData.curry_average,
+        curryRange: metricData.curry_range,
+        difference: metricData.difference,
+        similarityPercent: Math.round(metricData.similarity_percent),
+        grade: metricData.grade,
+        status: metricData.status
+      });
+    }
+
     return {
-      videoId: apiResults.video_id || apiResults.videoId,
-      overallScore: apiResults.overall_score || apiResults.overallScore,
-      confidence: apiResults.confidence,
-      phases: apiResults.phases,
-      metrics: apiResults.metrics,
-      baselineComparison: apiResults.baseline_comparison || apiResults.baselineComparison,
-      coachingCues: apiResults.coaching_cues || apiResults.coachingCues,
-      timestamp: apiResults.analyzed_at || apiResults.timestamp,
-      
-      // Legacy compatibility fields
-      similarityScore: apiResults.baseline_comparison?.similarity_percentage || 0,
-      yourMetrics: apiResults.metrics,
-      recommendations: apiResults.coaching_cues?.map(cue => cue.description) || []
+      name: categoryName,
+      metrics: metrics,
+      averageScore: Math.round(
+        metrics.reduce((sum, m) => sum + m.similarityPercent, 0) / metrics.length
+      )
     };
   }
 }

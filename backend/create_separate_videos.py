@@ -1,8 +1,7 @@
 """
 Separate Video Visualizer
 Creates two separate videos: user shot and Curry shot with pose overlays
-Much faster than side-by-side comparison
-Handles video rotation and automatic baseline matching
+OPTIMIZED for faster processing with lower resolution
 """
 import cv2
 import json
@@ -20,7 +19,7 @@ logging.basicConfig(level=logging.WARNING)
 
 
 class SeparateVideoVisualizer:
-    """Create separate annotated videos for user and Curry"""
+    """Create separate annotated videos for user and Curry - OPTIMIZED"""
 
     COLORS = {
         'user': (255, 100, 100),      # Light blue
@@ -36,7 +35,8 @@ class SeparateVideoVisualizer:
     }
 
     def __init__(self):
-        self.pose_processor = PoseProcessor(model_complexity=1)
+        # Use lite model for faster processing
+        self.pose_processor = PoseProcessor(model_complexity=0)
 
     def create_separate_videos(
         self,
@@ -46,10 +46,10 @@ class SeparateVideoVisualizer:
         output_user: str,
         output_curry: str
     ):
-        """Create two separate annotated videos"""
+        """Create two separate annotated videos - OPTIMIZED"""
 
         print("=" * 80)
-        print("🎬 CREATING SEPARATE ANNOTATED VIDEOS")
+        print("🎬 CREATING SEPARATE ANNOTATED VIDEOS (OPTIMIZED)")
         print("=" * 80)
         print(f"\n📹 Processing videos separately for faster generation...")
 
@@ -62,7 +62,8 @@ class SeparateVideoVisualizer:
         print(f"   Input: {Path(user_video).name}")
         print(f"   Output: {output_user}")
 
-        user_pose = self.pose_processor.process_video(user_video, frame_skip=1)
+        # OPTIMIZATION: Skip more frames (process every 3rd frame)
+        user_pose = self.pose_processor.process_video(user_video, frame_skip=3)
         user_keypoints = user_pose['keypoints_sequence']
 
         self._create_single_video(
@@ -83,7 +84,7 @@ class SeparateVideoVisualizer:
         print(f"   Input: {Path(curry_video).name}")
         print(f"   Output: {output_curry}")
 
-        curry_pose = self.pose_processor.process_video(curry_video, frame_skip=1)
+        curry_pose = self.pose_processor.process_video(curry_video, frame_skip=3)
         curry_keypoints = curry_pose['keypoints_sequence']
 
         self._create_single_video(
@@ -116,7 +117,7 @@ class SeparateVideoVisualizer:
         text_color: tuple,
         is_user: bool
     ):
-        """Create a single annotated video"""
+        """Create a single annotated video - OPTIMIZED"""
 
         # Use VideoHandler to get proper rotation info
         cap, rotation, width, height = VideoHandler.get_video_capture_with_rotation(video_path)
@@ -124,21 +125,25 @@ class SeparateVideoVisualizer:
         # Get video properties
         fps = cap.get(cv2.CAP_PROP_FPS)
 
-        # Target dimensions (smaller for faster processing)
-        target_height = 720
+        # OPTIMIZATION: Lower resolution for faster processing (480p instead of 720p)
+        target_height = 480  # Reduced from 720
         target_width = int(width * target_height / height)
 
         # Add space for metrics at bottom
-        canvas_height = target_height + 150
+        canvas_height = target_height + 120  # Reduced from 150
 
-        # Setup video writer
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        # Setup video writer with better codec
+        fourcc = cv2.VideoWriter_fourcc(*'avc1')  # H.264 codec (better compression)
         out = cv2.VideoWriter(output_path, fourcc, fps, (target_width, canvas_height))
 
         frame_idx = 0
         max_frames = len(keypoints)
 
-        print(f"   Processing {max_frames} frames at {fps:.1f} fps...")
+        # OPTIMIZATION: Process every Nth frame to speed up video generation
+        frame_skip = 1  # Can increase to 2 for even faster processing
+        processed_frames = 0
+
+        print(f"   Processing {max_frames} frames at {fps:.1f} fps (skip={frame_skip})...")
         if rotation != 0:
             print(f"   Applying rotation fix: {rotation}°")
 
@@ -148,30 +153,30 @@ class SeparateVideoVisualizer:
             if not ret:
                 break
 
+            # OPTIMIZATION: Skip frames
+            if frame_idx % frame_skip != 0:
+                frame_idx += 1
+                continue
+
             # Fix rotation if needed
-            if rotation != 0:
-                frame = VideoHandler.fix_rotation(frame, rotation)
+            if rotation == 90:
+                frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
+            elif rotation == 180:
+                frame = cv2.rotate(frame, cv2.ROTATE_180)
+            elif rotation == 270:
+                frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
 
-            # Resize frame
-            frame_resized = cv2.resize(frame, (target_width, target_height))
-
-            # Draw pose overlay
-            if frame_idx < len(keypoints):
-                frame_resized = self._draw_pose(
-                    frame_resized,
-                    keypoints[frame_idx],
-                    target_width,
-                    target_height,
-                    skeleton_color
-                )
-
-            # Add label
-            cv2.putText(frame_resized, label, (20, 40),
-                       cv2.FONT_HERSHEY_DUPLEX, 1.0, text_color, 2)
+            # Resize frame to target dimensions
+            frame = cv2.resize(frame, (target_width, target_height))
 
             # Create canvas with metrics area
             canvas = np.zeros((canvas_height, target_width, 3), dtype=np.uint8)
-            canvas[0:target_height, :] = frame_resized
+            canvas[:target_height, :] = frame
+
+            # Draw pose skeleton if available
+            if frame_idx < len(keypoints):
+                kp = keypoints[frame_idx]
+                self._draw_skeleton(canvas, kp, skeleton_color, target_width, target_height)
 
             # Draw metrics overlay
             canvas = self._draw_metrics(
@@ -183,18 +188,22 @@ class SeparateVideoVisualizer:
             )
 
             out.write(canvas)
-
             frame_idx += 1
+            processed_frames += 1
 
-            # Progress
-            if frame_idx % 30 == 0:
-                progress = (frame_idx / max_frames) * 100
-                print(f"   Progress: {progress:.1f}%", end='\r')
+            # Progress update every 30 frames
+            if processed_frames % 30 == 0:
+                progress = (processed_frames / max_frames) * 100
+                print(f"   Progress: {progress:.0f}%")
 
         cap.release()
         out.release()
 
-        print(f"   Progress: 100.0%")
+        print(f"   ✓ Processed {processed_frames} frames")
+
+    def _draw_skeleton(self, frame, keypoints, color, width, height):
+        """Draw pose skeleton on frame"""
+        self._draw_pose(frame[:height, :], keypoints, width, height, color)
 
     def _draw_pose(self, frame, keypoints, width, height, color):
         """Draw pose skeleton on frame"""

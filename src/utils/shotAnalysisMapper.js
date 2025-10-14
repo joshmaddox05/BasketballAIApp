@@ -277,7 +277,10 @@ function toMetricCards(metrics, cues = []) {
     const z = computeZScore('release_angle_deg', metrics.release_angle_deg);
     const grade = zScoreToGrade(z);
     const band = TARGET_BANDS.release_angle_deg;
-    const cue = cues.find(c => c.cue.toLowerCase().includes('arc') || c.cue.toLowerCase().includes('angle'));
+    const cue = cues.find(c => {
+      const cueText = (c.cue || c.title || c.description || '').toLowerCase();
+      return cueText.includes('arc') || cueText.includes('angle');
+    });
     
     cards.push({
       id: 'release_angle',
@@ -299,7 +302,10 @@ function toMetricCards(metrics, cues = []) {
     const z = computeZScore('time_load_to_release_ms', metrics.time_load_to_release_ms);
     const grade = zScoreToGrade(z);
     const band = TARGET_BANDS.time_load_to_release_ms;
-    const cue = cues.find(c => c.cue.toLowerCase().includes('earlier') || c.cue.toLowerCase().includes('timing'));
+    const cue = cues.find(c => {
+      const cueText = (c.cue || c.title || c.description || '').toLowerCase();
+      return cueText.includes('earlier') || cueText.includes('timing');
+    });
     
     cards.push({
       id: 'release_timing',
@@ -321,7 +327,10 @@ function toMetricCards(metrics, cues = []) {
     const z = computeZScore('elbow_flare_deg', metrics.elbow_flare_deg);
     const grade = zScoreToGrade(z);
     const band = TARGET_BANDS.elbow_flare_deg;
-    const cue = cues.find(c => c.cue.toLowerCase().includes('elbow') || c.cue.toLowerCase().includes('tuck'));
+    const cue = cues.find(c => {
+      const cueText = (c.cue || c.title || c.description || '').toLowerCase();
+      return cueText.includes('elbow') || cueText.includes('tuck');
+    });
     
     cards.push({
       id: 'elbow_flare',
@@ -343,7 +352,10 @@ function toMetricCards(metrics, cues = []) {
     const z = computeZScore('knee_load_deg', metrics.knee_load_deg);
     const grade = zScoreToGrade(z);
     const band = TARGET_BANDS.knee_load_deg;
-    const cue = cues.find(c => c.cue.toLowerCase().includes('knee') || c.cue.toLowerCase().includes('load'));
+    const cue = cues.find(c => {
+      const cueText = (c.cue || c.title || c.description || '').toLowerCase();
+      return cueText.includes('knee') || cueText.includes('load');
+    });
     
     cards.push({
       id: 'knee_load',
@@ -365,7 +377,10 @@ function toMetricCards(metrics, cues = []) {
     const z = computeZScore('lateral_sway_cm', metrics.lateral_sway_cm);
     const grade = zScoreToGrade(z);
     const band = TARGET_BANDS.lateral_sway_cm;
-    const cue = cues.find(c => c.cue.toLowerCase().includes('balance') || c.cue.toLowerCase().includes('stabilize'));
+    const cue = cues.find(c => {
+      const cueText = (c.cue || c.title || c.description || '').toLowerCase();
+      return cueText.includes('balance') || cueText.includes('stabilize');
+    });
     
     cards.push({
       id: 'lateral_sway',
@@ -389,11 +404,25 @@ function toMetricCards(metrics, cues = []) {
  * Format cues to be HS/College friendly (max 8 words)
  */
 function formatCues(cues) {
-  return cues.map(cue => ({
-    ...cue,
-    shortCue: cue.cue.split('.')[0].split(',')[0].substring(0, 50), // First sentence, max 50 chars
-    drill: DRILL_LIBRARY[cue.drill_id] || null
-  }));
+  return cues.map(cue => {
+    // Handle different data structures
+    let cueText = cue.cue || cue.title || cue.description || '';
+    let drillId = cue.drill_id || cue.drill || '';
+    
+    // Safely process the cue text
+    let shortCue = '';
+    if (cueText) {
+      shortCue = cueText.split('.')[0].split(',')[0].substring(0, 50); // First sentence, max 50 chars
+    }
+    
+    return {
+      ...cue,
+      shortCue: shortCue,
+      drill: DRILL_LIBRARY[drillId] || null,
+      priority: cue.priority || 1,
+      why: cue.why || cue.description || ''
+    };
+  });
 }
 
 /**

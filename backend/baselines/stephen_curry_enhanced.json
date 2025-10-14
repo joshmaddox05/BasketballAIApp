@@ -1,0 +1,48 @@
+{
+  "player_name": "Stephen Curry",
+  "videos_analyzed": 2,
+  "angles_covered": [
+    "side",
+    "back"
+  ],
+  "total_shots_analyzed": 2,
+  "metrics": {},
+  "metrics_by_angle": {
+    "side": {
+      "videos_count": 1,
+      "video_names": [
+        "Steph side 5.mp4"
+      ]
+    },
+    "back": {
+      "videos_count": 1,
+      "video_names": [
+        "Steph back.mp4"
+      ]
+    }
+  },
+  "individual_videos": [
+    {
+      "name": "Steph side 5.mp4",
+      "angle": "side",
+      "quality": 0.7761194029850746,
+      "metrics_summary": {
+        "release_angle": null,
+        "elbow_alignment": null,
+        "follow_through": null,
+        "balance": null
+      }
+    },
+    {
+      "name": "Steph back.mp4",
+      "angle": "back",
+      "quality": 0.9558823529411765,
+      "metrics_summary": {
+        "release_angle": null,
+        "elbow_alignment": null,
+        "follow_through": null,
+        "balance": null
+      }
+    }
+  ]
+}

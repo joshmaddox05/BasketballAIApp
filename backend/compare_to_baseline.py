@@ -1,6 +1,7 @@
 """
 Shot Comparison Tool - Compare user shot against Steph Curry baseline
 Shows detailed metrics comparison with visual feedback
+OPTIMIZED for faster processing
 """
 import json
 import sys
@@ -16,9 +17,12 @@ from services.video_handler import VideoHandler
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
 
+# Cache baseline metrics to avoid reprocessing
+_baseline_metrics_cache = {}
+
 
 def compare_to_baseline(user_video: str, baseline_dir: str = "baselines"):
-    """Compare user's shot to Steph Curry baseline"""
+    """Compare user's shot to Steph Curry baseline - OPTIMIZED"""
 
     print("=" * 80)
     print("🏀 SHOT COMPARISON: YOU vs STEPH CURRY")
@@ -61,10 +65,21 @@ def compare_to_baseline(user_video: str, baseline_dir: str = "baselines"):
 
     print(f"   Found {len(baseline_videos)} baseline videos in {baseline_subdir.name if baseline_subdir.exists() else 'baselines'}")
 
+    # OPTIMIZATION: Only process 1 baseline video instead of 3
     baseline_metrics_list = []
-    for video in baseline_videos[:3]:  # Use first 3 for speed
+    for video in baseline_videos[:1]:  # Process only first video for speed
         print(f"   Processing {video.name}...")
-        metrics = analyze_shot_simple(str(video), "Steph Curry", silent=True)
+
+        # Check cache first
+        cache_key = str(video)
+        if cache_key in _baseline_metrics_cache:
+            print(f"   ♻️ Using cached baseline metrics")
+            metrics = _baseline_metrics_cache[cache_key]
+        else:
+            metrics = analyze_shot_simple(str(video), "Steph Curry", silent=True)
+            if metrics:
+                _baseline_metrics_cache[cache_key] = metrics
+
         if metrics:
             baseline_metrics_list.append(metrics)
 
