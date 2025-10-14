@@ -272,41 +272,58 @@ def _generate_top_recommendations(comparison: dict):
 
 
 def _get_metric_tip(category: str, metric_name: str, data: dict):
-    """Get coaching tip for a specific metric"""
+    """Get coaching tip for a specific metric with detailed explanations"""
     difference = data['difference']
+    your_value = data['user_value']
+    curry_avg = data['baseline_mean']
 
     if category == 'wrist':
-        if 'release_height' in metric_name and difference < 0:
-            return "Release the ball higher - aim for full extension above your head"
+        if 'release_height' in metric_name:
+            if difference < 0:
+                return f"Your release point is {abs(difference):.1f}° lower than Curry's. Focus on releasing the ball at the peak of your jump with full arm extension. This gives the ball a higher arc and better chance of going in. Practice: Stand close to the basket and focus on releasing at your maximum reach."
+            else:
+                return f"Good release height! You're releasing {difference:.1f}° higher than average. Just make sure this is consistent on every shot and you maintain control."
         elif 'elbow_angle' in metric_name:
             if difference < 0:
-                return "Extend your elbow more at release for better arc"
+                return f"Your elbow angle at release is {abs(difference):.1f}° more bent than Curry's. Work on extending your shooting arm fully at release - imagine reaching into a cookie jar on a high shelf. This creates better arc and backspin. Drill: Form shooting from 5 feet, focusing on full extension."
             else:
-                return "Keep a slight bend in your elbow at release"
+                return f"Your elbow extends {difference:.1f}° more than average. This is okay, but ensure you're not locking out too hard which can reduce touch and control."
         elif 'speed' in metric_name:
-            if difference > 0:
-                return "Slow down your shooting motion for better control"
+            if difference < 0:
+                return f"Your shot motion is {abs(difference):.1f} units slower than Curry's. While a smooth shot is good, work on adding a bit more power and explosiveness from your legs. The speed should come from your lower body, not forcing with your arms. Drill: Jump shots focusing on quick, explosive leg drive."
             else:
-                return "Add more power to your upward motion"
+                return f"Your wrist movement is {difference:.1f} units faster than Curry's optimal speed. Try slowing down slightly for better control and consistency. Remember: smooth is fast. Focus on rhythm over rushing."
 
     elif category == 'head':
-        if 'movement' in metric_name and difference > 0:
-            return "Keep your head still and eyes on the target"
-        elif 'tilt' in metric_name and difference > 0:
-            return "Keep your head level throughout the shot"
+        if 'movement' in metric_name:
+            if difference > 0:
+                return f"Your head moves {difference:.1f} cm during your shot - {abs(difference/0.4):.1f}x more than Curry's ({curry_avg:.1f} cm). This affects your vision and balance. Practice: Pick a spot on the rim and never take your eyes off it. Drill: Shoot with a small object balanced on your head to feel the stability."
+            else:
+                return f"Excellent head stability! You're moving only {your_value:.1f} cm, which is better than most players. Keep this consistency."
+        elif 'tilt' in metric_name:
+            if difference > 0:
+                return f"Your head tilts {difference:.1f}° more than ideal. Keep your head level and eyes straight at the target. A tilted head throws off your spatial awareness. Practice: Use a mirror to check that your eyes stay level throughout your shot."
+            else:
+                return f"Good head position! Your {your_value:.1f}° tilt is close to optimal. Just maintain this on every shot."
 
     elif category == 'body':
-        if 'shoulder' in metric_name and difference > 0:
-            return "Keep your shoulders square and level"
-        elif 'hip' in metric_name and difference > 0:
-            return "Maintain balanced hip alignment"
+        if 'shoulder' in metric_name:
+            if difference > 0:
+                return f"Your shoulders are tilted {difference:.1f}° more than Curry's nearly level shoulders ({curry_avg:.1f}°). This creates inconsistent power transfer and can affect accuracy. Focus on keeping shoulders square to the basket. Drill: Practice with a broomstick across your shoulders to feel level alignment."
+            else:
+                return f"Great shoulder alignment! You're at {your_value:.1f}° which shows good balance and posture."
+        elif 'hip' in metric_name:
+            if difference > 0:
+                return f"Your hips show {difference:.1f}° more tilt than optimal. This indicates you may be favoring one leg or leaning. Work on balanced stance with equal weight distribution. Curry maintains {curry_avg:.1f}° hip level for maximum power and consistency."
+            else:
+                return f"Solid hip alignment at {your_value:.1f}°. This balanced base helps with consistent power generation."
         elif 'knee' in metric_name:
             if difference < 0:
-                return "Bend your knees more for better power generation"
+                return f"Your knee bend is {abs(difference):.1f}° less than Curry's ({curry_avg:.1f}°). Bend your knees more to generate power from your legs, not just your arms. Think of loading a spring - the deeper the dip, the more explosive your shot. Drill: Chair-touch squats before each shot."
             else:
-                return "Don't bend too deep - find your sweet spot"
+                return f"You're bending {difference:.1f}° more than needed. While leg power is good, too much bend can slow your release and make you inconsistent. Find the sweet spot where you feel balanced and explosive."
 
-    return "Focus on matching Curry's form in this area"
+    return f"Work on matching Curry's {curry_avg:.1f} {metric_name.replace('_', ' ')} (currently at {your_value:.1f})"
 
 
 def _get_drill_for_metric(category: str, metric: str):

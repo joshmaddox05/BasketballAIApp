@@ -74,16 +74,30 @@ const ShootingAnalysisScreen = ({ navigation }) => {
     const [isPlayingUserVideo, setIsPlayingUserVideo] = useState(false);
     const [hasValidUserVideo, setHasValidUserVideo] = useState(false);
 
-    // Update user video source when captured video changes
+    // Update user video source when captured video changes or when analysis results include videos
     useEffect(() => {
-        if (capturedVideoData?.videoUri && !capturedVideoData.videoUri.includes('simulated')) {
-            // Replace the user video player source asynchronously for better performance
+        // If we have annotated videos from the API, use those instead of captured video
+        if (analysisResults?.videos?.userVideo) {
+            console.log('🎥 Loading annotated user video from API:', analysisResults.videos.userVideo);
+            userVideoPlayer.replaceAsync({ uri: analysisResults.videos.userVideo });
+            setHasValidUserVideo(true);
+        } else if (capturedVideoData?.videoUri && !capturedVideoData.videoUri.includes('simulated')) {
+            // Fallback to captured video if no annotated video available
+            console.log('🎥 Loading captured user video:', capturedVideoData.videoUri);
             userVideoPlayer.replaceAsync({ uri: capturedVideoData.videoUri });
             setHasValidUserVideo(true);
         } else {
             setHasValidUserVideo(false);
         }
-    }, [capturedVideoData]);
+    }, [capturedVideoData, analysisResults]);
+
+    // Update Curry baseline video if API provides one
+    useEffect(() => {
+        if (analysisResults?.videos?.baselineVideo) {
+            console.log('🎥 Loading annotated baseline video from API:', analysisResults.videos.baselineVideo);
+            curryVideoPlayer.replaceAsync({ uri: analysisResults.videos.baselineVideo });
+        }
+    }, [analysisResults]);
 
     // Animation values
     const analysisProgressAnim = useRef(new Animated.Value(0)).current;
