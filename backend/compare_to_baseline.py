@@ -11,7 +11,6 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).parent))
 
 from services.pose_processor import PoseProcessor
-from services.hand_processor import HandProcessor
 from services.video_handler import VideoHandler
 
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
