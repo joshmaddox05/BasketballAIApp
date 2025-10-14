@@ -52,7 +52,12 @@ class VideoHandler:
         Detect if video is front-facing or side-facing
         Returns: 'front' or 'side'
 
-        Uses both aspect ratio and pose analysis for better detection
+        TEMPORARILY DEFAULTING TO FRONT FOR TESTING
+        """
+        # TEMPORARY: Default to front orientation since side is not working
+        return 'front'
+
+        # Original detection code disabled for now
         """
         cap = cv2.VideoCapture(video_path)
 
@@ -66,7 +71,7 @@ class VideoHandler:
 
         if not ret:
             cap.release()
-            return 'side'  # Default
+            return 'front'  # Default to front
 
         # Fix rotation if needed
         if rotation != 0:

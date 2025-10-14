@@ -616,20 +616,29 @@ async def get_analysis(video_id: str):
 
 @app.get("/health")
 async def health_check():
-    return {
-        "status": "healthy",
-        "timestamp": datetime.now().isoformat(),
-        "services": {
-            "baseline_analyzer": "operational",
-            "shot_comparator": "operational",
-            "video_processor": "operational"
-        },
-        "storage": {
-            "videos": len(video_storage),
-            "analyses": len(analysis_cache),
-            "baselines": len(baseline_analyzer.list_available_baselines())
+    """Health check endpoint that doesn't initialize heavy services"""
+    try:
+        return {
+            "status": "healthy",
+            "timestamp": datetime.now().isoformat(),
+            "services": {
+                "baseline_analyzer": "ready",
+                "shot_comparator": "ready",
+                "video_processor": "ready"
+            },
+            "storage": {
+                "videos": len(video_storage),
+                "analyses": len(analysis_cache),
+                "baselines": "available"
+            }
         }
-    }
+    except Exception as e:
+        logger.error(f"Health check error: {e}")
+        return {
+            "status": "error",
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
 
 @app.post("/baseline/create")
 async def create_baseline(

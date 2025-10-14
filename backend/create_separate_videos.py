@@ -132,9 +132,19 @@ class SeparateVideoVisualizer:
         # Add space for metrics at bottom
         canvas_height = target_height + 150
 
-        # Setup video writer with better codec
-        fourcc = cv2.VideoWriter_fourcc(*'avc1')  # H.264 codec
+        # Setup video writer with better codec for Render compatibility
+        # Use MP4V codec which is more widely supported than H.264
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Changed from 'avc1' to 'mp4v'
         out = cv2.VideoWriter(output_path, fourcc, fps, (target_width, canvas_height))
+
+        # Verify writer opened successfully
+        if not out.isOpened():
+            print(f"   ⚠️  Warning: Failed to open video writer with mp4v, trying XVID...")
+            fourcc = cv2.VideoWriter_fourcc(*'XVID')
+            out = cv2.VideoWriter(output_path, fourcc, fps, (target_width, canvas_height))
+
+        if not out.isOpened():
+            raise RuntimeError(f"Failed to create video writer for {output_path}")
 
         frame_idx = 0
         max_frames = len(keypoints)
