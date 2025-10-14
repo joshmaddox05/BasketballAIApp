@@ -20,16 +20,42 @@ const ShotComparisonResults = ({ results, onClose, onTryAgain }) => {
     const [isLoadingVideos, setIsLoadingVideos] = useState(true);
     const fadeAnim = useRef(new Animated.Value(0)).current;
 
-    // Video players for user and baseline videos
-    const userVideoPlayer = useVideoPlayer(results.videos?.userVideo, (player) => {
-        player.loop = true;
-        player.muted = false;
-    });
+    // Get video URLs with fallback
+    const userVideoUrl = results.videos?.userVideo || results.videos?.user_video;
+    const baselineVideoUrl = results.videos?.baselineVideo || results.videos?.baseline_video;
 
-    const baselineVideoPlayer = useVideoPlayer(results.videos?.baselineVideo, (player) => {
-        player.loop = true;
-        player.muted = false;
-    });
+    // Log video URLs for debugging
+    useEffect(() => {
+        console.log('🎬 ShotComparisonResults mounted with videos:', {
+            userVideo: userVideoUrl,
+            baselineVideo: baselineVideoUrl,
+            hasUserVideo: !!userVideoUrl,
+            hasBaselineVideo: !!baselineVideoUrl
+        });
+    }, [userVideoUrl, baselineVideoUrl]);
+
+    // Video players - only create if we have valid URLs
+    const userVideoPlayer = useVideoPlayer(
+        userVideoUrl ? userVideoUrl : null,
+        (player) => {
+            if (player && userVideoUrl) {
+                player.loop = true;
+                player.muted = false;
+                console.log('✅ User video player initialized with URI:', userVideoUrl);
+            }
+        }
+    );
+
+    const baselineVideoPlayer = useVideoPlayer(
+        baselineVideoUrl ? baselineVideoUrl : null,
+        (player) => {
+            if (player && baselineVideoUrl) {
+                player.loop = true;
+                player.muted = false;
+                console.log('✅ Baseline video player initialized with URI:', baselineVideoUrl);
+            }
+        }
+    );
 
     const [isPlayingUser, setIsPlayingUser] = useState(false);
     const [isPlayingBaseline, setIsPlayingBaseline] = useState(false);
@@ -42,9 +68,27 @@ const ShotComparisonResults = ({ results, onClose, onTryAgain }) => {
             useNativeDriver: true,
         }).start();
 
-        // Simulate video loading
-        setTimeout(() => setIsLoadingVideos(false), 1500);
-    }, []);
+        // Check if videos are available
+        const hasVideos = !!userVideoUrl && !!baselineVideoUrl;
+
+        if (hasVideos) {
+            console.log('✅ Videos available, setting loading to false after delay');
+            // Give players time to initialize
+            const loadingTimer = setTimeout(() => {
+                console.log('⏱️ Loading timer complete, showing videos');
+                setIsLoadingVideos(false);
+            }, 1500);
+
+            return () => clearTimeout(loadingTimer);
+        } else {
+            console.warn('⚠️ Video URLs not found in results:', {
+                userVideoUrl,
+                baselineVideoUrl,
+                fullResults: results.videos
+            });
+            setIsLoadingVideos(false);
+        }
+    }, [userVideoUrl, baselineVideoUrl]);
 
     // Video playback controls
     const handlePlayUser = () => {

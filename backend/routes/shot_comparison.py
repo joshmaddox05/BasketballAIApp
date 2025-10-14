@@ -2,8 +2,8 @@
 API endpoint for shot comparison with separate video outputs
 Returns comparison results + user video + baseline video
 """
-from fastapi import UploadFile, File, Form, HTTPException
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi import UploadFile, File, Form, HTTPException, Request
+from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 from typing import Optional, Dict, Any
 from pathlib import Path
 from datetime import datetime
@@ -12,6 +12,8 @@ import shutil
 import gc
 import logging
 import sys
+import os
+import re
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -176,12 +178,55 @@ def setup_comparison_routes(app, upload_dir: Path, output_dir: Path):
             )
 
     @app.get("/videos/{video_filename}")
-    async def download_video(video_filename: str):
+    async def download_video(video_filename: str, request: Request):
         """Download generated comparison video"""
         video_path = output_dir / video_filename
 
         if not video_path.exists():
             raise HTTPException(status_code=404, detail="Video not found")
+
+        # Support range requests for video streaming
+        range_header = request.headers.get('range', None)
+        if range_header:
+            try:
+                # Parse the range header
+                range_start, range_end = _parse_range_header(range_header, os.path.getsize(video_path))
+
+                # Open the file as a stream
+                def video_stream():
+                    with open(video_path, 'rb') as f:
+                        # Seek to the start of the requested range
+                        f.seek(range_start)
+                        bytes_to_read = range_end - range_start + 1
+                        remaining = bytes_to_read
+
+                        while remaining > 0:
+                            chunk_size = 1024 * 1024  # 1MB chunks
+                            if remaining < chunk_size:
+                                chunk_size = remaining
+
+                            data = f.read(chunk_size)
+                            if not data:
+                                break
+
+                            remaining -= len(data)
+                            yield data
+
+                response = StreamingResponse(
+                    video_stream(),
+                    media_type="video/mp4",
+                    status_code=206  # Partial content
+                )
+
+                # Set Content-Range header
+                response.headers.set('Content-Range', f'bytes {range_start}-{range_end}/{os.path.getsize(video_path)}')
+                response.headers.set('Accept-Ranges', 'bytes')
+
+                return response
+
+            except Exception as e:
+                logger.error(f"Range request error: {e}")
+                raise HTTPException(status_code=500, detail="Failed to process range request")
 
         return FileResponse(
             path=str(video_path),
@@ -350,3 +395,20 @@ def _get_priority_score(grade: str, similarity: float):
     """Calculate priority score (lower = higher priority)"""
     grade_scores = {'A': 4, 'B': 3, 'C': 2, 'D': 1, 'F': 0}
     return grade_scores.get(grade, 0) + similarity
+
+
+def _parse_range_header(range_header: str, file_size: int):
+    """Parse the Range header to get start and end bytes"""
+    range_match = re.match(r"bytes=(\d+)-(\d*)", range_header)
+
+    if not range_match:
+        raise HTTPException(status_code=400, detail="Invalid range header")
+
+    start = int(range_match.group(1))
+    end = int(range_match.group(2)) if range_match.group(2) else file_size - 1
+
+    # Ensure the range is within the file size
+    if start < 0 or end >= file_size or start > end:
+        raise HTTPException(status_code=416, detail="Requested range not satisfiable")
+
+    return start, end
