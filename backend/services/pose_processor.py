@@ -16,12 +16,13 @@ _pose_model_cache = {}
 class PoseProcessor:
     """Extract pose data from videos using MediaPipe with optimization"""
 
-    def __init__(self, model_complexity=0):
+    def __init__(self, model_complexity=1):
         """
         Initialize pose processor with optimized settings
 
         Args:
-            model_complexity: 0=Lite (fastest, 150MB less memory), 1=Full, 2=Heavy
+            model_complexity: 0=Lite (fastest), 1=Full (balanced), 2=Heavy (most accurate)
+                             Standard Plan: Use 1 for best balance of speed + accuracy
         """
         self.model_complexity = model_complexity
 
@@ -32,8 +33,8 @@ class PoseProcessor:
             self.mp_pose = mp.solutions.pose
             self.pose = self.mp_pose.Pose(
                 static_image_mode=False,
-                model_complexity=model_complexity,  # 0=Lite for speed
-                enable_segmentation=False,  # Disable to save memory
+                model_complexity=model_complexity,  # 1=Full model for better accuracy on Standard plan
+                enable_segmentation=False,  # Still disabled to save memory
                 smooth_landmarks=True,
                 min_detection_confidence=0.5,
                 min_tracking_confidence=0.5
@@ -44,13 +45,14 @@ class PoseProcessor:
             logger.info(f"♻️ Using cached MediaPipe model")
             self.mp_pose, self.pose = _pose_model_cache[cache_key]
 
-    def process_video(self, video_path: str, frame_skip: int = 3) -> Dict[str, Any]:
+    def process_video(self, video_path: str, frame_skip: int = 2) -> Dict[str, Any]:
         """
         Process video and extract pose keypoints with optimization
 
         Args:
             video_path: Path to video file
-            frame_skip: Process every Nth frame (3 = 10fps for 30fps video)
+            frame_skip: Process every Nth frame (2 = 15fps for 30fps video)
+                       Standard Plan: Use 2 for good balance of speed + accuracy
         """
         logger.info(f"🎥 Processing video: {video_path} (frame_skip={frame_skip})")
 
@@ -67,9 +69,9 @@ class PoseProcessor:
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         
-        # Adaptive frame skip based on video length
-        if total_frames > 150:
-            frame_skip = max(frame_skip, 5)  # Skip more for long videos
+        # Less aggressive frame skip for Standard plan (better accuracy)
+        if total_frames > 200:  # Increased threshold
+            frame_skip = max(frame_skip, 3)  # Only skip more for very long videos
 
         effective_fps = fps / frame_skip
 
@@ -91,10 +93,10 @@ class PoseProcessor:
                 frame_number += 1
                 continue
             
-            # Resize frame for faster processing (if too large)
-            if width > 1280:
-                scale = 1280 / width
-                frame = cv2.resize(frame, (1280, int(height * scale)))
+            # Keep higher resolution on Standard plan (better accuracy)
+            if width > 1920:  # Only resize very large videos
+                scale = 1920 / width
+                frame = cv2.resize(frame, (1920, int(height * scale)))
 
             # Convert to RGB for MediaPipe
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -175,5 +177,8 @@ class PoseProcessor:
     
     def __del__(self):
         """Clean up resources"""
-        if hasattr(self, 'pose'):
-            self.pose.close()
+        try:
+            if hasattr(self, 'pose') and self.pose is not None:
+                self.pose.close()
+        except Exception:
+            pass  # Ignore cleanup errors

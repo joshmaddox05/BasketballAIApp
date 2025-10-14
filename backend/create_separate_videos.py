@@ -35,8 +35,8 @@ class SeparateVideoVisualizer:
     }
 
     def __init__(self):
-        # Use lite model for faster processing
-        self.pose_processor = PoseProcessor(model_complexity=0)
+        # Use full model for better accuracy on Standard plan
+        self.pose_processor = PoseProcessor(model_complexity=1)
 
     def create_separate_videos(
         self,
@@ -46,12 +46,12 @@ class SeparateVideoVisualizer:
         output_user: str,
         output_curry: str
     ):
-        """Create two separate annotated videos - OPTIMIZED"""
+        """Create two separate annotated videos - OPTIMIZED for Standard Plan"""
 
         print("=" * 80)
-        print("🎬 CREATING SEPARATE ANNOTATED VIDEOS (OPTIMIZED)")
+        print("🎬 CREATING SEPARATE ANNOTATED VIDEOS (STANDARD PLAN)")
         print("=" * 80)
-        print(f"\n📹 Processing videos separately for faster generation...")
+        print(f"\n📹 Processing videos with higher quality settings...")
 
         # Load comparison data
         with open(comparison_json, 'r') as f:
@@ -62,8 +62,8 @@ class SeparateVideoVisualizer:
         print(f"   Input: {Path(user_video).name}")
         print(f"   Output: {output_user}")
 
-        # OPTIMIZATION: Skip more frames (process every 3rd frame)
-        user_pose = self.pose_processor.process_video(user_video, frame_skip=3)
+        # Better frame rate for Standard plan
+        user_pose = self.pose_processor.process_video(user_video, frame_skip=2)
         user_keypoints = user_pose['keypoints_sequence']
 
         self._create_single_video(
@@ -84,7 +84,7 @@ class SeparateVideoVisualizer:
         print(f"   Input: {Path(curry_video).name}")
         print(f"   Output: {output_curry}")
 
-        curry_pose = self.pose_processor.process_video(curry_video, frame_skip=3)
+        curry_pose = self.pose_processor.process_video(curry_video, frame_skip=2)
         curry_keypoints = curry_pose['keypoints_sequence']
 
         self._create_single_video(
@@ -117,7 +117,7 @@ class SeparateVideoVisualizer:
         text_color: tuple,
         is_user: bool
     ):
-        """Create a single annotated video - OPTIMIZED"""
+        """Create a single annotated video - OPTIMIZED for Standard Plan"""
 
         # Use VideoHandler to get proper rotation info
         cap, rotation, width, height = VideoHandler.get_video_capture_with_rotation(video_path)
@@ -125,25 +125,24 @@ class SeparateVideoVisualizer:
         # Get video properties
         fps = cap.get(cv2.CAP_PROP_FPS)
 
-        # OPTIMIZATION: Lower resolution for faster processing (480p instead of 720p)
-        target_height = 480  # Reduced from 720
+        # Higher resolution for Standard plan (720p instead of 480p)
+        target_height = 720  # Increased from 480
         target_width = int(width * target_height / height)
 
         # Add space for metrics at bottom
-        canvas_height = target_height + 120  # Reduced from 150
+        canvas_height = target_height + 150
 
         # Setup video writer with better codec
-        fourcc = cv2.VideoWriter_fourcc(*'avc1')  # H.264 codec (better compression)
+        fourcc = cv2.VideoWriter_fourcc(*'avc1')  # H.264 codec
         out = cv2.VideoWriter(output_path, fourcc, fps, (target_width, canvas_height))
 
         frame_idx = 0
         max_frames = len(keypoints)
 
-        # OPTIMIZATION: Process every Nth frame to speed up video generation
-        frame_skip = 1  # Can increase to 2 for even faster processing
+        # No frame skipping in video generation for Standard plan (best quality)
         processed_frames = 0
 
-        print(f"   Processing {max_frames} frames at {fps:.1f} fps (skip={frame_skip})...")
+        print(f"   Processing {max_frames} frames at {fps:.1f} fps (high quality mode)...")
         if rotation != 0:
             print(f"   Applying rotation fix: {rotation}°")
 
@@ -152,11 +151,6 @@ class SeparateVideoVisualizer:
 
             if not ret:
                 break
-
-            # OPTIMIZATION: Skip frames
-            if frame_idx % frame_skip != 0:
-                frame_idx += 1
-                continue
 
             # Fix rotation if needed
             if rotation == 90:

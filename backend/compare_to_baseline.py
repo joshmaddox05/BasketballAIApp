@@ -127,10 +127,10 @@ def analyze_shot_simple(video_path: str, name: str, silent: bool = False):
 
     try:
         # Initialize processors
-        pose_processor = PoseProcessor(model_complexity=0)  # Use lite model for speed
+        pose_processor = PoseProcessor(model_complexity=1)  # Use full model on Standard plan
 
-        # Extract pose data
-        pose_data = pose_processor.process_video(video_path, frame_skip=3)  # Skip frames for speed
+        # Extract pose data - less aggressive frame skip for better accuracy
+        pose_data = pose_processor.process_video(video_path, frame_skip=2)  # Changed from 3 to 2
 
         if not pose_data or 'keypoints_sequence' not in pose_data:
             raise ValueError("Failed to extract pose data from video")
