@@ -949,8 +949,10 @@ class AIAnalysisService {
    */
   formatShotComparisonResults(apiResults) {
     console.log('📝 Formatting shot comparison results...');
+    console.log('📹 API Results videos:', apiResults.videos);
+    console.log('🌐 API Base URL:', this.API_BASE_URL);
 
-    return {
+    const formattedResults = {
       videoId: apiResults.video_id,
       overallScore: Math.round(apiResults.overall_similarity),
       grade: apiResults.overall_grade,
@@ -983,6 +985,11 @@ class AIAnalysisService {
 
       analyzedAt: apiResults.analyzed_at
     };
+
+    console.log('✅ Formatted video URLs:', formattedResults.videos);
+    console.log('🎬 Full formatted results:', JSON.stringify(formattedResults, null, 2));
+
+    return formattedResults;
   }
 
   /**

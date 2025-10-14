@@ -169,7 +169,7 @@ const AICameraCapture = ({
     if (isSimulator) {
       Alert.alert(
         'Simulator Detected',
-        'Camera recording is not available on simulators/emulators. This feature requires a physical device.\n\nFor testing purposes, we\'ll simulate a recording.',
+        'Camera recording is not available on simulators/emulators. This feature requires a physical device.\n\nFor testing purposes, we\'ll simulate a recording',
         [
           { 
             text: 'Cancel', 
@@ -373,57 +373,58 @@ const AICameraCapture = ({
         pointerEvents="none"
       >
         <Svg width={overlayWidth} height={overlayHeight}>
-          {/* Draw skeleton connections */}
-          {SKELETON_CONNECTIONS.map((connection, index) => {
-            const [point1, point2] = connection;
-            const p1 = detectedPose[point1];
-            const p2 = detectedPose[point2];
+          {/* Positioning Frame Guide - Rectangle showing where user should stand */}
+          <Path
+            d={`
+              M ${overlayWidth * 0.15} ${overlayHeight * 0.1}
+              L ${overlayWidth * 0.85} ${overlayHeight * 0.1}
+              L ${overlayWidth * 0.85} ${overlayHeight * 0.9}
+              L ${overlayWidth * 0.15} ${overlayHeight * 0.9}
+              Z
+            `}
+            stroke="#4CAF50"
+            strokeWidth="3"
+            fill="none"
+            strokeDasharray="15,10"
+            opacity="0.8"
+          />
 
-            if (!p1.visible || !p2.visible) return null;
+          {/* Corner markers for better visibility */}
+          <Line x1={overlayWidth * 0.15} y1={overlayHeight * 0.1} x2={overlayWidth * 0.15 + 30} y2={overlayHeight * 0.1} stroke="#4CAF50" strokeWidth="4" />
+          <Line x1={overlayWidth * 0.15} y1={overlayHeight * 0.1} x2={overlayWidth * 0.15} y2={overlayHeight * 0.1 + 30} stroke="#4CAF50" strokeWidth="4" />
 
-            return (
-              <Line
-                key={`line-${index}`}
-                x1={p1.x * overlayWidth}
-                y1={p1.y * overlayHeight}
-                x2={p2.x * overlayWidth}
-                y2={p2.y * overlayHeight}
-                stroke="#FF6B35"
-                strokeWidth="2"
-                opacity="0.8"
-              />
-            );
-          })}
-          
-          {/* Draw pose points */}
-          {Object.entries(detectedPose).map(([key, point]) => {
-            if (!point.visible) return null;
+          <Line x1={overlayWidth * 0.85} y1={overlayHeight * 0.1} x2={overlayWidth * 0.85 - 30} y2={overlayHeight * 0.1} stroke="#4CAF50" strokeWidth="4" />
+          <Line x1={overlayWidth * 0.85} y1={overlayHeight * 0.1} x2={overlayWidth * 0.85} y2={overlayHeight * 0.1 + 30} stroke="#4CAF50" strokeWidth="4" />
 
-            return (
-              <Circle
-                key={key}
-                cx={point.x * overlayWidth}
-                cy={point.y * overlayHeight}
-                r="4"
-                fill="#FF6B35"
-                stroke="#FFF"
-                strokeWidth="1"
-              />
-            );
-          })}
+          <Line x1={overlayWidth * 0.15} y1={overlayHeight * 0.9} x2={overlayWidth * 0.15 + 30} y2={overlayHeight * 0.9} stroke="#4CAF50" strokeWidth="4" />
+          <Line x1={overlayWidth * 0.15} y1={overlayHeight * 0.9} x2={overlayWidth * 0.15} y2={overlayHeight * 0.9 - 30} stroke="#4CAF50" strokeWidth="4" />
 
-          {/* Draw shooting arc guide */}
-          {analysisMode === 'shooting' && (
-            <Path
-              d={`M ${overlayWidth * 0.7} ${overlayHeight * 0.45} Q ${overlayWidth * 0.8} ${overlayHeight * 0.2} ${overlayWidth * 0.9} ${overlayHeight * 0.1}`}
-              stroke="#4CAF50"
-              strokeWidth="2"
-              fill="none"
-              strokeDasharray="5,5"
-              opacity="0.6"
-            />
-          )}
+          <Line x1={overlayWidth * 0.85} y1={overlayHeight * 0.9} x2={overlayWidth * 0.85 - 30} y2={overlayHeight * 0.9} stroke="#4CAF50" strokeWidth="4" />
+          <Line x1={overlayWidth * 0.85} y1={overlayHeight * 0.9} x2={overlayWidth * 0.85} y2={overlayHeight * 0.9 - 30} stroke="#4CAF50" strokeWidth="4" />
+
+          {/* Center line for alignment */}
+          <Line
+            x1={overlayWidth * 0.5}
+            y1={overlayHeight * 0.1}
+            x2={overlayWidth * 0.5}
+            y2={overlayHeight * 0.9}
+            stroke="#4CAF50"
+            strokeWidth="1"
+            strokeDasharray="5,5"
+            opacity="0.4"
+          />
+
+          {/* Instruction text inside the box */}
+          {/* Note: SVG Text doesn't work well in React Native, we'll add a View overlay instead */}
         </Svg>
+
+        {/* Text instructions as a View overlay */}
+        <View style={styles.positioningTextContainer}>
+          <View style={styles.positioningTextBox}>
+            <Text style={styles.positioningText}>Position your full body within the frame</Text>
+            <Text style={styles.positioningSubtext}>Stand in center • Head to feet visible</Text>
+          </View>
+        </View>
       </Animated.View>
     );
   };
@@ -431,22 +432,22 @@ const AICameraCapture = ({
   const renderAnalysisGuide = () => {
     const guides = {
       shooting: [
-        "Stand sideways to camera",
-        "Ball should be visible",
-        "Full body in frame",
-        "Record complete shot motion"
+        "📱 Record in PORTRAIT mode (vertical)",
+        "🧍 Stand sideways, full body visible",
+        "🏀 Ball should be visible throughout",
+        "🎬 Record complete shot motion (5 sec)"
       ],
       form: [
-        "Stand facing camera",
-        "Arms visible clearly",
-        "Stable positioning",
-        "Record shooting form"
+        "📱 Record in PORTRAIT mode (vertical)",
+        "🧍 Stand facing camera, full body",
+        "💪 Arms visible clearly",
+        "🎬 Record shooting form (5 sec)"
       ],
       balance: [
-        "Side view to camera",
-        "Full body visible",
-        "Show stance and balance",
-        "Record movement"
+        "📱 Record in PORTRAIT mode (vertical)",
+        "🧍 Side view, full body visible",
+        "⚖️ Show stance and balance",
+        "🎬 Record movement (5 sec)"
       ]
     };
 
@@ -455,11 +456,12 @@ const AICameraCapture = ({
         <Text style={styles.guideTitle}>
           {analysisMode.charAt(0).toUpperCase() + analysisMode.slice(1)} Analysis
         </Text>
+        <View style={styles.portraitNotice}>
+          <Ionicons name="phone-portrait-outline" size={24} color="#FF6B35" />
+          <Text style={styles.portraitNoticeText}>Hold phone vertically for best results</Text>
+        </View>
         {guides[analysisMode].map((guide, index) => (
           <View key={index} style={styles.guideItem}>
-            <View style={styles.guideBullet}>
-              <Text style={styles.guideBulletText}>{index + 1}</Text>
-            </View>
             <Text style={styles.guideText}>{guide}</Text>
           </View>
         ))}
@@ -883,6 +885,64 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  positioningTextContainer: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [{ translateX: -0.5 * width }, { translateY: -0.5 * height }],
+    width: width,
+    height: height * 0.7,
+    justifyContent: 'center',
+    alignItems: 'center',
+    pointerEvents: 'none',
+  },
+  positioningTextBox: {
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  positioningText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  positioningSubtext: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+  },
+  portraitNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  portraitNoticeText: {
+    fontSize: 14,
+    color: '#333',
+    marginLeft: 8,
   },
 });
 

@@ -35,8 +35,8 @@ class SeparateVideoVisualizer:
     }
 
     def __init__(self):
-        # Use full model for better accuracy on Standard plan
-        self.pose_processor = PoseProcessor(model_complexity=1)
+        # Use highest accuracy model (complexity=2) for best pose tracking
+        self.pose_processor = PoseProcessor(model_complexity=2)
 
     def create_separate_videos(
         self,

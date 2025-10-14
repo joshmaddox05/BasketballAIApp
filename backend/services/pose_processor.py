@@ -20,20 +20,20 @@ class PoseProcessor:
 
         Args:
             model_complexity: 0=Lite (fastest), 1=Full (balanced), 2=Heavy (most accurate)
-                             Standard Plan: Use 1 for best balance of speed + accuracy
+                             Use 2 for best accuracy in video analysis
         """
         self.model_complexity = model_complexity
 
-        # Create a fresh model instance (don't cache - causes internal state issues)
+        # Create a fresh model instance with highest accuracy settings
         logger.info(f"🔧 Loading MediaPipe Pose model (complexity={model_complexity})...")
         self.mp_pose = mp.solutions.pose
         self.pose = self.mp_pose.Pose(
             static_image_mode=False,
-            model_complexity=model_complexity,  # 1=Full model for better accuracy on Standard plan
+            model_complexity=model_complexity,  # 2=Heavy model for best accuracy
             enable_segmentation=False,  # Disabled to save memory
             smooth_landmarks=True,
-            min_detection_confidence=0.5,
-            min_tracking_confidence=0.5
+            min_detection_confidence=0.7,  # Increased from 0.5 to 0.7 for better detection
+            min_tracking_confidence=0.7    # Increased from 0.5 to 0.7 for smoother tracking
         )
         logger.info("✅ Model loaded")
 
