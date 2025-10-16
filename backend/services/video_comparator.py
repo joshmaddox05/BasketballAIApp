@@ -15,18 +15,25 @@ logger = logging.getLogger(__name__)
 class VideoComparator:
     """Generate comparison videos with pose skeleton overlays"""
     
-    # MediaPipe Pose connections (simplified for key connections)
+    # MediaPipe Pose connections using LANDMARK NAMES (not indices)
     POSE_CONNECTIONS = [
         # Torso
-        (11, 12), (11, 23), (12, 24), (23, 24),
+        ('left_shoulder', 'right_shoulder'),
+        ('left_shoulder', 'left_hip'),
+        ('right_shoulder', 'right_hip'),
+        ('left_hip', 'right_hip'),
         # Right arm
-        (11, 13), (13, 15),
-        # Left arm  
-        (12, 14), (14, 16),
+        ('right_shoulder', 'right_elbow'),
+        ('right_elbow', 'right_wrist'),
+        # Left arm
+        ('left_shoulder', 'left_elbow'),
+        ('left_elbow', 'left_wrist'),
         # Right leg
-        (23, 25), (25, 27),
+        ('right_hip', 'right_knee'),
+        ('right_knee', 'right_ankle'),
         # Left leg
-        (24, 26), (26, 28),
+        ('left_hip', 'left_knee'),
+        ('left_knee', 'left_ankle'),
     ]
     
     # Colors (BGR format for OpenCV)
@@ -83,7 +90,15 @@ class VideoComparator:
             total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
             
             logger.info(f"📹 Video: {width}x{height} @ {fps}fps, {total_frames} frames")
-            
+            logger.info(f"📊 Keypoints: {len(user_keypoints)} frames")
+
+            # Create frame mapping for proper synchronization
+            # Map video frames to keypoint indices based on 'frame' field
+            frame_to_keypoint_map = {}
+            for kp_idx, kp in enumerate(user_keypoints):
+                video_frame = kp.get('frame', kp_idx)
+                frame_to_keypoint_map[video_frame] = kp_idx
+
             # Determine output dimensions
             if mode == 'split' and baseline_video_path:
                 out_width = width * 2 + 20
@@ -102,33 +117,46 @@ class VideoComparator:
             out = cv2.VideoWriter(str(output_path), fourcc, fps, (out_width, out_height))
             
             # Process frames
-            frame_idx = 0
-            while frame_idx < min(total_frames, len(user_keypoints)):
+            video_frame_idx = 0
+            processed_count = 0
+
+            while video_frame_idx < total_frames:
                 ret, frame = cap.read()
                 if not ret:
                     break
                 
-                # Create output frame
-                if mode == 'split' and baseline_video_path:
-                    output_frame = self._create_split_frame(
-                        frame, frame_idx, user_keypoints, width, height
-                    )
+                # Find corresponding keypoint index
+                kp_idx = frame_to_keypoint_map.get(video_frame_idx)
+
+                if kp_idx is not None:
+                    # Create output frame with synchronized keypoints
+                    if mode == 'split' and baseline_video_path:
+                        output_frame = self._create_split_frame(
+                            frame, kp_idx, user_keypoints, width, height
+                        )
+                    else:
+                        output_frame = self._create_overlay_frame(
+                            frame, kp_idx, user_keypoints, baseline_keypoints
+                        )
+
+                    # Add labels
+                    output_frame = self._add_labels(output_frame, kp_idx, user_phases, mode)
                 else:
-                    output_frame = self._create_overlay_frame(
-                        frame, frame_idx, user_keypoints, baseline_keypoints
-                    )
-                
-                # Add labels
-                output_frame = self._add_labels(output_frame, frame_idx, user_phases, mode)
-                
+                    # No keypoints for this frame - just show the frame
+                    output_frame = np.zeros((height + 80, out_width, 3), dtype=np.uint8)
+                    output_frame[40:40+height, :width] = frame
+
                 # Resize and write
-                output_frame = cv2.resize(output_frame, (out_width, out_height))
+                if output_frame.shape[:2] != (out_height, out_width):
+                    output_frame = cv2.resize(output_frame, (out_width, out_height))
                 out.write(output_frame)
                 
-                frame_idx += 1
-                if frame_idx % 30 == 0:
-                    logger.info(f"⏳ Processed {frame_idx}/{total_frames} frames")
-            
+                video_frame_idx += 1
+                processed_count += 1
+
+                if processed_count % 30 == 0:
+                    logger.info(f"⏳ Processed {processed_count}/{total_frames} frames")
+
             cap.release()
             out.release()
             
@@ -180,53 +208,69 @@ class VideoComparator:
         self, frame: np.ndarray, keypoints: List[Dict],
         frame_idx: int, skeleton_type: str, alpha: float = 1.0
     ) -> np.ndarray:
-        """Draw pose skeleton on frame"""
+        """Draw pose skeleton on frame using landmark NAMES for accurate positioning"""
         if frame_idx >= len(keypoints):
             return frame
         
         kp = keypoints[frame_idx]
         h, w = frame.shape[:2]
-        color = self.COLORS[skeleton_type]
-        
+        color = self.COLORS.get(skeleton_type, (255, 255, 255))
+
         # Create overlay for transparency
         overlay = frame.copy()
         
-        # Draw connections
-        for start_idx, end_idx in self.POSE_CONNECTIONS:
-            landmark_names = list(kp.keys())
-            if start_idx >= len(landmark_names) or end_idx >= len(landmark_names):
-                continue
-            
-            start_name = landmark_names[start_idx]
-            end_name = landmark_names[end_idx]
-            
+        # Draw connections using LANDMARK NAMES (not indices)
+        for start_name, end_name in self.POSE_CONNECTIONS:
+            # Check if both landmarks exist in this frame
             if start_name not in kp or end_name not in kp:
                 continue
             
             start_point = kp[start_name]
             end_point = kp[end_name]
             
-            # Check visibility
-            if start_point.get('visibility', 0) < 0.3 or end_point.get('visibility', 0) < 0.3:
+            # Skip if either point is not a dict (could be metadata)
+            if not isinstance(start_point, dict) or not isinstance(end_point, dict):
+                continue
+
+            # Check visibility threshold
+            if start_point.get('visibility', 0) < 0.5 or end_point.get('visibility', 0) < 0.5:
                 continue
             
-            # Convert to pixel coordinates
+            # Convert normalized coordinates to pixel coordinates
             sx = int(start_point['x'] * w)
             sy = int(start_point['y'] * h)
             ex = int(end_point['x'] * w)
             ey = int(end_point['y'] * h)
             
-            # Draw line
-            cv2.line(overlay, (sx, sy), (ex, ey), color, 2, cv2.LINE_AA)
-        
-        # Draw joints
-        for landmark in kp.values():
-            if landmark.get('visibility', 0) < 0.3:
+            # Validate coordinates are within frame bounds
+            if not (0 <= sx < w and 0 <= sy < h and 0 <= ex < w and 0 <= ey < h):
                 continue
+
+            # Draw connection line
+            cv2.line(overlay, (sx, sy), (ex, ey), color, 3, cv2.LINE_AA)
+
+        # Draw joints (keypoints)
+        for landmark_name, landmark in kp.items():
+            # Skip metadata fields
+            if landmark_name in ['frame', 'timestamp'] or not isinstance(landmark, dict):
+                continue
+
+            # Check visibility
+            if landmark.get('visibility', 0) < 0.5:
+                continue
+
+            # Convert to pixel coordinates
             x = int(landmark['x'] * w)
             y = int(landmark['y'] * h)
-            cv2.circle(overlay, (x, y), 4, color, -1)
-        
+
+            # Validate coordinates
+            if not (0 <= x < w and 0 <= y < h):
+                continue
+
+            # Draw joint as circle
+            cv2.circle(overlay, (x, y), 5, color, -1, cv2.LINE_AA)
+            cv2.circle(overlay, (x, y), 6, (0, 0, 0), 1, cv2.LINE_AA)  # Black outline
+
         # Blend for transparency
         if alpha < 1.0:
             frame = cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0)

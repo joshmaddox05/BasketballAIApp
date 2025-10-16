@@ -20,7 +20,7 @@ def setup_comprehensive_analysis_routes(app, upload_dir: Path, get_shot_analysis
     async def analyze_shot_comprehensive(
         video: UploadFile = File(...),
         baseline_player: str = Form(default="Stephen Curry"),
-        frame_skip: int = Form(default=1)
+        frame_skip: int = Form(default=1)  # DEFAULT TO 1 for maximum accuracy
     ):
         """
         Comprehensive shot analysis with MediaPipe Pose Landmarker
@@ -35,8 +35,8 @@ def setup_comprehensive_analysis_routes(app, upload_dir: Path, get_shot_analysis
         Args:
             video: Video file (mp4, mov, avi, mkv)
             baseline_player: NBA player to compare against (default: Stephen Curry)
-            frame_skip: Process every Nth frame (default: 1 for all frames)
-            
+            frame_skip: Process every Nth frame (default: 1 = every frame for maximum accuracy)
+
         Returns:
             Comprehensive analysis with metrics, comparison, and coaching cues
         """

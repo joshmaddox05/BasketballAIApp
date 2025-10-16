@@ -201,19 +201,56 @@ class ShotAnalysisService:
             logger.warning(f"⚠️ Baselines directory not found: {self.baselines_dir}")
             return baselines
         
+        # Priority order for loading baselines (prefer single-shot baseline)
+        baseline_priority = [
+            'stephen_curry_single.json',  # NEW: Single high-quality shot
+            'stephen_curry_enhanced.json',
+            'stephen_curry.json',
+            'stephen_curry_form_shot.json'
+        ]
+
+        loaded_players = set()
+
+        # First, load priority baselines
+        for filename in baseline_priority:
+            json_file = self.baselines_dir / filename
+            if json_file.exists():
+                try:
+                    with open(json_file, 'r') as f:
+                        data = json.load(f)
+
+                        # Extract player name (support both 'player' and 'player_name')
+                        player_name = data.get('player') or data.get('player_name')
+
+                        if player_name and player_name not in loaded_players:
+                            baselines[player_name] = data
+                            loaded_players.add(player_name)
+                            logger.info(f"📁 Loaded baseline: {player_name} (from {filename})")
+                except Exception as e:
+                    logger.error(f"❌ Failed to load {json_file}: {e}")
+
+        # Then, load any other baselines not yet loaded
         for json_file in self.baselines_dir.glob("*.json"):
+            if json_file.name in baseline_priority:
+                continue  # Already processed
+
             try:
                 with open(json_file, 'r') as f:
                     data = json.load(f)
                     
-                    # Extract player name
-                    player_name = data.get('player_name')
-                    if player_name:
+                    # Extract player name (support both formats)
+                    player_name = data.get('player') or data.get('player_name')
+
+                    if player_name and player_name not in loaded_players:
                         baselines[player_name] = data
-                        logger.info(f"📁 Loaded baseline: {player_name}")
+                        loaded_players.add(player_name)
+                        logger.info(f"📁 Loaded baseline: {player_name} (from {json_file.name})")
             except Exception as e:
                 logger.error(f"❌ Failed to load {json_file}: {e}")
         
+        if not baselines:
+            logger.warning("⚠️ No baselines loaded!")
+
         return baselines
     
     def _compare_to_baseline(

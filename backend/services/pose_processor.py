@@ -20,31 +20,31 @@ class PoseProcessor:
 
         Args:
             model_complexity: 0=Lite (fastest), 1=Full (balanced), 2=Heavy (most accurate)
-                             Use 2 for best accuracy in video analysis
+                             Standard Plan: Use 1 for best balance of speed + accuracy
         """
         self.model_complexity = model_complexity
 
-        # Create a fresh model instance with highest accuracy settings
+        # Create a fresh model instance with MAXIMUM tracking accuracy
         logger.info(f"🔧 Loading MediaPipe Pose model (complexity={model_complexity})...")
         self.mp_pose = mp.solutions.pose
         self.pose = self.mp_pose.Pose(
-            static_image_mode=False,
-            model_complexity=model_complexity,  # 2=Heavy model for best accuracy
-            enable_segmentation=False,  # Disabled to save memory
-            smooth_landmarks=True,
-            min_detection_confidence=0.7,  # Increased from 0.5 to 0.7 for better detection
-            min_tracking_confidence=0.7    # Increased from 0.5 to 0.7 for smoother tracking
+            static_image_mode=False,         # Video mode for temporal consistency
+            model_complexity=model_complexity,
+            enable_segmentation=False,       # Disabled to save memory
+            smooth_landmarks=True,           # CRITICAL: Enables temporal smoothing
+            min_detection_confidence=0.7,    # Higher = more accurate initial detection
+            min_tracking_confidence=0.8      # INCREASED: Better frame-to-frame tracking
         )
-        logger.info("✅ Model loaded")
+        logger.info("✅ Model loaded with enhanced tracking")
 
-    def process_video(self, video_path: str, frame_skip: int = 2) -> Dict[str, Any]:
+    def process_video(self, video_path: str, frame_skip: int = 1) -> Dict[str, Any]:
         """
-        Process video and extract pose keypoints with optimization
+        Process video and extract pose keypoints with maximum accuracy
 
         Args:
             video_path: Path to video file
-            frame_skip: Process every Nth frame (2 = 15fps for 30fps video)
-                       Standard Plan: Use 2 for good balance of speed + accuracy
+            frame_skip: Process every Nth frame
+                       Standard Plan: Use 1 for MAXIMUM accuracy and sync
         """
         logger.info(f"🎥 Processing video: {video_path} (frame_skip={frame_skip})")
 
@@ -61,10 +61,7 @@ class PoseProcessor:
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         
-        # Less aggressive frame skip for Standard plan (better accuracy)
-        if total_frames > 200:  # Increased threshold
-            frame_skip = max(frame_skip, 3)  # Only skip more for very long videos
-
+        # For MAXIMUM accuracy: process every frame (no adaptive skip)
         effective_fps = fps / frame_skip
 
         logger.info(f"📊 Video: {total_frames} frames @ {fps:.1f}fps → processing @ {effective_fps:.1f}fps")
@@ -80,40 +77,36 @@ class PoseProcessor:
             if not ret:
                 break
             
-            # Skip frames for performance
+            # Process frames according to frame_skip (1 = every frame for best accuracy)
             if frame_number % frame_skip != 0:
                 frame_number += 1
                 continue
             
-            # Keep higher resolution on Standard plan (better accuracy)
-            if width > 1920:  # Only resize very large videos
-                scale = 1920 / width
-                frame = cv2.resize(frame, (1920, int(height * scale)))
+            # Keep high resolution for better accuracy (only resize huge videos)
+            if width > 2560:  # Only resize 4K+ videos
+                scale = 2560 / width
+                frame = cv2.resize(frame, (2560, int(height * scale)))
 
             # Convert to RGB for MediaPipe
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-            # Process pose with error handling
-            try:
-                results = self.pose.process(rgb_frame)
-            except Exception as e:
-                logger.warning(f"Frame {frame_number} processing error: {e}")
-                frame_number += 1
-                continue
+            # Process pose with tracking enabled
+            results = self.pose.process(rgb_frame)
 
-            if results and results.pose_landmarks:
+            if results.pose_landmarks:
                 keypoints = self._extract_keypoints(results.pose_landmarks)
 
-                # Track confidence
+                # Track confidence with stricter threshold
                 avg_visibility = np.mean([
                     kp.get('visibility', 0)
                     for kp in keypoints.values()
                     if isinstance(kp, dict)
                 ])
 
-                if avg_visibility < 0.5:
+                if avg_visibility < 0.6:  # Stricter threshold
                     low_confidence_count += 1
 
+                # CRITICAL: Store the actual video frame number for synchronization
                 keypoints['frame'] = frame_number
                 keypoints['timestamp'] = frame_number / fps
                 keypoints_sequence.append(keypoints)
@@ -151,9 +144,9 @@ class PoseProcessor:
                 'low_confidence_frames': low_confidence_count
             }
         }
-    
+
     def _extract_keypoints(self, landmarks) -> Dict[str, Any]:
-        """Extract keypoints from MediaPipe landmarks"""
+        """Extract keypoints from MediaPipe landmarks with accurate visibility filtering"""
         keypoints = {}
 
         # MediaPipe landmark names mapping
@@ -170,7 +163,8 @@ class PoseProcessor:
         ]
 
         for idx, lm in enumerate(landmarks.landmark):
-            if lm.visibility < 0.5:
+            # Use visibility threshold that balances accuracy and completeness
+            if lm.visibility < 0.5:  # Balanced threshold
                 continue
 
             # Get landmark name by index

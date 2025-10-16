@@ -59,8 +59,8 @@ class MetricsCalculator:
             # Extract key frames
             release_frame = phases.get('release', {}).get('frame')
             load_frame = phases.get('load', {}).get('frame')
-            dip_frame = phases.get('dip_start', {}).get('frame')
-            
+            dip_frame = phases.get('dip_start', {}).get('frame') if phases.get('dip_start') else None
+
             if release_frame is None or load_frame is None:
                 return {
                     'error': 'Missing required phase frames',
@@ -104,10 +104,10 @@ class MetricsCalculator:
         """Calculate elbow angle at release (shoulder-elbow-wrist)"""
         try:
             # Get right side keypoints (assuming right-handed shooter)
-            shoulder = np.array([keypoints['RIGHT_SHOULDER']['x'], keypoints['RIGHT_SHOULDER']['y']])
-            elbow = np.array([keypoints['RIGHT_ELBOW']['x'], keypoints['RIGHT_ELBOW']['y']])
-            wrist = np.array([keypoints['RIGHT_WRIST']['x'], keypoints['RIGHT_WRIST']['y']])
-            
+            shoulder = np.array([keypoints['right_shoulder']['x'], keypoints['right_shoulder']['y']])
+            elbow = np.array([keypoints['right_elbow']['x'], keypoints['right_elbow']['y']])
+            wrist = np.array([keypoints['right_wrist']['x'], keypoints['right_wrist']['y']])
+
             # Calculate angle
             angle = self._calculate_angle(shoulder, elbow, wrist)
             
@@ -136,9 +136,9 @@ class MetricsCalculator:
         """Calculate elbow alignment (deviation from vertical plane)"""
         try:
             # Get keypoints
-            shoulder = np.array([keypoints['RIGHT_SHOULDER']['x'], keypoints['RIGHT_SHOULDER']['y']])
-            elbow = np.array([keypoints['RIGHT_ELBOW']['x'], keypoints['RIGHT_ELBOW']['y']])
-            
+            shoulder = np.array([keypoints['right_shoulder']['x'], keypoints['right_shoulder']['y']])
+            elbow = np.array([keypoints['right_elbow']['x'], keypoints['right_elbow']['y']])
+
             # Calculate horizontal deviation
             shoulder_to_elbow = elbow - shoulder
             flare_angle = abs(np.degrees(np.arctan2(shoulder_to_elbow[0], shoulder_to_elbow[1])))
@@ -168,10 +168,10 @@ class MetricsCalculator:
         """Calculate knee flexion angle at load (hip-knee-ankle)"""
         try:
             # Get right leg keypoints
-            hip = np.array([keypoints['RIGHT_HIP']['x'], keypoints['RIGHT_HIP']['y']])
-            knee = np.array([keypoints['RIGHT_KNEE']['x'], keypoints['RIGHT_KNEE']['y']])
-            ankle = np.array([keypoints['RIGHT_ANKLE']['x'], keypoints['RIGHT_ANKLE']['y']])
-            
+            hip = np.array([keypoints['right_hip']['x'], keypoints['right_hip']['y']])
+            knee = np.array([keypoints['right_knee']['x'], keypoints['right_knee']['y']])
+            ankle = np.array([keypoints['right_ankle']['x'], keypoints['right_ankle']['y']])
+
             # Calculate angle
             angle = self._calculate_angle(hip, knee, ankle)
             
@@ -200,11 +200,11 @@ class MetricsCalculator:
         """Calculate hip-shoulder alignment (rotation)"""
         try:
             # Get shoulder and hip keypoints
-            left_shoulder = np.array([keypoints['LEFT_SHOULDER']['x'], keypoints['LEFT_SHOULDER']['y']])
-            right_shoulder = np.array([keypoints['RIGHT_SHOULDER']['x'], keypoints['RIGHT_SHOULDER']['y']])
-            left_hip = np.array([keypoints['LEFT_HIP']['x'], keypoints['LEFT_HIP']['y']])
-            right_hip = np.array([keypoints['RIGHT_HIP']['x'], keypoints['RIGHT_HIP']['y']])
-            
+            left_shoulder = np.array([keypoints['left_shoulder']['x'], keypoints['left_shoulder']['y']])
+            right_shoulder = np.array([keypoints['right_shoulder']['x'], keypoints['right_shoulder']['y']])
+            left_hip = np.array([keypoints['left_hip']['x'], keypoints['left_hip']['y']])
+            right_hip = np.array([keypoints['right_hip']['x'], keypoints['right_hip']['y']])
+
             # Calculate shoulder and hip lines
             shoulder_angle = np.degrees(np.arctan2(
                 right_shoulder[1] - left_shoulder[1],
@@ -243,11 +243,11 @@ class MetricsCalculator:
         """Calculate base width as ratio of body height"""
         try:
             # Get ankle positions
-            left_ankle = np.array([keypoints['LEFT_ANKLE']['x'], keypoints['LEFT_ANKLE']['y']])
-            right_ankle = np.array([keypoints['RIGHT_ANKLE']['x'], keypoints['RIGHT_ANKLE']['y']])
-            
+            left_ankle = np.array([keypoints['left_ankle']['x'], keypoints['left_ankle']['y']])
+            right_ankle = np.array([keypoints['right_ankle']['x'], keypoints['right_ankle']['y']])
+
             # Get body height (nose to mid-ankle)
-            nose = np.array([keypoints['NOSE']['x'], keypoints['NOSE']['y']])
+            nose = np.array([keypoints['nose']['x'], keypoints['nose']['y']])
             mid_ankle = (left_ankle + right_ankle) / 2
             body_height = np.linalg.norm(nose - mid_ankle)
             
@@ -283,15 +283,15 @@ class MetricsCalculator:
     ) -> Dict[str, Any]:
         """Calculate lateral movement during shot"""
         try:
-            dip_frame = phases.get('dip_start', {}).get('frame', 0)
+            dip_frame = phases.get('dip_start', {}).get('frame') if phases.get('dip_start') else 0
             release_frame = phases.get('release', {}).get('frame', len(keypoints_sequence) - 1)
             
             # Track hip center movement
             hip_positions = []
             for i in range(dip_frame, min(release_frame + 1, len(keypoints_sequence))):
                 kp = keypoints_sequence[i]
-                left_hip = np.array([kp['LEFT_HIP']['x'], kp['LEFT_HIP']['y']])
-                right_hip = np.array([kp['RIGHT_HIP']['x'], kp['RIGHT_HIP']['y']])
+                left_hip = np.array([kp['left_hip']['x'], kp['left_hip']['y']])
+                right_hip = np.array([kp['right_hip']['x'], kp['right_hip']['y']])
                 mid_hip = (left_hip + right_hip) / 2
                 hip_positions.append(mid_hip)
             
@@ -345,9 +345,9 @@ class MetricsCalculator:
             release_kp = keypoints_sequence[min(release_frame, len(keypoints_sequence) - 1)]
             follow_kp = keypoints_sequence[min(follow_through_frame, len(keypoints_sequence) - 1)]
             
-            release_wrist = np.array([release_kp['RIGHT_WRIST']['x'], release_kp['RIGHT_WRIST']['y']])
-            follow_wrist = np.array([follow_kp['RIGHT_WRIST']['x'], follow_kp['RIGHT_WRIST']['y']])
-            
+            release_wrist = np.array([release_kp['right_wrist']['x'], release_kp['right_wrist']['y']])
+            follow_wrist = np.array([follow_kp['right_wrist']['x'], follow_kp['right_wrist']['y']])
+
             # Calculate trajectory angle
             delta = follow_wrist - release_wrist
             arc_angle = abs(np.degrees(np.arctan2(delta[1], delta[0])))
@@ -457,9 +457,9 @@ class MetricsCalculator:
     def _get_body_height(self, keypoints: Dict[str, Any]) -> float:
         """Calculate body height from keypoints"""
         try:
-            nose = np.array([keypoints['NOSE']['x'], keypoints['NOSE']['y']])
-            left_ankle = np.array([keypoints['LEFT_ANKLE']['x'], keypoints['LEFT_ANKLE']['y']])
-            right_ankle = np.array([keypoints['RIGHT_ANKLE']['x'], keypoints['RIGHT_ANKLE']['y']])
+            nose = np.array([keypoints['nose']['x'], keypoints['nose']['y']])
+            left_ankle = np.array([keypoints['left_ankle']['x'], keypoints['left_ankle']['y']])
+            right_ankle = np.array([keypoints['right_ankle']['x'], keypoints['right_ankle']['y']])
             mid_ankle = (left_ankle + right_ankle) / 2
             
             return np.linalg.norm(nose - mid_ankle)

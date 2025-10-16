@@ -79,12 +79,14 @@ const AICameraCapture = ({
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [showPoseOverlay, setShowPoseOverlay] = useState(true);
   const [detectedPose, setDetectedPose] = useState(POSE_POINTS);
-  const [analysisPhase, setAnalysisPhase] = useState('setup'); // setup, ready, recording, processing
+  const [analysisPhase, setAnalysisPhase] = useState('setup'); // setup, ready, countdown, recording, processing
+  const [countdown, setCountdown] = useState(5);
   const [cameraType, setCameraType] = useState('back');
   const [isSimulator, setIsSimulator] = useState(false);
   
   const cameraRef = useRef(null);
   const recordingTimer = useRef(null);
+  const countdownTimer = useRef(null);
   const poseAnimation = useRef(new Animated.Value(1)).current;
 
   // Check if running on simulator/emulator
@@ -178,7 +180,7 @@ const AICameraCapture = ({
           },
           {
             text: 'Simulate Recording',
-            onPress: () => simulateRecording()
+            onPress: () => startCountdown()
           }
         ]
       );
@@ -190,8 +192,38 @@ const AICameraCapture = ({
     const hasPermissions = await requestPermissions();
     if (!hasPermissions) return;
 
+    // Start countdown before recording
+    startCountdown();
+  };
+
+  const startCountdown = () => {
+    console.log('⏰ Starting 5-second countdown...');
+    setAnalysisPhase('countdown');
+    setCountdown(5);
+
+    // Countdown timer
+    countdownTimer.current = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          // Countdown finished, start recording
+          clearInterval(countdownTimer.current);
+          countdownTimer.current = null;
+          beginRecording();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const beginRecording = async () => {
+    if (isSimulator) {
+      simulateRecording();
+      return;
+    }
+
     try {
-      console.log('🎬 Starting camera recording...');
+      console.log('🎬 Starting camera recording after countdown...');
       setIsRecording(true);
       setRecordingDuration(0);
       setAnalysisPhase('recording');
@@ -544,6 +576,17 @@ const AICameraCapture = ({
 
         {/* Recording Stats */}
         {renderRecordingStats()}
+
+        {/* Countdown Overlay */}
+        {analysisPhase === 'countdown' && (
+          <View style={styles.countdownOverlay}>
+            <View style={styles.countdownCircle}>
+              <Text style={styles.countdownNumber}>{countdown}</Text>
+            </View>
+            <Text style={styles.countdownText}>Get Ready!</Text>
+            <Text style={styles.countdownSubtext}>Recording starts in {countdown}...</Text>
+          </View>
+        )}
 
         {/* Processing Overlay */}
         {analysisPhase === 'processing' && (
@@ -943,6 +986,42 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
     marginLeft: 8,
+  },
+  countdownOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  countdownCircle: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#FF6B35',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  countdownNumber: {
+    color: '#FFF',
+    fontSize: 48,
+    fontWeight: 'bold',
+  },
+  countdownText: {
+    color: '#FFF',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  countdownSubtext: {
+    color: '#FFF',
+    fontSize: 14,
+    textAlign: 'center',
   },
 });
 

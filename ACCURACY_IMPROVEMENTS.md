@@ -54,6 +54,36 @@
 **Files Changed:**
 - `src/components/shared/AICameraCapture.js` - Complete overlay redesign
 
+### 4. ✅ 5-Second Countdown Before Recording
+**Problem:** Users needed time to back up and get into proper shooting position after pressing the record button.
+
+**Solution:**
+- Added a prominent 5-second countdown before recording starts
+- Large circular countdown display (5... 4... 3... 2... 1...)
+- Clear "Get Ready!" message during countdown
+- Countdown text shows "Recording starts in X..."
+- Recording automatically begins when countdown reaches 0
+
+**User Experience:**
+1. User presses the record button
+2. 5-second countdown appears with large numbers
+3. User has time to:
+   - Back up to get full body in frame
+   - Position themselves sideways
+   - Get into shooting stance
+   - Prepare for the shot motion
+4. Recording automatically starts after countdown
+5. Recording continues for 5 seconds (can be stopped early)
+
+**Benefits:**
+- ⏰ Time to position yourself properly
+- 🎯 Better form capture since you're ready
+- 📹 Full body stays in frame throughout recording
+- 🏀 Improved AI model accuracy with proper positioning
+
+**Files Changed:**
+- `src/components/shared/AICameraCapture.js` - Added countdown overlay UI and styling
+
 ## User-Facing Changes
 
 ### Camera Instructions Now Show:
@@ -68,6 +98,12 @@
 - Green frame box showing where to stand
 - "Hold phone vertically for best results" message with phone icon
 - Clear visual boundaries instead of confusing skeleton overlay
+
+### Countdown Feature:
+- 5-second countdown before recording starts
+- Large, visible numbers counting down
+- "Get Ready!" message with recording start time
+- Automatic recording start after countdown
 
 ## Technical Details
 
@@ -116,4 +152,3 @@ All changes are in:
 - Frontend: `src/components/shared/AICameraCapture.js`
 
 Ready to commit and push to trigger automatic deployment on Render.
-
