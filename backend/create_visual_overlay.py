@@ -116,7 +116,13 @@ class PoseVisualizer:
         print(f"   Resolution: {width}x{height}")
         print(f"   FPS: {fps:.1f}")
 
-        frame_idx = 0
+        # Create frame mapping for proper synchronization
+        frame_to_keypoint_map = {}
+        for kp_idx, kp in enumerate(keypoints_seq):
+            video_frame = kp.get('frame', kp_idx)
+            frame_to_keypoint_map[video_frame] = kp_idx
+
+        video_frame_idx = 0
         total_frames = len(keypoints_seq)
 
         while cap.isOpened():
@@ -124,10 +130,13 @@ class PoseVisualizer:
             if not ret:
                 break
 
-            if frame_idx < len(keypoints_seq):
+            # Find corresponding keypoint index
+            kp_idx = frame_to_keypoint_map.get(video_frame_idx)
+
+            if kp_idx is not None:
                 # Get keypoints for this frame
-                keypoints = keypoints_seq[frame_idx]
-                frame_metrics = metrics[frame_idx] if frame_idx < len(metrics) else {}
+                keypoints = keypoints_seq[kp_idx]
+                frame_metrics = metrics[kp_idx] if kp_idx < len(metrics) else {}
 
                 # Draw pose overlay
                 frame = self._draw_pose_overlay(frame, keypoints, width, height)
@@ -136,16 +145,16 @@ class PoseVisualizer:
                 if show_metrics:
                     frame = self._draw_metrics_overlay(
                         frame, keypoints, frame_metrics,
-                        frame_idx, total_frames, quality
+                        kp_idx, total_frames, quality
                     )
 
             out.write(frame)
-            frame_idx += 1
+            video_frame_idx += 1
 
             # Progress indicator
-            if frame_idx % 30 == 0:
-                progress = (frame_idx / total_frames) * 100
-                print(f"   Progress: {progress:.1f}% ({frame_idx}/{total_frames} frames)", end='\r')
+            if video_frame_idx % 30 == 0:
+                progress = (video_frame_idx / total_frames) * 100
+                print(f"   Progress: {progress:.1f}% ({video_frame_idx}/{total_frames} frames)", end='\r')
 
         cap.release()
         out.release()

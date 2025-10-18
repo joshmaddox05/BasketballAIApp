@@ -123,15 +123,26 @@ class SideBySideVisualizer:
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         out = cv2.VideoWriter(output_path, fourcc, fps, (combined_width, combined_height))
 
-        frame_idx_user = 0
-        frame_idx_curry = 0
+        # Create frame mapping for proper synchronization
+        frame_to_keypoint_map_user = {}
+        for kp_idx, kp in enumerate(user_keypoints):
+            video_frame = kp.get('frame', kp_idx)
+            frame_to_keypoint_map_user[video_frame] = kp_idx
+
+        frame_to_keypoint_map_curry = {}
+        for kp_idx, kp in enumerate(curry_keypoints):
+            video_frame = kp.get('frame', kp_idx)
+            frame_to_keypoint_map_curry[video_frame] = kp_idx
+
+        video_frame_idx_user = 0
+        video_frame_idx_curry = 0
 
         # Use shorter video length for faster processing
-        max_frames = min(len(user_keypoints), len(curry_keypoints))
+        max_frames = max(len(user_keypoints), len(curry_keypoints))
 
         print(f"   Creating {max_frames} frames at {fps:.1f} fps...")
 
-        while frame_idx_user < max_frames and frame_idx_curry < max_frames:
+        while video_frame_idx_user < max_frames or video_frame_idx_curry < max_frames:
             # Read frames
             ret_user, frame_user = cap_user.read()
             ret_curry, frame_curry = cap_curry.read()
@@ -143,20 +154,24 @@ class SideBySideVisualizer:
             frame_user_resized = cv2.resize(frame_user, (target_width_user, target_height))
             frame_curry_resized = cv2.resize(frame_curry, (target_width_curry, target_height))
 
+            # Find corresponding keypoint indices
+            kp_idx_user = frame_to_keypoint_map_user.get(video_frame_idx_user)
+            kp_idx_curry = frame_to_keypoint_map_curry.get(video_frame_idx_curry)
+
             # Draw pose overlays
-            if frame_idx_user < len(user_keypoints):
+            if kp_idx_user is not None:
                 frame_user_resized = self._draw_pose(
                     frame_user_resized,
-                    user_keypoints[frame_idx_user],
+                    user_keypoints[kp_idx_user],
                     target_width_user,
                     target_height,
                     self.COLORS['skeleton_user']
                 )
 
-            if frame_idx_curry < len(curry_keypoints):
+            if kp_idx_curry is not None:
                 frame_curry_resized = self._draw_pose(
                     frame_curry_resized,
-                    curry_keypoints[frame_idx_curry],
+                    curry_keypoints[kp_idx_curry],
                     target_width_curry,
                     target_height,
                     self.COLORS['skeleton_curry']
@@ -185,12 +200,12 @@ class SideBySideVisualizer:
 
             out.write(canvas)
 
-            frame_idx_user += 1
-            frame_idx_curry += 1
+            video_frame_idx_user += 1
+            video_frame_idx_curry += 1
 
             # Progress
-            if frame_idx_user % 10 == 0:
-                progress = (frame_idx_user / max_frames) * 100
+            if video_frame_idx_user % 10 == 0:
+                progress = (video_frame_idx_user / max_frames) * 100
                 print(f"   Progress: {progress:.1f}%", end='\r')
 
         cap_user.release()

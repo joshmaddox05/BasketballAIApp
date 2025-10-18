@@ -53,24 +53,33 @@ def create_quick_visualization(input_video: str, output_video: str):
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         out = cv2.VideoWriter(output_video, fourcc, fps, (width, height))
 
-        frame_idx = 0
+        # Create frame mapping for proper synchronization
+        frame_to_keypoint_map = {}
+        for kp_idx, kp in enumerate(keypoints_seq):
+            video_frame = kp.get('frame', kp_idx)
+            frame_to_keypoint_map[video_frame] = kp_idx
+
+        video_frame_idx = 0
 
         while cap.isOpened():
             ret, frame = cap.read()
             if not ret:
                 break
 
-            if frame_idx < len(keypoints_seq):
-                keypoints = keypoints_seq[frame_idx]
+            # Find corresponding keypoint index
+            kp_idx = frame_to_keypoint_map.get(video_frame_idx)
+
+            if kp_idx is not None:
+                keypoints = keypoints_seq[kp_idx]
 
                 # Draw skeleton
                 frame = draw_skeleton(frame, keypoints, width, height)
 
                 # Draw tracking info
-                frame = draw_tracking_info(frame, keypoints, frame_idx, quality, width, height)
+                frame = draw_tracking_info(frame, keypoints, kp_idx, quality, width, height)
 
             out.write(frame)
-            frame_idx += 1
+            video_frame_idx += 1
 
         cap.release()
         out.release()

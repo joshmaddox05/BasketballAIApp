@@ -146,7 +146,13 @@ class SeparateVideoVisualizer:
         if not out.isOpened():
             raise RuntimeError(f"Failed to create video writer for {output_path}")
 
-        frame_idx = 0
+        # Create frame mapping for proper synchronization
+        frame_to_keypoint_map = {}
+        for kp_idx, kp in enumerate(keypoints):
+            video_frame = kp.get('frame', kp_idx)
+            frame_to_keypoint_map[video_frame] = kp_idx
+
+        video_frame_idx = 0
         max_frames = len(keypoints)
 
         # No frame skipping in video generation for Standard plan (best quality)
@@ -156,11 +162,14 @@ class SeparateVideoVisualizer:
         if rotation != 0:
             print(f"   Applying rotation fix: {rotation}°")
 
-        while frame_idx < max_frames:
+        while video_frame_idx < max_frames * 2:  # Allow for potential frame gaps
             ret, frame = cap.read()
 
             if not ret:
                 break
+
+            # Find corresponding keypoint index
+            kp_idx = frame_to_keypoint_map.get(video_frame_idx)
 
             # Fix rotation if needed
             if rotation == 90:
@@ -178,8 +187,8 @@ class SeparateVideoVisualizer:
             canvas[:target_height, :] = frame
 
             # Draw pose skeleton if available
-            if frame_idx < len(keypoints):
-                kp = keypoints[frame_idx]
+            if kp_idx is not None:
+                kp = keypoints[kp_idx]
                 self._draw_skeleton(canvas, kp, skeleton_color, target_width, target_height)
 
             # Draw metrics overlay
@@ -192,7 +201,7 @@ class SeparateVideoVisualizer:
             )
 
             out.write(canvas)
-            frame_idx += 1
+            video_frame_idx += 1
             processed_frames += 1
 
             # Progress update every 30 frames

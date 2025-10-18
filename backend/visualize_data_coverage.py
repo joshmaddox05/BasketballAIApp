@@ -171,7 +171,13 @@ class DataCoverageVisualizer:
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
 
-        frame_idx = 0
+        # Create frame mapping for proper synchronization
+        frame_to_keypoint_map = {}
+        for kp_idx, kp in enumerate(keypoints_seq):
+            video_frame = kp.get('frame', kp_idx)
+            frame_to_keypoint_map[video_frame] = kp_idx
+
+        video_frame_idx = 0
         total_frames = len(keypoints_seq)
 
         while cap.isOpened():
@@ -179,20 +185,23 @@ class DataCoverageVisualizer:
             if not ret:
                 break
 
-            if frame_idx < len(keypoints_seq):
-                keypoints = keypoints_seq[frame_idx]
-                hand_data = hand_data_seq[frame_idx] if frame_idx < len(hand_data_seq) else None
+            # Find corresponding keypoint index
+            kp_idx = frame_to_keypoint_map.get(video_frame_idx)
+
+            if kp_idx is not None:
+                keypoints = keypoints_seq[kp_idx]
+                hand_data = hand_data_seq[kp_idx] if kp_idx < len(hand_data_seq) else None
 
                 # Draw coverage indicators
                 frame = self._draw_coverage_indicators(
-                    frame, keypoints, hand_data, stats, frame_idx, total_frames, width, height
+                    frame, keypoints, hand_data, stats, kp_idx, total_frames, width, height
                 )
 
             out.write(frame)
-            frame_idx += 1
+            video_frame_idx += 1
 
-            if frame_idx % 30 == 0:
-                progress = (frame_idx / total_frames) * 100
+            if video_frame_idx % 30 == 0:
+                progress = (video_frame_idx / total_frames) * 100
                 print(f"   Progress: {progress:.1f}%", end='\r')
 
         cap.release()
