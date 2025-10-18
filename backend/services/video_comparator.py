@@ -195,18 +195,19 @@ class VideoComparator:
         canvas = np.zeros((frame.shape[0] + 80, frame.shape[1], 3), dtype=np.uint8)
         
         # Draw user skeleton
-        annotated = self._draw_skeleton(frame.copy(), user_keypoints, frame_idx, 'user')
+        annotated = self._draw_skeleton(frame.copy(), user_keypoints, frame_idx, 'user', rotation=0)
         
         # Draw baseline skeleton if available
         if baseline_keypoints and frame_idx < len(baseline_keypoints):
-            annotated = self._draw_skeleton(annotated, baseline_keypoints, frame_idx, 'baseline', alpha=0.5)
+            annotated = self._draw_skeleton(annotated, baseline_keypoints, frame_idx, 'baseline', alpha=0.5, rotation=0)
         
         canvas[40:40+frame.shape[0], :] = annotated
         return canvas
     
     def _draw_skeleton(
         self, frame: np.ndarray, keypoints: List[Dict],
-        frame_idx: int, skeleton_type: str, alpha: float = 1.0
+        frame_idx: int, skeleton_type: str, alpha: float = 1.0,
+        rotation: int = 0
     ) -> np.ndarray:
         """Draw pose skeleton on frame using landmark NAMES for accurate positioning"""
         if frame_idx >= len(keypoints):
@@ -219,6 +220,17 @@ class VideoComparator:
         # Create overlay for transparency
         overlay = frame.copy()
         
+        # Helper for rotation-aware normalized → pixel transform
+        def _rot_xy(xn: float, yn: float, rot: int) -> tuple:
+            r = rot % 360
+            if r == 90:
+                return yn, 1.0 - xn
+            if r == 180:
+                return 1.0 - xn, 1.0 - yn
+            if r == 270:
+                return 1.0 - yn, xn
+            return xn, yn
+
         # Draw connections using LANDMARK NAMES (not indices)
         for start_name, end_name in self.POSE_CONNECTIONS:
             # Check if both landmarks exist in this frame
@@ -236,11 +248,13 @@ class VideoComparator:
             if start_point.get('visibility', 0) < 0.5 or end_point.get('visibility', 0) < 0.5:
                 continue
             
-            # Convert normalized coordinates to pixel coordinates
-            sx = int(start_point['x'] * w)
-            sy = int(start_point['y'] * h)
-            ex = int(end_point['x'] * w)
-            ey = int(end_point['y'] * h)
+            # Convert normalized coordinates to pixel coordinates (rotation-aware)
+            sxn, syn = _rot_xy(float(start_point['x']), float(start_point['y']), rotation)
+            exn, eyn = _rot_xy(float(end_point['x']), float(end_point['y']), rotation)
+            sx = int(sxn * w)
+            sy = int(syn * h)
+            ex = int(exn * w)
+            ey = int(eyn * h)
             
             # Validate coordinates are within frame bounds
             if not (0 <= sx < w and 0 <= sy < h and 0 <= ex < w and 0 <= ey < h):
@@ -259,9 +273,10 @@ class VideoComparator:
             if landmark.get('visibility', 0) < 0.5:
                 continue
 
-            # Convert to pixel coordinates
-            x = int(landmark['x'] * w)
-            y = int(landmark['y'] * h)
+            # Convert to pixel coordinates (rotation-aware)
+            xn, yn = _rot_xy(float(landmark['x']), float(landmark['y']), rotation)
+            x = int(xn * w)
+            y = int(yn * h)
 
             # Validate coordinates
             if not (0 <= x < w and 0 <= y < h):

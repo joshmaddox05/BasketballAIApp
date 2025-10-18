@@ -165,8 +165,8 @@ class PoseVisualizer:
             if landmark_name in keypoints:
                 lm = keypoints[landmark_name]
                 if isinstance(lm, dict) and lm.get('visibility', 0) > 0.3:
-                    x = int(lm['x'] * width)
-                    y = int(lm['y'] * height)
+                    x = int(float(lm['x']) * width)
+                    y = int(float(lm['y']) * height)
                     return (x, y), lm['visibility']
             return None, 0
 

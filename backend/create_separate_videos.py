@@ -146,19 +146,26 @@ class SeparateVideoVisualizer:
         if not out.isOpened():
             raise RuntimeError(f"Failed to create video writer for {output_path}")
 
-        frame_idx = 0
-        max_frames = len(keypoints)
+        # Build precise frame mapping using stored frame indices
+        frame_to_kp_idx = {}
+        for idx, kp in enumerate(keypoints):
+            if isinstance(kp, dict) and 'frame' in kp:
+                frame_to_kp_idx[int(kp['frame'])] = idx
 
-        # No frame skipping in video generation for Standard plan (best quality)
+        total_kp_frames = len(keypoints)
         processed_frames = 0
 
-        print(f"   Processing {max_frames} frames at {fps:.1f} fps (high quality mode)...")
+        print(f"   Processing {total_kp_frames} synchronized frames at {fps:.1f} fps (high quality mode)...")
         if rotation != 0:
-            print(f"   Applying rotation fix: {rotation}°")
+            print(f"   Applying rotation fix: {rotation}° (with keypoint transform)")
 
-        while frame_idx < max_frames:
+        # Iterate over keypoint frames to ensure perfect sync
+        for kp_idx, kp in enumerate(keypoints):
+            # Seek to the exact source frame for this keypoint if available
+            source_frame = int(kp.get('frame', kp_idx))
+            cap.set(cv2.CAP_PROP_POS_FRAMES, source_frame)
+
             ret, frame = cap.read()
-
             if not ret:
                 break
 
@@ -177,10 +184,8 @@ class SeparateVideoVisualizer:
             canvas = np.zeros((canvas_height, target_width, 3), dtype=np.uint8)
             canvas[:target_height, :] = frame
 
-            # Draw pose skeleton if available
-            if frame_idx < len(keypoints):
-                kp = keypoints[frame_idx]
-                self._draw_skeleton(canvas, kp, skeleton_color, target_width, target_height)
+            # Draw pose skeleton using rotation-aware keypoints
+            self._draw_skeleton(canvas, kp, skeleton_color, target_width, target_height, rotation)
 
             # Draw metrics overlay
             canvas = self._draw_metrics(
@@ -192,12 +197,11 @@ class SeparateVideoVisualizer:
             )
 
             out.write(canvas)
-            frame_idx += 1
             processed_frames += 1
 
             # Progress update every 30 frames
             if processed_frames % 30 == 0:
-                progress = (processed_frames / max_frames) * 100
+                progress = (processed_frames / max(1, total_kp_frames)) * 100
                 print(f"   Progress: {progress:.0f}%")
 
         cap.release()
@@ -205,11 +209,11 @@ class SeparateVideoVisualizer:
 
         print(f"   ✓ Processed {processed_frames} frames")
 
-    def _draw_skeleton(self, frame, keypoints, color, width, height):
+    def _draw_skeleton(self, frame, keypoints, color, width, height, rotation):
         """Draw pose skeleton on frame"""
-        self._draw_pose(frame[:height, :], keypoints, width, height, color)
+        self._draw_pose(frame[:height, :], keypoints, width, height, color, rotation)
 
-    def _draw_pose(self, frame, keypoints, width, height, color):
+    def _draw_pose(self, frame, keypoints, width, height, color, rotation):
         """Draw pose skeleton on frame"""
 
         connections = [
@@ -227,12 +231,24 @@ class SeparateVideoVisualizer:
             ('left_knee', 'left_ankle'),
         ]
 
+        def transform_norm_xy(x_norm: float, y_norm: float, rot: int):
+            """Rotate normalized coordinates (0..1) to match rotated frame."""
+            r = rot % 360
+            if r == 90:
+                return y_norm, 1.0 - x_norm
+            if r == 180:
+                return 1.0 - x_norm, 1.0 - y_norm
+            if r == 270:
+                return 1.0 - y_norm, x_norm
+            return x_norm, y_norm
+
         def get_point(landmark_name):
             if landmark_name in keypoints and isinstance(keypoints[landmark_name], dict):
                 lm = keypoints[landmark_name]
                 if lm.get('visibility', 0) > 0.5:
-                    x = int(lm['x'] * width)
-                    y = int(lm['y'] * height)
+                    x_n, y_n = transform_norm_xy(float(lm['x']), float(lm['y']), rotation)
+                    x = int(x_n * width)
+                    y = int(y_n * height)
                     return (x, y)
             return None
 
