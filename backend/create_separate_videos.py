@@ -146,17 +146,20 @@ class SeparateVideoVisualizer:
         if not out.isOpened():
             raise RuntimeError(f"Failed to create video writer for {output_path}")
 
-        frame_idx = 0
-        max_frames = len(keypoints)
+        # Build mapping from actual video frame -> keypoints index, based on 'frame'
+        frame_to_kp_idx = {kp.get('frame', idx): idx for idx, kp in enumerate(keypoints)}
+
+        video_frame_idx = 0
+        total_video_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or len(keypoints)
 
         # No frame skipping in video generation for Standard plan (best quality)
         processed_frames = 0
 
-        print(f"   Processing {max_frames} frames at {fps:.1f} fps (high quality mode)...")
+        print(f"   Processing {total_video_frames} frames at {fps:.1f} fps (high quality mode)...")
         if rotation != 0:
             print(f"   Applying rotation fix: {rotation}°")
 
-        while frame_idx < max_frames:
+        while True:
             ret, frame = cap.read()
 
             if not ret:
@@ -177,9 +180,10 @@ class SeparateVideoVisualizer:
             canvas = np.zeros((canvas_height, target_width, 3), dtype=np.uint8)
             canvas[:target_height, :] = frame
 
-            # Draw pose skeleton if available
-            if frame_idx < len(keypoints):
-                kp = keypoints[frame_idx]
+            # Draw pose skeleton if available for this exact video frame
+            kp_idx = frame_to_kp_idx.get(video_frame_idx)
+            if kp_idx is not None and 0 <= kp_idx < len(keypoints):
+                kp = keypoints[kp_idx]
                 self._draw_skeleton(canvas, kp, skeleton_color, target_width, target_height)
 
             # Draw metrics overlay
@@ -192,12 +196,12 @@ class SeparateVideoVisualizer:
             )
 
             out.write(canvas)
-            frame_idx += 1
+            video_frame_idx += 1
             processed_frames += 1
 
             # Progress update every 30 frames
             if processed_frames % 30 == 0:
-                progress = (processed_frames / max_frames) * 100
+                progress = (processed_frames / max(total_video_frames, 1)) * 100
                 print(f"   Progress: {progress:.0f}%")
 
         cap.release()

@@ -94,6 +94,10 @@ class PoseVisualizer:
         print(f"   ✓ Processed {metadata['processed_frames']} frames")
         print(f"   ✓ Confidence: {quality['confidence']:.1%}")
 
+        # Create mapping from actual video frame index -> keypoints index
+        # Ensures we draw keypoints on the exact corresponding video frame
+        frame_to_kp_idx = {kp.get('frame', idx): idx for idx, kp in enumerate(keypoints_seq)}
+
         # Calculate metrics for visualization
         print("\n📐 Step 2: Calculating metrics...")
         metrics = self._calculate_frame_metrics(keypoints_seq)
@@ -116,18 +120,18 @@ class PoseVisualizer:
         print(f"   Resolution: {width}x{height}")
         print(f"   FPS: {fps:.1f}")
 
-        frame_idx = 0
-        total_frames = len(keypoints_seq)
+        video_frame_idx = 0
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or len(keypoints_seq)
 
         while cap.isOpened():
             ret, frame = cap.read()
             if not ret:
                 break
 
-            if frame_idx < len(keypoints_seq):
-                # Get keypoints for this frame
-                keypoints = keypoints_seq[frame_idx]
-                frame_metrics = metrics[frame_idx] if frame_idx < len(metrics) else {}
+            kp_idx = frame_to_kp_idx.get(video_frame_idx)
+            if kp_idx is not None and 0 <= kp_idx < len(keypoints_seq):
+                keypoints = keypoints_seq[kp_idx]
+                frame_metrics = metrics[kp_idx] if kp_idx < len(metrics) else {}
 
                 # Draw pose overlay
                 frame = self._draw_pose_overlay(frame, keypoints, width, height)
@@ -136,16 +140,16 @@ class PoseVisualizer:
                 if show_metrics:
                     frame = self._draw_metrics_overlay(
                         frame, keypoints, frame_metrics,
-                        frame_idx, total_frames, quality
+                        video_frame_idx, total_frames, quality, fps
                     )
 
             out.write(frame)
-            frame_idx += 1
+            video_frame_idx += 1
 
             # Progress indicator
-            if frame_idx % 30 == 0:
-                progress = (frame_idx / total_frames) * 100
-                print(f"   Progress: {progress:.1f}% ({frame_idx}/{total_frames} frames)", end='\r')
+            if video_frame_idx % 30 == 0:
+                progress = (video_frame_idx / max(total_frames, 1)) * 100
+                print(f"   Progress: {progress:.1f}% ({video_frame_idx}/{total_frames} frames)", end='\r')
 
         cap.release()
         out.release()
@@ -204,7 +208,7 @@ class PoseVisualizer:
 
         return frame
 
-    def _draw_metrics_overlay(self, frame, keypoints, metrics, frame_idx, total_frames, quality):
+    def _draw_metrics_overlay(self, frame, keypoints, metrics, frame_idx, total_frames, quality, fps):
         """Draw metrics and info overlay"""
         height, width = frame.shape[:2]
 
@@ -226,7 +230,7 @@ class PoseVisualizer:
                    cv2.FONT_HERSHEY_DUPLEX, 0.8, self.COLORS['highlight'], 2)
 
         # Frame info
-        timestamp = frame_idx / (total_frames / (metadata['duration'] if 'metadata' in locals() else 5.0))
+        timestamp = frame_idx / max(fps, 1.0)
         cv2.putText(frame, f"Frame: {frame_idx}/{total_frames}  |  Time: {timestamp:.2f}s", (20, 65),
                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, self.COLORS['text'], 1)
 
