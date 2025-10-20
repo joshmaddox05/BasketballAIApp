@@ -8,33 +8,45 @@
       "developmentClient": true,
       "distribution": "internal",
       "ios": {
-        "simulator": false
+        "simulator": false,
+        "jsEngine": "hermes"
       },
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "jsEngine": "hermes"
       }
     },
     "preview": {
       "distribution": "internal",
       "ios": {
-        "simulator": false
+        "simulator": false,
+        "jsEngine": "hermes"
       },
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "jsEngine": "hermes"
       }
     },
     "preview-simulator": {
       "developmentClient": false,
       "distribution": "internal",
       "ios": {
-        "simulator": true
+        "simulator": true,
+        "jsEngine": "hermes"
       },
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "jsEngine": "hermes"
       }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "ios": {
+        "jsEngine": "hermes"
+      },
+      "android": {
+        "jsEngine": "hermes"
+      }
     }
   },
   "submit": {

@@ -10,8 +10,32 @@ import uuid
 import shutil
 import gc
 import logging
+import sys
+
+# Add parent directory to path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from services.baseline_analyzer import NumpyEncoder
+import numpy as np
 
 logger = logging.getLogger(__name__)
+
+def convert_numpy_types(obj):
+    """Recursively convert numpy types to native Python types"""
+    if isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, dict):
+        return {key: convert_numpy_types(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_numpy_types(item) for item in obj]
+    elif isinstance(obj, tuple):
+        return tuple(convert_numpy_types(item) for item in obj)
+    else:
+        return obj
 
 def setup_comprehensive_analysis_routes(app, upload_dir: Path, get_shot_analysis_service_func):
     """Setup comprehensive analysis API routes"""
@@ -85,10 +109,16 @@ def setup_comprehensive_analysis_routes(app, upload_dir: Path, get_shot_analysis
                     file_path.unlink()
                 
                 logger.warning(f"⚠️ Analysis failed: {error_response['error']}")
-                return JSONResponse(status_code=200, content=error_response)
+                return JSONResponse(status_code=200, content=error_response, cls=NumpyEncoder)
+            
+            # Convert numpy types to native Python types
+            results = convert_numpy_types(results)
             
             # Format successful response
             response = _format_comprehensive_response(video_id, results)
+            
+            # Convert response to native Python types
+            response = convert_numpy_types(response)
             
             logger.info(f"✅ Comprehensive analysis complete - Score: {response['overall_score']}/100")
             
@@ -100,7 +130,7 @@ def setup_comprehensive_analysis_routes(app, upload_dir: Path, get_shot_analysis
             # Force garbage collection
             gc.collect()
             
-            return response
+            return JSONResponse(content=response, cls=NumpyEncoder)
             
         except Exception as e:
             logger.error(f"❌ Comprehensive analysis error: {str(e)}", exc_info=True)
@@ -199,6 +229,9 @@ def _format_metric(metric_data: Optional[Dict[str, Any]]) -> Dict[str, Any]:
             "error": metric_data.get('error', 'Not available') if metric_data else 'Not available',
             "quality_score": 0.0
         }
+    
+    # Convert numpy types to native Python types
+    metric_data = convert_numpy_types(metric_data)
     
     formatted = {
         "quality_score": round(metric_data.get('quality_score', 0), 1)

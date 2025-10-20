@@ -13,7 +13,7 @@ import numpy as np
 import logging
 import gc  # For garbage collection
 
-from services.baseline_analyzer import BaselineAnalyzer
+from services.baseline_analyzer import BaselineAnalyzer, NumpyEncoder
 from services.video_processor import VideoProcessor
 from services.shot_analysis_service import ShotAnalysisService
 from routes.comprehensive_analysis import setup_comprehensive_analysis_routes
@@ -21,6 +21,23 @@ from services.shot_analysis_service import ShotAnalysisService
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+def convert_numpy_types(obj):
+    """Recursively convert numpy types to native Python types"""
+    if isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, dict):
+        return {key: convert_numpy_types(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_numpy_types(item) for item in obj]
+    elif isinstance(obj, tuple):
+        return tuple(convert_numpy_types(item) for item in obj)
+    else:
+        return obj
 
 app = FastAPI(
     title="Basketball AI Analysis API",
@@ -51,7 +68,8 @@ async def limit_concurrent_processing(request, call_next):
         if active_requests >= MAX_CONCURRENT_REQUESTS:
             return JSONResponse(
                 status_code=503,
-                content={"detail": "Server is busy processing another video. Please try again in a moment."}
+                content={"detail": "Server is busy processing another video. Please try again in a moment."},
+                cls=NumpyEncoder
             )
         active_requests += 1
         try:
@@ -389,7 +407,10 @@ async def analyze_form(
                 file_path.unlink()
             
             logger.warning(f"⚠️ Form analysis failed: {error_response['error']}")
-            return JSONResponse(status_code=200, content=error_response)
+            return JSONResponse(status_code=200, content=error_response, cls=NumpyEncoder)
+        
+        # Convert numpy types to native Python types
+        results = convert_numpy_types(results)
         
         # Format successful response for pure form analysis
         response = {
@@ -461,6 +482,9 @@ async def analyze_form(
             "analyzed_at": datetime.now().isoformat()
         }
         
+        # Convert response to native Python types
+        response = convert_numpy_types(response)
+        
         # Cache results
         analysis_cache[video_id] = response
         
@@ -474,7 +498,7 @@ async def analyze_form(
         # Force garbage collection
         gc.collect()
         
-        return response
+        return JSONResponse(content=response, cls=NumpyEncoder)
         
     except Exception as e:
         logger.error(f"❌ Form analysis error: {str(e)}", exc_info=True)
@@ -560,7 +584,10 @@ async def analyze_shot_comprehensive(
                 file_path.unlink()
             
             logger.warning(f"⚠️ Analysis failed: {error_response['error']}")
-            return JSONResponse(status_code=200, content=error_response)
+            return JSONResponse(status_code=200, content=error_response, cls=NumpyEncoder)
+        
+        # Convert numpy types to native Python types
+        results = convert_numpy_types(results)
         
         # Format successful response
         response = {
@@ -633,6 +660,9 @@ async def analyze_shot_comprehensive(
             "analyzed_at": datetime.now().isoformat()
         }
         
+        # Convert response to native Python types
+        response = convert_numpy_types(response)
+        
         # Cache results
         analysis_cache[video_id] = response
         
@@ -646,7 +676,7 @@ async def analyze_shot_comprehensive(
         # Force garbage collection
         gc.collect()
         
-        return response
+        return JSONResponse(content=response, cls=NumpyEncoder)
         
     except Exception as e:
         logger.error(f"❌ Comprehensive analysis error: {str(e)}", exc_info=True)
@@ -669,6 +699,9 @@ def _format_metric(metric_data: Optional[Dict[str, Any]]) -> Dict[str, Any]:
             "error": metric_data.get('error', 'Not available') if metric_data else 'Not available',
             "quality_score": 0.0
         }
+    
+    # Convert numpy types to native Python types
+    metric_data = convert_numpy_types(metric_data)
     
     formatted = {
         "quality_score": round(metric_data.get('quality_score', 0), 1)
@@ -701,6 +734,9 @@ def _format_form_metric(metric_data: Optional[Dict[str, Any]]) -> Dict[str, Any]
             "optimal_range": "N/A",
             "status": "error"
         }
+    
+    # Convert numpy types to native Python types
+    metric_data = convert_numpy_types(metric_data)
     
     formatted = {
         "quality_score": round(metric_data.get('quality_score', 0), 1),

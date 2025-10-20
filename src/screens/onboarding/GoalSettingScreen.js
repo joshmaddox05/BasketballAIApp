@@ -8,7 +8,8 @@ import {
     ScrollView,
     TextInput,
     SafeAreaView,
-    Switch
+    Switch,
+    Alert
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';

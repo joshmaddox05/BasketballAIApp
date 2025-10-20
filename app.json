@@ -15,6 +15,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.jmaddox0503.BasketballAIApp",
       "deploymentTarget": "15.1",
+      "jsEngine": "hermes",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -24,7 +25,8 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.jmaddox0503.BasketballAIApp"
+      "package": "com.jmaddox0503.BasketballAIApp",
+      "jsEngine": "hermes"
     },
     "web": {
       "favicon": "./assets/favicon.png"
