@@ -3,6 +3,7 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
+import { View, Text } from 'react-native';
 
 // Import your main app screens
 import HomeScreen from '../screens/main/HomeScreen';
@@ -10,6 +11,7 @@ import TrainingScreen from '../screens/main/TrainingScreen';
 import ProgressScreen from '../screens/main/ProgressScreen';
 import CommunityScreen from '../screens/main/CommunityScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
+import SettingsScreen from '../screens/main/SettingsScreen';
 
 // Import the shared screens utility
 import { addSharedScreensToStack } from './SharedStackNavigator';
@@ -162,7 +164,6 @@ const AllGoalsScreen = () => <View style={{flex:1, justifyContent:'center', alig
 const CreatePostScreen = () => <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><Text>Create Post Screen</Text></View>;
 const AllChallengesScreen = () => <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><Text>All Challenges Screen</Text></View>;
 const EditProfileScreen = () => <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><Text>Edit Profile Screen</Text></View>;
-const SettingsScreen = () => <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><Text>Settings Screen</Text></View>;
 const NotificationsScreen = () => <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><Text>Notifications Screen</Text></View>;
 const AccountPrivacyScreen = () => <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><Text>Account Privacy Screen</Text></View>;
 const HelpCenterScreen = () => <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><Text>Help Center Screen</Text></View>;

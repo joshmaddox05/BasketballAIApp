@@ -5,13 +5,12 @@ import {
     Text,
     View,
     TouchableOpacity,
-    SafeAreaView,
-    StatusBar,
     ScrollView,
     TextInput,
-    Switch,
-    Alert
+    SafeAreaView,
+    Switch
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
 

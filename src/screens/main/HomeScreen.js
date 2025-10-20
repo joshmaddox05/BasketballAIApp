@@ -10,13 +10,14 @@ import {
     ActivityIndicator,
     Image,
     RefreshControl,
-    StatusBar,
     SafeAreaView
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getTheme } from '../../utils/theme';
 
 
 const HomeScreen = ({ navigation }) => {
@@ -27,8 +28,13 @@ const HomeScreen = ({ navigation }) => {
         loading,
         refreshUserData,
         dailyTip,
-        fetchDailyTip
+        fetchDailyTip,
+        theme: contextTheme,
+        isDarkMode
     } = useAppContext();
+
+    // Add fallback theme in case context theme is not ready
+    const theme = contextTheme || getTheme(isDarkMode || false);
 
     const [refreshing, setRefreshing] = React.useState(false);
 
@@ -57,22 +63,22 @@ const HomeScreen = ({ navigation }) => {
 
     const renderActivity = ({ item }) => (
         <TouchableOpacity
-            style={styles.activityCard}
+            style={[styles.activityCard, { backgroundColor: theme.card }]}
             onPress={() => navigation.navigate('ActivityDetail', { activityId: item.id })}
         >
             <View style={styles.activityInfo}>
-                <Text style={styles.activityTitle}>{item.title}</Text>
-                <Text style={styles.activityDate}>{item.date}</Text>
+                <Text style={[styles.activityTitle, { color: theme.text }]}>{item.title}</Text>
+                <Text style={[styles.activityDate, { color: theme.textSecondary }]}>{item.date}</Text>
             </View>
-            <View style={styles.progressContainer}>
-                <Text style={styles.progressText}>{item.progress}%</Text>
+            <View style={[styles.progressContainer, { backgroundColor: theme.backgroundTertiary }]}>
+                <Text style={[styles.progressText, { color: theme.primary }]}>{item.progress}%</Text>
             </View>
         </TouchableOpacity>
     );
 
     const renderWorkout = ({ item }) => (
         <TouchableOpacity
-            style={styles.workoutCard}
+            style={[styles.workoutCard, { backgroundColor: theme.card }]}
             onPress={() => navigation.navigate('WorkoutDetail', { workoutId: item.id })}
         >
             <View style={styles.workoutImageContainer}>
@@ -87,35 +93,35 @@ const HomeScreen = ({ navigation }) => {
                     <Text style={styles.workoutDifficultyText}>{item.level}</Text>
                 </View>
             </View>
-            <Text style={styles.workoutTitle}>{item.title}</Text>
+            <Text style={[styles.workoutTitle, { color: theme.text }]}>{item.title}</Text>
             <View style={styles.workoutMeta}>
                 <View style={styles.workoutDuration}>
-                    <Ionicons name="time-outline" size={14} color="#666" />
-                    <Text style={styles.workoutDurationText}>{item.duration}</Text>
+                    <Ionicons name="time-outline" size={14} color={theme.textSecondary} />
+                    <Text style={[styles.workoutDurationText, { color: theme.textSecondary }]}>{item.duration}</Text>
                 </View>
                 <TouchableOpacity
-                    style={styles.startWorkoutButton}
+                    style={[styles.startWorkoutButton, { backgroundColor: theme.backgroundTertiary }]}
                     onPress={() => navigation.navigate('WorkoutDetail', { workoutId: item.id, autoStart: true })}
                 >
-                    <Text style={styles.startWorkoutText}>Start</Text>
+                    <Text style={[styles.startWorkoutText, { color: theme.primary }]}>Start</Text>
                 </TouchableOpacity>
             </View>
         </TouchableOpacity>
     );
 
     return (
-        <SafeAreaView style={styles.safeArea}>
-            <StatusBar barStyle="dark-content" backgroundColor="#F8F9FA" />
+        <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+            <StatusBar style={theme.statusBarStyle} />
             <ScrollView
-                style={styles.container}
+                style={[styles.container, { backgroundColor: theme.background }]}
                 refreshControl={
                     <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
                 }
             >
                 <View style={styles.header}>
                     <View>
-                        <Text style={styles.greeting}>Hello, {userData.name.split(' ')[0]}</Text>
-                        <Text style={styles.subGreeting}>Ready to improve today?</Text>
+                        <Text style={[styles.greeting, { color: theme.text }]}>Hello, {userData.name.split(' ')[0]}</Text>
+                        <Text style={[styles.subGreeting, { color: theme.textSecondary }]}>Ready to improve today?</Text>
                     </View>
                     <TouchableOpacity
                         style={styles.profileButton}
@@ -135,27 +141,27 @@ const HomeScreen = ({ navigation }) => {
 
                 {/* Daily Tip Card */}
                 {dailyTip && (
-                    <View style={styles.tipCard}>
+                    <View style={[styles.tipCard, { backgroundColor: isDarkMode ? theme.backgroundSecondary : '#FFF8E1' }]}>
                         <View style={styles.tipHeader}>
                             <Ionicons name="bulb" size={20} color="#FFD700" />
-                            <Text style={styles.tipTitle}>Tip of the Day</Text>
+                            <Text style={[styles.tipTitle, { color: theme.text }]}>Tip of the Day</Text>
                         </View>
-                        <Text style={styles.tipText}>{dailyTip}</Text>
+                        <Text style={[styles.tipText, { color: theme.textSecondary }]}>{dailyTip}</Text>
                     </View>
                 )}
 
                 <View style={styles.statsContainer}>
-                    <View style={styles.statBox}>
-                        <Text style={styles.statValue}>{userData.stats.shooting}%</Text>
-                        <Text style={styles.statLabel}>Shooting</Text>
+                    <View style={[styles.statBox, { backgroundColor: theme.card }]}>
+                        <Text style={[styles.statValue, { color: theme.primary }]}>{userData.stats.shooting}%</Text>
+                        <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Shooting</Text>
                     </View>
-                    <View style={styles.statBox}>
-                        <Text style={styles.statValue}>{userData.stats.dribbling}%</Text>
-                        <Text style={styles.statLabel}>Dribbling</Text>
+                    <View style={[styles.statBox, { backgroundColor: theme.card }]}>
+                        <Text style={[styles.statValue, { color: theme.primary }]}>{userData.stats.dribbling}%</Text>
+                        <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Dribbling</Text>
                     </View>
-                    <View style={styles.statBox}>
-                        <Text style={styles.statValue}>{userData.stats.streak}</Text>
-                        <Text style={styles.statLabel}>Streak</Text>
+                    <View style={[styles.statBox, { backgroundColor: theme.card }]}>
+                        <Text style={[styles.statValue, { color: theme.primary }]}>{userData.stats.streak}</Text>
+                        <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Streak</Text>
                     </View>
                 </View>
 
@@ -183,9 +189,9 @@ const HomeScreen = ({ navigation }) => {
 
                 <View style={styles.sectionContainer}>
                     <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>Recent Activities</Text>
+                        <Text style={[styles.sectionTitle, { color: theme.text }]}>Recent Activities</Text>
                         <TouchableOpacity onPress={() => navigation.navigate('AllActivities')}>
-                            <Text style={styles.seeAllText}>See All</Text>
+                            <Text style={[styles.seeAllText, { color: theme.primary }]}>See All</Text>
                         </TouchableOpacity>
                     </View>
                     {activities.length > 0 ? (
@@ -197,10 +203,10 @@ const HomeScreen = ({ navigation }) => {
                             scrollEnabled={false}
                         />
                     ) : (
-                        <View style={styles.emptyState}>
-                            <Text style={styles.emptyStateText}>No activities yet.</Text>
+                        <View style={[styles.emptyState, { backgroundColor: theme.card }]}>
+                            <Text style={[styles.emptyStateText, { color: theme.textSecondary }]}>No activities yet.</Text>
                             <TouchableOpacity
-                                style={styles.emptyStateButton}
+                                style={[styles.emptyStateButton, { backgroundColor: theme.primary }]}
                                 onPress={() => navigation.navigate('TrainingTab')}
                             >
                                 <Text style={styles.emptyStateButtonText}>Start Training</Text>
@@ -211,9 +217,9 @@ const HomeScreen = ({ navigation }) => {
 
                 <View style={styles.sectionContainer}>
                     <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>Featured Workouts</Text>
+                        <Text style={[styles.sectionTitle, { color: theme.text }]}>Featured Workouts</Text>
                         <TouchableOpacity onPress={() => navigation.navigate('AllWorkouts')}>
-                            <Text style={styles.seeAllText}>See All</Text>
+                            <Text style={[styles.seeAllText, { color: theme.primary }]}>See All</Text>
                         </TouchableOpacity>
                     </View>
                     {workouts.length > 0 ? (
@@ -226,73 +232,73 @@ const HomeScreen = ({ navigation }) => {
                             contentContainerStyle={styles.featuredWorkoutsList}
                         />
                     ) : (
-                        <View style={styles.emptyState}>
-                            <Text style={styles.emptyStateText}>No workouts available.</Text>
+                        <View style={[styles.emptyState, { backgroundColor: theme.card }]}>
+                            <Text style={[styles.emptyStateText, { color: theme.textSecondary }]}>No workouts available.</Text>
                         </View>
                     )}
                 </View>
 
                 {/* Monthly Challenge Card - more visually appealing */}
-                <View style={styles.challengeContainer}>
+                <View style={[styles.challengeContainer, { backgroundColor: theme.card }]}>
                     <View style={styles.challengeHeader}>
-                        <Text style={styles.challengeTitle}>Monthly Challenge</Text>
-                        <View style={styles.challengeBadge}>
-                            <Text style={styles.challengeBadgeText}>ACTIVE</Text>
+                        <Text style={[styles.challengeTitle, { color: theme.text }]}>Monthly Challenge</Text>
+                        <View style={[styles.challengeBadge, { backgroundColor: isDarkMode ? theme.primaryLight + '30' : '#E0F7FA' }]}>
+                            <Text style={[styles.challengeBadgeText, { color: isDarkMode ? theme.primary : '#0097A7' }]}>ACTIVE</Text>
                         </View>
                     </View>
-                    <Text style={styles.challengeName}>"Perfect Your Free Throw"</Text>
+                    <Text style={[styles.challengeName, { color: theme.primary }]}>"Perfect Your Free Throw"</Text>
 
                     <View style={styles.challengeProgressContainer}>
-                        <View style={styles.challengeProgressBar}>
-                            <View style={[styles.challengeProgressFill, { width: '40%' }]} />
+                        <View style={[styles.challengeProgressBar, { backgroundColor: theme.backgroundTertiary }]}>
+                            <View style={[styles.challengeProgressFill, { backgroundColor: theme.primary, width: '40%' }]} />
                         </View>
-                        <Text style={styles.challengeProgressText}>12/30 days completed</Text>
+                        <Text style={[styles.challengeProgressText, { color: theme.textSecondary }]}>12/30 days completed</Text>
                     </View>
 
                     <TouchableOpacity
                         style={styles.challengeViewButton}
                         onPress={() => navigation.navigate('ChallengeDetail', { challengeId: 'monthly' })}
                     >
-                        <Text style={styles.challengeViewText}>View Challenge</Text>
-                        <Ionicons name="arrow-forward" size={16} color="#FF6B00" />
+                        <Text style={[styles.challengeViewText, { color: theme.primary }]}>View Challenge</Text>
+                        <Ionicons name="arrow-forward" size={16} color={theme.primary} />
                     </TouchableOpacity>
                 </View>
 
                 {/* Quick Actions Card */}
-                <View style={styles.quickActionsContainer}>
-                    <Text style={styles.sectionTitle}>Quick Actions</Text>
+                <View style={[styles.quickActionsContainer, { backgroundColor: theme.card }]}>
+                    <Text style={[styles.sectionTitle, { color: theme.text }]}>Quick Actions</Text>
                     <View style={styles.quickActionsGrid}>
                         <TouchableOpacity
-                            style={styles.quickActionCard}
+                            style={[styles.quickActionCard, { backgroundColor: theme.backgroundSecondary }]}
                             onPress={() => navigation.navigate('VideoLibrary')}
                         >
-                            <View style={[styles.quickActionIcon, { backgroundColor: '#FF6B0020' }]}>
-                                <Ionicons name="videocam" size={24} color="#FF6B00" />
+                            <View style={[styles.quickActionIcon, { backgroundColor: theme.primary + '20' }]}>
+                                <Ionicons name="videocam" size={24} color={theme.primary} />
                             </View>
-                            <Text style={styles.quickActionTitle}>Training Videos</Text>
-                            <Text style={styles.quickActionSubtitle}>Watch & Learn</Text>
+                            <Text style={[styles.quickActionTitle, { color: theme.text }]}>Training Videos</Text>
+                            <Text style={[styles.quickActionSubtitle, { color: theme.textSecondary }]}>Watch & Learn</Text>
                         </TouchableOpacity>
                         
                         <TouchableOpacity
-                            style={styles.quickActionCard}
+                            style={[styles.quickActionCard, { backgroundColor: theme.backgroundSecondary }]}
                             onPress={() => navigation.navigate('ShootingAnalysis')}
                         >
                             <View style={[styles.quickActionIcon, { backgroundColor: '#4CAF5020' }]}>
                                 <Ionicons name="analytics" size={24} color="#4CAF50" />
                             </View>
-                            <Text style={styles.quickActionTitle}>Shot Analysis</Text>
-                            <Text style={styles.quickActionSubtitle}>AI Feedback</Text>
+                            <Text style={[styles.quickActionTitle, { color: theme.text }]}>Form Analysis</Text>
+                            <Text style={[styles.quickActionSubtitle, { color: theme.textSecondary }]}>Form Coaching</Text>
                         </TouchableOpacity>
                         
                         <TouchableOpacity
-                            style={styles.quickActionCard}
+                            style={[styles.quickActionCard, { backgroundColor: theme.backgroundSecondary }]}
                             onPress={() => navigation.navigate('YouTubeTest')}
                         >
                             <View style={[styles.quickActionIcon, { backgroundColor: '#FF000020' }]}>
                                 <Ionicons name="bug" size={24} color="#FF0000" />
                             </View>
-                            <Text style={styles.quickActionTitle}>API Test</Text>
-                            <Text style={styles.quickActionSubtitle}>Debug YouTube</Text>
+                            <Text style={[styles.quickActionTitle, { color: theme.text }]}>API Test</Text>
+                            <Text style={[styles.quickActionSubtitle, { color: theme.textSecondary }]}>Debug YouTube</Text>
                         </TouchableOpacity>
                     </View>
                 </View>

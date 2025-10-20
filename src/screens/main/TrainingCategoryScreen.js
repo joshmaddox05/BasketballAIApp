@@ -4,13 +4,13 @@ import {
     StyleSheet,
     Text,
     View,
-    FlatList,
     TouchableOpacity,
-    Image,
+    FlatList,
     SafeAreaView,
-    StatusBar,
-    ActivityIndicator
+    ActivityIndicator,
+    Image
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
 

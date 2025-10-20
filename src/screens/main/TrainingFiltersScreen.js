@@ -7,9 +7,9 @@ import {
     TouchableOpacity,
     ScrollView,
     SafeAreaView,
-    StatusBar,
     Switch
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 
 const TrainingFiltersScreen = ({ route, navigation }) => {

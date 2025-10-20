@@ -5,14 +5,13 @@ import {
     Text,
     View,
     TouchableOpacity,
-    SafeAreaView,
-    StatusBar,
-    FlatList,
-    Image,
-    Dimensions,
+    ScrollView,
     Animated,
-    Alert
+    Dimensions,
+    Image,
+    SafeAreaView
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
 import welcomeBackground from '../../../assets/welcome-background.jpg'

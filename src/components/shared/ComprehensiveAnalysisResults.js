@@ -16,7 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 const { width } = Dimensions.get('window');
 
 const ComprehensiveAnalysisResults = ({ results, onClose, onTryAgain }) => {
-    const [activeTab, setActiveTab] = useState('overview'); // overview, phases, metrics, comparison, coaching
+    const [activeTab, setActiveTab] = useState('overview'); // overview, phases, metrics, coaching
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(50)).current;
 
@@ -106,9 +106,9 @@ const ComprehensiveAnalysisResults = ({ results, onClose, onTryAgain }) => {
                 <View style={styles.quickStatCard}>
                     <Ionicons name="trophy-outline" size={24} color="#F59E0B" />
                     <Text style={styles.quickStatValue}>
-                        {results.baselineComparison?.similarity_percentage || 'N/A'}%
+                        {results.metrics?.length || 0}
                     </Text>
-                    <Text style={styles.quickStatLabel}>NBA Match</Text>
+                    <Text style={styles.quickStatLabel}>Areas Analyzed</Text>
                 </View>
             </View>
 
@@ -275,18 +275,18 @@ const ComprehensiveAnalysisResults = ({ results, onClose, onTryAgain }) => {
                             </Text>
                         </View>
                         <View style={styles.comparisonRow}>
-                            <Text style={styles.comparisonLabel}>NBA Baseline:</Text>
+                            <Text style={styles.comparisonLabel}>Optimal Range:</Text>
                             <Text style={styles.comparisonValue}>
-                                {metric.baseline_value}{metric.unit}
+                                {metric.optimal_range || '45-55°'}
                             </Text>
                         </View>
                         <View style={styles.comparisonRow}>
-                            <Text style={styles.comparisonLabel}>Deviation:</Text>
+                            <Text style={styles.comparisonLabel}>Status:</Text>
                             <Text style={[
                                 styles.comparisonValue,
-                                { color: Math.abs(parseFloat(metric.deviation)) < 5 ? '#10B981' : '#F59E0B' }
+                                { color: metric.status === 'good' ? '#10B981' : metric.status === 'improve' ? '#F59E0B' : '#EF4444' }
                             ]}>
-                                {metric.deviation > 0 ? '+' : ''}{metric.deviation}{metric.unit}
+                                {metric.status === 'good' ? 'Good' : metric.status === 'improve' ? 'Needs Work' : 'Poor'}
                             </Text>
                         </View>
                     </View>
@@ -319,99 +319,7 @@ const ComprehensiveAnalysisResults = ({ results, onClose, onTryAgain }) => {
         </ScrollView>
     );
 
-    const renderComparisonTab = () => {
-        const comparison = results.baselineComparison;
-        if (!comparison) {
-            return (
-                <View style={styles.noDataContainer}>
-                    <Text style={styles.noDataText}>No comparison data available</Text>
-                </View>
-            );
-        }
-
-        return (
-            <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false}>
-                {/* NBA Player Card */}
-                <View style={styles.nbaPlayerCard}>
-                    <LinearGradient
-                        colors={['#6366F1', '#8B5CF6']}
-                        style={styles.nbaPlayerGradient}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                    >
-                        <View style={styles.nbaPlayerHeader}>
-                            <View>
-                                <Text style={styles.nbaPlayerName}>{comparison.player}</Text>
-                                <Text style={styles.nbaPlayerInfo}>
-                                    {comparison.position} • {comparison.team}
-                                </Text>
-                            </View>
-                            <View style={styles.similarityBadge}>
-                                <Text style={styles.similarityValue}>
-                                    {comparison.similarity_percentage}%
-                                </Text>
-                                <Text style={styles.similarityLabel}>Match</Text>
-                            </View>
-                        </View>
-                    </LinearGradient>
-                </View>
-
-                {/* Biomechanics Match Breakdown */}
-                {comparison.biomechanics_match && (
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Biomechanics Comparison</Text>
-                        {comparison.biomechanics_match.map((item, index) => (
-                            <View key={index} style={styles.matchRow}>
-                                <Text style={styles.matchMetric}>{item.metric}</Text>
-                                <View style={styles.matchBarContainer}>
-                                    <View style={styles.matchBar}>
-                                        <View 
-                                            style={[
-                                                styles.matchBarFill,
-                                                { 
-                                                    width: `${item.match}%`,
-                                                    backgroundColor: getScoreColor(item.match)
-                                                }
-                                            ]}
-                                        />
-                                    </View>
-                                    <Text style={styles.matchPercentage}>
-                                        {Math.round(item.match)}%
-                                    </Text>
-                                </View>
-                            </View>
-                        ))}
-                    </View>
-                )}
-
-                {/* Strengths */}
-                {comparison.stronger_areas && comparison.stronger_areas.length > 0 && (
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Your Strengths</Text>
-                        {comparison.stronger_areas.map((strength, index) => (
-                            <View key={index} style={styles.strengthItem}>
-                                <Ionicons name="trophy" size={20} color="#10B981" />
-                                <Text style={styles.strengthText}>{strength}</Text>
-                            </View>
-                        ))}
-                    </View>
-                )}
-
-                {/* Areas for Improvement */}
-                {comparison.improvement_areas && comparison.improvement_areas.length > 0 && (
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Focus Areas</Text>
-                        {comparison.improvement_areas.map((area, index) => (
-                            <View key={index} style={styles.improvementItem}>
-                                <Ionicons name="fitness" size={20} color="#F59E0B" />
-                                <Text style={styles.improvementText}>{area}</Text>
-                            </View>
-                        ))}
-                    </View>
-                )}
-            </ScrollView>
-        );
-    };
+    // Removed renderComparisonTab - no longer comparing to NBA players
 
     const renderCoachingTab = () => (
         <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false}>
@@ -524,19 +432,7 @@ const ComprehensiveAnalysisResults = ({ results, onClose, onTryAgain }) => {
                     </Text>
                 </TouchableOpacity>
                 
-                <TouchableOpacity 
-                    style={[styles.tab, activeTab === 'comparison' && styles.activeTab]}
-                    onPress={() => setActiveTab('comparison')}
-                >
-                    <Ionicons 
-                        name="people-outline" 
-                        size={20} 
-                        color={activeTab === 'comparison' ? '#6366F1' : '#9CA3AF'} 
-                    />
-                    <Text style={[styles.tabText, activeTab === 'comparison' && styles.activeTabText]}>
-                        NBA
-                    </Text>
-                </TouchableOpacity>
+                {/* Removed NBA comparison tab */}
                 
                 <TouchableOpacity 
                     style={[styles.tab, activeTab === 'coaching' && styles.activeTab]}
@@ -557,7 +453,6 @@ const ComprehensiveAnalysisResults = ({ results, onClose, onTryAgain }) => {
             {activeTab === 'overview' && renderOverviewTab()}
             {activeTab === 'phases' && renderPhasesTab()}
             {activeTab === 'metrics' && renderMetricsTab()}
-            {activeTab === 'comparison' && renderComparisonTab()}
             {activeTab === 'coaching' && renderCoachingTab()}
         </Animated.View>
     );
@@ -988,121 +883,7 @@ const styles = StyleSheet.create({
         color: '#4F46E5',
         lineHeight: 18,
     },
-    nbaPlayerCard: {
-        borderRadius: 20,
-        overflow: 'hidden',
-        marginBottom: 24,
-        ...Platform.select({
-            ios: {
-                shadowColor: '#6366F1',
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.2,
-                shadowRadius: 12,
-            },
-            android: {
-                elevation: 5,
-            },
-        }),
-    },
-    nbaPlayerGradient: {
-        padding: 24,
-    },
-    nbaPlayerHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    nbaPlayerName: {
-        fontSize: 24,
-        fontWeight: '800',
-        color: '#fff',
-        marginBottom: 4,
-    },
-    nbaPlayerInfo: {
-        fontSize: 14,
-        color: '#fff',
-        opacity: 0.9,
-    },
-    similarityBadge: {
-        backgroundColor: 'rgba(255, 255, 255, 0.2)',
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        borderRadius: 16,
-        alignItems: 'center',
-    },
-    similarityValue: {
-        fontSize: 28,
-        fontWeight: '800',
-        color: '#fff',
-    },
-    similarityLabel: {
-        fontSize: 11,
-        color: '#fff',
-        opacity: 0.9,
-        marginTop: 2,
-    },
-    matchRow: {
-        marginBottom: 16,
-    },
-    matchMetric: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#1F2937',
-        marginBottom: 8,
-    },
-    matchBarContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    matchBar: {
-        flex: 1,
-        height: 10,
-        backgroundColor: '#E5E7EB',
-        borderRadius: 5,
-        overflow: 'hidden',
-        marginRight: 12,
-    },
-    matchBarFill: {
-        height: '100%',
-        borderRadius: 5,
-    },
-    matchPercentage: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: '#1F2937',
-        minWidth: 40,
-        textAlign: 'right',
-    },
-    strengthItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#ECFDF5',
-        borderRadius: 12,
-        padding: 12,
-        marginBottom: 8,
-        gap: 10,
-    },
-    strengthText: {
-        flex: 1,
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#059669',
-    },
-    improvementItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#FFFBEB',
-        borderRadius: 12,
-        padding: 12,
-        marginBottom: 8,
-        gap: 10,
-    },
-    improvementText: {
-        flex: 1,
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#D97706',
-    },
+    // Removed NBA player card and comparison styles
     coachingCard: {
         backgroundColor: '#fff',
         borderRadius: 16,

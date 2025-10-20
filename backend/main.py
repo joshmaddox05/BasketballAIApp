@@ -14,11 +14,9 @@ import logging
 import gc  # For garbage collection
 
 from services.baseline_analyzer import BaselineAnalyzer
-from services.shot_comparator import ShotComparator
 from services.video_processor import VideoProcessor
 from services.shot_analysis_service import ShotAnalysisService
 from routes.comprehensive_analysis import setup_comprehensive_analysis_routes
-from routes.shot_comparison import setup_comparison_routes
 from services.shot_analysis_service import ShotAnalysisService
 
 logging.basicConfig(level=logging.INFO)
@@ -76,11 +74,6 @@ def get_baseline_analyzer():
         baseline_analyzer = BaselineAnalyzer()
     return baseline_analyzer
 
-def get_shot_comparator():
-    global shot_comparator
-    if shot_comparator is None:
-        shot_comparator = ShotComparator()
-    return shot_comparator
 
 def get_video_processor():
     global video_processor
@@ -110,7 +103,6 @@ analysis_cache = {}
 
 # Setup comprehensive analysis routes
 setup_comprehensive_analysis_routes(app, UPLOAD_DIR, get_shot_analysis_service)
-setup_comparison_routes(app, UPLOAD_DIR, OUTPUT_DIR)
 
 @app.get("/")
 async def root():
@@ -189,13 +181,12 @@ async def analyze_shooting_form(request: Dict[str, Any]):
     try:
         # Get services lazily
         processor = get_video_processor()
-        comparator = get_shot_comparator()
         
         video_id = request.get("video_id")
         analysis_mode = request.get("analysis_mode", "shooting")
         camera_type = request.get("camera_type", "back")
         duration = request.get("duration", 5.0)
-        comparison_player = request.get("comparison_player")
+        # Removed comparison_player parameter - no longer comparing to specific players
         
         if video_id not in video_storage:
             raise HTTPException(status_code=404, detail="Video not found")
@@ -208,17 +199,7 @@ async def analyze_shooting_form(request: Dict[str, Any]):
         # Process video and extract pose data
         user_analysis = processor.analyze_shooting_video(video_path)
         
-        # If comparison player specified, compare forms
-        comparison = None
-        if comparison_player:
-            try:
-                comparison = comparator.compare_to_baseline(
-                    user_analysis,
-                    comparison_player
-                )
-            except Exception as e:
-                logger.warning(f"Comparison failed: {e}")
-                comparison = None
+        # Removed comparison logic - no longer comparing to specific players
         
         # Generate comprehensive results
         results = {
@@ -228,9 +209,8 @@ async def analyze_shooting_form(request: Dict[str, Any]):
             "confidence": user_analysis.get('confidence', 0.85),
             "metrics": _format_metrics_for_app(user_analysis['metrics']),
             "keypoints": user_analysis.get('keypoints_sequence', [])[:10],  # First 10 frames
-            "recommendations": _generate_recommendations(user_analysis, comparison),
+            "recommendations": _generate_recommendations(user_analysis),
             "biomechanics": _format_biomechanics(user_analysis),
-            "comparison": comparison,
             "analyzed_at": datetime.now().isoformat()
         }
         
@@ -249,17 +229,18 @@ async def analyze_shooting_form(request: Dict[str, Any]):
         gc.collect()  # Clean up memory even on error
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
-@app.post("/analyze/compare-to-curry")
-async def compare_to_curry(video: UploadFile = File(...)):
+# Removed /analyze/compare-to-curry endpoint - no longer comparing to specific players
+
+@app.post("/analyze/form-analysis")
+async def analyze_form_analysis(video: UploadFile = File(...)):
     """
-    Upload a video and immediately compare it to Steph Curry's shooting form.
-    This is a streamlined endpoint that handles upload, analysis, and comparison in one call.
+    Pure form analysis without player comparison.
+    Analyzes shooting technique against optimal biomechanical ranges.
     """
     file_path = None
     try:
-        # Get services lazily (don't load on startup)
+        # Get services lazily
         processor = get_video_processor()
-        comparator = get_shot_comparator()
         
         # Step 1: Upload and save video
         video_id = str(uuid.uuid4())
@@ -276,7 +257,7 @@ async def compare_to_curry(video: UploadFile = File(...)):
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(video.file, buffer)
         
-        logger.info(f"📹 Video uploaded for Curry comparison: {video_id}")
+        logger.info(f"📹 Video uploaded for form analysis: {video_id}")
         
         # Store video metadata
         video_storage[video_id] = {
@@ -287,83 +268,29 @@ async def compare_to_curry(video: UploadFile = File(...)):
         }
         
         # Step 2: Analyze user's shooting form
-        logger.info(f"🎯 Analyzing user's shooting form...")
+        logger.info(f"🎯 Analyzing shooting form...")
         user_analysis = processor.analyze_shooting_video(str(file_path))
         
-        # Step 3: Compare to Steph Curry's baseline
-        logger.info(f"🏀 Comparing to Steph Curry's form...")
-        comparison = comparator.compare_to_baseline(
-            user_analysis,
-            "stephen_curry"
-        )
-        
-        # Step 4: Generate comprehensive results
+        # Step 3: Generate form analysis results
         overall_score = _calculate_overall_score(user_analysis)
         
         results = {
             "video_id": video_id,
-            "analysis_mode": "curry_comparison",
             "overall_score": overall_score,
-            "similarity_to_curry": comparison['overall_similarity'],
+            "overall_grade": _get_grade_from_score(overall_score),
             "confidence": user_analysis.get('confidence', 0.85),
+            "orientation": "side",  # Could be detected from video
             
-            # User's metrics formatted for the app
-            "your_metrics": _format_metrics_for_app(user_analysis['metrics']),
+            # Metrics by category with optimal ranges
+            "wrist_metrics": _format_wrist_metrics(user_analysis),
+            "head_metrics": _format_head_metrics(user_analysis),
+            "body_metrics": _format_body_metrics(user_analysis),
             
-            # Comparison details
-            "comparison": {
-                "player": "Stephen Curry",
-                "position": "Point Guard",
-                "team": "Golden State Warriors",
-                "overall_similarity": comparison['overall_similarity'],
-                "metric_comparisons": comparison['metric_comparisons'],
-                "strengths": comparison.get('strengths', []),
-                "areas_for_improvement": comparison.get('areas_for_improvement', []),
-            },
+            # Top recommendations
+            "top_recommendations": _generate_recommendations(user_analysis),
             
-            # Specific recommendations based on comparison
-            "recommendations": comparison.get('specific_feedback', [])[:5],
-            
-            # Biomechanics comparison
-            "biomechanics_comparison": {
-                "your_form": _format_biomechanics(user_analysis),
-                "curry_form": {
-                    "release_angle": "48.5°",
-                    "arc_angle": "47.0°",
-                    "follow_through_extension": "Excellent",
-                    "stance_width": "Optimal"
-                }
-            },
-            
-            # Visual data for charts
-            "visual_data": {
-                "similarity_breakdown": [
-                    {
-                        "metric": "Release Angle",
-                        "similarity": comparison['metric_comparisons']['release_angle']['similarity'] * 100,
-                        "your_value": user_analysis['metrics']['release_angle']['trajectory_angle'],
-                        "curry_value": 48.5
-                    },
-                    {
-                        "metric": "Elbow Alignment",
-                        "similarity": comparison['metric_comparisons']['elbow_alignment']['similarity'] * 100,
-                        "your_value": user_analysis['metrics']['elbow_alignment']['consistency'] * 100,
-                        "curry_value": 95.0
-                    },
-                    {
-                        "metric": "Follow Through",
-                        "similarity": comparison['metric_comparisons']['follow_through']['similarity'] * 100,
-                        "your_value": user_analysis['metrics']['follow_through']['quality_score'] * 10,
-                        "curry_value": 95.0
-                    },
-                    {
-                        "metric": "Balance",
-                        "similarity": comparison['metric_comparisons']['balance']['similarity'] * 100,
-                        "your_value": user_analysis['metrics']['balance']['stability_score'] * 10,
-                        "curry_value": 90.0
-                    }
-                ]
-            },
+            # Coaching cues
+            "coaching_cues": _generate_coaching_cues(user_analysis),
             
             "analyzed_at": datetime.now().isoformat()
         }
@@ -371,7 +298,7 @@ async def compare_to_curry(video: UploadFile = File(...)):
         # Cache results
         analysis_cache[video_id] = results
         
-        logger.info(f"✅ Curry comparison complete - Similarity: {comparison['overall_similarity']:.1f}%")
+        logger.info(f"✅ Form analysis complete - Score: {overall_score}")
         
         # Force garbage collection to free memory
         gc.collect()
@@ -381,7 +308,7 @@ async def compare_to_curry(video: UploadFile = File(...)):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Curry comparison error: {str(e)}")
+        logger.error(f"❌ Form analysis error: {str(e)}")
         # Clean up file if it was created
         if file_path and os.path.exists(file_path):
             os.remove(file_path)
@@ -393,10 +320,179 @@ async def compare_to_curry(video: UploadFile = File(...)):
         # Always try to clean up memory
         gc.collect()
 
+@app.post("/analyze/form-analysis")
+async def analyze_form(
+    video: UploadFile = File(...),
+    frame_skip: int = Form(default=1)
+):
+    """
+    Analyze shooting form for pure technique assessment without player comparison.
+    
+    Features:
+    - Advanced pose estimation with visibility filtering
+    - Phase detection (dip, load, release, follow-through, landing)
+    - Biomechanical metrics with optimal ranges
+    - Pure technique scoring (no player comparison)
+    - Top 3 coaching cues with drill recommendations
+    
+    Args:
+        video: Video file (mp4, mov, avi, mkv)
+        frame_skip: Process every Nth frame (default: 1 for all frames)
+        
+    Returns:
+        Pure form analysis with technique scores, optimal ranges, and coaching cues
+    """
+    file_path = None
+    
+    try:
+        # Get analysis service
+        analysis_service = get_shot_analysis_service()
+        
+        # Generate unique video ID
+        video_id = str(uuid.uuid4())
+        
+        # Validate file type
+        if not video.filename.lower().endswith(('.mp4', '.mov', '.avi', '.mkv')):
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid file type. Supported: mp4, mov, avi, mkv"
+            )
+        
+        # Save video file
+        file_path = UPLOAD_DIR / f"{video_id}.mp4"
+        logger.info(f"💾 Saving video to: {file_path}")
+        
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(video.file, buffer)
+        
+        logger.info(f"✅ Video saved, starting form analysis...")
+        
+        # Perform pure form analysis (no baseline comparison)
+        results = analysis_service.analyze_shot(
+            video_path=str(file_path),
+            frame_skip=frame_skip
+        )
+        
+        if not results.get('success', False):
+            # Analysis failed - return error with details
+            error_response = {
+                "video_id": video_id,
+                "success": False,
+                "error": results.get('error', 'Unknown error'),
+                "confidence": results.get('confidence', 0.0),
+                "warning": results.get('warning'),
+                "analyzed_at": datetime.now().isoformat()
+            }
+            
+            # Clean up video file
+            if file_path and file_path.exists():
+                file_path.unlink()
+            
+            logger.warning(f"⚠️ Form analysis failed: {error_response['error']}")
+            return JSONResponse(status_code=200, content=error_response)
+        
+        # Format successful response for pure form analysis
+        response = {
+            "video_id": video_id,
+            "success": True,
+            "analysis_mode": "form_analysis",
+            "overall_score": round(results['overall_score'], 1),
+            "confidence": round(results['confidence'], 2),
+            
+            # Shooting phases with timestamps
+            "phases": {
+                "dip_start": {
+                    "timestamp": results['phases']['dip_start']['timestamp'] if results['phases'].get('dip_start') else None,
+                    "frame": results['phases']['dip_start']['frame'] if results['phases'].get('dip_start') else None
+                },
+                "load": {
+                    "timestamp": results['phases']['load']['timestamp'] if results['phases'].get('load') else None,
+                    "frame": results['phases']['load']['frame'] if results['phases'].get('load') else None,
+                    "knee_angle": results['phases']['load'].get('knee_angle')
+                },
+                "release": {
+                    "timestamp": results['phases']['release']['timestamp'] if results['phases'].get('release') else None,
+                    "frame": results['phases']['release']['frame'] if results['phases'].get('release') else None
+                },
+                "follow_through_end": {
+                    "timestamp": results['phases']['follow_through_end']['timestamp'] if results['phases'].get('follow_through_end') else None,
+                    "frame": results['phases']['follow_through_end']['frame'] if results['phases'].get('follow_through_end') else None
+                },
+                "timing": results['phases'].get('timing', {})
+            },
+            
+            # Biomechanical metrics with optimal ranges
+            "metrics": {
+                "knee_load": _format_form_metric(results['metrics'].get('knee_load')),
+                "hip_shoulder_alignment": _format_form_metric(results['metrics'].get('hip_shoulder_alignment')),
+                "elbow_flare": _format_form_metric(results['metrics'].get('elbow_flare')),
+                "release_angle": _format_form_metric(results['metrics'].get('release_angle')),
+                "base_width": _format_form_metric(results['metrics'].get('base_width')),
+                "lateral_sway": _format_form_metric(results['metrics'].get('lateral_sway')),
+                "arc_trajectory": _format_form_metric(results['metrics'].get('arc_trajectory'))
+            },
+            
+            # Top 3 coaching cues
+            "coaching_cues": [
+                {
+                    "cue": cue['cue'],
+                    "why": cue['why'],
+                    "drill_id": cue.get('drill_id', ''),
+                    "metric": cue.get('metric', '')
+                }
+                for cue in results.get('coaching_cues', [])
+            ],
+            
+            # Quality information
+            "quality": {
+                "visibility_ratio": round(results['quality_info']['visibility_ratio'], 2),
+                "confidence": round(results['quality_info']['confidence'], 2),
+                "warning": results['quality_info'].get('warning')
+            },
+            
+            # Video metadata
+            "metadata": {
+                "duration": round(results['metadata']['duration'], 2),
+                "fps": round(results['metadata']['fps'], 1),
+                "total_frames": results['metadata']['total_frames'],
+                "processed_frames": results['metadata']['processed_frames']
+            },
+            
+            "analyzed_at": datetime.now().isoformat()
+        }
+        
+        # Cache results
+        analysis_cache[video_id] = response
+        
+        logger.info(f"✅ Form analysis complete - Score: {response['overall_score']}/100")
+        
+        # Clean up video file to save storage
+        if file_path and file_path.exists():
+            file_path.unlink()
+            logger.info(f"🗑️ Cleaned up video file")
+        
+        # Force garbage collection
+        gc.collect()
+        
+        return response
+        
+    except Exception as e:
+        logger.error(f"❌ Form analysis error: {str(e)}", exc_info=True)
+        
+        # Clean up on error
+        if file_path and file_path.exists():
+            file_path.unlink()
+        
+        gc.collect()
+        
+        raise HTTPException(
+            status_code=500,
+            detail=f"Form analysis failed: {str(e)}"
+        )
+
 @app.post("/analyze/comprehensive")
 async def analyze_shot_comprehensive(
     video: UploadFile = File(...),
-    baseline_player: str = Form(default="Stephen Curry"),
     frame_skip: int = Form(default=1)
 ):
     """
@@ -445,7 +541,6 @@ async def analyze_shot_comprehensive(
         # Perform comprehensive analysis
         results = analysis_service.analyze_shot(
             video_path=str(file_path),
-            baseline_player=baseline_player,
             frame_skip=frame_skip
         )
         
@@ -472,7 +567,6 @@ async def analyze_shot_comprehensive(
             "video_id": video_id,
             "success": True,
             "analysis_mode": "comprehensive",
-            "player": baseline_player,
             "overall_score": round(results['overall_score'], 1),
             "confidence": round(results['confidence'], 2),
             
@@ -509,14 +603,6 @@ async def analyze_shot_comprehensive(
                 "arc_trajectory": _format_metric(results['metrics'].get('arc_trajectory'))
             },
             
-            # Comparison to NBA baseline
-            "comparison": {
-                "player": results['comparison'].get('player', baseline_player),
-                "overall_similarity": round(results['comparison'].get('overall_similarity', 0), 1),
-                "strengths": results['comparison'].get('strengths', []),
-                "areas_for_improvement": results['comparison'].get('areas_for_improvement', []),
-                "metric_comparisons": results['comparison'].get('metric_comparisons', {})
-            },
             
             # Top 3 coaching cues
             "coaching_cues": [
@@ -599,6 +685,38 @@ def _format_metric(metric_data: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         formatted['arc_angle_deg'] = round(metric_data['arc_angle_deg'], 1)
     if 'optimal_range' in metric_data:
         formatted['optimal_range'] = metric_data['optimal_range']
+    if 'in_range' in metric_data:
+        formatted['in_range'] = metric_data['in_range']
+    if 'description' in metric_data:
+        formatted['description'] = metric_data['description']
+    
+    return formatted
+
+def _format_form_metric(metric_data: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Format metric data for pure form analysis (no player comparison)"""
+    if not metric_data or 'error' in metric_data:
+        return {
+            "error": metric_data.get('error', 'Not available') if metric_data else 'Not available',
+            "quality_score": 0.0,
+            "optimal_range": "N/A",
+            "status": "error"
+        }
+    
+    formatted = {
+        "quality_score": round(metric_data.get('quality_score', 0), 1),
+        "optimal_range": metric_data.get('optimal_range', 'N/A'),
+        "status": "good" if metric_data.get('quality_score', 0) >= 0.7 else "improve"
+    }
+    
+    # Add metric-specific fields
+    if 'angle_deg' in metric_data:
+        formatted['angle_deg'] = round(metric_data['angle_deg'], 1)
+    if 'ratio' in metric_data:
+        formatted['ratio'] = round(metric_data['ratio'], 3)
+    if 'sway_ratio' in metric_data:
+        formatted['sway_ratio'] = round(metric_data['sway_ratio'], 3)
+    if 'arc_angle_deg' in metric_data:
+        formatted['arc_angle_deg'] = round(metric_data['arc_angle_deg'], 1)
     if 'in_range' in metric_data:
         formatted['in_range'] = metric_data['in_range']
     if 'description' in metric_data:
@@ -802,8 +920,8 @@ def _format_metrics_for_app(metrics: Dict) -> List[Dict]:
     return formatted
 
 
-def _generate_recommendations(analysis: Dict, comparison: Dict = None) -> List[str]:
-    """Generate coaching recommendations"""
+def _generate_recommendations(analysis: Dict) -> List[str]:
+    """Generate coaching recommendations based on technique analysis"""
     recommendations = []
     metrics = analysis.get('metrics', {})
     
@@ -814,29 +932,79 @@ def _generate_recommendations(analysis: Dict, comparison: Dict = None) -> List[s
             recommendations.append("Practice your release angle - aim for 45-50° for optimal arc")
     
     # Elbow alignment
-    if 'elbow_alignment' in metrics:
-        elbow = metrics['elbow_alignment'].get('quality_score', 1.0)
+    if 'elbow_flare' in metrics:
+        elbow = metrics['elbow_flare'].get('quality_score', 1.0)
         if elbow < 0.7:
             recommendations.append("Work on keeping your elbow aligned under the ball")
     
-    # Follow through
-    if 'follow_through' in metrics:
-        follow = metrics['follow_through'].get('quality_score', 1.0)
-        if follow < 0.7:
-            recommendations.append("Focus on complete follow-through extension")
+    # Knee load
+    if 'knee_load' in metrics:
+        knee = metrics['knee_load'].get('quality_score', 1.0)
+        if knee < 0.7:
+            recommendations.append("Maintain proper knee bend (70-90°) for power generation")
     
     # Balance
-    if 'balance' in metrics:
-        balance = metrics['balance'].get('quality_score', 1.0)
-        if balance < 0.7:
-            recommendations.append("Maintain a stable, balanced stance throughout")
-    
-    # Add comparison-based recommendations
-    if comparison and 'areas_for_improvement' in comparison:
-        for area in comparison['areas_for_improvement'][:2]:
-            recommendations.append(f"Improve your {area.lower()}")
+    if 'lateral_sway' in metrics:
+        sway = metrics['lateral_sway'].get('quality_score', 1.0)
+        if sway < 0.7:
+            recommendations.append("Minimize lateral movement - shoot straight up and down")
     
     return recommendations[:5]  # Top 5 recommendations
+
+def _get_grade_from_score(score: float) -> str:
+    """Convert numeric score to letter grade"""
+    if score >= 90:
+        return "A"
+    elif score >= 80:
+        return "B"
+    elif score >= 70:
+        return "C"
+    elif score >= 60:
+        return "D"
+    else:
+        return "F"
+
+def _format_wrist_metrics(analysis: Dict) -> Dict:
+    """Format wrist-related metrics"""
+    metrics = analysis.get('metrics', {})
+    return {
+        'release_angle': metrics.get('release_angle', {}),
+        'elbow_flare': metrics.get('elbow_flare', {})
+    }
+
+def _format_head_metrics(analysis: Dict) -> Dict:
+    """Format head-related metrics"""
+    metrics = analysis.get('metrics', {})
+    return {
+        'hip_shoulder_alignment': metrics.get('hip_shoulder_alignment', {})
+    }
+
+def _format_body_metrics(analysis: Dict) -> Dict:
+    """Format body-related metrics"""
+    metrics = analysis.get('metrics', {})
+    return {
+        'knee_load': metrics.get('knee_load', {}),
+        'base_width': metrics.get('base_width', {}),
+        'lateral_sway': metrics.get('lateral_sway', {}),
+        'arc_trajectory': metrics.get('arc_trajectory', {})
+    }
+
+def _generate_coaching_cues(analysis: Dict) -> List[Dict]:
+    """Generate coaching cues based on analysis"""
+    metrics = analysis.get('metrics', {})
+    cues = []
+    
+    # Check each metric and generate cues for poor performance
+    for metric_name, metric_data in metrics.items():
+        if isinstance(metric_data, dict) and metric_data.get('quality_score', 10) < 6.0:
+            cue = {
+                'metric': metric_name,
+                'score': metric_data.get('quality_score', 0),
+                'message': f"Improve your {metric_name.replace('_', ' ')}"
+            }
+            cues.append(cue)
+    
+    return cues[:3]  # Top 3 cues
 
 
 def _format_biomechanics(analysis: Dict) -> Dict:

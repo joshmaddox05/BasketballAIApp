@@ -1,0 +1,6 @@
+    // Dark mode state management
+    const systemColorScheme = useColorScheme();
+    const [isDarkMode, setIsDarkMode] = useState(false);
+    const [useSystemTheme, setUseSystemTheme] = useState(true);
+    const [theme, setTheme] = useState(getTheme(false));
+    const [language, setLanguage] = useState('en');

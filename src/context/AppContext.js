@@ -2,6 +2,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { useColorScheme } from 'react-native';
+import { getTheme } from '../utils/theme';
 // Sample initial data
 const initialUserData = {
     name: 'Michael Jordan',
@@ -172,6 +174,13 @@ export const AppProvider = ({ children }) => {
     const [dailyTip, setDailyTip] = useState('Focus on your follow-through when shooting. Hold your form until the ball reaches the basket.');
     const [trainingVideos, setTrainingVideos] = useState([]);
     const [bookmarkedVideos, setBookmarkedVideos] = useState([]);
+
+    // Dark mode state management
+    const systemColorScheme = useColorScheme();
+    const [isDarkMode, setIsDarkMode] = useState(false);
+    const [useSystemTheme, setUseSystemTheme] = useState(true);
+    const [theme, setTheme] = useState(getTheme(false));
+    const [language, setLanguage] = useState('en');
 
     // Load data from AsyncStorage on startup
     useEffect(() => {
