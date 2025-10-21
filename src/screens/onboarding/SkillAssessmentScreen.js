@@ -23,21 +23,27 @@ const SKILL_LEVELS = [
         title: 'Beginner',
         description: 'I\'m new to basketball or haven\'t played much. I want to learn the basics.',
         icon: 'basketball-outline',
-        traits: ['Little to no experience', 'Looking to learn fundamentals', 'Working on basic coordination']
+        color: '#4CAF50',
+        traits: ['Little to no experience', 'Looking to learn fundamentals', 'Working on basic coordination'],
+        encouragement: 'Perfect! Every pro started as a beginner. Let\'s build your foundation!'
     },
     {
         id: 'intermediate',
         title: 'Intermediate',
         description: 'I have some experience and can play decent. I want to refine my skills.',
         icon: 'basketball',
-        traits: ['Have played before', 'Understand basic rules', 'Can make some shots consistently', 'Want to improve technique']
+        color: '#FF9800',
+        traits: ['Have played before', 'Understand basic rules', 'Can make some shots consistently', 'Want to improve technique'],
+        encouragement: 'Great! You have a solid foundation. Let\'s take your skills to the next level!'
     },
     {
         id: 'advanced',
         title: 'Advanced',
         description: 'I play regularly and have good skills. I want to take my game to the next level.',
         icon: 'ribbon',
-        traits: ['Play frequently', 'Good shooting form', 'Consistent performance', 'Looking for advanced training']
+        color: '#9C27B0',
+        traits: ['Play frequently', 'Good shooting form', 'Consistent performance', 'Looking for advanced training'],
+        encouragement: 'Excellent! You\'re ready for elite-level training and complex drills!'
     }
 ];
 
@@ -229,11 +235,16 @@ const SkillAssessmentScreen = ({ navigation }) => {
 
                 {showResults && (
                     <View style={styles.assessmentResultContainer}>
-                        <Ionicons name="analytics" size={30} color="#FF6B00" />
+                        <View style={styles.resultIconContainer}>
+                            <Ionicons name="analytics" size={30} color="#FF6B00" />
+                        </View>
                         <Text style={styles.assessmentResultText}>
                             Assessment Result: <Text style={styles.assessedLevel}>
                             {SKILL_LEVELS.find(level => level.id === assessedSkillLevel)?.title}
                         </Text>
+                        </Text>
+                        <Text style={styles.encouragementText}>
+                            {SKILL_LEVELS.find(level => level.id === assessedSkillLevel)?.encouragement}
                         </Text>
                     </View>
                 )}
@@ -424,21 +435,40 @@ const styles = StyleSheet.create({
         marginBottom: 24,
     },
     assessmentResultContainer: {
-        backgroundColor: '#FFF0E6',
-        padding: 16,
-        borderRadius: 12,
-        flexDirection: 'row',
+        backgroundColor: '#FFF3E0',
+        padding: 20,
+        borderRadius: 16,
         alignItems: 'center',
         marginBottom: 24,
+        borderWidth: 1,
+        borderColor: '#FFB74D',
+    },
+    resultIconContainer: {
+        backgroundColor: '#FF6B00',
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 12,
     },
     assessmentResultText: {
-        fontSize: 16,
-        color: '#333',
-        marginLeft: 12,
+        fontSize: 18,
+        color: '#E65100',
+        textAlign: 'center',
+        marginBottom: 8,
+        fontWeight: '600',
     },
     assessedLevel: {
         fontWeight: 'bold',
         color: '#FF6B00',
+    },
+    encouragementText: {
+        fontSize: 14,
+        color: '#E65100',
+        textAlign: 'center',
+        fontStyle: 'italic',
+        lineHeight: 20,
     },
     skillLevelsContainer: {
         flex: 1,

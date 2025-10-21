@@ -1,0 +1,359 @@
+// WelcomeCompleteScreen.js - Dynamic welcome screen after onboarding
+import React, { useEffect, useState } from 'react';
+import {
+    StyleSheet,
+    Text,
+    View,
+    TouchableOpacity,
+    SafeAreaView,
+    StatusBar,
+    Dimensions,
+    Animated,
+    ImageBackground,
+    Platform
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useAppContext } from '../../context/AppContext';
+import { getTheme } from '../../utils/theme';
+import welcomeBackground from '../../../assets/welcome-background.jpg';
+
+const { width, height } = Dimensions.get('window');
+
+const WelcomeCompleteScreen = ({ navigation }) => {
+    const { userData, theme: contextTheme, isDarkMode, completeOnboarding } = useAppContext();
+    const theme = contextTheme || getTheme(isDarkMode || false);
+    
+    const [fadeAnim] = useState(new Animated.Value(0));
+    const [slideAnim] = useState(new Animated.Value(50));
+    const [scaleAnim] = useState(new Animated.Value(0.8));
+
+    useEffect(() => {
+        // Animate the welcome screen
+        Animated.parallel([
+            Animated.timing(fadeAnim, {
+                toValue: 1,
+                duration: 1000,
+                useNativeDriver: true,
+            }),
+            Animated.timing(slideAnim, {
+                toValue: 0,
+                duration: 800,
+                useNativeDriver: true,
+            }),
+            Animated.spring(scaleAnim, {
+                toValue: 1,
+                tension: 50,
+                friction: 7,
+                useNativeDriver: true,
+            }),
+        ]).start();
+    }, []);
+
+    const getGreeting = () => {
+        const hour = new Date().getHours();
+        if (hour < 12) return 'Good morning';
+        if (hour < 17) return 'Good afternoon';
+        return 'Good evening';
+    };
+
+    const getSkillLevelMessage = (level) => {
+        const messages = {
+            beginner: "Perfect! We'll start with the fundamentals and build your skills step by step.",
+            intermediate: "Great! You have a solid foundation. Let's refine your technique and add advanced moves.",
+            advanced: "Excellent! You're ready for elite-level training and complex drills."
+        };
+        return messages[level] || messages.beginner;
+    };
+
+    const getGoalSummary = () => {
+        if (!userData.goals || userData.goals.length === 0) {
+            return "Let's set some goals to track your progress!";
+        }
+        
+        const goalCount = userData.goals.length;
+        const categories = [...new Set(userData.goals.map(goal => goal.category))];
+        
+        if (goalCount === 1) {
+            return `You're focused on ${userData.goals[0].title}. Let's make it happen!`;
+        } else if (categories.length === 1) {
+            return `You have ${goalCount} goals focused on ${categories[0]}. Great focus!`;
+        } else {
+            return `You have ${goalCount} goals across ${categories.length} areas. Well-rounded approach!`;
+        }
+    };
+
+    const getPersonalizedWorkout = () => {
+        const focusAreas = userData.preferences?.focusAreas || [];
+        if (focusAreas.length === 0) return "Shooting Fundamentals";
+        
+        const area = focusAreas[0];
+        const workouts = {
+            shooting: "Perfect Shot Form",
+            dribbling: "Ball Handling Mastery", 
+            defense: "Defensive Fundamentals",
+            conditioning: "Basketball Conditioning",
+            teamwork: "Team Play Drills"
+        };
+        return workouts[area] || "Personalized Training";
+    };
+
+    const handleStartTraining = () => {
+        // Complete onboarding - AppNavigator will handle navigation to main app
+        completeOnboarding();
+    };
+
+    return (
+        <ImageBackground
+            source={welcomeBackground}
+            style={styles.backgroundImage}
+        >
+            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+            <SafeAreaView style={styles.container}>
+                <Animated.View 
+                    style={[
+                        styles.content,
+                        {
+                            opacity: fadeAnim,
+                            transform: [
+                                { translateY: slideAnim },
+                                { scale: scaleAnim }
+                            ]
+                        }
+                    ]}
+                >
+                    {/* Header */}
+                    <View style={styles.header}>
+                        <View style={styles.logoCircle}>
+                            <Ionicons name="basketball" size={50} color="#FFF" />
+                        </View>
+                        <Text style={styles.welcomeText}>
+                            {getGreeting()}, {userData.displayName || 'Champion'}! 🏀
+                        </Text>
+                        <Text style={styles.subtitle}>
+                            Welcome to your personalized basketball training journey
+                        </Text>
+                    </View>
+
+                    {/* User Profile Summary */}
+                    <View style={styles.profileSummary}>
+                        <View style={styles.summaryCard}>
+                            <View style={styles.summaryHeader}>
+                                <Ionicons name="person-circle" size={24} color="#FF6B00" />
+                                <Text style={styles.summaryTitle}>Your Profile</Text>
+                            </View>
+                            <Text style={styles.summaryText}>
+                                <Text style={styles.bold}>Skill Level:</Text> {userData.level || 'Beginner'}
+                            </Text>
+                            <Text style={styles.summaryDescription}>
+                                {getSkillLevelMessage(userData.level)}
+                            </Text>
+                        </View>
+
+                        <View style={styles.summaryCard}>
+                            <View style={styles.summaryHeader}>
+                                <Ionicons name="flag" size={24} color="#FF6B00" />
+                                <Text style={styles.summaryTitle}>Your Goals</Text>
+                            </View>
+                            <Text style={styles.summaryText}>
+                                {getGoalSummary()}
+                            </Text>
+                        </View>
+
+                        <View style={styles.summaryCard}>
+                            <View style={styles.summaryHeader}>
+                                <Ionicons name="fitness" size={24} color="#FF6B00" />
+                                <Text style={styles.summaryTitle}>Recommended Workout</Text>
+                            </View>
+                            <Text style={styles.summaryText}>
+                                <Text style={styles.bold}>Start with:</Text> {getPersonalizedWorkout()}
+                            </Text>
+                        </View>
+                    </View>
+
+                    {/* Quick Stats Preview */}
+                    <View style={styles.statsPreview}>
+                        <Text style={styles.statsTitle}>Your Training Dashboard</Text>
+                        <View style={styles.statsRow}>
+                            <View style={styles.statItem}>
+                                <Text style={styles.statNumber}>0</Text>
+                                <Text style={styles.statLabel}>Workouts</Text>
+                            </View>
+                            <View style={styles.statItem}>
+                                <Text style={styles.statNumber}>0</Text>
+                                <Text style={styles.statLabel}>Goals</Text>
+                            </View>
+                            <View style={styles.statItem}>
+                                <Text style={styles.statNumber}>0</Text>
+                                <Text style={styles.statLabel}>Achievements</Text>
+                            </View>
+                        </View>
+                    </View>
+
+                    {/* Action Buttons */}
+                    <View style={styles.buttonsContainer}>
+                        <TouchableOpacity
+                            style={styles.startTrainingButton}
+                            onPress={handleStartTraining}
+                        >
+                            <Ionicons name="play" size={20} color="#FFF" />
+                            <Text style={styles.startTrainingButtonText}>Start Training</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.exploreButton}
+                            onPress={handleStartTraining}
+                        >
+                            <Text style={styles.exploreButtonText}>Explore the App</Text>
+                        </TouchableOpacity>
+                    </View>
+                </Animated.View>
+            </SafeAreaView>
+        </ImageBackground>
+    );
+};
+
+const styles = StyleSheet.create({
+    backgroundImage: {
+        flex: 1,
+        width: '100%',
+        height: '100%',
+    },
+    container: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+    },
+    content: {
+        flex: 1,
+        paddingHorizontal: 24,
+        paddingTop: height * 0.05,
+    },
+    header: {
+        alignItems: 'center',
+        marginBottom: 32,
+    },
+    logoCircle: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        backgroundColor: '#FF6B00',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    welcomeText: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: '#FFF',
+        textAlign: 'center',
+        marginBottom: 8,
+    },
+    subtitle: {
+        fontSize: 16,
+        color: 'rgba(255, 255, 255, 0.8)',
+        textAlign: 'center',
+    },
+    profileSummary: {
+        marginBottom: 32,
+    },
+    summaryCard: {
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        borderRadius: 16,
+        padding: 20,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.2)',
+    },
+    summaryHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    summaryTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#FFF',
+        marginLeft: 8,
+    },
+    summaryText: {
+        fontSize: 16,
+        color: '#FFF',
+        lineHeight: 22,
+        marginBottom: 8,
+    },
+    summaryDescription: {
+        fontSize: 14,
+        color: 'rgba(255, 255, 255, 0.7)',
+        lineHeight: 20,
+    },
+    bold: {
+        fontWeight: 'bold',
+        color: '#FF6B00',
+    },
+    statsPreview: {
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        borderRadius: 16,
+        padding: 20,
+        marginBottom: 32,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.2)',
+    },
+    statsTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#FFF',
+        textAlign: 'center',
+        marginBottom: 16,
+    },
+    statsRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+    },
+    statItem: {
+        alignItems: 'center',
+    },
+    statNumber: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: '#FF6B00',
+        marginBottom: 4,
+    },
+    statLabel: {
+        fontSize: 14,
+        color: 'rgba(255, 255, 255, 0.7)',
+    },
+    buttonsContainer: {
+        marginTop: 'auto',
+        marginBottom: height * 0.05,
+    },
+    startTrainingButton: {
+        backgroundColor: '#FF6B00',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 16,
+        borderRadius: 30,
+        marginBottom: 16,
+    },
+    startTrainingButtonText: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#FFF',
+        marginLeft: 8,
+    },
+    exploreButton: {
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        paddingVertical: 16,
+        borderRadius: 30,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.3)',
+    },
+    exploreButtonText: {
+        fontSize: 16,
+        color: '#FFF',
+        fontWeight: '600',
+    },
+});
+
+export default WelcomeCompleteScreen;

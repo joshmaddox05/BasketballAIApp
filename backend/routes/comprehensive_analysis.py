@@ -17,25 +17,45 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from services.baseline_analyzer import NumpyEncoder
 import numpy as np
+import json
 
 logger = logging.getLogger(__name__)
 
 def convert_numpy_types(obj):
     """Recursively convert numpy types to native Python types"""
-    if isinstance(obj, np.integer):
+    import numpy as np
+    
+    # Handle numpy scalar types
+    if isinstance(obj, (np.integer, np.int8, np.int16, np.int32, np.int64, np.uint8, np.uint16, np.uint32, np.uint64)):
         return int(obj)
-    elif isinstance(obj, np.floating):
+    elif isinstance(obj, (np.floating, np.float16, np.float32, np.float64)):
         return float(obj)
+    elif isinstance(obj, (np.bool_, np.bool8)):
+        return bool(obj)
     elif isinstance(obj, np.ndarray):
         return obj.tolist()
     elif isinstance(obj, dict):
         return {key: convert_numpy_types(value) for key, value in obj.items()}
-    elif isinstance(obj, list):
-        return [convert_numpy_types(item) for item in obj]
-    elif isinstance(obj, tuple):
-        return tuple(convert_numpy_types(item) for item in obj)
+    elif isinstance(obj, (list, tuple)):
+        return type(obj)(convert_numpy_types(item) for item in obj)
+    elif hasattr(obj, '__dict__'):
+        # Handle custom objects with __dict__
+        try:
+            return {key: convert_numpy_types(value) for key, value in obj.__dict__.items()}
+        except:
+            return str(obj)
     else:
         return obj
+
+def ensure_json_serializable(obj):
+    """Ensure object is JSON serializable by using NumpyEncoder"""
+    try:
+        # Try to serialize and deserialize to catch any remaining numpy types
+        json_str = json.dumps(obj, cls=NumpyEncoder)
+        return json.loads(json_str)
+    except (TypeError, ValueError) as e:
+        logger.warning(f"JSON serialization failed, converting to string: {e}")
+        return str(obj)
 
 def setup_comprehensive_analysis_routes(app, upload_dir: Path, get_shot_analysis_service_func):
     """Setup comprehensive analysis API routes"""
@@ -117,10 +137,16 @@ def setup_comprehensive_analysis_routes(app, upload_dir: Path, get_shot_analysis
             # Format successful response
             response = _format_comprehensive_response(video_id, results)
             
-            # Convert response to native Python types
-            response = convert_numpy_types(response)
+            # Convert response to native Python types and ensure JSON serializable
+            try:
+                response = convert_numpy_types(response)
+                response = ensure_json_serializable(response)
+            except Exception as e:
+                logger.error(f"Error converting response types: {e}")
+                # Fallback: convert everything to strings
+                response = str(response)
             
-            logger.info(f"✅ Comprehensive analysis complete - Score: {response['overall_score']}/100")
+            logger.info(f"✅ Comprehensive analysis complete - Score: {response.get('overall_score', 'N/A')}/100")
             
             # Clean up video file to save storage
             if file_path and file_path.exists():

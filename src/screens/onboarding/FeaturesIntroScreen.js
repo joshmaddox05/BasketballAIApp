@@ -70,22 +70,8 @@ const FeaturesIntroScreen = ({ navigation }) => {
                 animated: true
             });
         } else {
-            // Finish onboarding
-            completeOnboarding();
-
-            // Don't try to navigate directly - let AppNavigator handle it
-            // The following line is causing the error:
-            // navigation.navigate('Main');
-
-            // Instead, show a success message (optional)
-            Alert.alert(
-                'Onboarding Complete',
-                'Your basketball training journey begins now!',
-                [{ text: 'Start Training', style: 'default' }]
-            );
-
-            // AppNavigator will automatically navigate to the main app screens
-            // based on the onboardingCompleted flag we just set
+            // Navigate to welcome complete screen
+            navigation.navigate('WelcomeComplete');
         }
     };
 

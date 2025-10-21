@@ -17,15 +17,18 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
+import { signInWithEmail, signInWithGoogle, resetPassword } from '../../services/authService';
+import { getTheme } from '../../utils/theme';
 
 const LoginScreen = ({ navigation }) => {
-    const [email, setEmail] = useState('demo@example.com'); // Pre-filled for easy demo
-    const [password, setPassword] = useState('Password123'); // Pre-filled for easy demo
+    const [email, setEmail] = useState(''); // Remove demo data for production
+    const [password, setPassword] = useState(''); // Remove demo data for production
     const [isPasswordVisible, setIsPasswordVisible] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [rememberMe, setRememberMe] = useState(false);
 
-    const { login } = useAppContext();
+    const { theme: contextTheme, isDarkMode } = useAppContext();
+    const theme = contextTheme || getTheme(isDarkMode || false);
 
     const validateEmail = (email) => {
         const re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
@@ -52,18 +55,42 @@ const LoginScreen = ({ navigation }) => {
         // Show loading state
         setIsLoading(true);
 
-        // Simulate login API call
-        setTimeout(() => {
+        try {
+            // Firebase authentication
+            const result = await signInWithEmail(email.trim(), password);
+            
+            if (result.user && result.profile) {
+                console.log('Login successful!', result.user.email);
+                // AppContext will handle the auth state change automatically
+                // AppNavigator will navigate to the appropriate screen
+            }
+        } catch (error) {
+            console.error('Login error:', error);
+            Alert.alert('Login Failed', error.message);
+        } finally {
             setIsLoading(false);
+        }
+    };
 
-            // For demo purposes, always login successfully
-            login();
+    const handleGoogleSignIn = async () => {
+        setIsLoading(true);
+        try {
+            // For now, show a message that Google Sign-In is coming soon
+            Alert.alert(
+                'Coming Soon',
+                'Google Sign-In will be available in the next update. Please use email/password for now.',
+                [{ text: 'OK' }]
+            );
+        } catch (error) {
+            console.error('Google sign-in error:', error);
+            Alert.alert('Error', 'Google Sign-In is not available yet');
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
-            // AppNavigator will automatically navigate to the appropriate screen
-            // based on the authentication state (onboarding or main)
-            console.log('Login successful! AppNavigator will handle navigation.');
-
-        }, 1500); // Simulating API delay
+    const handleForgotPassword = () => {
+        navigation.navigate('PasswordReset');
     };
 
     return (
@@ -142,7 +169,7 @@ const LoginScreen = ({ navigation }) => {
                                 <Text style={styles.rememberMeText}>Remember me</Text>
                             </TouchableOpacity>
 
-                            <TouchableOpacity>
+                            <TouchableOpacity onPress={handleForgotPassword}>
                                 <Text style={styles.forgotPasswordText}>Forgot password?</Text>
                             </TouchableOpacity>
                         </View>
@@ -164,7 +191,10 @@ const LoginScreen = ({ navigation }) => {
                         <Text style={styles.orText}>Or sign in with</Text>
 
                         <View style={styles.socialButtonsRow}>
-                            <TouchableOpacity style={styles.socialButton}>
+                            <TouchableOpacity 
+                                style={styles.socialButton}
+                                onPress={handleGoogleSignIn}
+                            >
                                 <Ionicons name="logo-google" size={20} color="#DB4437" />
                             </TouchableOpacity>
 

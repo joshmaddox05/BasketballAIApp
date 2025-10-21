@@ -18,18 +18,21 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
+import { registerWithEmail, signInWithGoogle } from '../../services/authService';
+import { getTheme } from '../../utils/theme';
 
 const SignupScreen = ({ navigation }) => {
-    const [name, setName] = useState('John Doe'); // Pre-filled for demo
-    const [email, setEmail] = useState('demo@example.com'); // Pre-filled for demo
-    const [password, setPassword] = useState('Password123'); // Pre-filled for demo
-    const [confirmPassword, setConfirmPassword] = useState('Password123'); // Pre-filled for demo
+    const [name, setName] = useState(''); // Remove demo data for production
+    const [email, setEmail] = useState(''); // Remove demo data for production
+    const [password, setPassword] = useState(''); // Remove demo data for production
+    const [confirmPassword, setConfirmPassword] = useState(''); // Remove demo data for production
     const [isPasswordVisible, setIsPasswordVisible] = useState(false);
     const [isConfirmPasswordVisible, setIsConfirmPasswordVisible] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
-    const [agreeToTerms, setAgreeToTerms] = useState(true); // Pre-checked for demo
+    const [agreeToTerms, setAgreeToTerms] = useState(false); // Remove pre-check for production
 
-    const { register } = useAppContext();
+    const { theme: contextTheme, isDarkMode } = useAppContext();
+    const theme = contextTheme || getTheme(isDarkMode || false);
 
     const validateEmail = (email) => {
         const re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
@@ -85,18 +88,45 @@ const SignupScreen = ({ navigation }) => {
         // Show loading state
         setIsLoading(true);
 
-        // Simulate signup API call
-        setTimeout(() => {
+        try {
+            // Firebase registration
+            const result = await registerWithEmail(email.trim(), password, name.trim());
+            
+            if (result.user && result.profile) {
+                console.log('Registration successful!', result.user.email);
+                
+                Alert.alert(
+                    'Account Created!',
+                    'Your account has been created successfully. Please check your email to verify your account.',
+                    [{ text: 'OK' }]
+                );
+                
+                // AppContext will handle the auth state change automatically
+                // AppNavigator will navigate to onboarding
+            }
+        } catch (error) {
+            console.error('Registration error:', error);
+            Alert.alert('Registration Failed', error.message);
+        } finally {
             setIsLoading(false);
+        }
+    };
 
-            // Call register with the user info
-            // This sets isAuthenticated to true and onboardingCompleted to false
-            register({ name });
-
-            console.log('Registration successful! AppNavigator will navigate to onboarding.');
-            // AppNavigator will automatically navigate to onboarding
-
-        }, 1500);
+    const handleGoogleSignIn = async () => {
+        setIsLoading(true);
+        try {
+            // For now, show a message that Google Sign-In is coming soon
+            Alert.alert(
+                'Coming Soon',
+                'Google Sign-In will be available in the next update. Please use email/password for now.',
+                [{ text: 'OK' }]
+            );
+        } catch (error) {
+            console.error('Google sign-in error:', error);
+            Alert.alert('Error', 'Google Sign-In is not available yet');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -296,7 +326,10 @@ const SignupScreen = ({ navigation }) => {
                             <Text style={styles.orText}>Or sign up with</Text>
 
                             <View style={styles.socialButtonsRow}>
-                                <TouchableOpacity style={styles.socialButton}>
+                                <TouchableOpacity 
+                                    style={styles.socialButton}
+                                    onPress={handleGoogleSignIn}
+                                >
                                     <Ionicons name="logo-google" size={20} color="#DB4437" />
                                 </TouchableOpacity>
 

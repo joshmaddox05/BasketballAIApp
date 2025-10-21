@@ -1,9 +1,21 @@
-// AppContext.js - Enhanced for better onboarding and demo flow
+// AppContext.js - Enhanced with Firebase integration
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
 import { useColorScheme } from 'react-native';
 import { getTheme } from '../utils/theme';
+
+// Firebase imports
+import { onAuthStateChange, signOutUser } from '../services/authService';
+import { 
+  getUserProfile, 
+  listenToUserProfile, 
+  getUserActivities, 
+  listenToUserActivities,
+  getUserGoals,
+  getUserAchievements,
+  getWorkouts,
+  getVideos
+} from '../services/firestoreService';
 // Sample initial data
 const initialUserData = {
     name: 'Michael Jordan',
@@ -174,6 +186,7 @@ export const AppProvider = ({ children }) => {
     const [dailyTip, setDailyTip] = useState('Focus on your follow-through when shooting. Hold your form until the ball reaches the basket.');
     const [trainingVideos, setTrainingVideos] = useState([]);
     const [bookmarkedVideos, setBookmarkedVideos] = useState([]);
+    const [achievements, setAchievements] = useState([]);
 
     // Dark mode state management
     const systemColorScheme = useColorScheme();
@@ -182,64 +195,130 @@ export const AppProvider = ({ children }) => {
     const [theme, setTheme] = useState(getTheme(false));
     const [language, setLanguage] = useState('en');
 
-    // Load data from AsyncStorage on startup
+    // Firebase auth state listener
     useEffect(() => {
-        const loadData = async () => {
-            try {
-                const storedUserData = await AsyncStorage.getItem('userData');
-                const storedActivities = await AsyncStorage.getItem('activities');
-                const storedWorkouts = await AsyncStorage.getItem('workouts');
-                const storedGoals = await AsyncStorage.getItem('goals');
-                const storedAuthState = await AsyncStorage.getItem('isAuthenticated');
-                const storedBookmarkedVideos = await AsyncStorage.getItem('bookmarkedVideos');
-
-                if (storedUserData) setUserData(JSON.parse(storedUserData));
-                if (storedActivities) setActivities(JSON.parse(storedActivities));
-                if (storedWorkouts) setWorkouts(JSON.parse(storedWorkouts));
-                if (storedGoals) setGoals(JSON.parse(storedGoals));
-                if (storedAuthState) setIsAuthenticated(JSON.parse(storedAuthState));
-                if (storedBookmarkedVideos) setBookmarkedVideos(JSON.parse(storedBookmarkedVideos));
-
-                // For demo purposes - log the authentication state
-                console.log('AppContext - Initial auth state loaded:', {
-                    isAuthenticated: storedAuthState ? JSON.parse(storedAuthState) : false,
-                    onboardingCompleted: storedUserData ? JSON.parse(storedUserData).onboardingCompleted : false
-                });
-            } catch (error) {
-                console.error('Failed to load data from storage:', error);
-
-                // For demo purposes - use initial data
-                console.log('AppContext - Using initial demo data');
-            } finally {
-                setLoading(false);
+        const unsubscribe = onAuthStateChange(async ({ user, profile }) => {
+            console.log('AppContext - Auth state changed:', { user: !!user, profile: !!profile });
+            
+            if (user) {
+                // User is signed in
+                setIsAuthenticated(true);
+                
+                if (profile) {
+                    // User has a profile in Firestore
+                    setUserData(profile);
+                    
+                    // Load user-specific data from Firestore
+                    try {
+                        const [userActivities, userGoals, userAchievements] = await Promise.all([
+                            getUserActivities(user.uid),
+                            getUserGoals(user.uid),
+                            getUserAchievements(user.uid)
+                        ]);
+                        
+                        setActivities(userActivities);
+                        setGoals(userGoals);
+                        setAchievements(userAchievements);
+                    } catch (error) {
+                        console.error('Error loading user data:', error);
+                        // Use initial data as fallback
+                        setActivities(initialActivities);
+                        setGoals(initialGoals);
+                        setAchievements([]);
+                    }
+                } else {
+                    // User is authenticated but doesn't have a profile yet (during registration)
+                    console.log('User authenticated but no profile found - likely during registration');
+                    setUserData(initialUserData);
+                    setActivities(initialActivities);
+                    setGoals(initialGoals);
+                    setAchievements([]);
+                }
+            } else {
+                // User is signed out
+                setIsAuthenticated(false);
+                setUserData(initialUserData);
+                setActivities(initialActivities);
+                setGoals(initialGoals);
+                setAchievements([]);
             }
-        };
+            
+            setLoading(false);
+        });
 
-        loadData();
+        return unsubscribe;
     }, []);
 
-    // Save data to AsyncStorage when it changes
+    // Load global data (workouts, videos) when user is authenticated
     useEffect(() => {
-        const saveData = async () => {
-            try {
-                await AsyncStorage.setItem('userData', JSON.stringify(userData));
-                await AsyncStorage.setItem('activities', JSON.stringify(activities));
-                await AsyncStorage.setItem('workouts', JSON.stringify(workouts));
-                await AsyncStorage.setItem('goals', JSON.stringify(goals));
-                await AsyncStorage.setItem('isAuthenticated', JSON.stringify(isAuthenticated));
-                await AsyncStorage.setItem('bookmarkedVideos', JSON.stringify(bookmarkedVideos));
+        if (!isAuthenticated) {
+            // Use initial data when not authenticated
+            setWorkouts(initialWorkouts);
+            setTrainingVideos([]);
+            return;
+        }
 
-                // For demo purposes - log data saves
-                console.log('AppContext - Saved updated data to storage');
+        const loadGlobalData = async () => {
+            try {
+                const [globalWorkouts, globalVideos] = await Promise.all([
+                    getWorkouts(),
+                    getVideos()
+                ]);
+                
+                setWorkouts(globalWorkouts.length > 0 ? globalWorkouts : initialWorkouts);
+                setTrainingVideos(globalVideos);
             } catch (error) {
-                console.error('Failed to save data to storage:', error);
+                console.error('Error loading global data:', error);
+                // Use initial data as fallback
+                setWorkouts(initialWorkouts);
             }
         };
 
-        if (!loading) {
-            saveData();
-        }
-    }, [userData, activities, workouts, goals, isAuthenticated, bookmarkedVideos, loading]);
+        loadGlobalData();
+    }, [isAuthenticated]);
+
+    // Load theme and language preferences from AsyncStorage
+    useEffect(() => {
+        const loadPreferences = async () => {
+            try {
+                const storedTheme = await AsyncStorage.getItem('isDarkMode');
+                const storedLanguage = await AsyncStorage.getItem('language');
+                const storedBookmarkedVideos = await AsyncStorage.getItem('bookmarkedVideos');
+
+                if (storedTheme !== null) {
+                    const isDark = JSON.parse(storedTheme);
+                    setIsDarkMode(isDark);
+                    setTheme(getTheme(isDark));
+                } else {
+                    // Use system theme if no preference stored
+                    setIsDarkMode(systemColorScheme === 'dark');
+                    setTheme(getTheme(systemColorScheme === 'dark'));
+                }
+
+                if (storedLanguage) setLanguage(storedLanguage);
+                if (storedBookmarkedVideos) setBookmarkedVideos(JSON.parse(storedBookmarkedVideos));
+            } catch (error) {
+                console.error('Failed to load preferences:', error);
+            }
+        };
+
+        loadPreferences();
+    }, [systemColorScheme]);
+
+    // Save preferences to AsyncStorage when they change
+    useEffect(() => {
+        const savePreferences = async () => {
+            try {
+                await AsyncStorage.setItem('isDarkMode', JSON.stringify(isDarkMode));
+                await AsyncStorage.setItem('language', language);
+                await AsyncStorage.setItem('bookmarkedVideos', JSON.stringify(bookmarkedVideos));
+            } catch (error) {
+                console.error('Failed to save preferences:', error);
+            }
+        };
+
+        savePreferences();
+    }, [isDarkMode, language, bookmarkedVideos]);
 
     // Fetch a new daily tip (would connect to backend in real app)
     const fetchDailyTip = async () => {
@@ -272,49 +351,22 @@ export const AppProvider = ({ children }) => {
         return true;
     };
 
-    // Authentication functions
+    // Authentication functions (now handled by Firebase auth state listener)
     const register = (userInfo) => {
-        console.log('AppContext - Registering new user:', userInfo.name);
-
-        setUserData(prev => ({
-            ...prev,
-            name: userInfo.name || 'New User',
-            onboardingCompleted: false
-        }));
-
-        setIsAuthenticated(true);
+        console.log('AppContext - Register function called (handled by Firebase)');
+        // Registration is now handled by Firebase auth service
     };
 
     const login = () => {
-        console.log('AppContext - User logged in');
-        setIsAuthenticated(true);
+        console.log('AppContext - Login function called (handled by Firebase)');
+        // Login is now handled by Firebase auth service
     };
 
-// In AppContext.js, find and replace the logout function with this improved version:
-
     const logout = async () => {
-        console.log('AppContext - User logged out');
-
+        console.log('AppContext - Logging out user');
         try {
-            // Clear authentication state first
-            setIsAuthenticated(false);
-
-            // Reset onboarding status so it starts fresh on next login
-            setUserData(prev => ({
-                ...prev,
-                onboardingCompleted: false
-            }));
-
-            // Ensure logout state is immediately saved to storage
-            await AsyncStorage.setItem('isAuthenticated', 'false');
-
-            // Update user data in storage
-            await AsyncStorage.setItem('userData', JSON.stringify({
-                ...userData,
-                onboardingCompleted: false
-            }));
-
-            console.log('AppContext - Logout complete, storage updated');
+            await signOutUser();
+            // Auth state change will be handled by the listener
             return true;
         } catch (error) {
             console.error('Logout failed:', error);
@@ -427,11 +479,17 @@ export const AppProvider = ({ children }) => {
             activities,
             workouts,
             goals,
+            achievements,
             loading,
             isAuthenticated,
             dailyTip,
             trainingVideos,
             bookmarkedVideos,
+            isDarkMode,
+            setIsDarkMode,
+            theme,
+            language,
+            setLanguage,
             addWorkout,
             addActivity,
             addGoal,

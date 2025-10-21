@@ -21,42 +21,54 @@ const PRESET_GOALS = [
         title: 'Improve shooting accuracy',
         description: 'Work on shooting form and consistency',
         icon: 'basketball',
-        category: 'shooting'
+        category: 'shooting',
+        color: '#FF6B00',
+        recommendedFor: ['beginner', 'intermediate', 'advanced']
     },
     {
         id: 'goal2',
         title: 'Master dribbling skills',
         description: 'Enhance ball control and handling',
         icon: 'hand-left',
-        category: 'dribbling'
+        category: 'dribbling',
+        color: '#4CAF50',
+        recommendedFor: ['beginner', 'intermediate', 'advanced']
     },
     {
         id: 'goal3',
         title: 'Increase vertical jump',
         description: 'Improve jumping ability and explosiveness',
         icon: 'trending-up',
-        category: 'physical'
+        category: 'physical',
+        color: '#9C27B0',
+        recommendedFor: ['intermediate', 'advanced']
     },
     {
         id: 'goal4',
         title: 'Develop basketball IQ',
         description: 'Learn strategies and game awareness',
-        icon: 'brain',
-        category: 'strategy'
+        icon: 'bulb',
+        category: 'strategy',
+        color: '#FF9800',
+        recommendedFor: ['intermediate', 'advanced']
     },
     {
         id: 'goal5',
         title: 'Improve defensive skills',
         description: 'Work on positioning and movement',
         icon: 'shield',
-        category: 'defense'
+        category: 'defense',
+        color: '#2196F3',
+        recommendedFor: ['intermediate', 'advanced']
     },
     {
         id: 'goal6',
         title: 'Build consistent training habit',
         description: 'Practice regularly to develop skills',
         icon: 'calendar',
-        category: 'consistency'
+        category: 'consistency',
+        color: '#795548',
+        recommendedFor: ['beginner', 'intermediate', 'advanced']
     }
 ];
 
@@ -66,6 +78,16 @@ const GoalSettingScreen = ({ navigation }) => {
     const [customGoal, setCustomGoal] = useState('');
     const [customGoalCategory, setCustomGoalCategory] = useState('other');
     const [reminders, setReminders] = useState(true);
+
+    // Get recommended goals based on user's skill level
+    const getRecommendedGoals = () => {
+        const userLevel = userData.level || 'beginner';
+        return PRESET_GOALS.filter(goal => 
+            goal.recommendedFor.includes(userLevel)
+        );
+    };
+
+    const recommendedGoals = getRecommendedGoals();
 
     const handleToggleGoal = (goalId) => {
         setSelectedGoals(prev => ({
@@ -149,48 +171,116 @@ const GoalSettingScreen = ({ navigation }) => {
                     Select goals to help us personalize your training plan. You can change these later.
                 </Text>
 
-                <View style={styles.goalsContainer}>
-                    {PRESET_GOALS.map(goal => (
-                        <TouchableOpacity
-                            key={goal.id}
-                            style={[
-                                styles.goalCard,
-                                selectedGoals[goal.id] && styles.selectedGoalCard
-                            ]}
-                            onPress={() => handleToggleGoal(goal.id)}
-                        >
-                            <View style={styles.goalCheckbox}>
-                                {selectedGoals[goal.id] && (
-                                    <Ionicons name="checkmark" size={16} color="#FFF" />
-                                )}
-                            </View>
-
-                            <View
-                                style={[
-                                    styles.goalIconContainer,
-                                    selectedGoals[goal.id] && styles.selectedGoalIconContainer
-                                ]}
-                            >
-                                <Ionicons
-                                    name={goal.icon}
-                                    size={20}
-                                    color={selectedGoals[goal.id] ? "#FFF" : "#FF6B00"}
-                                />
-                            </View>
-
-                            <View style={styles.goalInfo}>
-                                <Text
+                {/* Recommended Goals Section */}
+                {recommendedGoals.length > 0 && (
+                    <View style={styles.recommendedSection}>
+                        <View style={styles.recommendedHeader}>
+                            <Ionicons name="star" size={20} color="#FF6B00" />
+                            <Text style={styles.recommendedTitle}>Recommended for {userData.level || 'Beginner'}s</Text>
+                        </View>
+                        <View style={styles.goalsContainer}>
+                            {recommendedGoals.map(goal => (
+                                <TouchableOpacity
+                                    key={goal.id}
                                     style={[
-                                        styles.goalTitle,
-                                        selectedGoals[goal.id] && styles.selectedGoalTitle
+                                        styles.goalCard,
+                                        styles.recommendedGoalCard,
+                                        selectedGoals[goal.id] && styles.selectedGoalCard
+                                    ]}
+                                    onPress={() => handleToggleGoal(goal.id)}
+                                >
+                                    <View style={styles.goalCheckbox}>
+                                        {selectedGoals[goal.id] && (
+                                            <Ionicons name="checkmark" size={16} color="#FFF" />
+                                        )}
+                                    </View>
+
+                                    <View
+                                        style={[
+                                            styles.goalIconContainer,
+                                            { backgroundColor: goal.color },
+                                            selectedGoals[goal.id] && styles.selectedGoalIconContainer
+                                        ]}
+                                    >
+                                        <Ionicons
+                                            name={goal.icon}
+                                            size={20}
+                                            color="#FFF"
+                                        />
+                                    </View>
+
+                                    <View style={styles.goalContent}>
+                                        <Text style={[
+                                            styles.goalTitle,
+                                            selectedGoals[goal.id] && styles.selectedGoalTitle
+                                        ]}>
+                                            {goal.title}
+                                        </Text>
+                                        <Text style={[
+                                            styles.goalDescription,
+                                            selectedGoals[goal.id] && styles.selectedGoalDescription
+                                        ]}>
+                                            {goal.description}
+                                        </Text>
+                                    </View>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    </View>
+                )}
+
+                {/* All Goals Section */}
+                <View style={styles.allGoalsSection}>
+                    <Text style={styles.allGoalsTitle}>All Available Goals</Text>
+                    <View style={styles.goalsContainer}>
+                        {PRESET_GOALS.map(goal => (
+                            <TouchableOpacity
+                                key={goal.id}
+                                style={[
+                                    styles.goalCard,
+                                    selectedGoals[goal.id] && styles.selectedGoalCard
+                                ]}
+                                onPress={() => handleToggleGoal(goal.id)}
+                            >
+                                <View style={styles.goalCheckbox}>
+                                    {selectedGoals[goal.id] && (
+                                        <Ionicons name="checkmark" size={16} color="#FFF" />
+                                    )}
+                                </View>
+
+                                <View
+                                    style={[
+                                        styles.goalIconContainer,
+                                        { backgroundColor: goal.color },
+                                        selectedGoals[goal.id] && styles.selectedGoalIconContainer
                                     ]}
                                 >
-                                    {goal.title}
-                                </Text>
-                                <Text style={styles.goalDescription}>{goal.description}</Text>
-                            </View>
-                        </TouchableOpacity>
-                    ))}
+                                    <Ionicons
+                                        name={goal.icon}
+                                        size={20}
+                                        color="#FFF"
+                                    />
+                                </View>
+
+                                <View style={styles.goalContent}>
+                                    <Text
+                                        style={[
+                                            styles.goalTitle,
+                                            selectedGoals[goal.id] && styles.selectedGoalTitle
+                                        ]}
+                                    >
+                                        {goal.title}
+                                    </Text>
+                                    <Text style={[
+                                        styles.goalDescription,
+                                        selectedGoals[goal.id] && styles.selectedGoalDescription
+                                    ]}>
+                                        {goal.description}
+                                    </Text>
+                                </View>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
                 </View>
 
                 <View style={styles.customGoalContainer}>
@@ -377,6 +467,36 @@ const styles = StyleSheet.create({
         color: '#666',
         marginBottom: 24,
         lineHeight: 20,
+    },
+    recommendedSection: {
+        marginBottom: 24,
+    },
+    recommendedHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 16,
+        paddingHorizontal: 4,
+    },
+    recommendedTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#FF6B00',
+        marginLeft: 8,
+    },
+    recommendedGoalCard: {
+        borderWidth: 2,
+        borderColor: '#FF6B00',
+        backgroundColor: '#FFF8F0',
+    },
+    allGoalsSection: {
+        marginBottom: 24,
+    },
+    allGoalsTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#333',
+        marginBottom: 16,
+        paddingHorizontal: 4,
     },
     goalsContainer: {
         marginBottom: 32,

@@ -12,6 +12,7 @@ from pathlib import Path
 import numpy as np
 import logging
 import gc  # For garbage collection
+import json
 
 from services.baseline_analyzer import BaselineAnalyzer, NumpyEncoder
 from services.video_processor import VideoProcessor
@@ -24,20 +25,44 @@ logger = logging.getLogger(__name__)
 
 def convert_numpy_types(obj):
     """Recursively convert numpy types to native Python types"""
-    if isinstance(obj, np.integer):
+    import numpy as np
+    
+    # Handle numpy scalar types
+    if isinstance(obj, (np.integer, np.int8, np.int16, np.int32, np.int64, np.uint8, np.uint16, np.uint32, np.uint64)):
+        logger.debug(f"Converting numpy integer {type(obj)} to int")
         return int(obj)
-    elif isinstance(obj, np.floating):
+    elif isinstance(obj, (np.floating, np.float16, np.float32, np.float64)):
+        logger.debug(f"Converting numpy float {type(obj)} to float")
         return float(obj)
+    elif isinstance(obj, (np.bool_, np.bool8)):
+        logger.debug(f"Converting numpy bool {type(obj)} to bool")
+        return bool(obj)
     elif isinstance(obj, np.ndarray):
+        logger.debug(f"Converting numpy array {type(obj)} to list")
         return obj.tolist()
     elif isinstance(obj, dict):
         return {key: convert_numpy_types(value) for key, value in obj.items()}
-    elif isinstance(obj, list):
-        return [convert_numpy_types(item) for item in obj]
-    elif isinstance(obj, tuple):
-        return tuple(convert_numpy_types(item) for item in obj)
+    elif isinstance(obj, (list, tuple)):
+        return type(obj)(convert_numpy_types(item) for item in obj)
+    elif hasattr(obj, '__dict__'):
+        # Handle custom objects with __dict__
+        try:
+            return {key: convert_numpy_types(value) for key, value in obj.__dict__.items()}
+        except:
+            return str(obj)
     else:
         return obj
+
+def ensure_json_serializable(obj):
+    """Ensure object is JSON serializable by using NumpyEncoder"""
+    try:
+        # Try to serialize and deserialize to catch any remaining numpy types
+        json_str = json.dumps(obj, cls=NumpyEncoder)
+        return json.loads(json_str)
+    except (TypeError, ValueError) as e:
+        logger.warning(f"JSON serialization failed, converting to string: {e}")
+        logger.warning(f"Problematic object type: {type(obj)}")
+        return str(obj)
 
 app = FastAPI(
     title="Basketball AI Analysis API",
@@ -482,13 +507,19 @@ async def analyze_form(
             "analyzed_at": datetime.now().isoformat()
         }
         
-        # Convert response to native Python types
-        response = convert_numpy_types(response)
+        # Convert response to native Python types and ensure JSON serializable
+        try:
+            response = convert_numpy_types(response)
+            response = ensure_json_serializable(response)
+        except Exception as e:
+            logger.error(f"Error converting response types: {e}")
+            # Fallback: convert everything to strings
+            response = str(response)
         
         # Cache results
         analysis_cache[video_id] = response
         
-        logger.info(f"✅ Form analysis complete - Score: {response['overall_score']}/100")
+        logger.info(f"✅ Form analysis complete - Score: {response.get('overall_score', 'N/A')}/100")
         
         # Clean up video file to save storage
         if file_path and file_path.exists():
@@ -660,13 +691,19 @@ async def analyze_shot_comprehensive(
             "analyzed_at": datetime.now().isoformat()
         }
         
-        # Convert response to native Python types
-        response = convert_numpy_types(response)
+        # Convert response to native Python types and ensure JSON serializable
+        try:
+            response = convert_numpy_types(response)
+            response = ensure_json_serializable(response)
+        except Exception as e:
+            logger.error(f"Error converting response types: {e}")
+            # Fallback: convert everything to strings
+            response = str(response)
         
         # Cache results
         analysis_cache[video_id] = response
         
-        logger.info(f"✅ Comprehensive analysis complete - Score: {response['overall_score']}/100")
+        logger.info(f"✅ Comprehensive analysis complete - Score: {response.get('overall_score', 'N/A')}/100")
         
         # Clean up video file to save storage
         if file_path and file_path.exists():
