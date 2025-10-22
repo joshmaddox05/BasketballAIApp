@@ -16,7 +16,7 @@ export default {
       supportsTablet: true,
       bundleIdentifier: "com.jmaddox0503.BasketballAIApp",
       deploymentTarget: "15.1",
-      googleServicesFile: process.env.GOOGLE_SERVICES_PLIST ?? "./ios/GoogleService-Info.plist",
+      googleServicesFile: "./ios/GoogleService-Info.plist",
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
         NSCameraUsageDescription: "This app needs access to camera to record basketball shots for AI analysis.",
@@ -30,7 +30,7 @@ export default {
         backgroundColor: "#ffffff"
       },
       package: "com.jmaddox0503.BasketballAIApp",
-      googleServicesFile: process.env.GOOGLE_SERVICES_JSON ?? "./android/app/google-services.json",
+      googleServicesFile: "./android/app/google-services.json",
       permissions: [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
