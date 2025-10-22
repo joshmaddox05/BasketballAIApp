@@ -7,6 +7,10 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "env": {
+        "GOOGLE_SERVICES_INFO_PLIST": "secret:GOOGLE_SERVICES_INFO_PLIST",
+        "GOOGLE_SERVICES_JSON": "secret:GOOGLE_SERVICES_JSON"
+      },
       "ios": {
         "simulator": false
       },
@@ -16,6 +20,10 @@
     },
     "preview": {
       "distribution": "internal",
+      "env": {
+        "GOOGLE_SERVICES_INFO_PLIST": "secret:GOOGLE_SERVICES_INFO_PLIST",
+        "GOOGLE_SERVICES_JSON": "secret:GOOGLE_SERVICES_JSON"
+      },
       "ios": {
         "simulator": false
       },
@@ -26,6 +34,10 @@
     "preview-simulator": {
       "developmentClient": false,
       "distribution": "internal",
+      "env": {
+        "GOOGLE_SERVICES_INFO_PLIST": "secret:GOOGLE_SERVICES_INFO_PLIST",
+        "GOOGLE_SERVICES_JSON": "secret:GOOGLE_SERVICES_JSON"
+      },
       "ios": {
         "simulator": true
       },
@@ -34,7 +46,11 @@
       }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "GOOGLE_SERVICES_INFO_PLIST": "secret:GOOGLE_SERVICES_INFO_PLIST",
+        "GOOGLE_SERVICES_JSON": "secret:GOOGLE_SERVICES_JSON"
+      }
     }
   },
   "submit": {

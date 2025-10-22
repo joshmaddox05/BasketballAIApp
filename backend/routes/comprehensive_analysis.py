@@ -10,52 +10,8 @@ import uuid
 import shutil
 import gc
 import logging
-import sys
-
-# Add parent directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from services.baseline_analyzer import NumpyEncoder
-import numpy as np
-import json
 
 logger = logging.getLogger(__name__)
-
-def convert_numpy_types(obj):
-    """Recursively convert numpy types to native Python types"""
-    import numpy as np
-    
-    # Handle numpy scalar types
-    if isinstance(obj, (np.integer, np.int8, np.int16, np.int32, np.int64, np.uint8, np.uint16, np.uint32, np.uint64)):
-        return int(obj)
-    elif isinstance(obj, (np.floating, np.float16, np.float32, np.float64)):
-        return float(obj)
-    elif isinstance(obj, (np.bool_, np.bool8)):
-        return bool(obj)
-    elif isinstance(obj, np.ndarray):
-        return obj.tolist()
-    elif isinstance(obj, dict):
-        return {key: convert_numpy_types(value) for key, value in obj.items()}
-    elif isinstance(obj, (list, tuple)):
-        return type(obj)(convert_numpy_types(item) for item in obj)
-    elif hasattr(obj, '__dict__'):
-        # Handle custom objects with __dict__
-        try:
-            return {key: convert_numpy_types(value) for key, value in obj.__dict__.items()}
-        except:
-            return str(obj)
-    else:
-        return obj
-
-def ensure_json_serializable(obj):
-    """Ensure object is JSON serializable by using NumpyEncoder"""
-    try:
-        # Try to serialize and deserialize to catch any remaining numpy types
-        json_str = json.dumps(obj, cls=NumpyEncoder)
-        return json.loads(json_str)
-    except (TypeError, ValueError) as e:
-        logger.warning(f"JSON serialization failed, converting to string: {e}")
-        return str(obj)
 
 def setup_comprehensive_analysis_routes(app, upload_dir: Path, get_shot_analysis_service_func):
     """Setup comprehensive analysis API routes"""
@@ -63,6 +19,7 @@ def setup_comprehensive_analysis_routes(app, upload_dir: Path, get_shot_analysis
     @app.post("/analyze/comprehensive")
     async def analyze_shot_comprehensive(
         video: UploadFile = File(...),
+        baseline_player: str = Form(default="Stephen Curry"),
         frame_skip: int = Form(default=1)
     ):
         """
@@ -72,15 +29,16 @@ def setup_comprehensive_analysis_routes(app, upload_dir: Path, get_shot_analysis
         - Advanced pose estimation with visibility filtering
         - Phase detection (dip, load, release, follow-through, landing)
         - Biomechanical metrics (knee load, elbow flare, release angle, etc.)
-        - Pure form analysis with optimal ranges
+        - NBA baseline comparison
         - Top 3 coaching cues with drill recommendations
         
         Args:
             video: Video file (mp4, mov, avi, mkv)
+            baseline_player: NBA player to compare against (default: Stephen Curry)
             frame_skip: Process every Nth frame (default: 1 for all frames)
             
         Returns:
-            Comprehensive analysis with metrics and coaching cues
+            Comprehensive analysis with metrics, comparison, and coaching cues
         """
         file_path = None
         
@@ -110,6 +68,7 @@ def setup_comprehensive_analysis_routes(app, upload_dir: Path, get_shot_analysis
             # Perform comprehensive analysis
             results = analysis_service.analyze_shot(
                 video_path=str(file_path),
+                baseline_player=baseline_player,
                 frame_skip=frame_skip
             )
             
@@ -129,24 +88,12 @@ def setup_comprehensive_analysis_routes(app, upload_dir: Path, get_shot_analysis
                     file_path.unlink()
                 
                 logger.warning(f"⚠️ Analysis failed: {error_response['error']}")
-                return JSONResponse(status_code=200, content=error_response, cls=NumpyEncoder)
-            
-            # Convert numpy types to native Python types
-            results = convert_numpy_types(results)
+                return JSONResponse(status_code=200, content=error_response)
             
             # Format successful response
-            response = _format_comprehensive_response(video_id, results)
+            response = _format_comprehensive_response(video_id, results, baseline_player)
             
-            # Convert response to native Python types and ensure JSON serializable
-            try:
-                response = convert_numpy_types(response)
-                response = ensure_json_serializable(response)
-            except Exception as e:
-                logger.error(f"Error converting response types: {e}")
-                # Fallback: convert everything to strings
-                response = str(response)
-            
-            logger.info(f"✅ Comprehensive analysis complete - Score: {response.get('overall_score', 'N/A')}/100")
+            logger.info(f"✅ Comprehensive analysis complete - Score: {response['overall_score']}/100")
             
             # Clean up video file to save storage
             if file_path and file_path.exists():
@@ -156,7 +103,7 @@ def setup_comprehensive_analysis_routes(app, upload_dir: Path, get_shot_analysis
             # Force garbage collection
             gc.collect()
             
-            return JSONResponse(content=response, cls=NumpyEncoder)
+            return response
             
         except Exception as e:
             logger.error(f"❌ Comprehensive analysis error: {str(e)}", exc_info=True)
@@ -172,15 +119,160 @@ def setup_comprehensive_analysis_routes(app, upload_dir: Path, get_shot_analysis
                 detail=f"Analysis failed: {str(e)}"
             )
     
+    @app.post("/analyze/comparison-video")
+    async def generate_comparison_video(
+        video: UploadFile = File(...),
+        baseline_player: str = Form(default="Stephen Curry"),
+        comparison_mode: str = Form(default="split"),
+        frame_skip: int = Form(default=1)
+    ):
+        """
+        Generate side-by-side comparison video with pose overlays
+        
+        Modes:
+        - split: Side-by-side user (left) vs baseline (right)
+        - overlay: Both skeletons on user video
+        - ghost: Transparent baseline skeleton over user video
+        
+        Args:
+            video: Video file (mp4, mov, avi, mkv)
+            baseline_player: NBA player to compare against
+            comparison_mode: 'split', 'overlay', or 'ghost'
+            frame_skip: Process every Nth frame (default: 1)
+            
+        Returns:
+            Analysis results + comparison video download URL
+        """
+        file_path = None
+        
+        try:
+            # Get analysis service
+            analysis_service = get_shot_analysis_service_func()
+            
+            # Validate inputs
+            if comparison_mode not in ['split', 'overlay', 'ghost']:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Invalid mode. Use 'split', 'overlay', or 'ghost'"
+                )
+            
+            if not video.filename.lower().endswith(('.mp4', '.mov', '.avi', '.mkv')):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Invalid file type. Supported: mp4, mov, avi, mkv"
+                )
+            
+            # Generate unique video ID
+            video_id = str(uuid.uuid4())
+            
+            # Save video file
+            file_path = upload_dir / f"{video_id}.mp4"
+            logger.info(f"💾 Saving video to: {file_path}")
+            
+            with open(file_path, "wb") as buffer:
+                shutil.copyfileobj(video.file, buffer)
+            
+            logger.info(f"✅ Video saved, generating comparison video...")
+            
+            # Perform analysis with comparison video
+            results = analysis_service.analyze_with_comparison_video(
+                video_path=str(file_path),
+                baseline_player=baseline_player,
+                comparison_mode=comparison_mode,
+                generate_video=True
+            )
+            
+            if not results.get('success', False):
+                # Analysis failed
+                error_response = {
+                    "video_id": video_id,
+                    "success": False,
+                    "error": results.get('error', 'Unknown error'),
+                    "confidence": results.get('confidence', 0.0),
+                    "analyzed_at": datetime.now().isoformat()
+                }
+                
+                # Clean up
+                if file_path and file_path.exists():
+                    file_path.unlink()
+                
+                logger.warning(f"⚠️ Comparison video generation failed: {error_response['error']}")
+                return JSONResponse(status_code=200, content=error_response)
+            
+            # Format response with comparison video
+            response = _format_comprehensive_response(video_id, results, baseline_player)
+            
+            # Add comparison video info
+            if 'comparison_video_path' in results:
+                comparison_path = Path(results['comparison_video_path'])
+                response['comparison_video'] = {
+                    'path': str(comparison_path),
+                    'filename': comparison_path.name,
+                    'mode': comparison_mode,
+                    'download_url': f"/download/comparison/{comparison_path.name}"
+                }
+                logger.info(f"✅ Comparison video ready: {comparison_path.name}")
+            
+            if 'comparison_video_error' in results:
+                response['comparison_video_error'] = results['comparison_video_error']
+            
+            # Clean up original video
+            if file_path and file_path.exists():
+                file_path.unlink()
+            
+            logger.info(f"✅ Comparison video generation complete")
+            
+            # Force garbage collection
+            gc.collect()
+            
+            return JSONResponse(status_code=200, content=response)
+            
+        except Exception as e:
+            logger.error(f"❌ Comparison video endpoint failed: {e}", exc_info=True)
+            
+            # Clean up on error
+            if file_path and file_path.exists():
+                try:
+                    file_path.unlink()
+                except:
+                    pass
+            
+            raise HTTPException(status_code=500, detail=str(e))
+    
+    @app.get("/baselines/available")
+    async def get_available_baselines():
+        """Get list of available NBA baseline players"""
+        analysis_service = get_shot_analysis_service_func()
+        return {
+            "available_baselines": analysis_service.get_available_baselines()
+        }
+    
+    @app.get("/baselines/{player_name}")
+    async def get_baseline_info(player_name: str):
+        """Get baseline data for a specific NBA player"""
+        analysis_service = get_shot_analysis_service_func()
+        baseline_data = analysis_service.get_baseline_data(player_name)
+        
+        if not baseline_data:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Baseline not found for {player_name}"
+            )
+        
+        return {
+            "player_name": player_name,
+            "baseline_data": baseline_data
+        }
 
 
-def _format_comprehensive_response(video_id: str, results: Dict[str, Any]) -> Dict[str, Any]:
+def _format_comprehensive_response(video_id: str, results: Dict[str, Any], baseline_player: str) -> Dict[str, Any]:
     """Format comprehensive analysis results for API response"""
     
     return {
         "video_id": video_id,
         "success": True,
         "analysis_mode": "comprehensive",
+        "player": baseline_player,
         "overall_score": round(results['overall_score'], 1),
         "confidence": round(results['confidence'], 2),
         
@@ -217,6 +309,14 @@ def _format_comprehensive_response(video_id: str, results: Dict[str, Any]) -> Di
             "arc_trajectory": _format_metric(results['metrics'].get('arc_trajectory'))
         },
         
+        # Comparison to NBA baseline
+        "comparison": {
+            "player": results['comparison'].get('player', baseline_player),
+            "overall_similarity": round(results['comparison'].get('overall_similarity', 0), 1),
+            "strengths": results['comparison'].get('strengths', []),
+            "areas_for_improvement": results['comparison'].get('areas_for_improvement', []),
+            "metric_comparisons": results['comparison'].get('metric_comparisons', {})
+        },
         
         # Top 3 coaching cues
         "coaching_cues": [
@@ -255,9 +355,6 @@ def _format_metric(metric_data: Optional[Dict[str, Any]]) -> Dict[str, Any]:
             "error": metric_data.get('error', 'Not available') if metric_data else 'Not available',
             "quality_score": 0.0
         }
-    
-    # Convert numpy types to native Python types
-    metric_data = convert_numpy_types(metric_data)
     
     formatted = {
         "quality_score": round(metric_data.get('quality_score', 0), 1)
