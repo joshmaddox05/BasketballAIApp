@@ -16,7 +16,7 @@ export default {
       supportsTablet: true,
       bundleIdentifier: "com.jmaddox0503.BasketballAIApp",
       deploymentTarget: "15.1",
-      googleServicesFile: "./ios/GoogleService-Info.plist",
+      googleServicesFile: "./GoogleService-Info.plist",
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
         NSCameraUsageDescription: "This app needs access to camera to record basketball shots for AI analysis.",

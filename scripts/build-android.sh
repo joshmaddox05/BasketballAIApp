@@ -10,3 +10,4 @@ echo "y" | eas build --profile development --platform android --non-interactive
 echo ""
 echo "✅ Android build initiated!"
 echo "📱 Check the build status at: https://expo.dev/accounts/jmaddox0503/projects/basketball-ai-app/builds"
+
