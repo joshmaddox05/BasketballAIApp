@@ -38,26 +38,8 @@ target 'BasketballAITraining' do
 
   config = use_native_modules!(config_command)
 
-  # Only use frameworks if explicitly set and not 'static'
-  if podfile_properties['ios.useFrameworks'] && podfile_properties['ios.useFrameworks'] != 'static'
-    use_frameworks! :linkage => podfile_properties['ios.useFrameworks'].to_sym
-  end
-  if ENV['USE_FRAMEWORKS'] && ENV['USE_FRAMEWORKS'] != 'static'
-    use_frameworks! :linkage => ENV['USE_FRAMEWORKS'].to_sym
-  end
-
-  # Enable modular headers for Firebase dependencies only
-  pod 'FirebaseAuthInterop', :modular_headers => true
-  pod 'FirebaseAppCheckInterop', :modular_headers => true
-  pod 'FirebaseCore', :modular_headers => true
-  pod 'FirebaseCoreExtension', :modular_headers => true
-  pod 'FirebaseFirestoreInternal', :modular_headers => true
-  pod 'FirebaseABTesting', :modular_headers => true
-  pod 'FirebaseInstallations', :modular_headers => true
-  pod 'GoogleUtilities', :modular_headers => true
-  pod 'GoogleDataTransport', :modular_headers => true
-  pod 'nanopb', :modular_headers => true
-  pod 'RecaptchaInterop', :modular_headers => true
+  # Use dynamic frameworks to properly support Swift Firebase dependencies
+  use_frameworks! :linkage => :static
 
   use_react_native!(
     :path => config[:reactNativePath],
@@ -74,55 +56,5 @@ target 'BasketballAITraining' do
       :mac_catalyst_enabled => false,
       :ccache_enabled => ccache_enabled?(podfile_properties),
     )
-    
-    # Fix for Firebase Swift bridging header issues
-    installer.pods_project.targets.each do |target|
-      target.build_configurations.each do |config|
-        # Enable Swift compilation for all targets
-        config.build_settings['SWIFT_VERSION'] ||= '5.0'
-        
-        # Fix RNFB* targets that depend on Firebase Swift modules
-        if target.name.start_with?('RNFB')
-          config.build_settings['CLANG_ENABLE_MODULES'] = 'YES'
-          config.build_settings['SWIFT_COMPILATION_MODE'] = 'wholemodule'
-          
-          # Add Firebase module paths
-          config.build_settings['HEADER_SEARCH_PATHS'] ||= ['$(inherited)']
-          config.build_settings['HEADER_SEARCH_PATHS'] << '"${PODS_CONFIGURATION_BUILD_DIR}/FirebaseAuth/FirebaseAuth.framework/Headers"'
-          config.build_settings['HEADER_SEARCH_PATHS'] << '"${PODS_CONFIGURATION_BUILD_DIR}/FirebaseCore/FirebaseCore.framework/Headers"'
-          config.build_settings['HEADER_SEARCH_PATHS'] << '"${PODS_CONFIGURATION_BUILD_DIR}/FirebaseStorage/FirebaseStorage.framework/Headers"'
-          config.build_settings['HEADER_SEARCH_PATHS'] << '"${PODS_CONFIGURATION_BUILD_DIR}/FirebaseFirestore/FirebaseFirestore.framework/Headers"'
-          
-          # Add Swift generated headers path
-          config.build_settings['SWIFT_INCLUDE_PATHS'] ||= ['$(inherited)']
-          config.build_settings['SWIFT_INCLUDE_PATHS'] << '"${PODS_CONFIGURATION_BUILD_DIR}/FirebaseAuth"'
-          config.build_settings['SWIFT_INCLUDE_PATHS'] << '"${PODS_CONFIGURATION_BUILD_DIR}/FirebaseCore"'
-        end
-        
-        # Ensure Firebase pods compile as frameworks with Swift support
-        if target.name.start_with?('Firebase')
-          config.build_settings['DEFINES_MODULE'] = 'YES'
-          config.build_settings['CLANG_ENABLE_MODULES'] = 'YES'
-        end
-      end
-    end
-    
-    # Ensure Firebase pods build before RNFB pods
-    installer.pods_project.targets.each do |target|
-      if target.name.start_with?('RNFB')
-        target.dependencies.each do |dep|
-          # Skip if already has Firebase dependencies
-          next if dep.name.start_with?('Firebase')
-        end
-        
-        # Add explicit dependencies on Firebase targets
-        firebase_targets = installer.pods_project.targets.select { |t| t.name.start_with?('Firebase') }
-        firebase_targets.each do |firebase_target|
-          unless target.dependencies.map(&:name).include?(firebase_target.name)
-            target.add_dependency(firebase_target)
-          end
-        end
-      end
-    end
   end
 end
