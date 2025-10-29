@@ -38,7 +38,7 @@ target 'BasketballAITraining' do
 
   config = use_native_modules!(config_command)
 
-  # Use dynamic frameworks to properly support Swift Firebase dependencies
+  # Use static frameworks (required for Firebase Analytics binary compatibility)
   use_frameworks! :linkage => :static
 
   use_react_native!(
@@ -56,5 +56,31 @@ target 'BasketballAITraining' do
       :mac_catalyst_enabled => false,
       :ccache_enabled => ccache_enabled?(podfile_properties),
     )
+    
+    # Fix for static frameworks with React Native Firebase
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        # Allow non-modular includes in framework modules
+        config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+        
+        # Fix C99 implicit int errors in gRPC and abseil
+        config.build_settings['GCC_C_LANGUAGE_STANDARD'] = 'gnu11'
+        config.build_settings['CLANG_WARN_IMPLICIT_FALLTHROUGH'] = 'NO'
+        config.build_settings['GCC_WARN_64_TO_32_BIT_CONVERSION'] = 'NO'
+        
+        # Disable strict implicit function declaration warnings
+        config.build_settings['GCC_WARN_ABOUT_MISSING_PROTOTYPES'] = 'NO'
+        config.build_settings['CLANG_WARN_STRICT_PROTOTYPES'] = 'NO'
+        config.build_settings['GCC_WARN_ABOUT_MISSING_FIELD_INITIALIZERS'] = 'NO'
+        
+        # Make implicit int a warning instead of error
+        config.build_settings['OTHER_CFLAGS'] ||= ['$(inherited)']
+        config.build_settings['OTHER_CFLAGS'] << '-Wno-error=implicit-int'
+        config.build_settings['OTHER_CFLAGS'] << '-Wno-error=implicit-function-declaration'
+        
+        # Ensure proper C++ standard for gRPC and abseil
+        config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] ||= 'c++17'
+      end
+    end
   end
 end
