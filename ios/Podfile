@@ -57,29 +57,46 @@ target 'BasketballAITraining' do
       :ccache_enabled => ccache_enabled?(podfile_properties),
     )
     
-    # Fix for static frameworks with React Native Firebase
+    # Fix compilation issues with Firebase, gRPC, and BoringSSL
     installer.pods_project.targets.each do |target|
       target.build_configurations.each do |config|
-        # Allow non-modular includes in framework modules
+        # Allow non-modular includes in framework modules (required for Firebase)
         config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
         
-        # Fix C99 implicit int errors in gRPC and abseil
+        # C++ standard for gRPC, abseil, and Firestore
+        config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17'
+        
+        # C standard to fix implicit int errors
         config.build_settings['GCC_C_LANGUAGE_STANDARD'] = 'gnu11'
-        config.build_settings['CLANG_WARN_IMPLICIT_FALLTHROUGH'] = 'NO'
-        config.build_settings['GCC_WARN_64_TO_32_BIT_CONVERSION'] = 'NO'
         
-        # Disable strict implicit function declaration warnings
-        config.build_settings['GCC_WARN_ABOUT_MISSING_PROTOTYPES'] = 'NO'
+        # Disable strict prototypes warning
         config.build_settings['CLANG_WARN_STRICT_PROTOTYPES'] = 'NO'
-        config.build_settings['GCC_WARN_ABOUT_MISSING_FIELD_INITIALIZERS'] = 'NO'
         
-        # Make implicit int a warning instead of error
-        config.build_settings['OTHER_CFLAGS'] ||= ['$(inherited)']
-        config.build_settings['OTHER_CFLAGS'] << '-Wno-error=implicit-int'
-        config.build_settings['OTHER_CFLAGS'] << '-Wno-error=implicit-function-declaration'
+        # Disable implicit int warning (treat as non-fatal)
+        config.build_settings['GCC_WARN_ABOUT_MISSING_PROTOTYPES'] = 'NO'
         
-        # Ensure proper C++ standard for gRPC and abseil
-        config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] ||= 'c++17'
+        # Suppress implicit int conversion warnings
+        config.build_settings['CLANG_WARN_IMPLICIT_INT_CONVERSION'] = 'NO'
+        config.build_settings['GCC_WARN_IMPLICIT_INT_CONVERSION'] = 'NO'
+        
+        # Fix for BoringSSL and gRPC-Core compilation
+        if target.name == 'BoringSSL-GRPC' || target.name == 'gRPC-Core' || target.name == 'gRPC-C++'
+          # Allow deprecated declarations
+          config.build_settings['GCC_WARN_ABOUT_DEPRECATED_FUNCTIONS'] = 'NO'
+          config.build_settings['CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS'] = 'NO'
+          
+          # Treat implicit int as warning, not error
+          config.build_settings['OTHER_CFLAGS'] ||= ['$(inherited)']
+          config.build_settings['OTHER_CFLAGS'] << '-Wno-error=implicit-int'
+          config.build_settings['OTHER_CFLAGS'] << '-Wno-implicit-int'
+          config.build_settings['OTHER_CFLAGS'] << '-Wno-error=implicit-function-declaration'
+        end
+        
+        # Ensure Swift 5.0 compatibility
+        config.build_settings['SWIFT_VERSION'] = '5.0'
+        
+        # Suppress Swift warnings to prevent module compilation issues
+        config.build_settings['SWIFT_SUPPRESS_WARNINGS'] = 'YES'
       end
     end
   end
