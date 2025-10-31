@@ -79,6 +79,28 @@ target 'BasketballAITraining' do
         config.build_settings['CLANG_WARN_IMPLICIT_INT_CONVERSION'] = 'NO'
         config.build_settings['GCC_WARN_IMPLICIT_INT_CONVERSION'] = 'NO'
         
+        # Additional compiler flags to suppress various errors
+        config.build_settings['OTHER_CFLAGS'] ||= ['$(inherited)']
+        config.build_settings['OTHER_CFLAGS'] << '-Wno-error=implicit-function-declaration'
+        config.build_settings['OTHER_CFLAGS'] << '-Wno-error=implicit-int'
+        config.build_settings['OTHER_CFLAGS'] << '-Wno-error=deprecated-declarations'
+        config.build_settings['OTHER_CFLAGS'] << '-Wno-error=incompatible-pointer-types'
+        config.build_settings['OTHER_CFLAGS'] << '-Wno-error=unused-function'
+        config.build_settings['OTHER_CFLAGS'] << '-Wno-error=unused-variable'
+        
+        # For C++ targets, suppress template-related errors
+        if target.name.include?('gRPC') || target.name.include?('BoringSSL') || target.name.include?('Firebase')
+          config.build_settings['OTHER_CPLUSPLUSFLAGS'] ||= ['$(inherited)']
+          config.build_settings['OTHER_CPLUSPLUSFLAGS'] << '-Wno-error=implicit-function-declaration'
+          config.build_settings['OTHER_CPLUSPLUSFLAGS'] << '-Wno-error=implicit-int'
+          config.build_settings['OTHER_CPLUSPLUSFLAGS'] << '-Wno-error=deprecated-declarations'
+          config.build_settings['OTHER_CPLUSPLUSFLAGS'] << '-Wno-error=incompatible-pointer-types'
+          config.build_settings['OTHER_CPLUSPLUSFLAGS'] << '-Wno-error=unused-function'
+          config.build_settings['OTHER_CPLUSPLUSFLAGS'] << '-Wno-error=unused-variable'
+          config.build_settings['OTHER_CPLUSPLUSFLAGS'] << '-Wno-error=template'
+          config.build_settings['OTHER_CPLUSPLUSFLAGS'] << '-Wno-error=undeclared-identifier'
+        end
+        
         # Fix for BoringSSL and gRPC-Core compilation
         if target.name == 'BoringSSL-GRPC' || target.name == 'gRPC-Core' || target.name == 'gRPC-C++'
           # Allow deprecated declarations
