@@ -5,10 +5,10 @@ import { CONFIG } from '../config/api';
 
 class AIAnalysisService {
   constructor() {
-    // Updated backend URL - now points to separate backend repository
-    // Production: https://basketballaiapp.onrender.com (update after deployment)
+    // Backend API URL - points to separate backend repository
+    // Production: https://basketballaiappapi.onrender.com
     // Local development: http://localhost:8000
-    this.API_BASE_URL = CONFIG.API_BASE_URL || 'https://basketballaiapp.onrender.com';
+    this.API_BASE_URL = CONFIG.API_BASE_URL || 'https://basketballaiappapi.onrender.com';
     this.ANALYSIS_CACHE_KEY = 'ai_analysis_cache';
     this.MODELS_CACHE_KEY = 'ai_models_cache';
     this.isOfflineMode = CONFIG.isOfflineMode || false; // Use config setting

@@ -106,7 +106,7 @@ FastAPI backend service providing AI-powered basketball shot analysis.
 
 ## Deployment
 
-Deployed on Render: https://basketballaiapp.onrender.com
+Deployed on Render: https://basketballaiappapi.onrender.com
 
 See `render.yaml` for configuration.
 ```
@@ -290,16 +290,13 @@ git push -u origin main
 Edit `/Users/joshuamaddox/Codebase/BasketballAIApp/src/services/aiAnalysisService.js`:
 
 ```javascript
-// OLD:
-const API_BASE_URL = 'https://basketballaiapp.onrender.com';
-
-// NEW (use your actual Render URL):
-const API_BASE_URL = 'https://basketball-ai-backend.onrender.com';
+// UPDATED:
+const API_BASE_URL = 'https://basketballaiappapi.onrender.com';
 
 // OR for local development:
 const API_BASE_URL = __DEV__
   ? 'http://localhost:8000'  // Local backend during development
-  : 'https://basketball-ai-backend.onrender.com';  // Production backend
+  : 'https://basketballaiappapi.onrender.com';  // Production backend
 ```
 
 ### Step 5.2: Test API Connection

@@ -9,9 +9,9 @@ const API_CONFIG = {
     timeout: 600000, // 10 minutes for long-running model processing
   },
   
-  // Production (Render deployment)
+  // Production (Render deployment - separate backend repository)
   production: {
-    API_BASE_URL: 'https://basketballaiapp.onrender.com',
+    API_BASE_URL: 'https://basketballaiappapi.onrender.com',
     isOfflineMode: false,
     timeout: 600000, // 10 minutes for long-running model processing (increased from 30s)
   },

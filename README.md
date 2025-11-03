@@ -24,7 +24,7 @@ React Native/Expo mobile application providing AI-powered basketball shot analys
 ## Related Repositories
 
 - **Backend API**: [BasketballAIAppApi](https://github.com/joshmaddox05/BasketballAIAppApi.git) - FastAPI backend for shot analysis
-  - Deployed at: https://basketballaiapp.onrender.com
+  - Deployed at: https://basketballaiappapi.onrender.com
 
 ## Prerequisites
 
@@ -61,7 +61,7 @@ The app requires the Basketball AI Backend to be running. Two options:
 
 The app is preconfigured to use the production backend at:
 ```
-https://basketballaiapp.onrender.com
+https://basketballaiappapi.onrender.com
 ```
 
 No additional setup needed.
@@ -213,7 +213,7 @@ FIREBASE_APP_ID=1:123456789:ios:abcdef
 
 ```javascript
 export const CONFIG = {
-  API_BASE_URL: 'https://basketballaiapp.onrender.com',
+  API_BASE_URL: 'https://basketballaiappapi.onrender.com',
   isOfflineMode: false,
   timeout: 600000 // 10 minutes
 };
@@ -246,7 +246,7 @@ npx expo start --clear
 ## Deployment Status
 
 - **App**: Development build only (not yet in App Store/Play Store)
-- **Backend**: Deployed on Render at https://basketballaiapp.onrender.com
+- **Backend**: Deployed on Render at https://basketballaiappapi.onrender.com
 - **Database**: Firebase Firestore (production)
 - **Auth**: Firebase Authentication (production)
 
@@ -254,7 +254,7 @@ npx expo start --clear
 
 ### "Cannot connect to backend"
 
-1. Check backend is running (visit health check: https://basketballaiapp.onrender.com/health)
+1. Check backend is running (visit health check: https://basketballaiappapi.onrender.com/health)
 2. Verify API_BASE_URL in `src/config/api.js`
 3. Check internet connection
 4. Try enabling offline mode temporarily
