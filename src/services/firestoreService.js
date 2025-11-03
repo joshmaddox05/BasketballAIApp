@@ -23,32 +23,59 @@ import { db } from '../config/firebaseConfig';
 // ==================== USER OPERATIONS ====================
 
 /**
- * Create a new user profile in Firestore
+ * Create a new user profile in Firestore with retry logic
  * @param {string} uid - User ID
  * @param {Object} userData - User profile data
  * @returns {Promise<void>}
  */
 export const createUserProfile = async (uid, userData) => {
-  try {
-    console.log('Firestore: Creating user profile for uid:', uid);
-    console.log('Firestore: User data:', userData);
-    
-    await setDoc(doc(db, 'users', uid), {
-      ...userData,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    });
-    
-    console.log('Firestore: User profile created successfully');
-  } catch (error) {
-    console.error('Firestore: Error creating user profile:', error);
-    console.error('Firestore: Error details:', {
-      code: error.code,
-      message: error.message,
-      uid: uid
-    });
-    throw error;
+  const maxRetries = 3;
+  let lastError;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`Firestore: Creating user profile for uid: ${uid} (attempt ${attempt}/${maxRetries})`);
+
+      if (attempt > 1) {
+        console.log('Firestore: User data:', userData);
+      }
+
+      await setDoc(doc(db, 'users', uid), {
+        ...userData,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+
+      console.log('Firestore: User profile created successfully');
+      return; // Success - exit function
+
+    } catch (error) {
+      lastError = error;
+      console.error(`Firestore: Error creating user profile (attempt ${attempt}/${maxRetries}):`, error);
+      console.error('Firestore: Error details:', {
+        code: error.code,
+        message: error.message,
+        uid: uid
+      });
+
+      // If it's a permission error and we have retries left, wait and try again
+      if (error.code === 'permission-denied' && attempt < maxRetries) {
+        const delayMs = 500 * attempt; // Exponential backoff: 500ms, 1000ms, 1500ms
+        console.log(`Firestore: Permission denied. Retrying in ${delayMs}ms... (auth token may still be propagating)`);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+        continue;
+      }
+
+      // For other errors or last attempt, throw immediately
+      if (error.code !== 'permission-denied' || attempt === maxRetries) {
+        throw error;
+      }
+    }
   }
+
+  // If we get here, all retries failed
+  console.error('Firestore: All retry attempts failed');
+  throw lastError;
 };
 
 /**

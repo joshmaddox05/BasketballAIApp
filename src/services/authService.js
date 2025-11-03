@@ -38,6 +38,10 @@ export const registerWithEmail = async (email, password, displayName) => {
     // Send email verification
     await sendEmailVerification(user);
 
+    // Small delay to allow auth token to propagate
+    console.log('Waiting for auth token to propagate...');
+    await new Promise(resolve => setTimeout(resolve, 500));
+
     // Create user profile in Firestore
     const userProfile = {
       uid: user.uid,
@@ -263,11 +267,38 @@ export const onAuthStateChange = (callback) => {
   return onAuthStateChanged(auth, async (user) => {
     if (user) {
       try {
-        // Get user profile from Firestore
-        const profile = await getUserProfile(user.uid);
-        callback({ user, profile });
+        // Get user profile from Firestore with retry logic
+        let profile = null;
+        let retries = 3;
+
+        while (retries > 0 && !profile) {
+          try {
+            profile = await getUserProfile(user.uid);
+            if (profile) {
+              // Successfully got profile
+              callback({ user, profile });
+              return;
+            }
+          } catch (error) {
+            retries--;
+            if (error.code === 'permission-denied') {
+              console.log(`Permission denied fetching profile, retries left: ${retries}`);
+              // Wait a bit before retrying to allow auth token to propagate
+              await new Promise(resolve => setTimeout(resolve, 500));
+            } else {
+              throw error;
+            }
+          }
+        }
+
+        // If we get here, profile fetch failed or returned null
+        // This is expected during registration before Firestore profile is created
+        console.log('No profile found for user:', user.uid);
+        callback({ user, profile: null });
+
       } catch (error) {
-        console.error('Error getting user profile:', error);
+        console.error('Unhandled auth error:', error);
+        // Pass user without profile - let AppContext decide what to do
         callback({ user, profile: null });
       }
     } else {

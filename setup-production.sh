@@ -93,14 +93,11 @@ if [ $? -ne 0 ]; then
 fi
 print_status "Dependencies installed successfully"
 
-# Install Firebase dependencies
-echo "🔥 Installing Firebase dependencies..."
-npm install @react-native-firebase/app @react-native-firebase/auth @react-native-firebase/firestore @react-native-firebase/storage
-if [ $? -ne 0 ]; then
-    print_error "Failed to install Firebase dependencies"
-    exit 1
-fi
-print_status "Firebase dependencies installed successfully"
+# Firebase dependencies no longer needed - using Firebase JS SDK instead
+# Removed React Native Firebase packages in favor of Firebase JS SDK (firebase: ^12.4.0)
+# echo "🔥 Installing Firebase dependencies..."
+# npm install @react-native-firebase/app @react-native-firebase/auth @react-native-firebase/firestore @react-native-firebase/storage
+print_status "Using Firebase JS SDK (already in package.json)"
 
 # Deploy Firestore rules and indexes
 echo "🚀 Deploying Firestore rules and indexes..."

@@ -56,8 +56,7 @@ export default {
           isAccessMediaLocationEnabled: true
         }
       ],
-      "expo-video",
-      "@react-native-firebase/app"
+      "expo-video"
     ],
     extra: {
       eas: {

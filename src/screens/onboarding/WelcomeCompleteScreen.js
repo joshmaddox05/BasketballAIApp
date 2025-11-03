@@ -22,10 +22,11 @@ const { width, height } = Dimensions.get('window');
 const WelcomeCompleteScreen = ({ navigation }) => {
     const { userData, theme: contextTheme, isDarkMode, completeOnboarding } = useAppContext();
     const theme = contextTheme || getTheme(isDarkMode || false);
-    
+
     const [fadeAnim] = useState(new Animated.Value(0));
     const [slideAnim] = useState(new Animated.Value(50));
     const [scaleAnim] = useState(new Animated.Value(0.8));
+    const [isCompleting, setIsCompleting] = useState(false);
 
     useEffect(() => {
         // Animate the welcome screen
@@ -97,9 +98,19 @@ const WelcomeCompleteScreen = ({ navigation }) => {
         return workouts[area] || "Personalized Training";
     };
 
-    const handleStartTraining = () => {
-        // Complete onboarding - AppNavigator will handle navigation to main app
-        completeOnboarding();
+    const handleStartTraining = async () => {
+        if (isCompleting) return; // Prevent double-tap
+
+        setIsCompleting(true);
+        try {
+            // Complete onboarding and persist to Firestore
+            await completeOnboarding();
+            // AppNavigator will detect the change and navigate to main app
+        } catch (error) {
+            console.error('Error completing onboarding:', error);
+            alert('There was an error saving your profile. Please try again.');
+            setIsCompleting(false);
+        }
     };
 
     return (
@@ -192,18 +203,24 @@ const WelcomeCompleteScreen = ({ navigation }) => {
                     {/* Action Buttons */}
                     <View style={styles.buttonsContainer}>
                         <TouchableOpacity
-                            style={styles.startTrainingButton}
+                            style={[styles.startTrainingButton, isCompleting && styles.buttonDisabled]}
                             onPress={handleStartTraining}
+                            disabled={isCompleting}
                         >
                             <Ionicons name="play" size={20} color="#FFF" />
-                            <Text style={styles.startTrainingButtonText}>Start Training</Text>
+                            <Text style={styles.startTrainingButtonText}>
+                                {isCompleting ? 'Setting up your profile...' : 'Start Training'}
+                            </Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                            style={styles.exploreButton}
+                            style={[styles.exploreButton, isCompleting && styles.buttonDisabled]}
                             onPress={handleStartTraining}
+                            disabled={isCompleting}
                         >
-                            <Text style={styles.exploreButtonText}>Explore the App</Text>
+                            <Text style={styles.exploreButtonText}>
+                                {isCompleting ? 'Please wait...' : 'Explore the App'}
+                            </Text>
                         </TouchableOpacity>
                     </View>
                 </Animated.View>
@@ -353,6 +370,9 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: '#FFF',
         fontWeight: '600',
+    },
+    buttonDisabled: {
+        opacity: 0.6,
     },
 });
 

@@ -72,12 +72,16 @@ const ProfileScreen = ({ navigation }) => {
                 {/* Profile Header */}
                 <View style={[styles.profileHeader, { backgroundColor: theme.card }]}>
                     <View style={[styles.profileImagePlaceholder, { backgroundColor: theme.primary }]}>
-                        <Text style={styles.profileInitials}>{getInitials(userData.name)}</Text>
+                        <Text style={styles.profileInitials}>
+                            {getInitials(userData?.displayName || userData?.name || 'User')}
+                        </Text>
                     </View>
 
-                    <Text style={[styles.profileName, { color: theme.text }]}>{userData.name}</Text>
+                    <Text style={[styles.profileName, { color: theme.text }]}>
+                        {userData?.displayName || userData?.name || 'User'}
+                    </Text>
                     <Text style={[styles.profileLevel, { color: theme.textSecondary }]}>
-                        {userData.level || 'Beginner'} Player
+                        {userData?.level ? userData.level.charAt(0).toUpperCase() + userData.level.slice(1) : 'Beginner'} Player
                     </Text>
 
                     <View style={styles.profileStatsRow}>

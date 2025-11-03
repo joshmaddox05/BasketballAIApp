@@ -5,30 +5,29 @@ import { useColorScheme } from 'react-native';
 import { getTheme } from '../utils/theme';
 
 // Firebase imports
-import { onAuthStateChange, signOutUser } from '../services/authService';
-import { 
-  getUserProfile, 
-  listenToUserProfile, 
-  getUserActivities, 
+import { onAuthStateChange, signOutUser, getCurrentUser } from '../services/authService';
+import {
+  getUserProfile,
+  listenToUserProfile,
+  getUserActivities,
   listenToUserActivities,
   getUserGoals,
   getUserAchievements,
   getWorkouts,
-  getVideos
+  getVideos,
+  updateUserProfile
 } from '../services/firestoreService';
-// Sample initial data
+// Initial empty user data - will be populated from Firestore
 const initialUserData = {
-    name: 'Michael Jordan',
+    displayName: null,
+    name: null,
     level: null,
-    age: 18,
     stats: {
-        shooting: 75,
-        dribbling: 70,
-        streak: 3
+        shooting: 0,
+        dribbling: 0,
+        physical: 0,
+        streak: 0
     },
-    workouts: 12,
-    badges: 5,
-    accuracy: 80,
     subscription: 'free',
     onboardingCompleted: false
 };
@@ -206,8 +205,14 @@ export const AppProvider = ({ children }) => {
                 
                 if (profile) {
                     // User has a profile in Firestore
-                    setUserData(profile);
-                    
+                    // Normalize field names: ensure both 'displayName' and 'name' are available
+                    const normalizedProfile = {
+                        ...profile,
+                        name: profile.displayName || profile.name,
+                        displayName: profile.displayName || profile.name
+                    };
+                    setUserData(normalizedProfile);
+
                     // Load user-specific data from Firestore
                     try {
                         const [userActivities, userGoals, userAchievements] = await Promise.all([
@@ -215,23 +220,29 @@ export const AppProvider = ({ children }) => {
                             getUserGoals(user.uid),
                             getUserAchievements(user.uid)
                         ]);
-                        
-                        setActivities(userActivities);
-                        setGoals(userGoals);
-                        setAchievements(userAchievements);
+
+                        setActivities(userActivities.length > 0 ? userActivities : []);
+                        setGoals(userGoals.length > 0 ? userGoals : []);
+                        setAchievements(userAchievements.length > 0 ? userAchievements : []);
                     } catch (error) {
                         console.error('Error loading user data:', error);
-                        // Use initial data as fallback
-                        setActivities(initialActivities);
-                        setGoals(initialGoals);
+                        // Use empty arrays as fallback
+                        setActivities([]);
+                        setGoals([]);
                         setAchievements([]);
                     }
                 } else {
                     // User is authenticated but doesn't have a profile yet (during registration)
                     console.log('User authenticated but no profile found - likely during registration');
-                    setUserData(initialUserData);
-                    setActivities(initialActivities);
-                    setGoals(initialGoals);
+                    setUserData({
+                        ...initialUserData,
+                        displayName: user.displayName,
+                        name: user.displayName,
+                        email: user.email,
+                        uid: user.uid
+                    });
+                    setActivities([]);
+                    setGoals([]);
                     setAchievements([]);
                 }
             } else {
@@ -374,39 +385,101 @@ export const AppProvider = ({ children }) => {
         }
     };
 
-    // Onboarding functions
-    const updateUserSkillLevel = (level) => {
+    // Onboarding functions - persist to Firestore
+    const updateUserSkillLevel = async (level) => {
         console.log('AppContext - Updating skill level to:', level);
-        setUserData(prev => ({
-            ...prev,
-            level
-        }));
+        const user = getCurrentUser();
+        if (user) {
+            try {
+                await updateUserProfile(user.uid, { level });
+                setUserData(prev => ({
+                    ...prev,
+                    level
+                }));
+            } catch (error) {
+                console.error('Error updating skill level:', error);
+                // Still update local state even if Firestore fails
+                setUserData(prev => ({
+                    ...prev,
+                    level
+                }));
+            }
+        } else {
+            // No user logged in, just update local state
+            setUserData(prev => ({
+                ...prev,
+                level
+            }));
+        }
     };
 
-    const setUserGoals = (selectedGoals) => {
+    const setUserGoals = async (selectedGoals) => {
         console.log('AppContext - Setting user goals');
-        setGoals(selectedGoals.map(goal => ({
+        const formattedGoals = selectedGoals.map(goal => ({
             ...goal,
-            progress: 0,
+            current: 0,
             target: 100,
+            isActive: true,
             startDate: new Date().toISOString()
-        })));
+        }));
+
+        // Update local state immediately for better UX
+        setGoals(formattedGoals);
+
+        // Note: Individual goals will be saved to Firestore when onboarding completes
+        // This is just for preview during onboarding flow
     };
 
-    const updateUserPreferences = (preferences) => {
+    const updateUserPreferences = async (preferences) => {
         console.log('AppContext - Updating user preferences');
-        setUserData(prev => ({
-            ...prev,
-            preferences
-        }));
+        const user = getCurrentUser();
+        if (user) {
+            try {
+                await updateUserProfile(user.uid, { preferences });
+                setUserData(prev => ({
+                    ...prev,
+                    preferences
+                }));
+            } catch (error) {
+                console.error('Error updating preferences:', error);
+                // Still update local state even if Firestore fails
+                setUserData(prev => ({
+                    ...prev,
+                    preferences
+                }));
+            }
+        } else {
+            setUserData(prev => ({
+                ...prev,
+                preferences
+            }));
+        }
     };
 
-    const completeOnboarding = () => {
+    const completeOnboarding = async () => {
         console.log('AppContext - Completing onboarding');
-        setUserData(prev => ({
-            ...prev,
-            onboardingCompleted: true
-        }));
+        const user = getCurrentUser();
+        if (user) {
+            try {
+                // Persist onboarding completion to Firestore
+                await updateUserProfile(user.uid, {
+                    onboardingCompleted: true
+                });
+
+                setUserData(prev => ({
+                    ...prev,
+                    onboardingCompleted: true
+                }));
+
+                return true;
+            } catch (error) {
+                console.error('Error completing onboarding:', error);
+                throw error;
+            }
+        } else {
+            console.error('No user logged in - cannot complete onboarding');
+            throw new Error('No user logged in');
+        }
     };
 
     // Function to add a new workout

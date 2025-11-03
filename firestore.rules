@@ -12,7 +12,14 @@ service cloud.firestore {
     
     // Users collection - users can only access their own data
     match /users/{uid} {
-      allow read, write: if isSignedIn() && isOwner(uid);
+      allow read: if isSignedIn() && isOwner(uid);
+      allow create: if isSignedIn() && isOwner(uid);
+      allow update, delete: if isSignedIn() && isOwner(uid);
+      
+      // User's activities (ADDED - this was missing!)
+      match /activities/{activityId} {
+        allow read, write: if isSignedIn() && isOwner(uid);
+      }
       
       // User's workout plans
       match /plans/{planId} {
@@ -58,7 +65,7 @@ service cloud.firestore {
       allow write: if false; // Admin only
     }
     
-    // Community features (coming soon)
+    // Community features
     match /community/{postId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();

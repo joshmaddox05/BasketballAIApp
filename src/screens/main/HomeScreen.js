@@ -120,7 +120,9 @@ const HomeScreen = ({ navigation }) => {
             >
                 <View style={styles.header}>
                     <View>
-                        <Text style={[styles.greeting, { color: theme.text }]}>Hello, {userData.name.split(' ')[0]}</Text>
+                        <Text style={[styles.greeting, { color: theme.text }]}>
+                            Hello, {userData?.displayName?.split(' ')[0] || userData?.name?.split(' ')[0] || 'Champion'}
+                        </Text>
                         <Text style={[styles.subGreeting, { color: theme.textSecondary }]}>Ready to improve today?</Text>
                     </View>
                     <TouchableOpacity
@@ -132,7 +134,7 @@ const HomeScreen = ({ navigation }) => {
                         ) : (
                             <View style={[styles.profileImage, styles.profileImagePlaceholder]}>
                                 <Text style={styles.profileImageText}>
-                                    {userData.name.split(' ').map(n => n[0]).join('')}
+                                    {(userData?.displayName || userData?.name || 'U').split(' ').map(n => n[0]).join('')}
                                 </Text>
                             </View>
                         )}
