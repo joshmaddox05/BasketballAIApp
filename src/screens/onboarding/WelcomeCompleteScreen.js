@@ -10,7 +10,8 @@ import {
     Dimensions,
     Animated,
     ImageBackground,
-    Platform
+    Platform,
+    ScrollView
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
@@ -120,18 +121,24 @@ const WelcomeCompleteScreen = ({ navigation }) => {
         >
             <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
             <SafeAreaView style={styles.container}>
-                <Animated.View 
-                    style={[
-                        styles.content,
-                        {
-                            opacity: fadeAnim,
-                            transform: [
-                                { translateY: slideAnim },
-                                { scale: scaleAnim }
-                            ]
-                        }
-                    ]}
+                <ScrollView
+                    style={styles.scrollView}
+                    contentContainerStyle={styles.scrollContent}
+                    showsVerticalScrollIndicator={false}
+                    bounces={false}
                 >
+                    <Animated.View
+                        style={[
+                            styles.content,
+                            {
+                                opacity: fadeAnim,
+                                transform: [
+                                    { translateY: slideAnim },
+                                    { scale: scaleAnim }
+                                ]
+                            }
+                        ]}
+                    >
                     {/* Header */}
                     <View style={styles.header}>
                         <View style={styles.logoCircle}>
@@ -223,7 +230,8 @@ const WelcomeCompleteScreen = ({ navigation }) => {
                             </Text>
                         </TouchableOpacity>
                     </View>
-                </Animated.View>
+                    </Animated.View>
+                </ScrollView>
             </SafeAreaView>
         </ImageBackground>
     );
@@ -240,10 +248,17 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0, 0, 0, 0.7)',
         paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
     },
-    content: {
+    scrollView: {
         flex: 1,
+    },
+    scrollContent: {
+        flexGrow: 1,
+        paddingBottom: 20,
+    },
+    content: {
         paddingHorizontal: 24,
         paddingTop: height * 0.05,
+        minHeight: height * 0.9,
     },
     header: {
         alignItems: 'center',
@@ -340,8 +355,8 @@ const styles = StyleSheet.create({
         color: 'rgba(255, 255, 255, 0.7)',
     },
     buttonsContainer: {
-        marginTop: 'auto',
-        marginBottom: height * 0.05,
+        marginTop: 32,
+        paddingBottom: height * 0.05,
     },
     startTrainingButton: {
         backgroundColor: '#FF6B00',

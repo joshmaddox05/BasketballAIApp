@@ -127,7 +127,7 @@ const HomeScreen = ({ navigation }) => {
                     </View>
                     <TouchableOpacity
                         style={styles.profileButton}
-                        onPress={() => navigation.navigate('ProfileTab')}
+                        onPress={() => navigation.navigate('Profile', { screen: 'ProfileMain' })}
                     >
                         {userData.profileImage ? (
                             <Image source={userData.profileImage} style={styles.profileImage} />
@@ -209,7 +209,7 @@ const HomeScreen = ({ navigation }) => {
                             <Text style={[styles.emptyStateText, { color: theme.textSecondary }]}>No activities yet.</Text>
                             <TouchableOpacity
                                 style={[styles.emptyStateButton, { backgroundColor: theme.primary }]}
-                                onPress={() => navigation.navigate('TrainingTab')}
+                                onPress={() => navigation.navigate('Training', { screen: 'TrainingMain' })}
                             >
                                 <Text style={styles.emptyStateButtonText}>Start Training</Text>
                             </TouchableOpacity>
@@ -259,7 +259,7 @@ const HomeScreen = ({ navigation }) => {
 
                     <TouchableOpacity
                         style={styles.challengeViewButton}
-                        onPress={() => navigation.navigate('ChallengeDetail', { challengeId: 'monthly' })}
+                        onPress={() => navigation.navigate('ChallengeDetail', { id: 'monthly' })}
                     >
                         <Text style={[styles.challengeViewText, { color: theme.primary }]}>View Challenge</Text>
                         <Ionicons name="arrow-forward" size={16} color={theme.primary} />

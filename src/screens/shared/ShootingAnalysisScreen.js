@@ -411,7 +411,7 @@ const ShootingAnalysisScreen = ({ navigation }) => {
                         {historicalData.length > 0 && (
                             <TouchableOpacity
                                 style={styles.historyButton}
-                                onPress={() => navigation.navigate('ShootingHistory')}
+                                onPress={() => navigation.navigate('Progress', { screen: 'ShootingHistory' })}
                             >
                                 <Text style={styles.historyButtonText}>View Analysis History</Text>
                             </TouchableOpacity>

@@ -186,7 +186,7 @@ const AddActivityScreen = ({ navigation }) => {
         [
           {
             text: 'View Progress',
-            onPress: () => navigation.navigate('ProgressTab')
+            onPress: () => navigation.navigate('Progress', { screen: 'ProgressMain' })
           },
           {
             text: 'Add Another',

@@ -1,0 +1,195 @@
+[debug] [2025-11-12T04:33:48.539Z] ----------------------------------------------------------------------
+[debug] [2025-11-12T04:33:48.544Z] Command:       /opt/homebrew/Cellar/node/24.2.0/bin/node /opt/homebrew/bin/firebase emulators:exec --only auth,firestore npm start
+[debug] [2025-11-12T04:33:48.544Z] CLI Version:   14.20.0
+[debug] [2025-11-12T04:33:48.544Z] Platform:      darwin
+[debug] [2025-11-12T04:33:48.544Z] Node Version:  v24.2.0
+[debug] [2025-11-12T04:33:48.544Z] Time:          Tue Nov 11 2025 22:33:48 GMT-0600 (Central Standard Time)
+[debug] [2025-11-12T04:33:48.544Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-11-12T04:33:48.654Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-11-12T04:33:48.655Z] > authorizing via signed-in user (steezthedj@gmail.com)
+[debug] [2025-11-12T04:33:48.755Z] openjdk version "22.0.2" 2024-07-16
+
+[debug] [2025-11-12T04:33:48.755Z] OpenJDK Runtime Environment (build 22.0.2+9-70)
+OpenJDK 64-Bit Server VM (build 22.0.2+9-70, mixed mode, sharing)
+
+[debug] [2025-11-12T04:33:48.757Z] Parsed Java major version: 22
+[info] i  emulators: Starting emulators: auth, firestore {"metadata":{"emulator":{"name":"hub"},"message":"Starting emulators: auth, firestore"}}
+[debug] [2025-11-12T04:33:48.975Z] [logging] Logging Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2025-11-12T04:33:48.975Z] [auth] Authentication Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2025-11-12T04:33:48.975Z] [firestore] Firestore Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2025-11-12T04:33:48.975Z] [firestore.websocket] websocket server for firestore only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2025-11-12T04:33:48.975Z] assigned listening specs for emulators {"user":{"hub":[{"address":"127.0.0.1","family":"IPv4","port":4400},{"address":"::1","family":"IPv6","port":4400}],"logging":[{"address":"127.0.0.1","family":"IPv4","port":4500}],"auth":[{"address":"127.0.0.1","family":"IPv4","port":9099}],"firestore":[{"address":"127.0.0.1","family":"IPv4","port":8080}],"firestore.websocket":[{"address":"127.0.0.1","family":"IPv4","port":9150}]},"metadata":{"message":"assigned listening specs for emulators"}}
+[debug] [2025-11-12T04:33:48.977Z] Emulator locator file path: /var/folders/bb/j2pbvm0x26572d001dzl9tg00000gn/T/hub-basketball-ai-app-db000.json
+[debug] [2025-11-12T04:33:48.977Z] [hub] writing locator at /var/folders/bb/j2pbvm0x26572d001dzl9tg00000gn/T/hub-basketball-ai-app-db000.json
+[debug] [2025-11-12T04:33:48.980Z] Ignoring unsupported arg: auto_download {"metadata":{"emulator":{"name":"firestore"},"message":"Ignoring unsupported arg: auto_download"}}
+[debug] [2025-11-12T04:33:48.980Z] Ignoring unsupported arg: single_project_mode_error {"metadata":{"emulator":{"name":"firestore"},"message":"Ignoring unsupported arg: single_project_mode_error"}}
+[debug] [2025-11-12T04:33:48.981Z] Starting Firestore Emulator with command {"binary":"java","args":["-Dgoogle.cloud_firestore.debug_log_level=FINE","-Duser.language=en","-jar","/Users/joshuamaddox/.cache/firebase/emulators/cloud-firestore-emulator-v1.19.8.jar","--host","127.0.0.1","--port",8080,"--websocket_port",9150,"--project_id","basketball-ai-app-db000","--rules","/Users/joshuamaddox/Codebase/BasketballAIApp/firestore.rules","--single_project_mode",true],"optionalArgs":["port","webchannel_port","host","rules","websocket_port","functions_emulator","seed_from_export","project_id","single_project_mode"],"joinArgs":false,"shell":false,"port":8080} {"metadata":{"emulator":{"name":"firestore"},"message":"Starting Firestore Emulator with command {\"binary\":\"java\",\"args\":[\"-Dgoogle.cloud_firestore.debug_log_level=FINE\",\"-Duser.language=en\",\"-jar\",\"/Users/joshuamaddox/.cache/firebase/emulators/cloud-firestore-emulator-v1.19.8.jar\",\"--host\",\"127.0.0.1\",\"--port\",8080,\"--websocket_port\",9150,\"--project_id\",\"basketball-ai-app-db000\",\"--rules\",\"/Users/joshuamaddox/Codebase/BasketballAIApp/firestore.rules\",\"--single_project_mode\",true],\"optionalArgs\":[\"port\",\"webchannel_port\",\"host\",\"rules\",\"websocket_port\",\"functions_emulator\",\"seed_from_export\",\"project_id\",\"single_project_mode\"],\"joinArgs\":false,\"shell\":false,\"port\":8080}"}}
+[info] i  firestore: Firestore Emulator logging to firestore-debug.log {"metadata":{"emulator":{"name":"firestore"},"message":"Firestore Emulator logging to \u001b[1mfirestore-debug.log\u001b[22m"}}
+[debug] [2025-11-12T04:33:49.640Z] Nov 11, 2025 10:33:49 PM com.google.cloud.datastore.emulator.firestore.websocket.WebSocketServer start
+INFO: Started WebSocket server on ws://127.0.0.1:9150
+ {"metadata":{"emulator":{"name":"firestore"},"message":"Nov 11, 2025 10:33:49 PM com.google.cloud.datastore.emulator.firestore.websocket.WebSocketServer start\nINFO: Started WebSocket server on ws://127.0.0.1:9150\n"}}
+[debug] [2025-11-12T04:33:49.652Z] API endpoint: http:// {"metadata":{"emulator":{"name":"firestore"},"message":"API endpoint: http://"}}
+[debug] [2025-11-12T04:33:49.652Z] 127.0.0.1:8080
+If you are using a library that supports the FIRESTORE_EMULATOR_HOST environment variable, run:
+
+   export FIRESTORE_EMULATOR_HOST=127.0.0.1:8080
+
+If you are running a Firestore in Datastore Mode project, run:
+
+   export DATASTORE_EMULATOR_HOST=127.0.0.1:8080
+
+Note: Support for Datastore Mode is in preview. If you encounter any bugs please file at https://github.com/firebase/firebase-tools/issues.
+Dev App Server is now running.
+
+ {"metadata":{"emulator":{"name":"firestore"},"message":"127.0.0.1:8080\nIf you are using a library that supports the FIRESTORE_EMULATOR_HOST environment variable, run:\n\n   export FIRESTORE_EMULATOR_HOST=127.0.0.1:8080\n\nIf you are running a Firestore in Datastore Mode project, run:\n\n   export DATASTORE_EMULATOR_HOST=127.0.0.1:8080\n\nNote: Support for Datastore Mode is in preview. If you encounter any bugs please file at https://github.com/firebase/firebase-tools/issues.\nDev App Server is now running.\n\n"}}
+[info] ✔  firestore: Firestore Emulator UI websocket is running on 9150. {"metadata":{"emulator":{"name":"firestore"},"message":"Firestore Emulator UI websocket is running on 9150."}}
+[debug] [2025-11-12T04:33:52.430Z] Could not find VSCode notification endpoint: FetchError: request to http://localhost:40001/vscode/notify failed, reason: . If you are not running the Firebase Data Connect VSCode extension, this is expected and not an issue.
+[info] i  Running script: npm start 
+[debug] [2025-11-12T04:33:52.431Z] Running npm start with environment {"TERM_PROGRAM":"Apple_Terminal","SHELL":"/bin/zsh","TERM":"xterm-256color","TMPDIR":"/var/folders/bb/j2pbvm0x26572d001dzl9tg00000gn/T/","TERM_PROGRAM_VERSION":"464","TERM_SESSION_ID":"B9E74068-8DC5-4F01-BAE6-910104B05830","USER":"joshuamaddox","SSH_AUTH_SOCK":"/private/tmp/com.apple.launchd.zVyf228MN6/Listeners","PATH":"/Library/Frameworks/Python.framework/Versions/3.11/bin:/Library/Frameworks/Python.framework/Versions/3.14/bin:/opt/homebrew/lib/ruby/gems/3.3.0/bin:/opt/homebrew/opt/ruby/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/Library/Apple/usr/bin","__CFBundleIdentifier":"com.apple.Terminal","PWD":"/Users/joshuamaddox/codebase/BasketballAIApp","XPC_FLAGS":"0x0","XPC_SERVICE_NAME":"0","SHLVL":"1","HOME":"/Users/joshuamaddox","LOGNAME":"joshuamaddox","OSLogRateLimit":"64","COLORTERM":"truecolor","OLDPWD":"/Users/joshuamaddox/codebase/BasketballAIApp","HOMEBREW_PREFIX":"/opt/homebrew","HOMEBREW_CELLAR":"/opt/homebrew/Cellar","HOMEBREW_REPOSITORY":"/opt/homebrew","INFOPATH":"/opt/homebrew/share/info:","LANG":"en_US.UTF-8","_":"/opt/homebrew/bin/firebase","__CF_USER_TEXT_ENCODING":"0x1F5:0x0:0x0","IS_FIREBASE_CLI":"true","GCLOUD_PROJECT":"basketball-ai-app-db000","FIREBASE_CONFIG":"{\"projectId\":\"basketball-ai-app-db000\",\"storageBucket\":\"basketball-ai-app-db000.appspot.com\",\"databaseURL\":\"https://basketball-ai-app-db000.firebaseio.com\"}","FIREBASE_EMULATOR_HUB":"127.0.0.1:4400","FIREBASE_AUTH_EMULATOR_HOST":"127.0.0.1:9099","FIRESTORE_EMULATOR_HOST":"127.0.0.1:8080","FIREBASE_FIRESTORE_EMULATOR_ADDRESS":"127.0.0.1:8080"}
+[debug] [2025-11-12T13:26:31.291Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-11-12T13:26:31.293Z] > authorizing via signed-in user (steezthedj@gmail.com)
+[debug] [2025-11-12T13:26:31.293Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-11-12T13:26:31.293Z] > authorizing via signed-in user (steezthedj@gmail.com)
+[debug] [2025-11-12T13:26:31.296Z] Checked if tokens are valid: false, expires at: 1762913563802
+[debug] [2025-11-12T13:26:31.296Z] Checked if tokens are valid: false, expires at: 1762913563802
+[debug] [2025-11-12T13:26:31.296Z] > refreshing access token with scopes: []
+[debug] [2025-11-12T13:26:31.297Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2025-11-12T13:26:31.297Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-11-12T13:26:31.298Z] Checked if tokens are valid: false, expires at: 1762913563802
+[debug] [2025-11-12T13:26:31.298Z] Checked if tokens are valid: false, expires at: 1762913563802
+[debug] [2025-11-12T13:26:31.298Z] > refreshing access token with scopes: []
+[debug] [2025-11-12T13:26:31.298Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2025-11-12T13:26:31.298Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-11-12T13:26:31.301Z] Checked if tokens are valid: false, expires at: 1762913563802
+[debug] [2025-11-12T13:26:31.301Z] Checked if tokens are valid: false, expires at: 1762913563802
+[debug] [2025-11-12T13:26:31.301Z] > refreshing access token with scopes: []
+[debug] [2025-11-12T13:26:31.301Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2025-11-12T13:26:31.301Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-11-12T13:26:31.302Z] Checked if tokens are valid: false, expires at: 1762913563802
+[debug] [2025-11-12T13:26:31.302Z] Checked if tokens are valid: false, expires at: 1762913563802
+[debug] [2025-11-12T13:26:31.302Z] > refreshing access token with scopes: []
+[debug] [2025-11-12T13:26:31.302Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2025-11-12T13:26:31.302Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-11-12T13:26:31.303Z] Checked if tokens are valid: false, expires at: 1762913563802
+[debug] [2025-11-12T13:26:31.303Z] Checked if tokens are valid: false, expires at: 1762913563802
+[debug] [2025-11-12T13:26:31.303Z] > refreshing access token with scopes: []
+[debug] [2025-11-12T13:26:31.303Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2025-11-12T13:26:31.303Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-11-12T13:26:31.303Z] Checked if tokens are valid: false, expires at: 1762913563802
+[debug] [2025-11-12T13:26:31.303Z] Checked if tokens are valid: false, expires at: 1762913563802
+[debug] [2025-11-12T13:26:31.303Z] > refreshing access token with scopes: []
+[debug] [2025-11-12T13:26:31.304Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2025-11-12T13:26:31.304Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-11-12T13:26:31.305Z] Checked if tokens are valid: false, expires at: 1762913563802
+[debug] [2025-11-12T13:26:31.305Z] Checked if tokens are valid: false, expires at: 1762913563802
+[debug] [2025-11-12T13:26:31.305Z] > refreshing access token with scopes: []
+[debug] [2025-11-12T13:26:31.305Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2025-11-12T13:26:31.305Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-11-12T13:26:31.305Z] Checked if tokens are valid: false, expires at: 1762913563802
+[debug] [2025-11-12T13:26:31.305Z] Checked if tokens are valid: false, expires at: 1762913563802
+[debug] [2025-11-12T13:26:31.305Z] > refreshing access token with scopes: []
+[debug] [2025-11-12T13:26:31.305Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2025-11-12T13:26:31.305Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-11-12T13:26:31.306Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-11-12T13:26:31.306Z] > authorizing via signed-in user (steezthedj@gmail.com)
+[debug] [2025-11-12T13:26:31.306Z] Checked if tokens are valid: false, expires at: 1762913563802
+[debug] [2025-11-12T13:26:31.306Z] Checked if tokens are valid: false, expires at: 1762913563802
+[debug] [2025-11-12T13:26:31.306Z] > refreshing access token with scopes: []
+[debug] [2025-11-12T13:26:31.306Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2025-11-12T13:26:31.306Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-11-12T13:26:31.307Z] Checked if tokens are valid: false, expires at: 1762913563802
+[debug] [2025-11-12T13:26:31.307Z] Checked if tokens are valid: false, expires at: 1762913563802
+[debug] [2025-11-12T13:26:31.307Z] > refreshing access token with scopes: []
+[debug] [2025-11-12T13:26:31.307Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2025-11-12T13:26:31.307Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-11-12T13:26:31.307Z] Checked if tokens are valid: false, expires at: 1762913563802
+[debug] [2025-11-12T13:26:31.308Z] Checked if tokens are valid: false, expires at: 1762913563802
+[debug] [2025-11-12T13:26:31.308Z] > refreshing access token with scopes: []
+[debug] [2025-11-12T13:26:31.308Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2025-11-12T13:26:31.308Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-11-12T13:26:31.308Z] Checked if tokens are valid: false, expires at: 1762913563802
+[debug] [2025-11-12T13:26:31.308Z] Checked if tokens are valid: false, expires at: 1762913563802
+[debug] [2025-11-12T13:26:31.308Z] > refreshing access token with scopes: []
+[debug] [2025-11-12T13:26:31.308Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2025-11-12T13:26:31.308Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-11-12T13:26:31.587Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2025-11-12T13:26:31.587Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-11-12T13:26:31.620Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/cloudfunctions.googleapis.com [none]
+[debug] [2025-11-12T13:26:31.620Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/cloudfunctions.googleapis.com x-goog-quota-user=projects/basketball-ai-app-db000
+[debug] [2025-11-12T13:26:31.682Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2025-11-12T13:26:31.682Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-11-12T13:26:31.701Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/firebaseapphosting.googleapis.com [none]
+[debug] [2025-11-12T13:26:31.701Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/firebaseapphosting.googleapis.com x-goog-quota-user=projects/basketball-ai-app-db000
+[debug] [2025-11-12T13:26:31.737Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2025-11-12T13:26:31.737Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-11-12T13:26:31.747Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/firebaseapphosting.googleapis.com [none]
+[debug] [2025-11-12T13:26:31.747Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/firebaseapphosting.googleapis.com x-goog-quota-user=projects/basketball-ai-app-db000
+[debug] [2025-11-12T13:26:31.851Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2025-11-12T13:26:31.851Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-11-12T13:26:31.861Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/firebaseio.com [none]
+[debug] [2025-11-12T13:26:31.861Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/firebaseio.com x-goog-quota-user=projects/basketball-ai-app-db000
+[debug] [2025-11-12T13:26:31.870Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2025-11-12T13:26:31.870Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-11-12T13:26:31.881Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/firebaseapphosting.googleapis.com [none]
+[debug] [2025-11-12T13:26:31.881Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/firebaseapphosting.googleapis.com x-goog-quota-user=projects/basketball-ai-app-db000
+[debug] [2025-11-12T13:26:31.886Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2025-11-12T13:26:31.886Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-11-12T13:26:31.896Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/cloudfunctions.googleapis.com [none]
+[debug] [2025-11-12T13:26:31.896Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/cloudfunctions.googleapis.com x-goog-quota-user=projects/basketball-ai-app-db000
+[debug] [2025-11-12T13:26:31.899Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2025-11-12T13:26:31.899Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-11-12T13:26:31.909Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/firebaseio.com [none]
+[debug] [2025-11-12T13:26:31.909Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/firebaseio.com x-goog-quota-user=projects/basketball-ai-app-db000
+[debug] [2025-11-12T13:26:31.909Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2025-11-12T13:26:31.909Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-11-12T13:26:31.920Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/firebaseio.com [none]
+[debug] [2025-11-12T13:26:31.920Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/firebaseio.com x-goog-quota-user=projects/basketball-ai-app-db000
+[debug] [2025-11-12T13:26:31.921Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2025-11-12T13:26:31.921Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-11-12T13:26:31.930Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/firebasedataconnect.googleapis.com [none]
+[debug] [2025-11-12T13:26:31.930Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/firebasedataconnect.googleapis.com x-goog-quota-user=projects/basketball-ai-app-db000
+[debug] [2025-11-12T13:26:31.995Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2025-11-12T13:26:31.995Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-11-12T13:26:32.002Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/cloudfunctions.googleapis.com [none]
+[debug] [2025-11-12T13:26:32.002Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/cloudfunctions.googleapis.com x-goog-quota-user=projects/basketball-ai-app-db000
+[debug] [2025-11-12T13:26:32.102Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2025-11-12T13:26:32.102Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-11-12T13:26:32.115Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/firebasedataconnect.googleapis.com [none]
+[debug] [2025-11-12T13:26:32.115Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/firebasedataconnect.googleapis.com x-goog-quota-user=projects/basketball-ai-app-db000
+[debug] [2025-11-12T13:26:32.116Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2025-11-12T13:26:32.116Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-11-12T13:26:32.126Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/firebasedataconnect.googleapis.com [none]
+[debug] [2025-11-12T13:26:32.126Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/firebasedataconnect.googleapis.com x-goog-quota-user=projects/basketball-ai-app-db000
+[debug] [2025-11-12T13:26:32.190Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/firebaseapphosting.googleapis.com 200
+[debug] [2025-11-12T13:26:32.191Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/firebaseapphosting.googleapis.com [omitted]
+[debug] [2025-11-12T13:26:32.400Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/firebaseio.com 403
+[debug] [2025-11-12T13:26:32.400Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/firebaseio.com [omitted]
+[debug] [2025-11-12T13:26:32.401Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/firebaseio.com 403
+[debug] [2025-11-12T13:26:32.401Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/firebaseio.com [omitted]
+[debug] [2025-11-12T13:26:32.402Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/firebaseio.com 403
+[debug] [2025-11-12T13:26:32.402Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/firebaseio.com [omitted]
+[debug] [2025-11-12T13:26:32.402Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/firebasedataconnect.googleapis.com 200
+[debug] [2025-11-12T13:26:32.402Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/firebasedataconnect.googleapis.com [omitted]
+[debug] [2025-11-12T13:26:32.402Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/firebaseapphosting.googleapis.com 200
+[debug] [2025-11-12T13:26:32.402Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/firebaseapphosting.googleapis.com [omitted]
+[debug] [2025-11-12T13:26:32.406Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/cloudfunctions.googleapis.com 200
+[debug] [2025-11-12T13:26:32.406Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/cloudfunctions.googleapis.com [omitted]
+[debug] [2025-11-12T13:26:32.407Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/firebaseapphosting.googleapis.com 200
+[debug] [2025-11-12T13:26:32.407Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/firebaseapphosting.googleapis.com [omitted]
+[debug] [2025-11-12T13:26:32.799Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/cloudfunctions.googleapis.com 200
+[debug] [2025-11-12T13:26:32.799Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/cloudfunctions.googleapis.com [omitted]
+[debug] [2025-11-12T13:26:32.813Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/firebasedataconnect.googleapis.com 200
+[debug] [2025-11-12T13:26:32.813Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/firebasedataconnect.googleapis.com [omitted]
+[debug] [2025-11-12T13:26:32.818Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/cloudfunctions.googleapis.com 200
+[debug] [2025-11-12T13:26:32.818Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/cloudfunctions.googleapis.com [omitted]
+[debug] [2025-11-12T13:26:32.842Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/firebasedataconnect.googleapis.com 200
+[debug] [2025-11-12T13:26:32.842Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/basketball-ai-app-db000/services/firebasedataconnect.googleapis.com [omitted]
+[debug] [2025-11-12T13:26:33.154Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-11-12T13:26:33.154Z] > authorizing via signed-in user (steezthedj@gmail.com)
+[debug] [2025-11-12T13:26:33.155Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-11-12T13:26:33.155Z] > authorizing via signed-in user (steezthedj@gmail.com)
+[debug] [2025-11-12T13:26:33.158Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-11-12T13:26:33.158Z] > authorizing via signed-in user (steezthedj@gmail.com)
+[debug] [2025-11-12T13:26:33.159Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-11-12T13:26:33.159Z] > authorizing via signed-in user (steezthedj@gmail.com)
