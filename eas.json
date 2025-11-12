@@ -16,6 +16,7 @@
         "resourceClass": "m-medium",
         "buildConfiguration": "Debug",
         "autoIncrement": false,
+        "enterpriseProvisioning": "adhoc",
         "cache": {
           "key": "development-pods",
           "paths": ["ios/Pods"]
