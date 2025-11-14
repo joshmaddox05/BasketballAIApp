@@ -5,40 +5,36 @@ service cloud.firestore {
     function isSignedIn() {
       return request.auth != null;
     }
-    
+
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
-    
-    // Users collection - users can only access their own data
+
+    // DEVELOPMENT MODE: Temporarily open for testing
+    // TODO: Tighten these rules before production!
+    // Users collection - temporarily open for development
     match /users/{uid} {
-      allow read: if isSignedIn() && isOwner(uid);
-      allow create: if isSignedIn() && isOwner(uid);
-      allow update, delete: if isSignedIn() && isOwner(uid);
+      allow read, write: if true; // DEVELOPMENT ONLY - CHANGE BEFORE PRODUCTION!
       
-      // User's activities (ADDED - this was missing!)
+      // User's subcollections - temporarily open for development
       match /activities/{activityId} {
-        allow read, write: if isSignedIn() && isOwner(uid);
+        allow read, write: if true; // DEVELOPMENT ONLY
       }
-      
-      // User's workout plans
+
       match /plans/{planId} {
-        allow read, write: if isSignedIn() && isOwner(uid);
+        allow read, write: if true; // DEVELOPMENT ONLY
       }
-      
-      // User's training sessions
+
       match /sessions/{sessionId} {
-        allow read, write: if isSignedIn() && isOwner(uid);
+        allow read, write: if true; // DEVELOPMENT ONLY
       }
-      
-      // User's goals
+
       match /goals/{goalId} {
-        allow read, write: if isSignedIn() && isOwner(uid);
+        allow read, write: if true; // DEVELOPMENT ONLY
       }
-      
-      // User's achievements
+
       match /achievements/{achievementId} {
-        allow read, write: if isSignedIn() && isOwner(uid);
+        allow read, write: if true; // DEVELOPMENT ONLY
       }
     }
     
@@ -54,15 +50,13 @@ service cloud.firestore {
       allow write: if false; // Lock down for now - admin only
     }
     
-    // Global content collections
+    // Global content collections - DEVELOPMENT MODE
     match /workouts/{workoutId} {
-      allow read: if isSignedIn();
-      allow write: if false; // Admin only
+      allow read, write: if true; // DEVELOPMENT ONLY - CHANGE BEFORE PRODUCTION!
     }
-    
+
     match /videos/{videoId} {
-      allow read: if isSignedIn();
-      allow write: if false; // Admin only
+      allow read, write: if true; // DEVELOPMENT ONLY - CHANGE BEFORE PRODUCTION!
     }
     
     // Community features

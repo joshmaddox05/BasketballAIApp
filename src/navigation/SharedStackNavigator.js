@@ -6,6 +6,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import AddGoalScreen from '../screens/shared/AddGoalScreen';
 import ShootingAnalysisScreen from '../screens/shared/ShootingAnalysisScreen';
 import WorkoutDetailScreen from '../screens/shared/WorkoutDetailScreen';
+import ActiveWorkoutScreen from '../screens/main/ActiveWorkoutScreen';
 
 // Import video screens
 import VideoLibraryScreen from '../screens/main/VideoLibraryScreen';
@@ -30,6 +31,11 @@ export const sharedScreens = [
     {
         name: 'WorkoutDetail',
         component: WorkoutDetailScreen,
+        options: { headerShown: false }
+    },
+    {
+        name: 'ActiveWorkout',
+        component: ActiveWorkoutScreen,
         options: { headerShown: false }
     },
     {

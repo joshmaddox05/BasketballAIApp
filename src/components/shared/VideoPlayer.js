@@ -88,8 +88,8 @@ const VideoPlayer = ({
       >
         {/* Video Thumbnail */}
         <View style={styles.thumbnailContainer}>
-          <Image 
-            source={{ uri: video.thumbnail.medium || video.thumbnail.default }}
+          <Image
+            source={{ uri: video.thumbnail?.medium || video.thumbnail?.default || 'https://via.placeholder.com/640x360?text=Video' }}
             style={styles.thumbnail}
             resizeMode="cover"
           />
@@ -192,8 +192,8 @@ const VideoPlayer = ({
           
           <ScrollView style={styles.modalContent}>
             {/* Video Thumbnail */}
-            <Image 
-              source={{ uri: video.thumbnail.high || video.thumbnail.medium }}
+            <Image
+              source={{ uri: video.thumbnail?.high || video.thumbnail?.medium || video.thumbnail?.default || 'https://via.placeholder.com/640x360?text=Video' }}
               style={styles.modalThumbnail}
               resizeMode="cover"
             />

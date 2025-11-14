@@ -63,8 +63,8 @@ target 'BasketballAITraining' do
         # Allow non-modular includes in framework modules (required for Firebase)
         config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
         
-        # C++ standard for gRPC, abseil, and Firestore
-        config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17'
+        # C++ standard for gRPC, abseil, and Firestore (C++20 required for React Native)
+        config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++20'
         
         # C standard to fix implicit int errors
         config.build_settings['GCC_C_LANGUAGE_STANDARD'] = 'gnu11'

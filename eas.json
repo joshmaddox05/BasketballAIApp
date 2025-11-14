@@ -12,7 +12,15 @@
         "GOOGLE_SERVICES_JSON": "secret:GOOGLE_SERVICES_JSON"
       },
       "ios": {
-        "simulator": false
+        "simulator": false,
+        "resourceClass": "m-medium",
+        "buildConfiguration": "Debug",
+        "autoIncrement": false,
+        "enterpriseProvisioning": "adhoc",
+        "cache": {
+          "key": "development-pods",
+          "paths": ["ios/Pods"]
+        }
       },
       "android": {
         "buildType": "apk"

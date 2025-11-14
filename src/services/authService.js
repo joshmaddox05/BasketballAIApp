@@ -38,9 +38,10 @@ export const registerWithEmail = async (email, password, displayName) => {
     // Send email verification
     await sendEmailVerification(user);
 
-    // Small delay to allow auth token to propagate
+    // Delay to allow auth token to propagate to Firestore security rules
+    // This is critical - Firestore needs time to receive the auth token
     console.log('Waiting for auth token to propagate...');
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 1500));
 
     // Create user profile in Firestore
     const userProfile = {
@@ -292,8 +293,48 @@ export const onAuthStateChange = (callback) => {
         }
 
         // If we get here, profile fetch failed or returned null
-        // This is expected during registration before Firestore profile is created
-        console.log('No profile found for user:', user.uid);
+        // Try to create a default profile for the user
+        if (!profile) {
+          console.log('No profile found for user:', user.uid);
+          console.log('Attempting to create default profile...');
+
+          try {
+            const defaultProfile = {
+              uid: user.uid,
+              email: user.email,
+              displayName: user.displayName || user.email?.split('@')[0] || 'User',
+              photoURL: user.photoURL || null,
+              createdAt: new Date(),
+              lastLoginAt: new Date(),
+              emailVerified: user.emailVerified,
+              stats: {
+                shooting: 0,
+                dribbling: 0,
+                physical: 0,
+                streak: 0
+              },
+              preferences: {
+                theme: 'auto',
+                notifications: true,
+                units: 'imperial',
+                language: 'en'
+              },
+              subscription: 'free',
+              level: 'beginner',
+              onboardingCompleted: false
+            };
+
+            await createUserProfile(user.uid, defaultProfile);
+            console.log('✅ Default profile created successfully');
+            profile = defaultProfile;
+            callback({ user, profile });
+            return;
+          } catch (createError) {
+            console.error('Failed to create default profile:', createError);
+            // Continue with null profile
+          }
+        }
+
         callback({ user, profile: null });
 
       } catch (error) {

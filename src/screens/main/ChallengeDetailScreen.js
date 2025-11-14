@@ -17,7 +17,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
 
 const ChallengeDetailScreen = ({ route, navigation }) => {
-    const { id } = route.params;
+    const routeParams = route?.params || {};
+    const challengeId = routeParams.id || routeParams.challengeId || 'monthly';
     const { addActivity } = useAppContext();
     const [loading, setLoading] = useState(true);
     const [challenge, setChallenge] = useState(null);
@@ -159,7 +160,7 @@ const ChallengeDetailScreen = ({ route, navigation }) => {
             // Simulate API request
             setLoading(true);
             setTimeout(() => {
-                const foundChallenge = mockChallenges.find(c => c.id === id);
+                const foundChallenge = mockChallenges.find(c => c.id === challengeId);
                 if (foundChallenge) {
                     setChallenge(foundChallenge);
                     setSelectedDay(foundChallenge.currentDay);
@@ -169,7 +170,7 @@ const ChallengeDetailScreen = ({ route, navigation }) => {
         };
 
         loadChallenge();
-    }, [id]);
+    }, [challengeId]);
 
     const completeExercise = (dayIndex, exerciseIndex) => {
         // Create a deep copy of the challenge
@@ -241,7 +242,7 @@ const ChallengeDetailScreen = ({ route, navigation }) => {
                     </Text>
                     <TouchableOpacity
                         style={styles.backToHomeButton}
-                        onPress={() => navigation.navigate('Home')}
+                        onPress={() => navigation.navigate('Home', { screen: 'HomeMain' })}
                     >
                         <Text style={styles.backToHomeButtonText}>Back to Home</Text>
                     </TouchableOpacity>

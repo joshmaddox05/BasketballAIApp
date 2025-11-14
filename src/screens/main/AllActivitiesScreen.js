@@ -220,7 +220,7 @@ const AllActivitiesScreen = ({ navigation }) => {
                     </Text>
                     <TouchableOpacity
                         style={styles.startWorkoutButton}
-                        onPress={() => navigation.navigate('Training')}
+                        onPress={() => navigation.navigate('Training', { screen: 'TrainingMain' })}
                     >
                         <Text style={styles.startWorkoutButtonText}>Find Workouts</Text>
                     </TouchableOpacity>

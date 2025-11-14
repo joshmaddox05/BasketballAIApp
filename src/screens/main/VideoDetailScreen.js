@@ -118,8 +118,8 @@ const VideoDetailScreen = ({ route, navigation }) => {
       style={styles.relatedVideoCard}
       onPress={() => navigation.replace('VideoDetail', { video: item })}
     >
-      <Image 
-        source={{ uri: item.thumbnail.medium }}
+      <Image
+        source={{ uri: item.thumbnail?.medium || item.thumbnail?.default || 'https://via.placeholder.com/120x90?text=Video' }}
         style={styles.relatedVideoThumbnail}
       />
       <View style={styles.relatedVideoInfo}>
@@ -160,8 +160,8 @@ const VideoDetailScreen = ({ route, navigation }) => {
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         {/* Video Thumbnail */}
         <View style={styles.videoContainer}>
-          <Image 
-            source={{ uri: video.thumbnail.high || video.thumbnail.medium }}
+          <Image
+            source={{ uri: video.thumbnail?.high || video.thumbnail?.medium || video.thumbnail?.default || 'https://via.placeholder.com/640x360?text=Video' }}
             style={styles.videoThumbnail}
             resizeMode="cover"
           />

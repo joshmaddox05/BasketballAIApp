@@ -208,7 +208,7 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
         [
           {
             text: 'View Progress',
-            onPress: () => navigation.navigate('ProgressTab')
+            onPress: () => navigation.navigate('Progress', { screen: 'ProgressMain' })
           },
           {
             text: 'Done',

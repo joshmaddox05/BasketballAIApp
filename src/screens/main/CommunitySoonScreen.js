@@ -298,7 +298,7 @@ const CommunitySoonScreen = ({ navigation }) => {
           </Text>
           <TouchableOpacity
             style={[styles.ctaButton, { backgroundColor: theme.primary }]}
-            onPress={() => navigation.navigate('TrainingTab')}
+            onPress={() => navigation.navigate('Training', { screen: 'TrainingMain' })}
           >
             <Text style={styles.ctaButtonText}>Continue Training</Text>
             <Ionicons name="arrow-forward" size={20} color="#FFF" />
