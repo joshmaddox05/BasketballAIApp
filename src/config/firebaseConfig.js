@@ -3,6 +3,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, initializeAuth, getReactNativePersistence } from 'firebase/auth';
 import { getFirestore, initializeFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
+import { getFunctions } from 'firebase/functions';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Firebase configuration object - using web config for cross-platform compatibility
@@ -31,6 +32,9 @@ const db = initializeFirestore(app, {
 
 // Initialize Firebase Storage
 const storage = getStorage(app);
+
+// Initialize Firebase Functions
+const functions = getFunctions(app);
 
 // Connect to Firebase Emulators in development
 // This allows local testing without hitting production Firebase
@@ -69,7 +73,8 @@ export {
   app,
   auth,
   db,
-  storage
+  storage,
+  functions
 };
 
 // Export default app

@@ -4,6 +4,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { View, Text } from 'react-native';
+import { useAppContext } from '../context/AppContext';
 
 // Import your main app screens
 import HomeScreen from '../screens/main/HomeScreen';
@@ -118,6 +119,8 @@ function ProfileStackNavigator() {
 const Tab = createBottomTabNavigator();
 
 export default function MainNavigator() {
+    const { theme } = useAppContext();
+
     return (
         <Tab.Navigator
             screenOptions={({ route }) => ({
@@ -138,10 +141,12 @@ export default function MainNavigator() {
 
                     return <Ionicons name={iconName} size={size} color={color} />;
                 },
-                tabBarActiveTintColor: '#FF6B00',
-                tabBarInactiveTintColor: 'gray',
+                tabBarActiveTintColor: theme.tabActive,
+                tabBarInactiveTintColor: theme.tabInactive,
                 headerShown: false,
                 tabBarStyle: {
+                    backgroundColor: theme.tabBar,
+                    borderTopColor: theme.border,
                     paddingBottom: 5,
                     paddingTop: 5
                 }

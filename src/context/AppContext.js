@@ -17,6 +17,10 @@ import {
   getVideos,
   updateUserProfile
 } from '../services/firestoreService';
+
+// Import workout templates
+import { getAllWorkoutTemplates } from '../data/workoutTemplates';
+import { hasAccess } from '../utils/subscription';
 // Initial empty user data - will be populated from Firestore
 const initialUserData = {
     displayName: null,
@@ -32,108 +36,29 @@ const initialUserData = {
     onboardingCompleted: false
 };
 
-// Sample Initial workouts data
-const initialWorkouts = [
-    {
-        id: '1',
-        title: 'Shooting Fundamentals',
-        description: 'Master the basics of proper shooting technique to improve your accuracy and consistency.',
-        level: 'Beginner',
-        duration: '30 min',
-        featured: true,
-        category: 'shooting',
-        steps: [
-            {
-                title: 'Warm-up Shooting',
-                instructions: 'Take 20 shots from close range to warm up your shooting motion. Focus on proper form rather than speed.',
-                tips: 'Keep your elbow in, follow through with your wrist, and maintain good balance.'
-            },
-            {
-                title: 'Form Shooting Drill',
-                instructions: 'Stand 5 feet from the basket. Take 30 shots focusing exclusively on proper form. Hold your follow-through until the ball hits the rim or goes in.',
-                tips: 'Use your legs for power. The ball should roll off your fingertips, not your palm.'
-            },
-            {
-                title: 'Mid-Range Shooting',
-                instructions: 'Move to mid-range (10-15 feet). Take 25 shots, maintaining the same form you practiced up close.',
-                tips: 'Don\'t rush. Take a deep breath before each shot and keep your eyes on the target.'
-            },
-            {
-                title: 'Shooting on the Move',
-                instructions: 'Practice catching and shooting while moving. Have a partner pass you the ball, take one dribble, and shoot.',
-                tips: 'Square your shoulders to the basket quickly before shooting.'
-            },
-            {
-                title: 'Cool Down',
-                instructions: 'Finish with 10 free throws, focusing on consistency and routine.',
-                tips: 'Develop a pre-shot routine that you can repeat every time.'
-            }
-        ],
-        equipment: ['Basketball', 'Hoop', 'Water bottle'],
-        coachNotes: 'This workout is perfect for beginners looking to build a solid foundation for their shooting technique. Consistency is key - it\'s better to take fewer shots with perfect form than many shots with poor form.'
-    },
-    {
-        id: '2',
-        title: 'Dribbling Mastery',
-        description: 'Improve ball handling with a series of progressive dribbling drills.',
-        level: 'Intermediate',
-        duration: '45 min',
-        featured: true,
-        category: 'dribbling',
-        steps: [
-            {
-                title: 'Stationary Dribbling',
-                instructions: 'Dribble the ball in place, alternating between right and left hands. Perform 30 seconds each hand.',
-                tips: 'Keep your eyes up, not on the ball. Use your fingertips, not your palm.'
-            },
-            {
-                title: 'Walking Dribble Drill',
-                instructions: 'Walk while dribbling, performing crossovers every three steps. Go up and down the court 5 times.',
-                tips: 'Keep the ball low and controlled. Protect the ball with your non-dribbling hand.'
-            },
-            {
-                title: 'Figure-8 Dribbling',
-                instructions: 'Dribble the ball in a figure-8 pattern around your legs. Perform for 2 minutes.',
-                tips: 'Start slow and increase speed as you get comfortable. Keep your knees slightly bent.'
-            },
-            {
-                title: 'Two-Ball Dribbling',
-                instructions: 'Dribble two basketballs simultaneously for 1 minute, then alternating rhythms for 1 minute.',
-                tips: 'Focus on equal control of both balls. Look ahead, not down at the balls.'
-            },
-            {
-                title: 'Speed Dribbling',
-                instructions: 'Dribble at full speed up and down the court, changing hands at half court. Repeat 10 times.',
-                tips: 'Push the ball slightly ahead when moving at speed. Keep your body low.'
-            }
-        ],
-        equipment: ['2 Basketballs', 'Open court space', 'Water bottle'],
-        coachNotes: 'This workout is designed to improve your ball control in all situations. Remember, great dribblers practice with both hands equally.'
-    },
-    {
-        id: '3',
-        title: 'Advanced Shooting Drills',
-        description: 'Take your shooting to the next level with these challenging drills focused on game situations.',
-        level: 'Advanced',
-        duration: '50 min',
-        featured: false,
-        category: 'shooting',
-        steps: [
-            {
-                title: 'Corner 3-Point Shooting',
-                instructions: 'Take 10 shots from each corner, focusing on quick release and proper form.',
-                tips: 'Plant your feet quickly and find balance before shooting.'
-            },
-            {
-                title: 'Pull-Up Jumpers',
-                instructions: 'Dribble from half court, perform a pull-up jumper from mid-range. Alternate directions. Complete 20 total shots.',
-                tips: 'Focus on stopping quickly and maintaining balance through your shot.'
-            }
-        ],
-        equipment: ['Basketball', 'Hoop', 'Water bottle'],
-        coachNotes: 'This workout simulates game situations and helps develop shooting skills under pressure.'
-    }
-];
+// Convert workout templates to app format
+const convertTemplateToWorkout = (template) => {
+    return {
+        id: template.id,
+        title: template.name,
+        description: template.description,
+        level: template.difficulty,
+        duration: `${template.estimatedDuration} min`,
+        featured: template.requiredTier === 'free', // Feature free workouts
+        category: template.category.toLowerCase(),
+        requiredTier: template.requiredTier, // Add subscription tier
+        steps: template.steps.map(step => ({
+            title: step.name,
+            instructions: step.instructions.join(' '),
+            tips: `Reps: ${step.reps || 'As needed'} | Duration: ${Math.floor(step.duration / 60)} min`
+        })),
+        equipment: ['Basketball', 'Court space', 'Water bottle'],
+        coachNotes: `This ${template.difficulty.toLowerCase()} workout focuses on ${template.category.toLowerCase()} and takes approximately ${template.estimatedDuration} minutes to complete.`
+    };
+};
+
+// Load all workout templates and convert them
+const initialWorkouts = getAllWorkoutTemplates().map(convertTemplateToWorkout);
 
 // Sample initial activities
 const initialActivities = [
@@ -271,13 +196,14 @@ export const AppProvider = ({ children }) => {
 
         const loadGlobalData = async () => {
             try {
-                const [globalWorkouts, globalVideos] = await Promise.all([
-                    getWorkouts(),
-                    getVideos()
-                ]);
-                
-                setWorkouts(globalWorkouts.length > 0 ? globalWorkouts : initialWorkouts);
+                const globalVideos = await getVideos();
+
+                // Always use local workout templates as the source of truth
+                // Firestore workouts can be added for user-created custom workouts later
+                setWorkouts(initialWorkouts);
                 setTrainingVideos(globalVideos);
+
+                console.log('Loaded workouts from templates:', initialWorkouts.length);
             } catch (error) {
                 console.error('Error loading global data:', error);
                 // Use initial data as fallback
@@ -293,17 +219,35 @@ export const AppProvider = ({ children }) => {
         const loadPreferences = async () => {
             try {
                 const storedTheme = await AsyncStorage.getItem('isDarkMode');
+                const storedUseSystemTheme = await AsyncStorage.getItem('useSystemTheme');
                 const storedLanguage = await AsyncStorage.getItem('language');
                 const storedBookmarkedVideos = await AsyncStorage.getItem('bookmarkedVideos');
 
-                if (storedTheme !== null) {
+                if (storedUseSystemTheme !== null) {
+                    const useSystem = JSON.parse(storedUseSystemTheme);
+                    setUseSystemTheme(useSystem);
+
+                    if (useSystem) {
+                        // Use system theme
+                        setIsDarkMode(systemColorScheme === 'dark');
+                        setTheme(getTheme(systemColorScheme === 'dark'));
+                    } else if (storedTheme !== null) {
+                        // Use manual preference
+                        const isDark = JSON.parse(storedTheme);
+                        setIsDarkMode(isDark);
+                        setTheme(getTheme(isDark));
+                    }
+                } else if (storedTheme !== null) {
+                    // Legacy: if only theme is stored, use it and disable system theme
                     const isDark = JSON.parse(storedTheme);
                     setIsDarkMode(isDark);
                     setTheme(getTheme(isDark));
+                    setUseSystemTheme(false);
                 } else {
-                    // Use system theme if no preference stored
+                    // Default: use system theme
                     setIsDarkMode(systemColorScheme === 'dark');
                     setTheme(getTheme(systemColorScheme === 'dark'));
+                    setUseSystemTheme(true);
                 }
 
                 if (storedLanguage) setLanguage(storedLanguage);
@@ -530,6 +474,57 @@ export const AppProvider = ({ children }) => {
         });
     };
 
+    // Subscription management function
+    const upgradeSubscription = async (planId) => {
+        console.log('AppContext - Upgrading subscription to:', planId);
+        const user = getCurrentUser();
+        if (user) {
+            try {
+                // Note: The actual subscription update happens via Stripe webhooks
+                // This function just updates the local state for immediate UI feedback
+                // The webhook will update Firestore with the authoritative subscription data
+
+                // Optimistically update local state
+                setUserData(prev => ({
+                    ...prev,
+                    subscription: planId
+                }));
+
+                console.log('AppContext - Subscription updated locally to:', planId);
+                console.log('AppContext - Waiting for webhook to confirm in Firestore...');
+
+                return true;
+            } catch (error) {
+                console.error('AppContext - Error updating subscription:', error);
+                return false;
+            }
+        }
+        return false;
+    };
+
+    // Theme management functions
+    const toggleDarkMode = async () => {
+        const newValue = !isDarkMode;
+        setIsDarkMode(newValue);
+        setTheme(getTheme(newValue));
+        setUseSystemTheme(false); // Disable system theme when manually toggling
+        try {
+            await AsyncStorage.setItem('isDarkMode', JSON.stringify(newValue));
+            await AsyncStorage.setItem('useSystemTheme', JSON.stringify(false));
+        } catch (error) {
+            console.error('Failed to save dark mode preference:', error);
+        }
+    };
+
+    const changeLanguage = async (newLang) => {
+        setLanguage(newLang);
+        try {
+            await AsyncStorage.setItem('language', newLang);
+        } catch (error) {
+            console.error('Failed to save language preference:', error);
+        }
+    };
+
     // Video management functions
     const addBookmarkedVideo = (video) => {
         const isAlreadyBookmarked = bookmarkedVideos.find(v => v.youtubeId === video.youtubeId);
@@ -546,6 +541,22 @@ export const AppProvider = ({ children }) => {
         setTrainingVideos(videos);
     };
 
+    // Get workouts accessible to current user based on subscription
+    const getAccessibleWorkouts = () => {
+        const userSubscription = userData?.subscription || 'free';
+        return workouts.filter(workout =>
+            !workout.requiredTier || hasAccess(userSubscription, workout.requiredTier)
+        );
+    };
+
+    // Get locked workouts that require upgrade
+    const getLockedWorkouts = () => {
+        const userSubscription = userData?.subscription || 'free';
+        return workouts.filter(workout =>
+            workout.requiredTier && !hasAccess(userSubscription, workout.requiredTier)
+        );
+    };
+
     return (
         <AppContext.Provider value={{
             userData,
@@ -560,9 +571,12 @@ export const AppProvider = ({ children }) => {
             bookmarkedVideos,
             isDarkMode,
             setIsDarkMode,
+            toggleDarkMode,
+            useSystemTheme,
             theme,
             language,
             setLanguage,
+            changeLanguage,
             addWorkout,
             addActivity,
             addGoal,
@@ -577,9 +591,12 @@ export const AppProvider = ({ children }) => {
             setUserGoals,
             updateUserPreferences,
             completeOnboarding,
+            upgradeSubscription,
             addBookmarkedVideo,
             removeBookmarkedVideo,
-            setTrainingVideosData
+            setTrainingVideosData,
+            getAccessibleWorkouts,
+            getLockedWorkouts
         }}>
             {children}
         </AppContext.Provider>
