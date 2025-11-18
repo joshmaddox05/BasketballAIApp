@@ -38,8 +38,8 @@ target 'BasketballAITraining' do
 
   config = use_native_modules!(config_command)
 
-  # Use static frameworks (required for Firebase Analytics binary compatibility)
-  use_frameworks! :linkage => :static
+  use_frameworks! :linkage => podfile_properties['ios.useFrameworks'].to_sym if podfile_properties['ios.useFrameworks']
+  use_frameworks! :linkage => ENV['USE_FRAMEWORKS'].to_sym if ENV['USE_FRAMEWORKS']
 
   use_react_native!(
     :path => config[:reactNativePath],
@@ -56,70 +56,5 @@ target 'BasketballAITraining' do
       :mac_catalyst_enabled => false,
       :ccache_enabled => ccache_enabled?(podfile_properties),
     )
-    
-    # Fix compilation issues with Firebase, gRPC, and BoringSSL
-    installer.pods_project.targets.each do |target|
-      target.build_configurations.each do |config|
-        # Allow non-modular includes in framework modules (required for Firebase)
-        config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
-        
-        # C++ standard for gRPC, abseil, and Firestore (C++20 required for React Native)
-        config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++20'
-        
-        # C standard to fix implicit int errors
-        config.build_settings['GCC_C_LANGUAGE_STANDARD'] = 'gnu11'
-        
-        # Disable strict prototypes warning
-        config.build_settings['CLANG_WARN_STRICT_PROTOTYPES'] = 'NO'
-        
-        # Disable implicit int warning (treat as non-fatal)
-        config.build_settings['GCC_WARN_ABOUT_MISSING_PROTOTYPES'] = 'NO'
-        
-        # Suppress implicit int conversion warnings
-        config.build_settings['CLANG_WARN_IMPLICIT_INT_CONVERSION'] = 'NO'
-        config.build_settings['GCC_WARN_IMPLICIT_INT_CONVERSION'] = 'NO'
-        
-        # Additional compiler flags to suppress various errors
-        config.build_settings['OTHER_CFLAGS'] ||= ['$(inherited)']
-        config.build_settings['OTHER_CFLAGS'] << '-Wno-error=implicit-function-declaration'
-        config.build_settings['OTHER_CFLAGS'] << '-Wno-error=implicit-int'
-        config.build_settings['OTHER_CFLAGS'] << '-Wno-error=deprecated-declarations'
-        config.build_settings['OTHER_CFLAGS'] << '-Wno-error=incompatible-pointer-types'
-        config.build_settings['OTHER_CFLAGS'] << '-Wno-error=unused-function'
-        config.build_settings['OTHER_CFLAGS'] << '-Wno-error=unused-variable'
-        
-        # For C++ targets, suppress template-related errors
-        if target.name.include?('gRPC') || target.name.include?('BoringSSL') || target.name.include?('Firebase')
-          config.build_settings['OTHER_CPLUSPLUSFLAGS'] ||= ['$(inherited)']
-          config.build_settings['OTHER_CPLUSPLUSFLAGS'] << '-Wno-error=implicit-function-declaration'
-          config.build_settings['OTHER_CPLUSPLUSFLAGS'] << '-Wno-error=implicit-int'
-          config.build_settings['OTHER_CPLUSPLUSFLAGS'] << '-Wno-error=deprecated-declarations'
-          config.build_settings['OTHER_CPLUSPLUSFLAGS'] << '-Wno-error=incompatible-pointer-types'
-          config.build_settings['OTHER_CPLUSPLUSFLAGS'] << '-Wno-error=unused-function'
-          config.build_settings['OTHER_CPLUSPLUSFLAGS'] << '-Wno-error=unused-variable'
-          config.build_settings['OTHER_CPLUSPLUSFLAGS'] << '-Wno-error=template'
-          config.build_settings['OTHER_CPLUSPLUSFLAGS'] << '-Wno-error=undeclared-identifier'
-        end
-        
-        # Fix for BoringSSL and gRPC-Core compilation
-        if target.name == 'BoringSSL-GRPC' || target.name == 'gRPC-Core' || target.name == 'gRPC-C++'
-          # Allow deprecated declarations
-          config.build_settings['GCC_WARN_ABOUT_DEPRECATED_FUNCTIONS'] = 'NO'
-          config.build_settings['CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS'] = 'NO'
-          
-          # Treat implicit int as warning, not error
-          config.build_settings['OTHER_CFLAGS'] ||= ['$(inherited)']
-          config.build_settings['OTHER_CFLAGS'] << '-Wno-error=implicit-int'
-          config.build_settings['OTHER_CFLAGS'] << '-Wno-implicit-int'
-          config.build_settings['OTHER_CFLAGS'] << '-Wno-error=implicit-function-declaration'
-        end
-        
-        # Ensure Swift 5.0 compatibility
-        config.build_settings['SWIFT_VERSION'] = '5.0'
-        
-        # Suppress Swift warnings to prevent module compilation issues
-        config.build_settings['SWIFT_SUPPRESS_WARNINGS'] = 'YES'
-      end
-    end
   end
 end

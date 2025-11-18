@@ -21,7 +21,9 @@ import { VideoView, useVideoPlayer } from 'expo-video';
 import { useAppContext } from '../../context/AppContext';
 import AICameraCapture from '../../components/shared/AICameraCapture';
 import ShotAnalysisResultsSimple from '../../components/shared/ShotAnalysisResultsSimple';
+import UpgradePrompt from '../../components/shared/UpgradePrompt';
 import aiAnalysisService from '../../services/aiAnalysisService';
+import { canAccessFeature, getRequiredSubscription } from '../../utils/subscription';
 
 const { width } = Dimensions.get('window');
 
@@ -42,7 +44,7 @@ const getDefaultImprovements = () => [
 ];
 
 const ShootingAnalysisScreen = ({ navigation }) => {
-    const { updateUserStats, addActivity } = useAppContext();
+    const { updateUserStats, addActivity, userData, theme } = useAppContext();
 
     // State management
     const [currentStage, setCurrentStage] = useState('intro'); // intro, recording, analyzing, results
@@ -56,6 +58,10 @@ const ShootingAnalysisScreen = ({ navigation }) => {
         { date: '2023-04-02', score: 75 },
     ]);
     const [useComprehensiveAnalysis, setUseComprehensiveAnalysis] = useState(true); // NEW: Toggle for comprehensive analysis
+
+    // Feature gate state
+    const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+    const [lockedFeature, setLockedFeature] = useState(null);
 
     // Video playback state using expo-video
     const curryVideoPlayer = useVideoPlayer(require('../../../assets/StephCurryShot.mp4'), (player) => {
@@ -172,9 +178,37 @@ const ShootingAnalysisScreen = ({ navigation }) => {
         }
     };
 
-    // Start camera capture
+    // Start camera capture with subscription check
     const startCapture = () => {
+        // Check if user has access to AI shot analysis (requires Basic or higher)
+        const userSubscription = userData?.subscription || 'free';
+        const hasAccess = canAccessFeature('aiShotAnalysis', userSubscription);
+
+        if (!hasAccess) {
+            const requiredTier = getRequiredSubscription('feature', 'aiShotAnalysis');
+            setLockedFeature({
+                name: 'AI Shot Analysis',
+                requiredTier,
+                customMessage: 'Unlock AI-powered shooting form analysis with professional player comparisons. Get detailed feedback on your technique and track your improvements over time.'
+            });
+            setShowUpgradePrompt(true);
+            return;
+        }
+
         setCurrentStage('recording');
+    };
+
+    // Handle upgrade navigation
+    const handleUpgrade = (requiredTier) => {
+        setShowUpgradePrompt(false);
+        setLockedFeature(null);
+        navigation.navigate('Settings', { openSubscription: true });
+    };
+
+    // Handle modal close
+    const handleCloseUpgradePrompt = () => {
+        setShowUpgradePrompt(false);
+        setLockedFeature(null);
     };
 
     const resetAnalysis = () => {
@@ -912,6 +946,16 @@ const ShootingAnalysisScreen = ({ navigation }) => {
                     </View>
                 </View>
             </Modal>
+
+            {/* Upgrade Prompt for Locked Features */}
+            <UpgradePrompt
+                visible={showUpgradePrompt && lockedFeature !== null}
+                onClose={handleCloseUpgradePrompt}
+                onUpgrade={handleUpgrade}
+                featureName={lockedFeature?.name || ''}
+                requiredTier={lockedFeature?.requiredTier || 'basic'}
+                customMessage={lockedFeature?.customMessage}
+            />
         </SafeAreaView>
     );
 };

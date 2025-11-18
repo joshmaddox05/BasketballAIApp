@@ -17,9 +17,11 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
+import UpgradePrompt from '../../components/shared/UpgradePrompt';
+import { canAccessFeature, getRequiredSubscription } from '../../utils/subscription';
 
 const CommunityScreen = ({ navigation }) => {
-    const { userData } = useAppContext();
+    const { userData, theme, isDarkMode } = useAppContext();
 
     // State for different sections
     const [loading, setLoading] = useState(false);
@@ -28,6 +30,10 @@ const CommunityScreen = ({ navigation }) => {
     const [selectedPost, setSelectedPost] = useState(null);
     const [commentText, setCommentText] = useState('');
     const [refreshing, setRefreshing] = useState(false);
+
+    // Feature gate state
+    const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+    const [lockedFeature, setLockedFeature] = useState(null);
 
     // Mock data for community posts
     const [posts, setPosts] = useState([
@@ -89,7 +95,8 @@ const CommunityScreen = ({ navigation }) => {
             prize: 'Gold Badge + 500 Points',
             isJoined: true,
             progress: 65,
-            image: null
+            image: null,
+            isExclusive: false
         },
         {
             id: '2',
@@ -100,7 +107,8 @@ const CommunityScreen = ({ navigation }) => {
             prize: 'Silver Badge + 300 Points',
             isJoined: false,
             progress: 0,
-            image: null
+            image: null,
+            isExclusive: false
         },
         {
             id: '3',
@@ -111,7 +119,32 @@ const CommunityScreen = ({ navigation }) => {
             prize: 'Featured in App + 1000 Points',
             isJoined: false,
             progress: 0,
-            image: null
+            image: null,
+            isExclusive: false
+        },
+        {
+            id: '4',
+            title: '🏆 Elite Shooting Championship',
+            description: 'Premium-only challenge: Master 10 different shooting techniques',
+            participants: 45,
+            daysLeft: 20,
+            prize: 'Exclusive Trophy + 2000 Points + Premium Badge',
+            isJoined: false,
+            progress: 0,
+            image: null,
+            isExclusive: true
+        },
+        {
+            id: '5',
+            title: '⭐ Pro Training Circuit',
+            description: 'Premium-only: Complete advanced training modules with mentor feedback',
+            participants: 32,
+            daysLeft: 30,
+            prize: 'VIP Access + 5000 Points',
+            isJoined: false,
+            progress: 0,
+            image: null,
+            isExclusive: true
         }
     ];
 
@@ -248,7 +281,27 @@ const CommunityScreen = ({ navigation }) => {
 
     // Handle joining a challenge
     const handleJoinChallenge = (challengeId) => {
-        // In a real app, would send to API
+        // Find the challenge
+        const challenge = challenges.find(c => c.id === challengeId);
+
+        // Check if this is an exclusive challenge
+        if (challenge?.isExclusive) {
+            const userSubscription = userData?.subscription || 'free';
+            const hasAccess = canAccessFeature('exclusiveChallenges', userSubscription);
+
+            if (!hasAccess) {
+                const requiredTier = getRequiredSubscription('feature', 'exclusiveChallenges');
+                setLockedFeature({
+                    name: 'Exclusive Challenges',
+                    requiredTier,
+                    customMessage: 'Join premium-only challenges with exclusive rewards, advanced training modules, and mentor feedback. Unlock elite competitions and VIP access!'
+                });
+                setShowUpgradePrompt(true);
+                return;
+            }
+        }
+
+        // User has access - proceed with joining
         Alert.alert(
             'Join Challenge',
             'Are you ready to take on this challenge?',
@@ -262,6 +315,19 @@ const CommunityScreen = ({ navigation }) => {
                 }
             ]
         );
+    };
+
+    // Handle modal close
+    const handleCloseUpgradePrompt = () => {
+        setShowUpgradePrompt(false);
+        setLockedFeature(null);
+    };
+
+    // Handle upgrade navigation
+    const handleUpgrade = () => {
+        setShowUpgradePrompt(false);
+        setLockedFeature(null);
+        navigation.navigate('Settings', { openSubscription: true });
     };
 
     // Handle connecting with a mentor
@@ -353,7 +419,7 @@ const CommunityScreen = ({ navigation }) => {
     // Render the top tab navigation
     const renderTabs = () => {
         return (
-            <View style={styles.tabsContainer}>
+            <View style={[styles.tabsContainer, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
                 <TouchableOpacity
                     style={[styles.tab, activeTab === 'feed' && styles.activeTab]}
                     onPress={() => setActiveTab('feed')}
@@ -361,12 +427,13 @@ const CommunityScreen = ({ navigation }) => {
                     <Ionicons
                         name={activeTab === 'feed' ? 'people' : 'people-outline'}
                         size={22}
-                        color={activeTab === 'feed' ? '#FF6B00' : '#666'}
+                        color={activeTab === 'feed' ? theme.primary : theme.textSecondary}
                     />
                     <Text
                         style={[
                             styles.tabText,
-                            activeTab === 'feed' && styles.activeTabText
+                            { color: theme.textSecondary },
+                            activeTab === 'feed' && [styles.activeTabText, { color: theme.primary }]
                         ]}
                     >
                         Feed
@@ -380,12 +447,13 @@ const CommunityScreen = ({ navigation }) => {
                     <Ionicons
                         name={activeTab === 'challenges' ? 'trophy' : 'trophy-outline'}
                         size={22}
-                        color={activeTab === 'challenges' ? '#FF6B00' : '#666'}
+                        color={activeTab === 'challenges' ? theme.primary : theme.textSecondary}
                     />
                     <Text
                         style={[
                             styles.tabText,
-                            activeTab === 'challenges' && styles.activeTabText
+                            { color: theme.textSecondary },
+                            activeTab === 'challenges' && [styles.activeTabText, { color: theme.primary }]
                         ]}
                     >
                         Challenges
@@ -399,12 +467,13 @@ const CommunityScreen = ({ navigation }) => {
                     <Ionicons
                         name={activeTab === 'mentors' ? 'school' : 'school-outline'}
                         size={22}
-                        color={activeTab === 'mentors' ? '#FF6B00' : '#666'}
+                        color={activeTab === 'mentors' ? theme.primary : theme.textSecondary}
                     />
                     <Text
                         style={[
                             styles.tabText,
-                            activeTab === 'mentors' && styles.activeTabText
+                            { color: theme.textSecondary },
+                            activeTab === 'mentors' && [styles.activeTabText, { color: theme.primary }]
                         ]}
                     >
                         Mentors
@@ -418,12 +487,13 @@ const CommunityScreen = ({ navigation }) => {
                     <Ionicons
                         name={activeTab === 'events' ? 'calendar' : 'calendar-outline'}
                         size={22}
-                        color={activeTab === 'events' ? '#FF6B00' : '#666'}
+                        color={activeTab === 'events' ? theme.primary : theme.textSecondary}
                     />
                     <Text
                         style={[
                             styles.tabText,
-                            activeTab === 'events' && styles.activeTabText
+                            { color: theme.textSecondary },
+                            activeTab === 'events' && [styles.activeTabText, { color: theme.primary }]
                         ]}
                     >
                         Events
@@ -443,7 +513,7 @@ const CommunityScreen = ({ navigation }) => {
         return (
             <View style={styles.feedContainer}>
                 {/* Create post box */}
-                <View style={styles.createPostContainer}>
+                <View style={[styles.createPostContainer, { backgroundColor: theme.card }]}>
                     <View style={styles.createPostHeader}>
                         <View style={styles.userAvatarContainer}>
                             {userData.profileImage ? (
@@ -455,25 +525,25 @@ const CommunityScreen = ({ navigation }) => {
                             )}
                         </View>
                         <TouchableOpacity
-                            style={styles.postInputContainer}
+                            style={[styles.postInputContainer, { backgroundColor: theme.backgroundTertiary }]}
                             onPress={() => navigation.navigate('CreatePost')}
                         >
-                            <Text style={styles.postInputPlaceholder}>Share your training progress or ask a question...</Text>
+                            <Text style={[styles.postInputPlaceholder, { color: theme.textTertiary }]}>Share your training progress or ask a question...</Text>
                         </TouchableOpacity>
                     </View>
 
-                    <View style={styles.postOptionsContainer}>
+                    <View style={[styles.postOptionsContainer, { borderTopColor: theme.border }]}>
                         <TouchableOpacity style={styles.postOption}>
-                            <Ionicons name="image-outline" size={18} color="#666" />
-                            <Text style={styles.postOptionText}>Photo</Text>
+                            <Ionicons name="image-outline" size={18} color={theme.textSecondary} />
+                            <Text style={[styles.postOptionText, { color: theme.textSecondary }]}>Photo</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.postOption}>
-                            <Ionicons name="videocam-outline" size={18} color="#666" />
-                            <Text style={styles.postOptionText}>Video</Text>
+                            <Ionicons name="videocam-outline" size={18} color={theme.textSecondary} />
+                            <Text style={[styles.postOptionText, { color: theme.textSecondary }]}>Video</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.postOption}>
-                            <Ionicons name="stats-chart-outline" size={18} color="#666" />
-                            <Text style={styles.postOptionText}>Stats</Text>
+                            <Ionicons name="stats-chart-outline" size={18} color={theme.textSecondary} />
+                            <Text style={[styles.postOptionText, { color: theme.textSecondary }]}>Stats</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -490,14 +560,16 @@ const CommunityScreen = ({ navigation }) => {
                             key={category.id}
                             style={[
                                 styles.categoryChip,
-                                selectedCategory === category.id && styles.activeCategoryChip
+                                { backgroundColor: theme.backgroundTertiary },
+                                selectedCategory === category.id && [styles.activeCategoryChip, { backgroundColor: theme.primary + '20' }]
                             ]}
                             onPress={() => setSelectedCategory(category.id)}
                         >
                             <Text
                                 style={[
                                     styles.categoryChipText,
-                                    selectedCategory === category.id && styles.activeCategoryChipText
+                                    { color: theme.textSecondary },
+                                    selectedCategory === category.id && [styles.activeCategoryChipText, { color: theme.primary }]
                                 ]}
                             >
                                 {category.name}
@@ -509,7 +581,7 @@ const CommunityScreen = ({ navigation }) => {
                 {/* Posts list */}
                 {filteredPosts.length > 0 ? (
                     filteredPosts.map(post => (
-                        <View key={post.id} style={styles.postCard}>
+                        <View key={post.id} style={[styles.postCard, { backgroundColor: theme.card }]}>
                             <View style={styles.postHeader}>
                                 <View style={styles.postUser}>
                                     {post.user.image ? (
@@ -520,21 +592,21 @@ const CommunityScreen = ({ navigation }) => {
                                         </View>
                                     )}
                                     <View style={styles.postUserInfo}>
-                                        <Text style={styles.postUserName}>{post.user.name}</Text>
+                                        <Text style={[styles.postUserName, { color: theme.text }]}>{post.user.name}</Text>
                                         <View style={styles.postUserMeta}>
-                                            <Text style={styles.postUserLevel}>{post.user.level}</Text>
-                                            <Text style={styles.postTimestamp}>{formatRelativeTime(post.timestamp)}</Text>
+                                            <Text style={[styles.postUserLevel, { color: theme.textSecondary }]}>{post.user.level}</Text>
+                                            <Text style={[styles.postTimestamp, { color: theme.textTertiary }]}>{formatRelativeTime(post.timestamp)}</Text>
                                         </View>
                                     </View>
                                 </View>
                                 <TouchableOpacity style={styles.postOptionsButton}>
-                                    <Ionicons name="ellipsis-horizontal" size={20} color="#666" />
+                                    <Ionicons name="ellipsis-horizontal" size={20} color={theme.textSecondary} />
                                 </TouchableOpacity>
                             </View>
 
-                            <Text style={styles.postContent}>{post.content}</Text>
+                            <Text style={[styles.postContent, { color: theme.text }]}>{post.content}</Text>
 
-                            <View style={styles.postActions}>
+                            <View style={[styles.postActions, { borderTopColor: theme.border }]}>
                                 <TouchableOpacity
                                     style={styles.postAction}
                                     onPress={() => handleLikePost(post.id)}
@@ -558,22 +630,22 @@ const CommunityScreen = ({ navigation }) => {
                                     style={styles.postAction}
                                     onPress={() => handleShowComments(post)}
                                 >
-                                    <Ionicons name="chatbubble-outline" size={20} color="#666" />
-                                    <Text style={styles.postActionText}>{post.comments}</Text>
+                                    <Ionicons name="chatbubble-outline" size={20} color={theme.textSecondary} />
+                                    <Text style={[styles.postActionText, { color: theme.textSecondary }]}>{post.comments}</Text>
                                 </TouchableOpacity>
 
                                 <TouchableOpacity style={styles.postAction}>
-                                    <Ionicons name="share-social-outline" size={20} color="#666" />
-                                    <Text style={styles.postActionText}>Share</Text>
+                                    <Ionicons name="share-social-outline" size={20} color={theme.textSecondary} />
+                                    <Text style={[styles.postActionText, { color: theme.textSecondary }]}>Share</Text>
                                 </TouchableOpacity>
                             </View>
                         </View>
                     ))
                 ) : (
-                    <View style={styles.emptyStateContainer}>
-                        <Text style={styles.emptyStateText}>No posts in this category yet.</Text>
+                    <View style={[styles.emptyStateContainer, { backgroundColor: theme.card }]}>
+                        <Text style={[styles.emptyStateText, { color: theme.textSecondary }]}>No posts in this category yet.</Text>
                         <TouchableOpacity
-                            style={styles.emptyStateButton}
+                            style={[styles.emptyStateButton, { backgroundColor: theme.primary }]}
                             onPress={() => navigation.navigate('CreatePost')}
                         >
                             <Text style={styles.emptyStateButtonText}>Create the First Post</Text>
@@ -973,14 +1045,14 @@ const CommunityScreen = ({ navigation }) => {
     };
 
     return (
-        <SafeAreaView style={styles.safeArea}>
-            <StatusBar barStyle="dark-content" backgroundColor="#F8F9FA" />
+        <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+            <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={theme.background} />
 
             {/* Header */}
-            <View style={styles.header}>
-                <Text style={styles.headerTitle}>Community</Text>
+            <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+                <Text style={[styles.headerTitle, { color: theme.text }]}>Community</Text>
                 <TouchableOpacity style={styles.notificationsButton}>
-                    <Ionicons name="notifications-outline" size={24} color="#333" />
+                    <Ionicons name="notifications-outline" size={24} color={theme.text} />
                     <View style={styles.notificationBadge}>
                         <Text style={styles.notificationBadgeText}>3</Text>
                     </View>
@@ -992,7 +1064,7 @@ const CommunityScreen = ({ navigation }) => {
 
             {/* Content based on active tab */}
             <ScrollView
-                style={styles.contentContainer}
+                style={[styles.contentContainer, { backgroundColor: theme.background }]}
                 showsVerticalScrollIndicator={false}
             >
                 {activeTab === 'feed' && renderFeed()}
@@ -1008,15 +1080,15 @@ const CommunityScreen = ({ navigation }) => {
                 transparent={true}
                 onRequestClose={() => setShowCommentModal(false)}
             >
-                <View style={styles.modalContainer}>
-                    <View style={styles.modalContent}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Comments</Text>
+                <View style={[styles.modalContainer, { backgroundColor: theme.overlay }]}>
+                    <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
+                        <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
+                            <Text style={[styles.modalTitle, { color: theme.text }]}>Comments</Text>
                             <TouchableOpacity
                                 style={styles.modalCloseButton}
                                 onPress={() => setShowCommentModal(false)}
                             >
-                                <Ionicons name="close" size={24} color="#666" />
+                                <Ionicons name="close" size={24} color={theme.textSecondary} />
                             </TouchableOpacity>
                         </View>
 
@@ -1025,15 +1097,15 @@ const CommunityScreen = ({ navigation }) => {
                                 <View style={styles.commentUserAvatar}>
                                     <Text style={styles.commentUserInitials}>JD</Text>
                                 </View>
-                                <View style={styles.commentContent}>
-                                    <Text style={styles.commentUserName}>John Doe</Text>
-                                    <Text style={styles.commentText}>
+                                <View style={[styles.commentContent, { backgroundColor: theme.backgroundTertiary }]}>
+                                    <Text style={[styles.commentUserName, { color: theme.text }]}>John Doe</Text>
+                                    <Text style={[styles.commentText, { color: theme.text }]}>
                                         I've been working on my three-point shooting as well. Have you tried the corner three drill?
                                     </Text>
                                     <View style={styles.commentActions}>
-                                        <Text style={styles.commentTime}>2 hours ago</Text>
+                                        <Text style={[styles.commentTime, { color: theme.textTertiary }]}>2 hours ago</Text>
                                         <TouchableOpacity>
-                                            <Text style={styles.commentReplyButton}>Reply</Text>
+                                            <Text style={[styles.commentReplyButton, { color: theme.primary }]}>Reply</Text>
                                         </TouchableOpacity>
                                     </View>
                                 </View>
@@ -1043,28 +1115,29 @@ const CommunityScreen = ({ navigation }) => {
                                 <View style={styles.commentUserAvatar}>
                                     <Text style={styles.commentUserInitials}>AS</Text>
                                 </View>
-                                <View style={styles.commentContent}>
-                                    <Text style={styles.commentUserName}>Alex Smith</Text>
-                                    <Text style={styles.commentText}>
+                                <View style={[styles.commentContent, { backgroundColor: theme.backgroundTertiary }]}>
+                                    <Text style={[styles.commentUserName, { color: theme.text }]}>Alex Smith</Text>
+                                    <Text style={[styles.commentText, { color: theme.text }]}>
                                         I found that focusing on my follow-through really helped improve my consistency.
                                     </Text>
                                     <View style={styles.commentActions}>
-                                        <Text style={styles.commentTime}>5 hours ago</Text>
+                                        <Text style={[styles.commentTime, { color: theme.textTertiary }]}>5 hours ago</Text>
                                         <TouchableOpacity>
-                                            <Text style={styles.commentReplyButton}>Reply</Text>
+                                            <Text style={[styles.commentReplyButton, { color: theme.primary }]}>Reply</Text>
                                         </TouchableOpacity>
                                     </View>
                                 </View>
                             </View>
                         </ScrollView>
 
-                        <View style={styles.addCommentContainer}>
+                        <View style={[styles.addCommentContainer, { borderTopColor: theme.border }]}>
                             <View style={styles.currentUserAvatar}>
                                 <Text style={styles.currentUserInitials}>{getInitials(userData.name)}</Text>
                             </View>
                             <TextInput
-                                style={styles.commentInput}
+                                style={[styles.commentInput, { backgroundColor: theme.backgroundTertiary, color: theme.text }]}
                                 placeholder="Add a comment..."
+                                placeholderTextColor={theme.textTertiary}
                                 value={commentText}
                                 onChangeText={setCommentText}
                                 multiline
@@ -1084,6 +1157,16 @@ const CommunityScreen = ({ navigation }) => {
                     </View>
                 </View>
             </Modal>
+
+            {/* Upgrade Prompt for Locked Features */}
+            <UpgradePrompt
+                visible={showUpgradePrompt && lockedFeature !== null}
+                onClose={handleCloseUpgradePrompt}
+                onUpgrade={handleUpgrade}
+                featureName={lockedFeature?.name || ''}
+                requiredTier={lockedFeature?.requiredTier || 'premium'}
+                customMessage={lockedFeature?.customMessage}
+            />
         </SafeAreaView>
     );
 };
@@ -1091,7 +1174,6 @@ const CommunityScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
     safeArea: {
         flex: 1,
-        backgroundColor: '#F8F9FA',
     },
     header: {
         flexDirection: 'row',

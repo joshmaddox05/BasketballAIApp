@@ -1,5 +1,5 @@
 // SubscriptionModal.js - Premium subscription paywall
-import React from 'react';
+import React, { useState } from 'react';
 import {
     StyleSheet,
     Text,
@@ -7,27 +7,186 @@ import {
     Modal,
     TouchableOpacity,
     ScrollView,
-    Dimensions
+    Dimensions,
+    ActivityIndicator,
+    Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
 import { SUBSCRIPTION_PLANS } from '../../utils/subscription';
 import i18n from '../../i18n/i18n';
 import { getTheme } from '../../utils/theme';
+import { getPriceId } from '../../config/stripe';
+import { useSubscriptionPayment, processSubscriptionPayment, updateSubscription } from '../../services/stripePaymentService';
 
 const { width } = Dimensions.get('window');
 
 const SubscriptionModal = ({ visible, onClose, onUpgrade }) => {
     const { userData, theme: contextTheme, isDarkMode } = useAppContext();
+    const { initializePaymentSheet, openPaymentSheet } = useSubscriptionPayment();
+    const [processingPayment, setProcessingPayment] = useState(false);
 
     // Fallback to default theme if context theme is undefined
     const theme = contextTheme || getTheme(isDarkMode || false);
 
     const currentPlanId = userData.subscription || 'free';
 
-    const handleSelectPlan = (planId) => {
-        if (planId !== 'free' && planId !== currentPlanId) {
-            onUpgrade(planId);
+    // Define tier hierarchy for upgrade/downgrade detection
+    const tierHierarchy = { free: 0, basic: 1, premium: 2, pro: 3 };
+
+    const handleSelectPlan = async (planId) => {
+        // Don't allow selecting the same plan
+        if (planId === currentPlanId) {
+            return;
+        }
+
+        setProcessingPayment(true);
+
+        try {
+            // Validate user data
+            if (!userData || !userData.uid || !userData.email) {
+                Alert.alert(
+                    'Error',
+                    'User information is missing. Please sign out and sign back in.'
+                );
+                setProcessingPayment(false);
+                return;
+            }
+
+            // Determine if this is an upgrade, downgrade, or new subscription
+            const currentTierLevel = tierHierarchy[currentPlanId] || 0;
+            const newTierLevel = tierHierarchy[planId] || 0;
+            const isUpgrade = newTierLevel > currentTierLevel;
+            const isDowngrade = newTierLevel < currentTierLevel;
+            const hasActiveSubscription = currentPlanId !== 'free' && userData.subscriptionDetails?.stripeSubscriptionId;
+
+            console.log(`Subscription change: ${currentPlanId} (${currentTierLevel}) → ${planId} (${newTierLevel})`);
+            console.log(`Is upgrade: ${isUpgrade}, Is downgrade: ${isDowngrade}, Has active: ${hasActiveSubscription}`);
+
+            // Handle downgrade to free (cancellation)
+            if (planId === 'free' && hasActiveSubscription) {
+                Alert.alert(
+                    'Cancel Subscription?',
+                    `Your ${currentPlanId} subscription will remain active until ${new Date(userData.subscriptionDetails.currentPeriodEnd).toLocaleDateString()}. After that, you'll be downgraded to the free plan.`,
+                    [
+                        { text: 'Keep Subscription', style: 'cancel' },
+                        {
+                            text: 'Cancel Subscription',
+                            style: 'destructive',
+                            onPress: async () => {
+                                const result = await updateSubscription(userData.uid, 'cancel');
+                                setProcessingPayment(false);
+
+                                if (result.success) {
+                                    Alert.alert('Success', result.message);
+                                    if (onUpgrade) await onUpgrade('free');
+                                    onClose();
+                                } else {
+                                    Alert.alert('Error', result.error || 'Failed to cancel subscription');
+                                }
+                            }
+                        }
+                    ]
+                );
+                setProcessingPayment(false);
+                return;
+            }
+
+            // Handle upgrade or downgrade of existing subscription
+            if (hasActiveSubscription && (isUpgrade || isDowngrade)) {
+                const action = isUpgrade ? 'upgrade' : 'downgrade';
+                const priceId = getPriceId(planId);
+
+                if (!priceId) {
+                    Alert.alert('Configuration Error', 'This subscription plan is not properly configured.');
+                    setProcessingPayment(false);
+                    return;
+                }
+
+                const actionText = isUpgrade ? 'upgraded' : 'downgraded';
+                const timingText = isUpgrade
+                    ? 'immediately and you\'ll be charged a prorated amount'
+                    : `at the end of your current billing period (${new Date(userData.subscriptionDetails.currentPeriodEnd).toLocaleDateString()})`;
+
+                Alert.alert(
+                    `${isUpgrade ? 'Upgrade' : 'Downgrade'} Subscription?`,
+                    `Your subscription will be ${actionText} to ${planId} ${timingText}.`,
+                    [
+                        { text: 'Cancel', style: 'cancel', onPress: () => setProcessingPayment(false) },
+                        {
+                            text: 'Confirm',
+                            onPress: async () => {
+                                const result = await updateSubscription(userData.uid, action, priceId);
+
+                                if (result.success) {
+                                    Alert.alert('Success!', result.message);
+                                    if (onUpgrade) await onUpgrade(planId);
+                                    onClose();
+                                } else {
+                                    Alert.alert('Error', result.error || 'Failed to update subscription');
+                                }
+                                setProcessingPayment(false);
+                            }
+                        }
+                    ]
+                );
+                return;
+            }
+
+            // Handle new subscription (user is on free plan)
+            const priceId = getPriceId(planId);
+
+            if (!priceId) {
+                Alert.alert(
+                    'Configuration Error',
+                    'This subscription plan is not properly configured. Please contact support.'
+                );
+                setProcessingPayment(false);
+                return;
+            }
+
+            console.log(`Starting new subscription for plan: ${planId}, price: ${priceId}`);
+
+            // Process the subscription payment
+            const result = await processSubscriptionPayment(
+                userData.uid,
+                userData.email,
+                priceId,
+                planId,
+                initializePaymentSheet,
+                openPaymentSheet
+            );
+
+            if (result.success) {
+                // Payment successful!
+                console.log('Subscription payment successful, subscription ID:', result.subscriptionId);
+
+                // Call the upgrade callback if provided
+                if (onUpgrade) {
+                    await onUpgrade(planId);
+                }
+
+                // Close the modal
+                onClose();
+            } else if (result.canceled) {
+                // User canceled - just log it, don't show an error
+                console.log('User canceled the payment');
+            } else {
+                // Payment failed (but wasn't canceled by user)
+                const errorMessage = result.error
+                    ? `Error: ${result.error}`
+                    : 'We couldn\'t process your payment. Please try again or contact support.';
+
+                Alert.alert('Payment Failed', errorMessage);
+            }
+        } catch (error) {
+            console.error('Exception in handleSelectPlan:', error);
+            Alert.alert(
+                'Unexpected Error',
+                'An unexpected error occurred while processing your subscription. Please try again or contact support if the problem persists.'
+            );
+        } finally {
+            setProcessingPayment(false);
         }
     };
 
@@ -57,6 +216,20 @@ const SubscriptionModal = ({ visible, onClose, onUpgrade }) => {
                         {SUBSCRIPTION_PLANS.map((plan) => {
                             const isCurrentPlan = plan.id === currentPlanId;
                             const isPremium = plan.id !== 'free';
+                            const planLevel = tierHierarchy[plan.id] || 0;
+                            const currentLevel = tierHierarchy[currentPlanId] || 0;
+                            const isUpgrade = planLevel > currentLevel;
+                            const isDowngrade = planLevel < currentLevel;
+
+                            // Determine button text
+                            let buttonText = i18n.t('upgradeNow');
+                            if (plan.id === 'free') {
+                                buttonText = 'Cancel Subscription';
+                            } else if (isDowngrade) {
+                                buttonText = 'Downgrade';
+                            } else if (isUpgrade) {
+                                buttonText = i18n.t('upgradeNow');
+                            }
 
                             return (
                                 <TouchableOpacity
@@ -71,7 +244,7 @@ const SubscriptionModal = ({ visible, onClose, onUpgrade }) => {
                                         plan.popular && [styles.popularPlan, { borderColor: theme.primary }]
                                     ]}
                                     onPress={() => handleSelectPlan(plan.id)}
-                                    disabled={isCurrentPlan || !isPremium}
+                                    disabled={isCurrentPlan}
                                 >
                                     {plan.popular && (
                                         <View style={[styles.popularBadge, { backgroundColor: theme.primary }]}>
@@ -115,11 +288,28 @@ const SubscriptionModal = ({ visible, onClose, onUpgrade }) => {
                                         </View>
                                     )}
 
-                                    {!isCurrentPlan && isPremium && (
-                                        <View style={[styles.upgradeButton, { backgroundColor: theme.primary }]}>
-                                            <Text style={styles.upgradeButtonText}>
-                                                {i18n.t('upgradeNow')}
-                                            </Text>
+                                    {!isCurrentPlan && (
+                                        <View style={[
+                                            styles.upgradeButton,
+                                            {
+                                                backgroundColor: processingPayment
+                                                    ? theme.border
+                                                    : (plan.id === 'free' || isDowngrade) ? theme.error : theme.primary,
+                                                opacity: processingPayment ? 0.6 : 1
+                                            }
+                                        ]}>
+                                            {processingPayment ? (
+                                                <View style={styles.processingContainer}>
+                                                    <ActivityIndicator size="small" color="#FFF" />
+                                                    <Text style={[styles.upgradeButtonText, { marginLeft: 10 }]}>
+                                                        Processing...
+                                                    </Text>
+                                                </View>
+                                            ) : (
+                                                <Text style={styles.upgradeButtonText}>
+                                                    {buttonText}
+                                                </Text>
+                                            )}
                                         </View>
                                     )}
                                 </TouchableOpacity>
@@ -255,6 +445,11 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         marginTop: 20,
         lineHeight: 18,
+    },
+    processingContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
 });
 

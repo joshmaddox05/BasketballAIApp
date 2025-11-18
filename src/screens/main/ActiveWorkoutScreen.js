@@ -9,19 +9,30 @@ import {
   Alert,
   Animated,
   Vibration,
-  Dimensions
+  Dimensions,
+  Platform
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAppContext } from '../../context/AppContext';
+import { hasAccess } from '../../utils/subscription';
+import SubscriptionModal from '../../components/shared/SubscriptionModal';
 import { getTheme } from '../../utils/theme';
-import { addActivity, updateUserStats } from '../../services/firestoreService';
+import {
+  addWorkoutCompletion,
+  updateUserStats,
+  initializeGamification,
+  addXP,
+  checkAndUnlockAchievements
+} from '../../services/firestoreService';
+import { XP_REWARDS } from '../../data/achievements';
 
 const { width, height } = Dimensions.get('window');
 
 const ActiveWorkoutScreen = ({ route, navigation }) => {
-  const { workoutId, resumeStep = 0 } = route.params;
-  const { userData, theme: contextTheme, isDarkMode } = useAppContext();
+  const { workoutId, resumeStep = 0, workout: passedWorkout, isCustom } = route.params;
+  const { userData, theme: contextTheme, isDarkMode, workouts } = useAppContext();
   const theme = contextTheme || getTheme(isDarkMode || false);
 
   // Workout state
@@ -31,6 +42,8 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
   const [startTime, setStartTime] = useState(Date.now());
   const [totalTime, setTotalTime] = useState(0);
   const [stepStartTime, setStepStartTime] = useState(Date.now());
+  const [stepPerformance, setStepPerformance] = useState([]);
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
 
   // Timer state
   const [timeRemaining, setTimeRemaining] = useState(0);
@@ -44,10 +57,13 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
   // Animation refs
   const progressAnimation = useRef(new Animated.Value(0)).current;
   const pulseAnimation = useRef(new Animated.Value(1)).current;
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
   const timerRef = useRef(null);
 
-  // Get workout data (in real app, this would come from Firestore)
-  const workout = {
+  // Get workout data - use passed workout for custom workouts, or look up from workouts array
+  const workout = passedWorkout || workouts?.find(w => w.id === workoutId) || {
     id: workoutId,
     title: 'Shooting Fundamentals',
     steps: [
@@ -85,25 +101,82 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
     ]
   };
 
+  // Check subscription access (custom workouts are always accessible)
+  const userSubscription = userData?.subscription || 'free';
+  const workoutHasAccess = isCustom ? true : (!workout.requiredTier || hasAccess(userSubscription, workout.requiredTier));
+
+  // Block access to locked workouts
+  useEffect(() => {
+    if (!isCustom && !workoutHasAccess) {
+      Alert.alert(
+        'Workout Locked',
+        `This workout requires a ${workout.requiredTier || 'premium'} subscription.`,
+        [
+          {
+            text: 'View Plans',
+            onPress: () => {
+              navigation.goBack();
+              setShowSubscriptionModal(true);
+            }
+          },
+          {
+            text: 'Go Back',
+            onPress: () => navigation.goBack(),
+            style: 'cancel'
+          }
+        ]
+      );
+    }
+  }, [workoutHasAccess, isCustom]);
+
   const currentStepData = workout.steps[currentStep];
 
-  // Initialize step when it changes
+  // Initialize step when it changes with smooth transition
   useEffect(() => {
     if (currentStepData) {
-      setStepStartTime(Date.now());
-      setCurrentReps(0);
-      setTargetReps(currentStepData.reps || 0);
-      
-      if (currentStepData.duration) {
-        setTimeRemaining(currentStepData.duration * 60); // Convert minutes to seconds
-        setTimerType('duration');
-        setTimerActive(true);
-      } else {
-        setTimerActive(false);
-        setTimerType(null);
-      }
+      // Fade out and slide animation
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true
+        }),
+        Animated.timing(slideAnim, {
+          toValue: -20,
+          duration: 200,
+          useNativeDriver: true
+        })
+      ]).start(() => {
+        // Update state
+        setStepStartTime(Date.now());
+        setCurrentReps(0);
+        setTargetReps(currentStepData.reps || 0);
+
+        if (currentStepData.duration) {
+          setTimeRemaining(currentStepData.duration * 60);
+          setTimerType('duration');
+          setTimerActive(true);
+        } else {
+          setTimerActive(false);
+          setTimerType(null);
+        }
+
+        // Fade in and slide back
+        Animated.parallel([
+          Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true
+          }),
+          Animated.timing(slideAnim, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true
+          })
+        ]).start();
+      });
     }
-  }, [currentStep, currentStepData]);
+  }, [currentStep]);
 
   // Timer effect
   useEffect(() => {
@@ -171,7 +244,19 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
 
   const handleStepComplete = async () => {
     const stepTime = Math.floor((Date.now() - stepStartTime) / 1000);
-    
+
+    // Record step performance
+    const performance = {
+      stepIndex: currentStep,
+      stepTitle: currentStepData.title,
+      timeSpent: stepTime,
+      repsCompleted: currentReps,
+      targetReps: targetReps,
+      completionPercentage: targetReps > 0 ? Math.round((currentReps / targetReps) * 100) : 100
+    };
+
+    setStepPerformance(prev => [...prev, performance]);
+
     if (currentStep < workout.steps.length - 1) {
       // Move to next step
       setCurrentStep(prev => prev + 1);
@@ -184,27 +269,102 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
   const completeWorkout = async () => {
     const totalWorkoutTime = Math.floor((Date.now() - startTime) / 1000);
     setIsCompleted(true);
-    
+
     try {
-      // Save workout completion to Firestore
-      await addActivity(userData.uid, {
-        title: workout.title,
-        type: 'workout',
+      // Calculate total reps
+      const totalReps = stepPerformance.reduce((sum, step) => sum + (step.repsCompleted || 0), 0);
+
+      // Calculate overall completion percentage
+      const avgCompletion = stepPerformance.length > 0
+        ? stepPerformance.reduce((sum, step) => sum + step.completionPercentage, 0) / stepPerformance.length
+        : 100;
+
+      // Estimate calories (rough estimate: 5 calories per minute)
+      const caloriesEstimate = Math.round((totalWorkoutTime / 60) * 5);
+
+      // Determine workout category - use workout.category if available (custom workouts), otherwise infer from title
+      let category = workout.category || 'general';
+      if (!workout.category) {
+        const title = (workout.title || workout.name || '').toLowerCase();
+        if (title.includes('shooting')) category = 'Shooting';
+        else if (title.includes('dribbling')) category = 'Dribbling';
+        else if (title.includes('physical') || title.includes('conditioning')) category = 'Physical';
+        else if (title.includes('defense')) category = 'Defense';
+        else if (title.includes('passing')) category = 'Passing';
+      }
+
+      // Save detailed workout completion to Firestore
+      await addWorkoutCompletion(userData.uid, {
+        workoutId: workout.id,
+        title: workout.name || workout.title,
+        category: category,
+        difficulty: workout.difficulty || workout.level || 'Intermediate',
         duration: totalWorkoutTime,
+        durationMinutes: Math.floor(totalWorkoutTime / 60),
         steps: workout.steps.length,
-        completedAt: new Date(),
-        workoutId: workout.id
+        stepPerformance: stepPerformance,
+        totalReps: totalReps,
+        completionPercentage: Math.round(avgCompletion),
+        caloriesEstimate: caloriesEstimate,
+        completedAt: new Date()
       });
 
-      // Update user stats
-      await updateUserStats(userData.uid, {
-        streak: 1, // Increment streak
-        workoutsCompleted: 1 // Increment total workouts
-      });
+      // Update user stats based on category
+      const statsUpdate = {};
+
+      // Increment category-specific skill (by 1 point)
+      if (category === 'shooting' && userData.stats.shooting < 100) {
+        statsUpdate.shooting = 1;
+      } else if (category === 'dribbling' && userData.stats.dribbling < 100) {
+        statsUpdate.dribbling = 1;
+      } else if (category === 'physical' && userData.stats.physical < 100) {
+        statsUpdate.physical = 1;
+      }
+
+      // Always increment streak
+      statsUpdate.streak = 1;
+
+      await updateUserStats(userData.uid, statsUpdate);
+
+      // ==================== GAMIFICATION ====================
+      // Initialize gamification if needed
+      await initializeGamification(userData.uid);
+
+      // Award XP for workout completion
+      const xpResult = await addXP(
+        userData.uid,
+        XP_REWARDS.WORKOUT_COMPLETE,
+        'Completed workout'
+      );
+
+      // Check for newly unlocked achievements
+      const workoutData = {
+        category: category,
+        createdAt: new Date()
+      };
+      const newAchievements = await checkAndUnlockAchievements(userData.uid, workoutData);
+
+      // Build completion message
+      let completionMessage = `Great job! You completed ${workout.title} in ${Math.floor(totalWorkoutTime / 60)} minutes.\n\n` +
+        `Steps: ${stepPerformance.length}/${workout.steps.length}\n` +
+        `Completion: ${Math.round(avgCompletion)}%\n` +
+        `Calories: ~${caloriesEstimate} kcal\n` +
+        `XP Earned: +${xpResult.xpGained} XP`;
+
+      if (xpResult.leveledUp) {
+        completionMessage += `\n\n🎊 LEVEL UP! You're now Level ${xpResult.newLevel}!`;
+      }
+
+      if (newAchievements && newAchievements.length > 0) {
+        completionMessage += `\n\n🏆 New Achievement${newAchievements.length > 1 ? 's' : ''} Unlocked!\n`;
+        newAchievements.forEach(achievement => {
+          completionMessage += `• ${achievement.title}\n`;
+        });
+      }
 
       Alert.alert(
-        'Workout Complete!',
-        `Great job! You completed ${workout.title} in ${Math.floor(totalWorkoutTime / 60)} minutes.`,
+        'Workout Complete! 🎉',
+        completionMessage,
         [
           {
             text: 'View Progress',
@@ -245,6 +405,20 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
     if (currentReps < targetReps) {
       setCurrentReps(prev => prev + 1);
       Vibration.vibrate(100); // Short vibration for rep completion
+
+      // Scale animation for button press feedback
+      Animated.sequence([
+        Animated.timing(scaleAnim, {
+          toValue: 0.9,
+          duration: 100,
+          useNativeDriver: true
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 1,
+          duration: 100,
+          useNativeDriver: true
+        })
+      ]).start();
     }
   };
 
@@ -257,6 +431,22 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
   const getProgressPercentage = () => {
     return ((currentStep + 1) / workout.steps.length) * 100;
   };
+
+  // Block rendering if locked (prevent bypassing the alert)
+  if (!isCustom && !workoutHasAccess) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+        <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} />
+        <View style={styles.completedContainer}>
+          <Ionicons name="lock-closed" size={100} color="#9C27B0" />
+          <Text style={[styles.completedTitle, { color: theme.text }]}>Workout Locked</Text>
+          <Text style={[styles.completedSubtitle, { color: theme.textSecondary }]}>
+            This workout requires a {workout.requiredTier || 'premium'} subscription
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (isCompleted) {
     return (
@@ -318,53 +508,110 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
       </View>
 
       {/* Main Content */}
-      <View style={styles.content}>
-        {/* Step Title */}
-        <Text style={[styles.stepTitle, { color: theme.text }]}>
-          {currentStepData.title}
-        </Text>
+      <Animated.View
+        style={[
+          styles.content,
+          {
+            opacity: fadeAnim,
+            transform: [{ translateY: slideAnim }]
+          }
+        ]}
+      >
+        {/* Step Title with Badge */}
+        <View style={styles.stepTitleContainer}>
+          <View style={[styles.stepBadge, { backgroundColor: theme.primary + '20' }]}>
+            <Text style={[styles.stepBadgeText, { color: theme.primary }]}>
+              STEP {currentStep + 1}/{workout.steps.length}
+            </Text>
+          </View>
+          <Text style={[styles.stepTitle, { color: theme.text }]}>
+            {currentStepData.title}
+          </Text>
+        </View>
 
-        {/* Timer or Rep Counter */}
+        {/* Enhanced Timer or Rep Counter */}
         {timerActive ? (
-          <Animated.View style={[styles.timerContainer, { transform: [{ scale: pulseAnimation }] }]}>
-            <Text style={[styles.timerText, { color: timeRemaining <= 10 ? theme.error : theme.primary }]}>
-              {formatTime(timeRemaining)}
-            </Text>
-            <Text style={[styles.timerLabel, { color: theme.textSecondary }]}>
-              {timerType === 'duration' ? 'Time Remaining' : 'Rest Time'}
-            </Text>
-          </Animated.View>
-        ) : targetReps > 0 ? (
-          <View style={styles.repContainer}>
-            <Text style={[styles.repText, { color: theme.primary }]}>
-              {currentReps} / {targetReps}
-            </Text>
-            <Text style={[styles.repLabel, { color: theme.textSecondary }]}>
-              Repetitions
-            </Text>
-            <TouchableOpacity
-              style={[styles.repButton, { backgroundColor: theme.primary }]}
-              onPress={handleRepComplete}
-              disabled={currentReps >= targetReps}
+          <View style={styles.timerWrapper}>
+            <Animated.View
+              style={[
+                styles.timerContainer,
+                {
+                  backgroundColor: timeRemaining <= 10 ? theme.error + '10' : theme.primary + '10',
+                  transform: [{ scale: pulseAnimation }]
+                }
+              ]}
             >
-              <Ionicons name="add" size={24} color="#FFF" />
-            </TouchableOpacity>
+              <Text style={[styles.timerText, { color: timeRemaining <= 10 ? theme.error : theme.primary }]}>
+                {formatTime(timeRemaining)}
+              </Text>
+              <Text style={[styles.timerLabel, { color: theme.textSecondary }]}>
+                {timerType === 'duration' ? 'Time Remaining' : 'Rest Time'}
+              </Text>
+              {timeRemaining <= 10 && (
+                <View style={styles.urgentIndicator}>
+                  <Ionicons name="timer-outline" size={20} color={theme.error} />
+                  <Text style={[styles.urgentText, { color: theme.error }]}>Almost Done!</Text>
+                </View>
+              )}
+            </Animated.View>
+          </View>
+        ) : targetReps > 0 ? (
+          <View style={styles.repWrapper}>
+            <View style={[styles.repContainer, { backgroundColor: theme.card }]}>
+              <View style={styles.repCounter}>
+                <Text style={[styles.repText, { color: theme.primary }]}>
+                  {currentReps}
+                </Text>
+                <Text style={[styles.repDivider, { color: theme.textTertiary }]}>/</Text>
+                <Text style={[styles.repTargetText, { color: theme.textSecondary }]}>
+                  {targetReps}
+                </Text>
+              </View>
+              <Text style={[styles.repLabel, { color: theme.textSecondary }]}>
+                Repetitions Completed
+              </Text>
+              <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+                <TouchableOpacity
+                  style={[
+                    styles.repButton,
+                    {
+                      backgroundColor: currentReps >= targetReps ? theme.success : theme.primary,
+                      opacity: currentReps >= targetReps ? 0.6 : 1
+                    }
+                  ]}
+                  onPress={handleRepComplete}
+                  disabled={currentReps >= targetReps}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons
+                    name={currentReps >= targetReps ? "checkmark" : "add"}
+                    size={32}
+                    color="#FFF"
+                  />
+                </TouchableOpacity>
+              </Animated.View>
+            </View>
           </View>
         ) : null}
 
-        {/* Instructions */}
-        <View style={[styles.instructionsContainer, { backgroundColor: theme.card }]}>
-          <Text style={[styles.instructionsTitle, { color: theme.text }]}>Instructions</Text>
+        {/* Enhanced Instructions */}
+        <View style={[styles.instructionsContainer, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          <View style={styles.instructionsHeader}>
+            <Ionicons name="list-outline" size={24} color={theme.primary} />
+            <Text style={[styles.instructionsTitle, { color: theme.text }]}>Instructions</Text>
+          </View>
           <Text style={[styles.instructionsText, { color: theme.textSecondary }]}>
             {currentStepData.instructions}
           </Text>
         </View>
 
-        {/* Tips */}
+        {/* Enhanced Tips */}
         {currentStepData.tips && (
-          <View style={[styles.tipsContainer, { backgroundColor: theme.backgroundSecondary }]}>
+          <View style={[styles.tipsContainer, { backgroundColor: theme.primary + '08', borderColor: theme.primary + '30' }]}>
             <View style={styles.tipsHeader}>
-              <Ionicons name="bulb" size={20} color={theme.primary} />
+              <View style={[styles.tipsIconContainer, { backgroundColor: theme.primary }]}>
+                <Ionicons name="bulb" size={20} color="#FFF" />
+              </View>
               <Text style={[styles.tipsTitle, { color: theme.text }]}>Pro Tip</Text>
             </View>
             <Text style={[styles.tipsText, { color: theme.textSecondary }]}>
@@ -395,7 +642,7 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
             </Text>
           </View>
         )}
-      </View>
+      </Animated.View>
 
       {/* Bottom Actions */}
       <View style={[styles.bottomActions, { backgroundColor: theme.card, borderTopColor: theme.border }]}>
@@ -416,6 +663,16 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
           </Text>
         </TouchableOpacity>
       </View>
+
+      {/* Subscription Modal for Locked Workouts */}
+      <SubscriptionModal
+        visible={showSubscriptionModal}
+        onClose={() => setShowSubscriptionModal(false)}
+        onUpgrade={() => {
+          setShowSubscriptionModal(false);
+          navigation.goBack();
+        }}
+      />
     </SafeAreaView>
   );
 };
@@ -472,76 +729,158 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
   },
+  stepTitleContainer: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  stepBadge: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginBottom: 12,
+  },
+  stepBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
   stepTitle: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: 'bold',
     textAlign: 'center',
+  },
+  timerWrapper: {
     marginBottom: 30,
+    alignItems: 'center',
   },
   timerContainer: {
     alignItems: 'center',
-    marginBottom: 30,
+    paddingVertical: 32,
+    paddingHorizontal: 40,
+    borderRadius: 24,
+    minWidth: 240,
   },
   timerText: {
-    fontSize: 48,
+    fontSize: 56,
     fontWeight: 'bold',
+    letterSpacing: -2,
   },
   timerLabel: {
     fontSize: 16,
-    marginTop: 5,
+    marginTop: 8,
+    fontWeight: '500',
+  },
+  urgentIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    gap: 6,
+  },
+  urgentText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  repWrapper: {
+    marginBottom: 30,
+    paddingHorizontal: 10,
   },
   repContainer: {
     alignItems: 'center',
-    marginBottom: 30,
+    padding: 24,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  repCounter: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginBottom: 8,
   },
   repText: {
-    fontSize: 48,
+    fontSize: 56,
     fontWeight: 'bold',
+    letterSpacing: -2,
+  },
+  repDivider: {
+    fontSize: 40,
+    fontWeight: '300',
+    marginHorizontal: 8,
+  },
+  repTargetText: {
+    fontSize: 40,
+    fontWeight: '300',
   },
   repLabel: {
     fontSize: 16,
-    marginTop: 5,
     marginBottom: 20,
+    fontWeight: '500',
   },
   repButton: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
   },
   instructionsContainer: {
     padding: 20,
-    borderRadius: 12,
-    marginBottom: 20,
+    borderRadius: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  instructionsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 10,
   },
   instructionsTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 10,
   },
   instructionsText: {
     fontSize: 16,
     lineHeight: 24,
   },
   tipsContainer: {
-    padding: 15,
-    borderRadius: 12,
+    padding: 18,
+    borderRadius: 16,
     marginBottom: 20,
+    borderWidth: 2,
   },
   tipsHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 10,
+    gap: 10,
+  },
+  tipsIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   tipsTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    marginLeft: 8,
   },
   tipsText: {
     fontSize: 14,
-    lineHeight: 20,
+    lineHeight: 22,
   },
   repProgressContainer: {
     marginTop: 20,
@@ -563,16 +902,17 @@ const styles = StyleSheet.create({
   bottomActions: {
     flexDirection: 'row',
     paddingHorizontal: 20,
-    paddingVertical: 15,
+    paddingVertical: 20,
     borderTopWidth: 1,
-    gap: 15,
+    gap: 12,
   },
   skipButton: {
     flex: 1,
-    paddingVertical: 15,
-    borderRadius: 12,
-    borderWidth: 1,
+    paddingVertical: 16,
+    borderRadius: 14,
+    borderWidth: 2,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   skipButtonText: {
     fontSize: 16,
@@ -580,13 +920,19 @@ const styles = StyleSheet.create({
   },
   completeButton: {
     flex: 2,
-    paddingVertical: 15,
-    borderRadius: 12,
+    paddingVertical: 16,
+    borderRadius: 14,
     alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
   completeButtonText: {
     color: '#FFF',
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: 'bold',
   },
   completedContainer: {

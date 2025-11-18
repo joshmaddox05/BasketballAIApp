@@ -80,6 +80,9 @@ export const translations = {
     subscriptionRequired: 'Subscription Required',
     subscriptionMessage: 'This feature requires a premium subscription. Upgrade to unlock all features!',
     upgradeNow: 'Upgrade Now',
+    upgradeRequired: 'Upgrade Required',
+    upgradeTo: 'Upgrade to',
+    maybeLater: 'Maybe Later',
 
     // Features
     basicWorkouts: 'Basic workouts',
@@ -195,6 +198,9 @@ export const translations = {
     subscriptionRequired: 'Abonnement requis',
     subscriptionMessage: 'Cette fonctionnalité nécessite un abonnement premium. Mettez à niveau pour débloquer toutes les fonctionnalités!',
     upgradeNow: 'Mettre à niveau maintenant',
+    upgradeRequired: 'Mise à niveau requise',
+    upgradeTo: 'Passer à',
+    maybeLater: 'Peut-être plus tard',
 
     // Features
     basicWorkouts: 'Entraînements de base',

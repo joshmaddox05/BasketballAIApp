@@ -93,7 +93,7 @@ export const CONTENT_ACCESS = {
   },
   // Features access
   features: {
-    aiShotAnalysis: SUBSCRIPTION_TIERS.BASIC,
+    aiShotAnalysis: SUBSCRIPTION_TIERS.PRO,        // Pro feature - Premier AI analysis
     advancedMetrics: SUBSCRIPTION_TIERS.PREMIUM,
     personalizedPlans: SUBSCRIPTION_TIERS.PRO,
     mentorChat: SUBSCRIPTION_TIERS.PREMIUM,
@@ -102,7 +102,8 @@ export const CONTENT_ACCESS = {
     videoLibrary: SUBSCRIPTION_TIERS.FREE,
     advancedVideoLibrary: SUBSCRIPTION_TIERS.PREMIUM,
     challenges: SUBSCRIPTION_TIERS.FREE,
-    exclusiveChallenges: SUBSCRIPTION_TIERS.PREMIUM,
+    exclusiveChallenges: SUBSCRIPTION_TIERS.PREMIUM,  // Premium feature
+    exclusiveWorkouts: SUBSCRIPTION_TIERS.BASIC,      // Basic feature - Premium workouts
     leaderboard: SUBSCRIPTION_TIERS.FREE,
   }
 };

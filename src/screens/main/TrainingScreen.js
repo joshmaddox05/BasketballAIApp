@@ -18,21 +18,23 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
 import VideoPlayer from '../../components/shared/VideoPlayer';
 import YouTubeService from '../../services/youtubeService';
+import { hasAccess } from '../../utils/subscription';
+import SubscriptionModal from '../../components/shared/SubscriptionModal';
 
 const TrainingScreen = ({ navigation }) => {
-    const { workouts, loading, userData, trainingVideos, setTrainingVideosData } = useAppContext();
+    const { workouts, loading, userData, trainingVideos, setTrainingVideosData, theme, isDarkMode, getAccessibleWorkouts } = useAppContext();
     const [searchQuery, setSearchQuery] = useState('');
     const [filteredWorkouts, setFilteredWorkouts] = useState([]);
     const [selectedCategory, setSelectedCategory] = useState('All');
     const [loadingVideos, setLoadingVideos] = useState(false);
+    const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
 
     const trainingCategories = [
         { id: '1', title: 'Shooting', icon: 'basketball-outline', color: '#FF6B00' },
         { id: '2', title: 'Dribbling', icon: 'hand-left-outline', color: '#4CAF50' },
         { id: '3', title: 'Physical', icon: 'fitness-outline', color: '#2196F3' },
-        { id: '4', title: 'Strategy', icon: 'clipboard-outline', color: '#9C27B0' },
-        { id: '5', title: 'Mental', icon: 'fitness-outline', color: '#FF9800' },
-        { id: '6', title: 'Nutrition', icon: 'nutrition-outline', color: '#00BCD4' },
+        { id: '4', title: 'Defense', icon: 'shield-outline', color: '#9C27B0' },
+        { id: '5', title: 'Passing', icon: 'swap-horizontal-outline', color: '#FF9800' },
     ];
 
     // Filter workouts based on search and category selection
@@ -40,16 +42,22 @@ const TrainingScreen = ({ navigation }) => {
         useCallback(() => {
             if (!workouts) return;
 
+            const userSubscription = userData?.subscription || 'free';
+
+            // SHOW ALL WORKOUTS - Don't filter by subscription
+            // Instead, we'll mark them as locked in the UI
             let filtered = workouts;
 
-            // Filter by category if not 'All'
+            console.log(`Total workouts: ${workouts.length}, Subscription: ${userSubscription}`);
+
+            // FIRST: Filter by category if not 'All'
             if (selectedCategory !== 'All') {
                 filtered = filtered.filter(workout =>
                     workout.category === selectedCategory.toLowerCase()
                 );
             }
 
-            // Filter by search query
+            // SECOND: Filter by search query
             if (searchQuery) {
                 const query = searchQuery.toLowerCase();
                 filtered = filtered.filter(workout =>
@@ -64,7 +72,7 @@ const TrainingScreen = ({ navigation }) => {
             if (trainingVideos.length === 0) {
                 loadTrainingVideos();
             }
-        }, [workouts, searchQuery, selectedCategory])
+        }, [workouts, searchQuery, selectedCategory, userData])
     );
 
     const loadTrainingVideos = async () => {
@@ -86,53 +94,81 @@ const TrainingScreen = ({ navigation }) => {
 
     const renderCategoryItem = ({ item }) => (
         <TouchableOpacity
-            style={styles.categoryCard}
+            style={[styles.categoryCard, { backgroundColor: theme.card }]}
             onPress={() => handleCategoryPress(item.title)}
         >
             <View style={[styles.categoryIcon, { backgroundColor: `${item.color}20` }]}>
                 <Ionicons name={item.icon} size={32} color={item.color} />
             </View>
-            <Text style={styles.categoryTitle}>{item.title}</Text>
+            <Text style={[styles.categoryTitle, { color: theme.text }]}>{item.title}</Text>
         </TouchableOpacity>
     );
 
-    const renderWorkoutItem = ({ item }) => (
-        <TouchableOpacity
-            style={styles.workoutItem}
-            onPress={() => navigation.navigate('WorkoutDetail', { workoutId: item.id })}
-        >
-            {/* Left: Workout Image */}
-            <View style={styles.workoutImageContainer}>
-                {item.image ? (
-                    <Image source={item.image} style={styles.workoutImage} />
-                ) : (
-                    <View style={[styles.workoutImage, { backgroundColor: '#EEE' }]}>
-                        <Ionicons name="basketball-outline" size={24} color="#AAA" />
+    const renderWorkoutItem = ({ item }) => {
+        const userSubscription = userData?.subscription || 'free';
+        const isLocked = item.requiredTier && !hasAccess(userSubscription, item.requiredTier);
+
+        const handleWorkoutPress = () => {
+            if (isLocked) {
+                // Show subscription modal
+                setShowSubscriptionModal(true);
+            } else {
+                navigation.navigate('WorkoutDetail', { workoutId: item.id });
+            }
+        };
+
+        return (
+            <TouchableOpacity
+                style={[styles.workoutItem, { backgroundColor: theme.card }, isLocked && styles.lockedWorkout]}
+                onPress={handleWorkoutPress}
+            >
+                {/* Lock Badge */}
+                {isLocked && (
+                    <View style={styles.lockBadge}>
+                        <Ionicons name="lock-closed" size={16} color="#FFF" />
                     </View>
                 )}
-            </View>
 
-            {/* Middle: Title and Info */}
-            <View style={styles.workoutInfo}>
-                <Text style={styles.workoutTitle}>{item.title}</Text>
-                <View style={styles.workoutMeta}>
-                    <Text style={styles.workoutLevel}>{item.level}</Text>
-                    <View style={styles.workoutDuration}>
-                        <Ionicons name="time-outline" size={14} color="#666" />
-                        <Text style={styles.workoutDurationText}>{item.duration}</Text>
+                {/* Left: Workout Image */}
+                <View style={styles.workoutImageContainer}>
+                    {item.image ? (
+                        <Image source={item.image} style={styles.workoutImage} />
+                    ) : (
+                        <View style={[styles.workoutImage, { backgroundColor: theme.backgroundSecondary }]}>
+                            <Ionicons name="basketball-outline" size={24} color={theme.textSecondary} />
+                        </View>
+                    )}
+                </View>
+
+                {/* Middle: Title and Info */}
+                <View style={styles.workoutInfo}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={[styles.workoutTitle, { color: theme.text }]}>{item.title}</Text>
+                        {isLocked && (
+                            <View style={styles.premiumBadge}>
+                                <Text style={styles.premiumBadgeText}>PRO</Text>
+                            </View>
+                        )}
+                    </View>
+                    <View style={styles.workoutMeta}>
+                        <Text style={[styles.workoutLevel, { color: theme.textSecondary }]}>{item.level}</Text>
+                        <View style={styles.workoutDuration}>
+                            <Ionicons name="time-outline" size={14} color={theme.textSecondary} />
+                            <Text style={[styles.workoutDurationText, { color: theme.textSecondary }]}>{item.duration}</Text>
+                        </View>
                     </View>
                 </View>
-            </View>
 
-            {/* Right: Action Button */}
-            <TouchableOpacity
-                style={styles.startButton}
-                onPress={() => navigation.navigate('WorkoutDetail', { workoutId: item.id, autoStart: true })}
-            >
-                <Ionicons name="play" size={18} color="#FFF" />
+                {/* Right: Action Button */}
+                <TouchableOpacity
+                    style={[styles.startButton, isLocked && styles.lockedButton]}
+                    onPress={handleWorkoutPress}
+                >
+                    <Ionicons name={isLocked ? "lock-closed" : "play"} size={18} color="#FFF" />
+                </TouchableOpacity>
             </TouchableOpacity>
-        </TouchableOpacity>
-    );
+        );
+    };
 
     const renderVideoItem = ({ item }) => (
         <View style={styles.videoCard}>
@@ -175,24 +211,32 @@ const TrainingScreen = ({ navigation }) => {
     }).slice(0, 3); // Limit to 3
 
     return (
-        <SafeAreaView style={styles.safeArea}>
-            <StatusBar barStyle="dark-content" backgroundColor="#F8F9FA" />
-            <View style={styles.container}>
+        <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+            <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={theme.background} />
+            <View style={[styles.container, { backgroundColor: theme.background }]}>
                 <View style={styles.header}>
-                    <Text style={styles.headerTitle}>Training Programs</Text>
-                    <TouchableOpacity
-                        style={styles.filterButton}
-                        onPress={() => navigation.navigate('TrainingFilters')}
-                    >
-                        <Ionicons name="options-outline" size={22} color="#666" />
-                    </TouchableOpacity>
+                    <Text style={[styles.headerTitle, { color: theme.text }]}>Training Programs</Text>
+                    <View style={styles.headerActions}>
+                        <TouchableOpacity
+                            style={styles.headerButton}
+                            onPress={() => navigation.navigate('MyWorkouts')}
+                        >
+                            <Ionicons name="folder-outline" size={22} color={theme.primary} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.filterButton}
+                            onPress={() => navigation.navigate('TrainingFilters')}
+                        >
+                            <Ionicons name="options-outline" size={22} color={theme.textSecondary} />
+                        </TouchableOpacity>
+                    </View>
                 </View>
-
-                <View style={styles.searchContainer}>
-                    <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
+                <View style={[styles.searchContainer, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                    <Ionicons name="search" size={20} color={theme.textSecondary} style={styles.searchIcon} />
                     <TextInput
-                        style={styles.searchInput}
+                        style={[styles.searchInput, { color: theme.text }]}
                         placeholder="Search workouts"
+                        placeholderTextColor={theme.textSecondary}
                         value={searchQuery}
                         onChangeText={setSearchQuery}
                         returnKeyType="search"
@@ -203,7 +247,7 @@ const TrainingScreen = ({ navigation }) => {
                 <ScrollView showsVerticalScrollIndicator={false}>
                     {/* Categories */}
                     <View style={styles.categoriesSection}>
-                        <Text style={styles.sectionTitle}>Training Categories</Text>
+                        <Text style={[styles.sectionTitle, { color: theme.text }]}>Training Categories</Text>
                         <FlatList
                             data={trainingCategories}
                             renderItem={renderCategoryItem}
@@ -216,10 +260,10 @@ const TrainingScreen = ({ navigation }) => {
 
                     {/* AI-Powered Analysis Feature */}
                     <View style={styles.analysisSection}>
-                        <View style={styles.analysisCard}>
+                        <View style={[styles.analysisCard, { backgroundColor: theme.card }]}>
                             <View style={styles.analysisContent}>
-                                <Text style={styles.analysisTitle}>AI Shooting Analysis</Text>
-                                <Text style={styles.analysisDescription}>
+                                <Text style={[styles.analysisTitle, { color: theme.text }]}>AI Shooting Analysis</Text>
+                                <Text style={[styles.analysisDescription, { color: theme.textSecondary }]}>
                                     Get personalized feedback on your shooting form with our AI-powered analysis
                                 </Text>
                                 <TouchableOpacity
@@ -239,7 +283,7 @@ const TrainingScreen = ({ navigation }) => {
 
                     {/* Recommended for You */}
                     <View style={styles.recommendedSection}>
-                        <Text style={styles.sectionTitle}>Recommended for You</Text>
+                        <Text style={[styles.sectionTitle, { color: theme.text }]}>Recommended for You</Text>
                         {recommendedWorkouts.length > 0 ? (
                             <FlatList
                                 data={recommendedWorkouts.slice(0, 3)}
@@ -249,7 +293,7 @@ const TrainingScreen = ({ navigation }) => {
                             />
                         ) : (
                             <View style={styles.emptyStateContainer}>
-                                <Text style={styles.emptyStateText}>
+                                <Text style={[styles.emptyStateText, { color: theme.textSecondary }]}>
                                     No recommendations available for your level yet.
                                 </Text>
                             </View>
@@ -259,10 +303,10 @@ const TrainingScreen = ({ navigation }) => {
                     {/* Challenge Yourself */}
                     {nextLevelWorkouts.length > 0 && (
                         <View style={styles.challengeSection}>
-                            <Text style={styles.sectionTitle}>Challenge Yourself</Text>
-                            <View style={styles.challengeCard}>
-                                <Text style={styles.challengeTitle}>Ready for the next level?</Text>
-                                <Text style={styles.challengeDescription}>
+                            <Text style={[styles.sectionTitle, { color: theme.text }]}>Challenge Yourself</Text>
+                            <View style={[styles.challengeCard, { backgroundColor: theme.card }]}>
+                                <Text style={[styles.challengeTitle, { color: theme.text }]}>Ready for the next level?</Text>
+                                <Text style={[styles.challengeDescription, { color: theme.textSecondary }]}>
                                     Try these workouts to push your skills to the next level
                                 </Text>
 
@@ -271,12 +315,13 @@ const TrainingScreen = ({ navigation }) => {
                                         key={workout.id}
                                         style={[
                                             styles.challengeWorkout,
+                                            { borderBottomColor: theme.border },
                                             index < nextLevelWorkouts.length - 1 && styles.challengeWorkoutBorder
                                         ]}
                                         onPress={() => navigation.navigate('WorkoutDetail', { workoutId: workout.id })}
                                     >
-                                        <Text style={styles.challengeWorkoutTitle}>{workout.title}</Text>
-                                        <Ionicons name="chevron-forward" size={18} color="#666" />
+                                        <Text style={[styles.challengeWorkoutTitle, { color: theme.text }]}>{workout.title}</Text>
+                                        <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
                                     </TouchableOpacity>
                                 ))}
                             </View>
@@ -286,15 +331,15 @@ const TrainingScreen = ({ navigation }) => {
                     {/* Training Programs */}
                     <View style={styles.trainingProgramsSection}>
                         <View style={styles.sectionTitleRow}>
-                            <Text style={styles.sectionTitle}>All Training Programs</Text>
+                            <Text style={[styles.sectionTitle, { color: theme.text }]}>All Training Programs</Text>
                             <TouchableOpacity onPress={() => setSelectedCategory('All')}>
-                                <Text style={styles.seeAllText}>See All</Text>
+                                <Text style={[styles.seeAllText, { color: theme.primary }]}>See All</Text>
                             </TouchableOpacity>
                         </View>
 
                         {searchQuery && filteredWorkouts.length === 0 ? (
                             <View style={styles.emptyStateContainer}>
-                                <Text style={styles.emptyStateText}>
+                                <Text style={[styles.emptyStateText, { color: theme.textSecondary }]}>
                                     No workouts found for "{searchQuery}"
                                 </Text>
                             </View>
@@ -359,6 +404,16 @@ const TrainingScreen = ({ navigation }) => {
                     <View style={{ height: 20 }} />
                 </ScrollView>
             </View>
+
+            {/* Subscription Modal for Locked Workouts */}
+            <SubscriptionModal
+                visible={showSubscriptionModal}
+                onClose={() => setShowSubscriptionModal(false)}
+                onUpgrade={() => {
+                    setShowSubscriptionModal(false);
+                    // Workouts will automatically update when subscription changes
+                }}
+            />
         </SafeAreaView>
     );
 };
@@ -389,6 +444,19 @@ const styles = StyleSheet.create({
         fontSize: 24,
         fontWeight: 'bold',
         color: '#333',
+        flex: 1,
+    },
+    headerActions: {
+        flexDirection: 'row',
+        gap: 8,
+    },
+    headerButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#FF6B0015',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     filterButton: {
         width: 40,
@@ -583,6 +651,42 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginLeft: 8,
+    },
+    lockedWorkout: {
+        opacity: 0.75,
+    },
+    lockBadge: {
+        position: 'absolute',
+        top: 8,
+        right: 8,
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        backgroundColor: '#9C27B0',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 1,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 3,
+        elevation: 3,
+    },
+    premiumBadge: {
+        backgroundColor: '#9C27B0',
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 8,
+        marginLeft: 8,
+    },
+    premiumBadgeText: {
+        fontSize: 10,
+        fontWeight: 'bold',
+        color: '#FFF',
+        letterSpacing: 0.5,
+    },
+    lockedButton: {
+        backgroundColor: '#9C27B0',
     },
     emptyStateContainer: {
         backgroundColor: '#FFF',

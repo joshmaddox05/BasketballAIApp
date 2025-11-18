@@ -1,5 +1,5 @@
 // ProgressScreen.js
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
     StyleSheet,
     Text,
@@ -10,17 +10,33 @@ import {
     StatusBar,
     Dimensions,
     Animated,
-    Alert
+    Alert,
+    ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
+import { useFocusEffect } from '@react-navigation/native';
 import { LineChart, BarChart } from 'react-native-chart-kit';
+import {
+    getWorkoutHistory,
+    getWorkoutStats,
+    getCategoryBreakdown,
+    getWorkoutStreak,
+    getWorkoutRecommendations,
+    getGamificationStats,
+    getAchievementProgress
+} from '../../services/firestoreService';
+import { ACHIEVEMENT_CATEGORIES } from '../../data/achievements';
+import UpgradePrompt from '../../components/shared/UpgradePrompt';
+import LockedFeatureCard from '../../components/features/LockedFeatureCard';
+import { canAccessFeature } from '../../utils/subscription';
 
 const { width } = Dimensions.get('window');
 
 // Tab options for progress screen
 const TABS = [
     { id: 'overview', label: 'Overview' },
+    { id: 'achievements', label: 'Achievements' },
     { id: 'skills', label: 'Skills' },
     { id: 'goals', label: 'Goals' },
     { id: 'history', label: 'History' },
@@ -32,16 +48,76 @@ const ProgressScreen = ({ navigation }) => {
         goals,
         activities,
         updateGoalProgress,
-        historicalData
+        historicalData,
+        theme,
+        isDarkMode
     } = useAppContext();
 
     const [activeTab, setActiveTab] = useState('overview');
     const [expandedGoalId, setExpandedGoalId] = useState(null);
-    const [selectedTimeframe, setSelectedTimeframe] = useState('week'); // week, month, year
+    const [selectedTimeframe, setSelectedTimeframe] = useState('month'); // week, month, year
     const [selectedSkill, setSelectedSkill] = useState('shooting'); // shooting, dribbling, etc.
+    const [selectedCategory, setSelectedCategory] = useState('all'); // all, shooting, dribbling, physical, etc.
+
+    // Real analytics data
+    const [workoutStats, setWorkoutStats] = useState(null);
+    const [workoutHistory, setWorkoutHistory] = useState([]);
+    const [categoryBreakdown, setCategoryBreakdown] = useState({});
+    const [currentStreak, setCurrentStreak] = useState(0);
+    const [recommendations, setRecommendations] = useState(null);
+    const [loading, setLoading] = useState(true);
+
+    // Gamification data
+    const [gamificationStats, setGamificationStats] = useState(null);
+    const [achievementProgress, setAchievementProgress] = useState([]);
+    const [selectedAchievementCategory, setSelectedAchievementCategory] = useState('all');
 
     // Animation value for tab indicator
     const tabIndicatorPosition = useRef(new Animated.Value(0)).current;
+
+    // Fetch analytics data
+    const fetchAnalyticsData = async () => {
+        if (!userData?.uid) return;
+
+        try {
+            setLoading(true);
+
+            // Fetch data in parallel
+            const [stats, history, breakdown, streak, recs, gamification, achievements] = await Promise.all([
+                getWorkoutStats(userData.uid, selectedTimeframe),
+                getWorkoutHistory(userData.uid, { limitCount: 100 }),
+                getCategoryBreakdown(userData.uid, selectedTimeframe),
+                getWorkoutStreak(userData.uid),
+                getWorkoutRecommendations(userData.uid),
+                getGamificationStats(userData.uid),
+                getAchievementProgress(userData.uid)
+            ]);
+
+            setWorkoutStats(stats);
+            setWorkoutHistory(history);
+            setCategoryBreakdown(breakdown);
+            setCurrentStreak(streak);
+            setRecommendations(recs);
+            setGamificationStats(gamification);
+            setAchievementProgress(achievements);
+        } catch (error) {
+            console.error('Error fetching analytics data:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Fetch data on mount and when timeframe changes
+    useEffect(() => {
+        fetchAnalyticsData();
+    }, [selectedTimeframe, userData?.uid]);
+
+    // Refresh data when screen comes into focus
+    useFocusEffect(
+        React.useCallback(() => {
+            fetchAnalyticsData();
+        }, [selectedTimeframe, userData?.uid])
+    );
 
     // Handle tab change
     const handleTabChange = (tabId) => {
@@ -67,10 +143,9 @@ const ProgressScreen = ({ navigation }) => {
         }
     };
 
-    // Calculate workout streak
+    // Calculate workout streak - now using real data
     const calculateStreak = () => {
-        // This would be more sophisticated in a real app
-        return userData.stats.streak || 0;
+        return currentStreak || userData.stats.streak || 0;
     };
 
     // Calculate progress percentage for a goal
@@ -143,35 +218,75 @@ const ProgressScreen = ({ navigation }) => {
         }
     };
 
-    // Get activity data for charts
+    // Get activity data for charts - now using real data
     const getActivityData = () => {
-        // In a real app, this would come from backend based on selected timeframe
-        return {
-            labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-            datasets: [
-                {
-                    data: [30, 45, 0, 60, 20, 50, 15],
+        if (!workoutHistory || workoutHistory.length === 0) {
+            // Return empty data if no workouts
+            return {
+                labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                datasets: [{
+                    data: [0, 0, 0, 0, 0, 0, 0],
                     color: (opacity = 1) => `rgba(255, 107, 0, ${opacity})`,
                     strokeWidth: 2
+                }]
+            };
+        }
+
+        // Group workouts by day of week (last 7 days)
+        const today = new Date();
+        const last7Days = [];
+        const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const workoutMinutes = [0, 0, 0, 0, 0, 0, 0];
+
+        // Calculate last 7 days
+        for (let i = 6; i >= 0; i--) {
+            const date = new Date(today);
+            date.setDate(today.getDate() - i);
+            last7Days.push(date.toDateString());
+        }
+
+        // Sum workout minutes per day
+        workoutHistory.forEach(workout => {
+            if (workout.createdAt && workout.createdAt.toDate) {
+                const workoutDate = workout.createdAt.toDate().toDateString();
+                const dayIndex = last7Days.indexOf(workoutDate);
+
+                if (dayIndex !== -1) {
+                    workoutMinutes[dayIndex] += workout.durationMinutes || Math.floor((workout.duration || 0) / 60);
                 }
-            ]
+            }
+        });
+
+        // Get labels for the last 7 days
+        const labels = last7Days.map((dateStr, index) => {
+            const date = new Date(dateStr);
+            return dayLabels[date.getDay()];
+        });
+
+        return {
+            labels,
+            datasets: [{
+                data: workoutMinutes.map(m => m || 0.1), // Ensure at least 0.1 for visibility
+                color: (opacity = 1) => `rgba(255, 107, 0, ${opacity})`,
+                strokeWidth: 2
+            }]
         };
     };
 
-    // Chart configuration
+    // Chart configuration - dynamic based on theme
     const chartConfig = {
-        backgroundGradientFrom: '#FFFFFF',
-        backgroundGradientTo: '#FFFFFF',
+        backgroundGradientFrom: theme.card,
+        backgroundGradientTo: theme.card,
         decimalPlaces: 0,
-        color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-        labelColor: (opacity = 1) => `rgba(100, 100, 100, ${opacity})`,
+        color: (opacity = 1) => isDarkMode ? `rgba(255, 255, 255, ${opacity})` : `rgba(0, 0, 0, ${opacity})`,
+        labelColor: (opacity = 1) => isDarkMode ? `rgba(170, 170, 170, ${opacity})` : `rgba(100, 100, 100, ${opacity})`,
         style: {
             borderRadius: 16
         },
         propsForDots: {
             r: '6',
             strokeWidth: '2',
-            stroke: '#FF6B00'
+            stroke: theme.primary
         }
     };
 
@@ -186,32 +301,67 @@ const ProgressScreen = ({ navigation }) => {
 
     // Renders the Overview tab content
     const renderOverviewTab = () => {
+        if (loading) {
+            return (
+                <View style={[styles.tabContent, styles.loadingContainer]}>
+                    <ActivityIndicator size="large" color="#FF6B00" />
+                    <Text style={styles.loadingText}>Loading your progress...</Text>
+                </View>
+            );
+        }
+
+        const totalWorkouts = workoutStats?.totalWorkouts || 0;
+        const totalCalories = workoutStats?.totalCalories || 0;
+        const avgDuration = workoutStats?.averageDuration || 0;
+
         return (
             <View style={styles.tabContent}>
                 {/* Progress Summary */}
                 <View style={styles.summaryContainer}>
                     <View style={styles.summaryHeader}>
                         <Text style={styles.summaryTitle}>Progress Summary</Text>
-                        <TouchableOpacity style={styles.timeframeSelector}>
-                            <Text style={styles.timeframeText}>{selectedTimeframe === 'week' ? 'This Week' : selectedTimeframe === 'month' ? 'This Month' : 'This Year'}</Text>
+                        <TouchableOpacity
+                            style={styles.timeframeSelector}
+                            onPress={() => {
+                                const timeframes = ['week', 'month', 'year'];
+                                const currentIndex = timeframes.indexOf(selectedTimeframe);
+                                const nextIndex = (currentIndex + 1) % timeframes.length;
+                                setSelectedTimeframe(timeframes[nextIndex]);
+                            }}
+                        >
+                            <Text style={styles.timeframeText}>
+                                {selectedTimeframe === 'week' ? 'This Week' : selectedTimeframe === 'month' ? 'This Month' : 'This Year'}
+                            </Text>
                             <Ionicons name="chevron-down" size={16} color="#666" />
                         </TouchableOpacity>
                     </View>
 
                     <View style={styles.metricsRow}>
                         <View style={styles.metricCard}>
-                            <Text style={styles.metricValue}>{activities.length}</Text>
+                            <Ionicons name="fitness" size={24} color="#FF6B00" style={styles.metricIcon} />
+                            <Text style={styles.metricValue}>{totalWorkouts}</Text>
                             <Text style={styles.metricLabel}>Workouts</Text>
                         </View>
                         <View style={styles.metricCard}>
+                            <Ionicons name="flame" size={24} color="#FF6B00" style={styles.metricIcon} />
                             <Text style={styles.metricValue}>{calculateStreak()}</Text>
                             <Text style={styles.metricLabel}>Day Streak</Text>
                         </View>
                         <View style={styles.metricCard}>
-                            <Text style={styles.metricValue}>{goals.filter(g => calculateGoalProgress(g) === 100).length}</Text>
-                            <Text style={styles.metricLabel}>Goals Met</Text>
+                            <Ionicons name="time" size={24} color="#FF6B00" style={styles.metricIcon} />
+                            <Text style={styles.metricValue}>{avgDuration}</Text>
+                            <Text style={styles.metricLabel}>Avg Minutes</Text>
                         </View>
                     </View>
+
+                    {totalCalories > 0 && (
+                        <View style={styles.caloriesCard}>
+                            <Ionicons name="nutrition" size={20} color="#4CAF50" />
+                            <Text style={styles.caloriesText}>
+                                ~{totalCalories} calories burned this {selectedTimeframe}
+                            </Text>
+                        </View>
+                    )}
                 </View>
 
                 {/* Activity Chart */}
@@ -377,6 +527,270 @@ const ProgressScreen = ({ navigation }) => {
                             </View>
                         ))}
                     </ScrollView>
+                </View>
+
+                {/* Smart Recommendations */}
+                {recommendations && (
+                    <View style={styles.recommendationsContainer}>
+                        <View style={styles.sectionHeader}>
+                            <Ionicons name="bulb" size={20} color="#FF6B00" />
+                            <Text style={styles.sectionTitle}>Recommended For You</Text>
+                        </View>
+
+                        <View style={styles.recommendationCard}>
+                            <View style={styles.recommendationHeader}>
+                                <View style={styles.recommendationIconContainer}>
+                                    <Ionicons name="trophy" size={24} color="#FF6B00" />
+                                </View>
+                                <View style={styles.recommendationInfo}>
+                                    <Text style={styles.recommendationTitle}>
+                                        Try {recommendations.nextWorkout} Next
+                                    </Text>
+                                    <Text style={styles.recommendationReason}>
+                                        {recommendations.reason}
+                                    </Text>
+                                </View>
+                            </View>
+
+                            <TouchableOpacity
+                                style={styles.recommendationButton}
+                                onPress={() => {
+                                    navigation.navigate('Train', {
+                                        screen: 'TrainMain',
+                                        params: { filterCategory: recommendations.nextWorkout }
+                                    });
+                                }}
+                            >
+                                <Text style={styles.recommendationButtonText}>
+                                    Browse {recommendations.nextWorkout} Workouts
+                                </Text>
+                                <Ionicons name="arrow-forward" size={18} color="#FFF" />
+                            </TouchableOpacity>
+
+                            {recommendations.alternativeWorkouts && recommendations.alternativeWorkouts.length > 0 && (
+                                <View style={styles.alternativesSection}>
+                                    <Text style={styles.alternativesLabel}>Or try:</Text>
+                                    <View style={styles.alternativesChips}>
+                                        {recommendations.alternativeWorkouts.map((alt, index) => (
+                                            <TouchableOpacity
+                                                key={index}
+                                                style={styles.alternativeChip}
+                                                onPress={() => {
+                                                    navigation.navigate('Train', {
+                                                        screen: 'TrainMain',
+                                                        params: { filterCategory: alt }
+                                                    });
+                                                }}
+                                            >
+                                                <Text style={styles.alternativeChipText}>{alt}</Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
+                                </View>
+                            )}
+                        </View>
+                    </View>
+                )}
+            </View>
+        );
+    };
+
+    // Renders the Achievements tab content
+    const renderAchievementsTab = () => {
+        if (!gamificationStats || !achievementProgress) {
+            return (
+                <View style={styles.tabContent}>
+                    <ActivityIndicator size="large" color="#FF6B00" />
+                </View>
+            );
+        }
+
+        const filteredAchievements = selectedAchievementCategory === 'all'
+            ? achievementProgress
+            : achievementProgress.filter(a => a.category === selectedAchievementCategory);
+
+        const unlockedAchievements = achievementProgress.filter(a => a.unlocked);
+        const levelInfo = gamificationStats.levelInfo;
+
+        return (
+            <View style={styles.tabContent}>
+                {/* XP and Level Header */}
+                <View style={styles.xpLevelCard}>
+                    <View style={styles.xpLevelHeader}>
+                        <View style={styles.levelBadge}>
+                            <Text style={styles.levelNumber}>{levelInfo.level}</Text>
+                        </View>
+                        <View style={styles.xpLevelInfo}>
+                            <Text style={styles.levelTitle}>{levelInfo.title}</Text>
+                            <Text style={styles.xpText}>{gamificationStats.totalXP} XP</Text>
+                        </View>
+                        <TouchableOpacity style={styles.achievementsTrophyIcon}>
+                            <Ionicons name="trophy" size={28} color="#FFD700" />
+                            <Text style={styles.achievementCount}>
+                                {unlockedAchievements.length}/{achievementProgress.length}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* XP Progress Bar */}
+                    {levelInfo.xpForNextLevel && (
+                        <View style={styles.xpProgressSection}>
+                            <View style={styles.xpProgressBar}>
+                                <View
+                                    style={[
+                                        styles.xpProgressFill,
+                                        { width: `${levelInfo.progressToNextLevel}%` }
+                                    ]}
+                                />
+                            </View>
+                            <Text style={styles.xpProgressText}>
+                                {levelInfo.currentXP - levelInfo.xpForCurrentLevel} / {levelInfo.xpForNextLevel - levelInfo.xpForCurrentLevel} XP to Level {levelInfo.level + 1}
+                            </Text>
+                        </View>
+                    )}
+                </View>
+
+                {/* Achievement Category Filter */}
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.achievementCategoryFilter}
+                    contentContainerStyle={styles.achievementCategoryContent}
+                >
+                    <TouchableOpacity
+                        style={[
+                            styles.achievementCategoryChip,
+                            selectedAchievementCategory === 'all' && styles.achievementCategoryChipActive
+                        ]}
+                        onPress={() => setSelectedAchievementCategory('all')}
+                    >
+                        <Ionicons
+                            name="apps"
+                            size={16}
+                            color={selectedAchievementCategory === 'all' ? '#FF6B00' : '#666'}
+                        />
+                        <Text style={[
+                            styles.achievementCategoryChipText,
+                            selectedAchievementCategory === 'all' && styles.achievementCategoryChipTextActive
+                        ]}>
+                            All
+                        </Text>
+                    </TouchableOpacity>
+
+                    {Object.values(ACHIEVEMENT_CATEGORIES).map((category) => {
+                        const isSelected = selectedAchievementCategory === category;
+                        const categoryIcons = {
+                            workouts: 'basketball',
+                            streaks: 'flame',
+                            mastery: 'star',
+                            milestones: 'flag',
+                            special: 'sparkles'
+                        };
+
+                        return (
+                            <TouchableOpacity
+                                key={category}
+                                style={[
+                                    styles.achievementCategoryChip,
+                                    isSelected && styles.achievementCategoryChipActive
+                                ]}
+                                onPress={() => setSelectedAchievementCategory(category)}
+                            >
+                                <Ionicons
+                                    name={categoryIcons[category]}
+                                    size={16}
+                                    color={isSelected ? '#FF6B00' : '#666'}
+                                />
+                                <Text style={[
+                                    styles.achievementCategoryChipText,
+                                    isSelected && styles.achievementCategoryChipTextActive
+                                ]}>
+                                    {category.charAt(0).toUpperCase() + category.slice(1)}
+                                </Text>
+                            </TouchableOpacity>
+                        );
+                    })}
+                </ScrollView>
+
+                {/* Achievement List */}
+                <View style={styles.achievementsList}>
+                    {filteredAchievements.length === 0 ? (
+                        <View style={styles.emptyAchievements}>
+                            <Ionicons name="trophy-outline" size={64} color="#CCC" />
+                            <Text style={styles.emptyAchievementsText}>No achievements in this category</Text>
+                        </View>
+                    ) : (
+                        filteredAchievements.map((achievement, index) => (
+                            <View
+                                key={achievement.id}
+                                style={[
+                                    styles.achievementCard,
+                                    achievement.unlocked && styles.achievementCardUnlocked
+                                ]}
+                            >
+                                <View style={styles.achievementIconContainer}>
+                                    <View
+                                        style={[
+                                            styles.achievementIcon,
+                                            achievement.unlocked && styles.achievementIconUnlocked,
+                                            { backgroundColor: achievement.tier.color + '20' }
+                                        ]}
+                                    >
+                                        <Ionicons
+                                            name={achievement.icon}
+                                            size={28}
+                                            color={achievement.unlocked ? achievement.tier.color : '#CCC'}
+                                        />
+                                    </View>
+                                    {achievement.unlocked && (
+                                        <View style={styles.unlockedBadge}>
+                                            <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
+                                        </View>
+                                    )}
+                                </View>
+
+                                <View style={styles.achievementInfo}>
+                                    <Text style={[
+                                        styles.achievementTitle,
+                                        !achievement.unlocked && styles.achievementTitleLocked
+                                    ]}>
+                                        {achievement.title}
+                                    </Text>
+                                    <Text style={styles.achievementDescription}>
+                                        {achievement.description}
+                                    </Text>
+
+                                    {!achievement.unlocked && achievement.progress > 0 && (
+                                        <View style={styles.achievementProgressSection}>
+                                            <View style={styles.achievementProgressBar}>
+                                                <View
+                                                    style={[
+                                                        styles.achievementProgressFill,
+                                                        { width: `${achievement.progress}%`, backgroundColor: achievement.tier.color }
+                                                    ]}
+                                                />
+                                            </View>
+                                            <Text style={styles.achievementProgressText}>
+                                                {achievement.current} / {achievement.target}
+                                            </Text>
+                                        </View>
+                                    )}
+                                </View>
+
+                                <View style={styles.achievementTierBadge}>
+                                    <Text style={[
+                                        styles.achievementTierText,
+                                        { color: achievement.tier.color }
+                                    ]}>
+                                        {achievement.tier.name}
+                                    </Text>
+                                    <Text style={styles.achievementXPText}>
+                                        +{achievement.tier.xp} XP
+                                    </Text>
+                                </View>
+                            </View>
+                        ))
+                    )}
                 </View>
             </View>
         );
@@ -653,6 +1067,65 @@ const ProgressScreen = ({ navigation }) => {
                     </View>
                 </View>
 
+                {/* Category Distribution */}
+                {loading ? (
+                    <View style={[styles.categoryDistributionContainer, styles.loadingContainer]}>
+                        <ActivityIndicator size="small" color="#FF6B00" />
+                    </View>
+                ) : Object.keys(categoryBreakdown).length > 0 && (
+                    <View style={styles.categoryDistributionContainer}>
+                        <Text style={styles.sectionTitle}>Training Distribution</Text>
+                        <Text style={styles.categorySubtitle}>
+                            Your workout focus for this {selectedTimeframe.toLowerCase()}
+                        </Text>
+
+                        {Object.entries(categoryBreakdown)
+                            .sort((a, b) => b[1] - a[1])
+                            .map(([category, count]) => {
+                                const total = Object.values(categoryBreakdown).reduce((sum, val) => sum + val, 0);
+                                const percentage = Math.round((count / total) * 100);
+
+                                // Map category to icon and color
+                                const categoryConfig = {
+                                    'Shooting': { icon: 'basketball', color: '#FF6B00' },
+                                    'Dribbling': { icon: 'hand-left', color: '#4CAF50' },
+                                    'Physical': { icon: 'fitness', color: '#2196F3' },
+                                    'Defense': { icon: 'shield', color: '#9C27B0' },
+                                    'Passing': { icon: 'swap-horizontal', color: '#FF9800' },
+                                };
+
+                                const config = categoryConfig[category] || { icon: 'fitness', color: '#666' };
+
+                                return (
+                                    <View key={category} style={styles.categoryItem}>
+                                        <View style={styles.categoryHeader}>
+                                            <View style={styles.categoryNameContainer}>
+                                                <View style={[styles.categoryIcon, { backgroundColor: `${config.color}15` }]}>
+                                                    <Ionicons name={config.icon} size={20} color={config.color} />
+                                                </View>
+                                                <View>
+                                                    <Text style={styles.categoryName}>{category}</Text>
+                                                    <Text style={styles.categoryCount}>{count} workout{count !== 1 ? 's' : ''}</Text>
+                                                </View>
+                                            </View>
+                                            <Text style={[styles.categoryPercentage, { color: config.color }]}>
+                                                {percentage}%
+                                            </Text>
+                                        </View>
+                                        <View style={styles.categoryBar}>
+                                            <View
+                                                style={[
+                                                    styles.categoryBarFill,
+                                                    { width: `${percentage}%`, backgroundColor: config.color }
+                                                ]}
+                                            />
+                                        </View>
+                                    </View>
+                                );
+                            })}
+                    </View>
+                )}
+
                 {/* Suggested Training */}
                 <View style={styles.suggestedTrainingContainer}>
                     <Text style={styles.sectionTitle}>Suggested Training</Text>
@@ -912,28 +1385,94 @@ const ProgressScreen = ({ navigation }) => {
 
     // Renders the History tab content
     const renderHistoryTab = () => {
-        // Sample workout history data
-        const workoutHistory = [
-            { id: '1', date: '2023-06-15', title: 'Jump Shot Training', duration: '45 min', score: 85 },
-            { id: '2', date: '2023-06-13', title: 'Dribbling Drill', duration: '30 min', score: 92 },
-            { id: '3', date: '2023-06-11', title: 'Full Court Practice', duration: '60 min', score: 78 },
-            { id: '4', date: '2023-06-09', title: 'Shooting Analysis', duration: '20 min', score: 83 },
-            { id: '5', date: '2023-06-07', title: 'Agility Workout', duration: '40 min', score: 88 },
-        ];
+        // Group workouts by date for calendar
+        const getWorkoutDates = () => {
+            const dates = new Set();
+            workoutHistory.forEach(workout => {
+                if (workout.createdAt && workout.createdAt.toDate) {
+                    const date = workout.createdAt.toDate();
+                    dates.add(date.toDateString());
+                }
+            });
+            return dates;
+        };
+
+        const workoutDates = getWorkoutDates();
+        const currentMonth = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+        // Get the most recent workouts (limit to 10 for display)
+        const recentWorkouts = workoutHistory.slice(0, 10);
+
+        // Filter workouts by category
+        const filteredWorkouts = selectedCategory === 'all'
+            ? recentWorkouts
+            : recentWorkouts.filter(w => w.category === selectedCategory);
+
+        // Get unique categories from workout history
+        const availableCategories = ['all', ...new Set(workoutHistory.map(w => w.category).filter(Boolean))];
 
         return (
             <View style={styles.tabContent}>
                 <View style={styles.historyHeader}>
                     <Text style={styles.historyTitle}>Training History</Text>
-                    <TouchableOpacity style={styles.historyFilterButton}>
-                        <Ionicons name="options-outline" size={20} color="#666" />
-                        <Text style={styles.historyFilterText}>Filter</Text>
-                    </TouchableOpacity>
                 </View>
 
-                {workoutHistory.length === 0 ? (
+                {/* Category Filter */}
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.categoryFilterContainer}
+                    contentContainerStyle={styles.categoryFilterContent}
+                >
+                    {availableCategories.map((category) => {
+                        const isSelected = selectedCategory === category;
+                        const categoryConfig = {
+                            'all': { icon: 'apps', color: '#666', label: 'All' },
+                            'Shooting': { icon: 'basketball', color: '#FF6B00', label: 'Shooting' },
+                            'Dribbling': { icon: 'hand-left', color: '#4CAF50', label: 'Dribbling' },
+                            'Physical': { icon: 'fitness', color: '#2196F3', label: 'Physical' },
+                            'Defense': { icon: 'shield', color: '#9C27B0', label: 'Defense' },
+                            'Passing': { icon: 'swap-horizontal', color: '#FF9800', label: 'Passing' },
+                        };
+                        const config = categoryConfig[category] || { icon: 'fitness', color: '#666', label: category };
+
+                        return (
+                            <TouchableOpacity
+                                key={category}
+                                style={[
+                                    styles.categoryFilterChip,
+                                    isSelected && { backgroundColor: config.color + '20', borderColor: config.color }
+                                ]}
+                                onPress={() => setSelectedCategory(category)}
+                            >
+                                <Ionicons
+                                    name={config.icon}
+                                    size={16}
+                                    color={isSelected ? config.color : '#666'}
+                                />
+                                <Text style={[
+                                    styles.categoryFilterText,
+                                    isSelected && { color: config.color, fontWeight: '600' }
+                                ]}>
+                                    {config.label}
+                                </Text>
+                            </TouchableOpacity>
+                        );
+                    })}
+                </ScrollView>
+
+                {loading ? (
+                    <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="large" color="#FF6B00" />
+                        <Text style={styles.loadingText}>Loading workout history...</Text>
+                    </View>
+                ) : workoutHistory.length === 0 ? (
                     <View style={styles.emptyState}>
+                        <Ionicons name="fitness-outline" size={48} color="#CCC" style={{ marginBottom: 12 }} />
                         <Text style={styles.emptyStateText}>No workout history found.</Text>
+                        <Text style={styles.emptyStateSubtext}>
+                            Complete your first workout to start tracking your progress!
+                        </Text>
                     </View>
                 ) : (
                     <>
@@ -943,13 +1482,13 @@ const ProgressScreen = ({ navigation }) => {
                                 <TouchableOpacity>
                                     <Ionicons name="chevron-back" size={20} color="#666" />
                                 </TouchableOpacity>
-                                <Text style={styles.monthText}>June 2023</Text>
+                                <Text style={styles.monthText}>{currentMonth}</Text>
                                 <TouchableOpacity>
                                     <Ionicons name="chevron-forward" size={20} color="#666" />
                                 </TouchableOpacity>
                             </View>
 
-                            {/* Simple calendar UI - would be a full calendar component in real app */}
+                            {/* Simple calendar UI - simplified activity indicator */}
                             <View style={styles.calendarGrid}>
                                 <View style={styles.calendarRow}>
                                     {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, index) => (
@@ -959,9 +1498,9 @@ const ProgressScreen = ({ navigation }) => {
 
                                 <View style={styles.calendarDays}>
                                     {Array.from({ length: 30 }, (_, i) => i + 1).map(day => {
-                                        const hasWorkout = workoutHistory.some(
-                                            workout => new Date(workout.date).getDate() === day
-                                        );
+                                        const currentDate = new Date();
+                                        const checkDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
+                                        const hasWorkout = workoutDates.has(checkDate.toDateString());
                                         return (
                                             <View key={day} style={styles.calendarDay}>
                                                 <Text style={styles.calendarDayText}>{day}</Text>
@@ -974,44 +1513,92 @@ const ProgressScreen = ({ navigation }) => {
                         </View>
 
                         <View style={styles.workoutHistoryContainer}>
-                            <Text style={styles.workoutHistoryTitle}>Recent Workouts</Text>
+                            <Text style={styles.workoutHistoryTitle}>
+                                {selectedCategory === 'all' ? 'Recent Workouts' : `${selectedCategory} Workouts`}
+                            </Text>
 
-                            {workoutHistory.map(workout => (
-                                <TouchableOpacity
-                                    key={workout.id}
-                                    style={styles.historyItem}
-                                    onPress={() => {
-                                        // Navigate to workout details in a real app
-                                        Alert.alert('Workout Details', `View details for ${workout.title}`);
-                                    }}
-                                >
-                                    <View style={styles.historyItemLeft}>
-                                        <Text style={styles.historyItemDate}>
-                                            {new Date(workout.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                        </Text>
-                                    </View>
+                            {filteredWorkouts.length === 0 ? (
+                                <View style={styles.emptyFilterState}>
+                                    <Ionicons name="search-outline" size={40} color="#CCC" />
+                                    <Text style={styles.emptyFilterText}>
+                                        No {selectedCategory === 'all' ? '' : selectedCategory.toLowerCase()} workouts found
+                                    </Text>
+                                    <TouchableOpacity
+                                        style={styles.clearFilterButton}
+                                        onPress={() => setSelectedCategory('all')}
+                                    >
+                                        <Text style={styles.clearFilterText}>Clear Filter</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            ) : (
+                                <>
+                                    {filteredWorkouts.map(workout => {
+                                const workoutDate = workout.createdAt && workout.createdAt.toDate ? workout.createdAt.toDate() : new Date();
+                                const durationMinutes = workout.durationMinutes || Math.floor((workout.duration || 0) / 60);
+                                const completionScore = workout.completionPercentage || 0;
 
-                                    <View style={styles.historyItemContent}>
-                                        <Text style={styles.historyItemTitle}>{workout.title}</Text>
-                                        <View style={styles.historyItemMeta}>
-                                            <View style={styles.historyItemMetaItem}>
-                                                <Ionicons name="time-outline" size={14} color="#666" />
-                                                <Text style={styles.historyItemMetaText}>{workout.duration}</Text>
-                                            </View>
-                                            <View style={styles.historyItemMetaItem}>
-                                                <Ionicons name="analytics-outline" size={14} color="#666" />
-                                                <Text style={styles.historyItemMetaText}>Score: {workout.score}</Text>
+                                // Map category to icon and color
+                                const categoryConfig = {
+                                    'Shooting': { icon: 'basketball', color: '#FF6B00' },
+                                    'Dribbling': { icon: 'hand-left', color: '#4CAF50' },
+                                    'Physical': { icon: 'fitness', color: '#2196F3' },
+                                    'Defense': { icon: 'shield', color: '#9C27B0' },
+                                    'Passing': { icon: 'swap-horizontal', color: '#FF9800' },
+                                };
+
+                                const config = categoryConfig[workout.category] || { icon: 'fitness', color: '#666' };
+
+                                return (
+                                    <TouchableOpacity
+                                        key={workout.id}
+                                        style={styles.historyItem}
+                                        onPress={() => {
+                                            // Navigate to workout details
+                                            navigation.navigate('WorkoutDetail', { workoutId: workout.workoutId });
+                                        }}
+                                    >
+                                        <View style={styles.historyItemLeft}>
+                                            <View style={[styles.historyItemIcon, { backgroundColor: `${config.color}15` }]}>
+                                                <Ionicons name={config.icon} size={20} color={config.color} />
                                             </View>
                                         </View>
-                                    </View>
 
-                                    <Ionicons name="chevron-forward" size={20} color="#666" />
-                                </TouchableOpacity>
-                            ))}
+                                        <View style={styles.historyItemContent}>
+                                            <Text style={styles.historyItemTitle}>{workout.title}</Text>
+                                            <View style={styles.historyItemMeta}>
+                                                <View style={styles.historyItemMetaItem}>
+                                                    <Ionicons name="calendar-outline" size={14} color="#666" />
+                                                    <Text style={styles.historyItemMetaText}>
+                                                        {workoutDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                                    </Text>
+                                                </View>
+                                                <View style={styles.historyItemMetaItem}>
+                                                    <Ionicons name="time-outline" size={14} color="#666" />
+                                                    <Text style={styles.historyItemMetaText}>{durationMinutes} min</Text>
+                                                </View>
+                                                {completionScore > 0 && (
+                                                    <View style={styles.historyItemMetaItem}>
+                                                        <Ionicons name="checkmark-circle" size={14} color={config.color} />
+                                                        <Text style={[styles.historyItemMetaText, { color: config.color }]}>
+                                                            {completionScore}%
+                                                        </Text>
+                                                    </View>
+                                                )}
+                                            </View>
+                                        </View>
 
-                            <TouchableOpacity style={styles.viewMoreButton}>
-                                <Text style={styles.viewMoreText}>View All History</Text>
-                            </TouchableOpacity>
+                                        <Ionicons name="chevron-forward" size={20} color="#666" />
+                                    </TouchableOpacity>
+                                );
+                                    })}
+
+                                    {workoutHistory.length > 10 && (
+                                        <TouchableOpacity style={styles.viewMoreButton}>
+                                            <Text style={styles.viewMoreText}>View All History ({workoutHistory.length} total)</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                </>
+                            )}
                         </View>
                     </>
                 )}
@@ -1020,16 +1607,16 @@ const ProgressScreen = ({ navigation }) => {
     };
 
     return (
-        <SafeAreaView style={styles.safeArea}>
-            <StatusBar barStyle="dark-content" backgroundColor="#F8F9FA" />
+        <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+            <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={theme.background} />
 
             {/* Header */}
-            <View style={styles.header}>
-                <Text style={styles.headerTitle}>Your Progress</Text>
+            <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+                <Text style={[styles.headerTitle, { color: theme.text }]}>Your Progress</Text>
             </View>
 
             {/* Tabs */}
-            <View style={styles.tabsContainer}>
+            <View style={[styles.tabsContainer, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
                 {TABS.map((tab) => (
                     <TouchableOpacity
                         key={tab.id}
@@ -1039,8 +1626,11 @@ const ProgressScreen = ({ navigation }) => {
                         <Text
                             style={[
                                 styles.tabText,
-                                activeTab === tab.id && styles.activeTabText
+                                { color: theme.textSecondary },
+                                activeTab === tab.id && [styles.activeTabText, { color: theme.primary }]
                             ]}
+                            numberOfLines={1}
+                            adjustsFontSizeToFit
                         >
                             {tab.label}
                         </Text>
@@ -1049,6 +1639,7 @@ const ProgressScreen = ({ navigation }) => {
                 <Animated.View
                     style={[
                         styles.tabIndicator,
+                        { backgroundColor: theme.primary },
                         {
                             left: tabIndicatorPosition,
                             width: width / TABS.length,
@@ -1058,8 +1649,9 @@ const ProgressScreen = ({ navigation }) => {
             </View>
 
             {/* Tab Content */}
-            <ScrollView style={styles.contentContainer} showsVerticalScrollIndicator={false}>
+            <ScrollView style={[styles.contentContainer, { backgroundColor: theme.background }]} showsVerticalScrollIndicator={false}>
                 {activeTab === 'overview' && renderOverviewTab()}
+                {activeTab === 'achievements' && renderAchievementsTab()}
                 {activeTab === 'skills' && renderSkillsTab()}
                 {activeTab === 'goals' && renderGoalsTab()}
                 {activeTab === 'history' && renderHistoryTab()}
@@ -1071,7 +1663,6 @@ const ProgressScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
     safeArea: {
         flex: 1,
-        backgroundColor: '#F8F9FA',
     },
     header: {
         paddingHorizontal: 16,
@@ -1101,9 +1692,10 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFF',
     },
     tabText: {
-        fontSize: 14,
+        fontSize: 12,
         color: '#666',
         fontWeight: '500',
+        textAlign: 'center',
     },
     activeTabText: {
         color: '#FF6B00',
@@ -1173,6 +1765,34 @@ const styles = StyleSheet.create({
     },
     metricLabel: {
         fontSize: 12,
+        color: '#666',
+    },
+    metricIcon: {
+        marginBottom: 8,
+    },
+    caloriesCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#E8F5E9',
+        padding: 12,
+        borderRadius: 12,
+        marginTop: 12,
+        gap: 8,
+    },
+    caloriesText: {
+        fontSize: 14,
+        color: '#2E7D32',
+        fontWeight: '500',
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingVertical: 40,
+    },
+    loadingText: {
+        marginTop: 12,
+        fontSize: 16,
         color: '#666',
     },
     chartContainer: {
@@ -1350,6 +1970,11 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         marginBottom: 16,
     },
+    emptyStateSubtext: {
+        fontSize: 13,
+        color: '#999',
+        textAlign: 'center',
+    },
     emptyStateButton: {
         backgroundColor: '#FF6B00',
         paddingHorizontal: 16,
@@ -1461,6 +2086,61 @@ const styles = StyleSheet.create({
     skillBreakdownFill: {
         height: '100%',
         borderRadius: 3,
+    },
+    categoryDistributionContainer: {
+        backgroundColor: '#FFF',
+        padding: 16,
+        marginTop: 8,
+    },
+    categorySubtitle: {
+        fontSize: 13,
+        color: '#666',
+        marginBottom: 16,
+    },
+    categoryItem: {
+        marginBottom: 16,
+    },
+    categoryHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    categoryNameContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    categoryIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    categoryName: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#333',
+    },
+    categoryCount: {
+        fontSize: 12,
+        color: '#666',
+        marginTop: 2,
+    },
+    categoryPercentage: {
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    categoryBar: {
+        height: 8,
+        backgroundColor: '#F0F0F0',
+        borderRadius: 4,
+        overflow: 'hidden',
+    },
+    categoryBarFill: {
+        height: '100%',
+        borderRadius: 4,
     },
     suggestedTrainingContainer: {
         backgroundColor: '#FFF',
@@ -1696,6 +2376,52 @@ const styles = StyleSheet.create({
         color: '#666',
         marginLeft: 4,
     },
+    categoryFilterContainer: {
+        marginTop: 12,
+        marginBottom: 8,
+    },
+    categoryFilterContent: {
+        paddingHorizontal: 16,
+        gap: 10,
+    },
+    categoryFilterChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 20,
+        backgroundColor: '#F5F5F5',
+        borderWidth: 2,
+        borderColor: 'transparent',
+        gap: 6,
+    },
+    categoryFilterText: {
+        fontSize: 14,
+        color: '#666',
+    },
+    emptyFilterState: {
+        alignItems: 'center',
+        paddingVertical: 40,
+        paddingHorizontal: 20,
+    },
+    emptyFilterText: {
+        fontSize: 15,
+        color: '#666',
+        marginTop: 12,
+        marginBottom: 16,
+        textAlign: 'center',
+    },
+    clearFilterButton: {
+        backgroundColor: '#FF6B00',
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderRadius: 20,
+    },
+    clearFilterText: {
+        color: '#FFF',
+        fontSize: 14,
+        fontWeight: '600',
+    },
     calendarContainer: {
         backgroundColor: '#FFF',
         padding: 16,
@@ -1778,6 +2504,13 @@ const styles = StyleSheet.create({
         width: 50,
         alignItems: 'center',
     },
+    historyItemIcon: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
     historyItemDate: {
         fontSize: 12,
         color: '#666',
@@ -1817,6 +2550,314 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#666',
         fontWeight: '500',
+    },
+
+    // Recommendations Styles
+    recommendationsContainer: {
+        backgroundColor: '#FFF',
+        padding: 16,
+        marginTop: 8,
+        marginBottom: 20,
+    },
+    recommendationCard: {
+        backgroundColor: '#FFF9F5',
+        borderRadius: 16,
+        padding: 16,
+        borderWidth: 2,
+        borderColor: '#FF6B00',
+        shadowColor: '#FF6B00',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 3,
+    },
+    recommendationHeader: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        marginBottom: 16,
+        gap: 12,
+    },
+    recommendationIconContainer: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: '#FF6B00',
+        justifyContent: 'center',
+        alignItems: 'center',
+        opacity: 0.15,
+    },
+    recommendationInfo: {
+        flex: 1,
+    },
+    recommendationTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#333',
+        marginBottom: 6,
+    },
+    recommendationReason: {
+        fontSize: 14,
+        color: '#666',
+        lineHeight: 20,
+    },
+    recommendationButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#FF6B00',
+        paddingVertical: 14,
+        paddingHorizontal: 20,
+        borderRadius: 12,
+        gap: 8,
+        shadowColor: '#FF6B00',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.3,
+        shadowRadius: 6,
+        elevation: 4,
+    },
+    recommendationButtonText: {
+        color: '#FFF',
+        fontSize: 15,
+        fontWeight: '600',
+    },
+    alternativesSection: {
+        marginTop: 16,
+        paddingTop: 16,
+        borderTopWidth: 1,
+        borderTopColor: '#FFE5D4',
+    },
+    alternativesLabel: {
+        fontSize: 13,
+        color: '#666',
+        marginBottom: 10,
+    },
+    alternativesChips: {
+        flexDirection: 'row',
+        gap: 8,
+    },
+    alternativeChip: {
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 16,
+        backgroundColor: '#FFF',
+        borderWidth: 1,
+        borderColor: '#FF6B00',
+    },
+    alternativeChipText: {
+        fontSize: 13,
+        color: '#FF6B00',
+        fontWeight: '500',
+    },
+
+    // ==================== ACHIEVEMENTS TAB STYLES ====================
+    xpLevelCard: {
+        backgroundColor: '#FFF',
+        padding: 16,
+        borderRadius: 16,
+        marginBottom: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 3,
+    },
+    xpLevelHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        marginBottom: 16,
+    },
+    levelBadge: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: '#FF6B00',
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#FF6B00',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    levelNumber: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: '#FFF',
+    },
+    xpLevelInfo: {
+        flex: 1,
+    },
+    levelTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#333',
+        marginBottom: 4,
+    },
+    xpText: {
+        fontSize: 14,
+        color: '#666',
+        fontWeight: '500',
+    },
+    achievementsTrophyIcon: {
+        alignItems: 'center',
+        gap: 4,
+    },
+    achievementCount: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#666',
+    },
+    xpProgressSection: {
+        gap: 8,
+    },
+    xpProgressBar: {
+        height: 8,
+        backgroundColor: '#F0F0F0',
+        borderRadius: 4,
+        overflow: 'hidden',
+    },
+    xpProgressFill: {
+        height: '100%',
+        backgroundColor: '#FF6B00',
+        borderRadius: 4,
+    },
+    xpProgressText: {
+        fontSize: 12,
+        color: '#666',
+        textAlign: 'center',
+    },
+    achievementCategoryFilter: {
+        marginBottom: 16,
+        flexGrow: 0,
+    },
+    achievementCategoryContent: {
+        paddingHorizontal: 4,
+        gap: 8,
+    },
+    achievementCategoryChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 20,
+        backgroundColor: '#F5F5F5',
+        borderWidth: 1,
+        borderColor: 'transparent',
+    },
+    achievementCategoryChipActive: {
+        backgroundColor: '#FF6B0015',
+        borderColor: '#FF6B00',
+    },
+    achievementCategoryChipText: {
+        fontSize: 13,
+        color: '#666',
+        fontWeight: '500',
+    },
+    achievementCategoryChipTextActive: {
+        color: '#FF6B00',
+        fontWeight: '600',
+    },
+    achievementsList: {
+        gap: 12,
+    },
+    emptyAchievements: {
+        padding: 40,
+        alignItems: 'center',
+        gap: 12,
+    },
+    emptyAchievementsText: {
+        fontSize: 14,
+        color: '#999',
+        textAlign: 'center',
+    },
+    achievementCard: {
+        backgroundColor: '#F8F8F8',
+        borderRadius: 12,
+        padding: 14,
+        flexDirection: 'row',
+        gap: 12,
+        borderWidth: 2,
+        borderColor: '#E0E0E0',
+    },
+    achievementCardUnlocked: {
+        backgroundColor: '#FFF',
+        borderColor: '#4CAF5030',
+    },
+    achievementIconContainer: {
+        position: 'relative',
+    },
+    achievementIcon: {
+        width: 56,
+        height: 56,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: '#E0E0E0',
+    },
+    achievementIconUnlocked: {
+        borderColor: 'transparent',
+    },
+    unlockedBadge: {
+        position: 'absolute',
+        bottom: -4,
+        right: -4,
+        backgroundColor: '#FFF',
+        borderRadius: 12,
+        padding: 2,
+    },
+    achievementInfo: {
+        flex: 1,
+        gap: 4,
+    },
+    achievementTitle: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#333',
+    },
+    achievementTitleLocked: {
+        color: '#999',
+    },
+    achievementDescription: {
+        fontSize: 13,
+        color: '#666',
+        lineHeight: 18,
+    },
+    achievementProgressSection: {
+        marginTop: 8,
+        gap: 4,
+    },
+    achievementProgressBar: {
+        height: 6,
+        backgroundColor: '#E0E0E0',
+        borderRadius: 3,
+        overflow: 'hidden',
+    },
+    achievementProgressFill: {
+        height: '100%',
+        borderRadius: 3,
+    },
+    achievementProgressText: {
+        fontSize: 11,
+        color: '#666',
+        fontWeight: '500',
+    },
+    achievementTierBadge: {
+        alignItems: 'flex-end',
+        justifyContent: 'center',
+        gap: 2,
+    },
+    achievementTierText: {
+        fontSize: 12,
+        fontWeight: '700',
+        textTransform: 'uppercase',
+    },
+    achievementXPText: {
+        fontSize: 11,
+        color: '#666',
+        fontWeight: '600',
     },
 });
 
