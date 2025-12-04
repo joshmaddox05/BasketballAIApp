@@ -658,8 +658,8 @@ class AIAnalysisService {
       const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 minutes for long-running model processing
 
       try {
-        // Call the form-analysis endpoint that returns JSON analysis
-        const response = await fetch(`${this.API_BASE_URL}/analyze/form-analysis`, {
+        // Call the shot analysis endpoint that returns JSON analysis
+        const response = await fetch(`${this.API_BASE_URL}/analyze/shot`, {
           method: 'POST',
           body: formData,
           headers: {
@@ -706,34 +706,48 @@ class AIAnalysisService {
    */
   formatFormAnalysisResults(apiResults) {
     console.log('📝 Formatting form analysis results...');
-    console.log('🌐 API Base URL:', this.API_BASE_URL);
+    console.log('🌐 API Response:', JSON.stringify(apiResults, null, 2));
+
+    // Check if API returned an error
+    if (apiResults.success === false) {
+      console.warn('⚠️ API returned failure:', apiResults.error);
+      throw new Error(apiResults.error || 'Analysis failed');
+    }
+
+    // Map the metrics from the API response to the UI format
+    const metricsArray = this._mapMetricsToArray(apiResults.metrics || {});
+
+    // Extract improvement areas from coaching cues and improvement summary
+    const improvements = this._extractImprovements(apiResults);
 
     const formattedResults = {
       videoId: apiResults.video_id,
-      overallScore: Math.round(apiResults.overall_score || apiResults.overall_similarity),
+      overallScore: Math.round(apiResults.overall_score || 0),
       grade: apiResults.overall_grade || this.getGradeFromScore(apiResults.overall_score),
       confidence: apiResults.confidence || 0.90,
-      orientation: apiResults.orientation,
 
-      // Detailed metrics by category
-      metrics: {
-        wrist: this._formatMetricsCategory(apiResults.wrist_metrics, 'Wrist & Release'),
-        head: this._formatMetricsCategory(apiResults.head_metrics, 'Head Position'),
-        body: this._formatMetricsCategory(apiResults.body_metrics, 'Body Mechanics')
-      },
+      // Metrics as array for FlatList rendering
+      metrics: metricsArray,
 
-      // Top recommendations
-      recommendations: apiResults.top_recommendations?.map((rec, idx) => ({
+      // Coaching cues for the top fixes
+      coachingCues: (apiResults.coaching_cues || []).map((cue, idx) => ({
         priority: idx + 1,
-        title: rec.title,
-        category: rec.category,
-        grade: rec.grade,
-        tip: rec.tip,
-        drill: rec.drill
-      })) || [],
+        cue: cue,
+        title: cue,
+        description: cue
+      })),
 
-      // Coaching cues
-      coachingCues: apiResults.coaching_cues || [],
+      // Improvement suggestions
+      improvements: improvements,
+
+      // Phases data if available
+      phases: apiResults.phases || {},
+
+      // Quality/visibility data
+      quality: apiResults.quality || {},
+
+      // Metadata
+      metadata: apiResults.metadata || {},
 
       analyzedAt: apiResults.analyzed_at
     };
@@ -741,6 +755,72 @@ class AIAnalysisService {
     console.log('✅ Formatted results:', JSON.stringify(formattedResults, null, 2));
 
     return formattedResults;
+  }
+
+  /**
+   * Map API metrics object to array format for UI
+   */
+  _mapMetricsToArray(metrics) {
+    const metricsArray = [];
+
+    const metricConfig = {
+      release_angle: { name: 'Release Angle', ideal: '45-55°', unit: '°' },
+      elbow_flare: { name: 'Elbow Alignment', ideal: '<10° flare', unit: '°' },
+      knee_load: { name: 'Knee Bend', ideal: '45-65°', unit: '°' },
+      hip_shoulder_alignment: { name: 'Body Alignment', ideal: 'Aligned', unit: '°' },
+      base_width: { name: 'Stance Width', ideal: 'Shoulder width', unit: '' },
+      lateral_sway: { name: 'Balance & Stability', ideal: '<3cm sway', unit: 'cm' },
+      arc_trajectory: { name: 'Shot Arc', ideal: '45-52°', unit: '°' }
+    };
+
+    for (const [key, data] of Object.entries(metrics)) {
+      if (data && metricConfig[key]) {
+        const config = metricConfig[key];
+        const qualityScore = data.quality_score || 0.5;
+        const status = data.in_optimal_range ? 'good' : (qualityScore >= 0.6 ? 'improve' : 'poor');
+
+        metricsArray.push({
+          id: key,
+          name: config.name,
+          score: Math.round(qualityScore * 10),
+          value: `${typeof data.value === 'number' ? data.value.toFixed(1) : data.value}${config.unit}`,
+          ideal: data.optimal_range ? `${data.optimal_range[0]}-${data.optimal_range[1]}${config.unit}` : config.ideal,
+          feedback: data.status || (data.in_optimal_range ? 'Good form!' : 'Room for improvement'),
+          status: status
+        });
+      }
+    }
+
+    return metricsArray;
+  }
+
+  /**
+   * Extract improvement suggestions from API response
+   */
+  _extractImprovements(apiResults) {
+    const improvements = [];
+
+    // Add from improvement_summary if available
+    if (apiResults.improvement_summary?.areas_to_improve) {
+      improvements.push(...apiResults.improvement_summary.areas_to_improve);
+    }
+
+    // Add from coaching_cues if we need more
+    if (improvements.length < 3 && apiResults.coaching_cues) {
+      const additionalCues = apiResults.coaching_cues.slice(0, 3 - improvements.length);
+      improvements.push(...additionalCues);
+    }
+
+    // Fallback if no improvements found
+    if (improvements.length === 0) {
+      improvements.push(
+        'Focus on consistent follow-through',
+        'Work on balance throughout your shot',
+        'Practice your release timing'
+      );
+    }
+
+    return improvements;
   }
 
   /**
@@ -756,140 +836,117 @@ class AIAnalysisService {
 
   /**
    * Simulate comprehensive form analysis for development/offline mode
+   * Returns data in the same format as the real API
    */
   async simulateComprehensiveAnalysis(videoData) {
     return new Promise((resolve) => {
       setTimeout(() => {
         const overallScore = 70 + Math.random() * 25; // 70-95 range
-        
-        const results = {
+
+        // Simulate API response format matching /analyze/shot endpoint
+        const apiResponse = {
           video_id: 'simulated_' + Date.now(),
+          success: true,
           overall_score: Math.round(overallScore),
           overall_grade: this.getGradeFromScore(overallScore),
           confidence: 0.85 + Math.random() * 0.1,
-          orientation: 'side',
-          
-          // Metrics by category
-          wrist_metrics: {
+
+          // Metrics matching API format
+          metrics: {
             release_angle: {
-              your_value: `${(45 + Math.random() * 10).toFixed(1)}°`,
-              optimal_range: '45-55°',
-              ideal_value: '50°',
+              value: 45 + Math.random() * 15,
               quality_score: 0.7 + Math.random() * 0.3,
-              grade: 'B',
-              status: 'good'
+              optimal_range: [45, 55],
+              in_optimal_range: Math.random() > 0.3,
+              status: 'Good arc on your shot'
             },
-            wrist_snap: {
-              your_value: Math.random() > 0.5 ? 'Good' : 'Needs work',
-              optimal_range: 'Full extension',
-              ideal_value: 'Complete snap',
+            elbow_flare: {
+              value: Math.random() * 15,
               quality_score: 0.6 + Math.random() * 0.4,
-              grade: 'C',
-              status: 'improve'
-            }
-          },
-          
-          head_metrics: {
-            head_position: {
-              your_value: Math.random() > 0.6 ? 'Stable' : 'Slight movement',
-              optimal_range: 'Minimal movement',
-              ideal_value: 'Steady',
+              optimal_range: [0, 10],
+              in_optimal_range: Math.random() > 0.4,
+              status: 'Elbow alignment is solid'
+            },
+            knee_load: {
+              value: 45 + Math.random() * 25,
+              quality_score: 0.65 + Math.random() * 0.35,
+              optimal_range: [45, 65],
+              in_optimal_range: Math.random() > 0.35,
+              status: 'Good power generation from legs'
+            },
+            hip_shoulder_alignment: {
+              value: Math.random() * 10,
               quality_score: 0.7 + Math.random() * 0.3,
-              grade: 'B',
-              status: 'good'
-            }
-          },
-          
-          body_metrics: {
-            balance: {
-              your_value: Math.random() > 0.5 ? 'Stable' : 'Needs work',
-              optimal_range: 'Stable throughout',
-              ideal_value: 'No sway',
+              optimal_range: [0, 5],
+              in_optimal_range: Math.random() > 0.3,
+              status: 'Body is well aligned'
+            },
+            base_width: {
+              value: 0.18 + Math.random() * 0.12,
+              quality_score: 0.7 + Math.random() * 0.3,
+              optimal_range: [0.18, 0.28],
+              in_optimal_range: Math.random() > 0.3,
+              status: 'Good stance width'
+            },
+            lateral_sway: {
+              value: Math.random() * 5,
               quality_score: 0.6 + Math.random() * 0.4,
-              grade: 'C',
-              status: 'improve'
+              optimal_range: [0, 3],
+              in_optimal_range: Math.random() > 0.4,
+              status: 'Maintain better balance'
             },
-            stance: {
-              your_value: Math.random() > 0.6 ? 'Good width' : 'Too narrow',
-              optimal_range: 'Shoulder width',
-              ideal_value: 'Optimal spacing',
+            arc_trajectory: {
+              value: 45 + Math.random() * 10,
               quality_score: 0.7 + Math.random() * 0.3,
-              grade: 'B',
-              status: 'good'
+              optimal_range: [45, 52],
+              in_optimal_range: Math.random() > 0.3,
+              status: 'Nice arc trajectory'
             }
           },
-          
-          // Top recommendations
-          top_recommendations: [
-            {
-              title: 'Improve Release Angle',
-              category: 'Wrist & Release',
-              grade: 'B',
-              tip: 'Focus on getting more arc on your shot for better accuracy',
-              drill: 'Wall shooting drill - practice consistent arc'
-            },
-            {
-              title: 'Enhance Balance',
-              category: 'Body Mechanics',
-              grade: 'C',
-              tip: 'Work on maintaining stability throughout your shot motion',
-              drill: 'Balance board practice and slow-motion shots'
-            }
-          ],
-          
-          // Coaching cues
+
+          // Coaching cues as simple strings (matching API format)
           coaching_cues: [
-            {
-              priority: 1,
-              title: 'Release Angle Consistency',
-              description: 'Your release angle varies between shots. Focus on consistent arc.',
-              impact: 'high',
-              drill: 'Practice 50 form shots daily with focus on arc'
-            },
-            {
-              priority: 2,
-              title: 'Balance Maintenance',
-              description: 'Work on keeping your center of mass stable during the shot.',
-              impact: 'medium',
-              drill: 'Slow-motion shooting with balance focus'
-            }
+            'Focus on keeping your elbow tucked under the ball',
+            'Try to maintain a consistent release point',
+            'Work on your follow-through extension'
           ],
-          
+
+          // Improvement summary
+          improvement_summary: {
+            strengths: [
+              'Good release angle',
+              'Solid base positioning'
+            ],
+            areas_to_improve: [
+              'Work on balance throughout the shot',
+              'Focus on consistent follow-through',
+              'Improve knee bend for more power'
+            ]
+          },
+
+          // Quality metrics
+          quality: {
+            visibility_ratio: 0.85,
+            confidence: 0.9,
+            warning: null
+          },
+
+          // Metadata
+          metadata: {
+            duration_seconds: 2.5,
+            fps: 30,
+            total_frames: 75,
+            processed_frames: 60
+          },
+
           analyzed_at: new Date().toISOString()
         };
-        
-        resolve(results);
+
+        // Format the response using the same formatter as real API responses
+        const formattedResults = this.formatFormAnalysisResults(apiResponse);
+        resolve(formattedResults);
       }, 3000); // 3 second delay
     });
-  }
-
-  /**
-   * Helper to format a metrics category
-   */
-  _formatMetricsCategory(categoryMetrics, categoryName) {
-    const metrics = [];
-
-    for (const [metricKey, metricData] of Object.entries(categoryMetrics)) {
-      metrics.push({
-        id: metricKey,
-        name: metricKey.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
-        yourValue: metricData.your_value,
-        optimalRange: metricData.optimal_range,
-        idealValue: metricData.ideal_value,
-        difference: metricData.difference,
-        qualityScore: Math.round(metricData.quality_score * 10),
-        grade: metricData.grade,
-        status: metricData.status
-      });
-    }
-
-    return {
-      name: categoryName,
-      metrics: metrics,
-      averageScore: Math.round(
-        metrics.reduce((sum, m) => sum + m.qualityScore, 0) / metrics.length
-      )
-    };
   }
 }
 
