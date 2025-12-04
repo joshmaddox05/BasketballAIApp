@@ -222,12 +222,10 @@ class AIAnalysisService {
       });
 
       console.log('📤 Uploading to:', `${this.API_BASE_URL}/upload/video`);
+      // Note: Do NOT set Content-Type header manually for FormData
       const response = await fetch(`${this.API_BASE_URL}/upload/video`, {
         method: 'POST',
         body: formData,
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
         timeout: this.timeout
       });
 
@@ -659,12 +657,11 @@ class AIAnalysisService {
 
       try {
         // Call the shot analysis endpoint that returns JSON analysis
+        // Note: Do NOT set Content-Type header manually for FormData -
+        // React Native/fetch will set it automatically with the correct boundary
         const response = await fetch(`${this.API_BASE_URL}/analyze/shot`, {
           method: 'POST',
           body: formData,
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
           signal: controller.signal,
         });
 
