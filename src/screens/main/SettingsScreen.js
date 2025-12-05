@@ -8,13 +8,15 @@ import {
     TouchableOpacity,
     Switch,
     SafeAreaView,
-    Alert
+    Alert,
+    ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
 import i18n from '../../i18n/i18n';
 import SubscriptionModal from '../../components/shared/SubscriptionModal';
 import { getTheme } from '../../utils/theme';
+import { seedChallenges, checkChallengesExist } from '../../scripts/seedChallenges';
 
 const SettingsScreen = ({ navigation }) => {
     const {
@@ -31,6 +33,42 @@ const SettingsScreen = ({ navigation }) => {
     const theme = contextTheme || getTheme(isDarkMode || false);
 
     const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+    const [seedingChallenges, setSeedingChallenges] = useState(false);
+
+    const handleSeedChallenges = async () => {
+        Alert.alert(
+            'Seed Challenges',
+            'This will add sample challenges to the database. Continue?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Seed',
+                    onPress: async () => {
+                        setSeedingChallenges(true);
+                        try {
+                            const exists = await checkChallengesExist();
+                            if (exists) {
+                                Alert.alert('Info', 'Challenges already exist in the database.');
+                                setSeedingChallenges(false);
+                                return;
+                            }
+
+                            const result = await seedChallenges();
+                            if (result.success) {
+                                Alert.alert('Success', `Successfully seeded ${result.count} challenges!`);
+                            } else {
+                                Alert.alert('Error', `Failed to seed challenges: ${result.error}`);
+                            }
+                        } catch (error) {
+                            Alert.alert('Error', `Failed to seed challenges: ${error.message}`);
+                        } finally {
+                            setSeedingChallenges(false);
+                        }
+                    }
+                }
+            ]
+        );
+    };
 
     const handleLanguageChange = (lang) => {
         changeLanguage(lang);
@@ -179,6 +217,23 @@ const SettingsScreen = ({ navigation }) => {
                     title="About"
                     subtitle="Version 1.0.0 (MVP)"
                     rightComponent={null}
+                />
+
+                {/* Developer Tools Section - Remove in production */}
+                <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>DEVELOPER TOOLS</Text>
+
+                <SettingRow
+                    icon="flask-outline"
+                    title="Seed Challenges"
+                    subtitle={seedingChallenges ? "Seeding..." : "Add sample challenges to database"}
+                    onPress={seedingChallenges ? null : handleSeedChallenges}
+                    rightComponent={
+                        seedingChallenges ? (
+                            <ActivityIndicator size="small" color={theme.primary} />
+                        ) : (
+                            <Ionicons name="chevron-forward" size={20} color={theme.textTertiary} />
+                        )
+                    }
                 />
 
                 <View style={styles.bottomSpace} />

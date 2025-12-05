@@ -2,7 +2,7 @@
 // Run this script once to populate Firestore with initial challenge data
 // Usage: Import and call seedChallenges() from a dev screen or Firebase Admin script
 
-import { db } from '../config/firebase';
+import { db } from '../config/firebaseConfig';
 import { collection, doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 const INITIAL_CHALLENGES = [

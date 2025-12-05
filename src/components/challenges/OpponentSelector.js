@@ -19,7 +19,8 @@ import { useAppContext } from '../../context/AppContext';
 import {
   searchUsers,
   getFriends,
-  sendFriendRequest
+  sendFriendRequest,
+  getRecentOpponents
 } from '../../services/firestoreService';
 
 const TABS = [
@@ -65,9 +66,13 @@ const OpponentSelector = ({
   };
 
   const loadRecentOpponents = async () => {
-    // TODO: Implement recent opponents from challenge history
-    // For now, use empty array
-    setRecentOpponents([]);
+    try {
+      const opponents = await getRecentOpponents(user.uid, 10);
+      setRecentOpponents(opponents);
+    } catch (error) {
+      console.error('Error loading recent opponents:', error);
+      setRecentOpponents([]);
+    }
   };
 
   // Debounced search
@@ -126,7 +131,26 @@ const OpponentSelector = ({
     }
   };
 
-  const renderUserItem = ({ item, showAddFriend = false }) => {
+  // Format time ago for recent opponents
+  const getTimeAgo = (timestamp) => {
+    if (!timestamp) return '';
+
+    const now = new Date();
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+    return date.toLocaleDateString();
+  };
+
+  const renderUserItem = ({ item, showAddFriend = false, showLastPlayed = false }) => {
     const isFriend = friends.some(f => f.uid === item.uid);
 
     return (
@@ -160,6 +184,14 @@ const OpponentSelector = ({
                 <View style={[styles.friendBadge, { backgroundColor: '#4CAF5020' }]}>
                   <Ionicons name="people" size={12} color="#4CAF50" />
                   <Text style={[styles.friendBadgeText, { color: '#4CAF50' }]}>Friend</Text>
+                </View>
+              )}
+              {showLastPlayed && item.lastPlayed && (
+                <View style={[styles.lastPlayedBadge, { backgroundColor: theme.backgroundSecondary }]}>
+                  <Ionicons name="time-outline" size={11} color={theme.textSecondary} />
+                  <Text style={[styles.lastPlayedText, { color: theme.textSecondary }]}>
+                    {getTimeAgo(item.lastPlayed)}
+                  </Text>
                 </View>
               )}
             </View>
@@ -284,7 +316,7 @@ const OpponentSelector = ({
           <FlatList
             data={recentOpponents}
             keyExtractor={(item) => item.uid}
-            renderItem={({ item }) => renderUserItem({ item })}
+            renderItem={({ item }) => renderUserItem({ item, showLastPlayed: true })}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
           />
@@ -490,6 +522,18 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   friendBadgeText: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  lastPlayedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    gap: 4,
+  },
+  lastPlayedText: {
     fontSize: 11,
     fontWeight: '500',
   },

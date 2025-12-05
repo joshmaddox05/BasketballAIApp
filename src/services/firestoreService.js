@@ -1574,6 +1574,91 @@ export const addCommunityPost = async (uid, postData) => {
 // ==================== CHALLENGE OPERATIONS ====================
 
 /**
+ * Get the user's daily challenge (first active challenge or a featured one)
+ * @param {string} uid - User ID
+ * @returns {Promise<Object|null>} Daily challenge data
+ */
+export const getDailyChallenge = async (uid) => {
+  try {
+    // First, check if user has any active challenges
+    const userChallengesQuery = query(
+      collection(db, 'users', uid, 'challengeProgress'),
+      where('status', '==', 'active'),
+      orderBy('startedAt', 'desc'),
+      limit(1)
+    );
+
+    const userChallengesSnapshot = await getDocs(userChallengesQuery);
+
+    if (!userChallengesSnapshot.empty) {
+      const progressDoc = userChallengesSnapshot.docs[0];
+      const progressData = progressDoc.data();
+
+      // Get the full challenge data
+      const challengeDoc = await getDoc(doc(db, 'challenges', progressDoc.id));
+      if (challengeDoc.exists()) {
+        return {
+          id: progressDoc.id,
+          ...challengeDoc.data(),
+          userProgress: progressData
+        };
+      }
+    }
+
+    // If no active challenges, return a featured/recommended challenge
+    const featuredQuery = query(
+      collection(db, 'challenges'),
+      where('featured', '==', true),
+      limit(1)
+    );
+
+    const featuredSnapshot = await getDocs(featuredQuery);
+    if (!featuredSnapshot.empty) {
+      const featuredDoc = featuredSnapshot.docs[0];
+      return { id: featuredDoc.id, ...featuredDoc.data() };
+    }
+
+    // Fallback: return the first available challenge
+    const allChallengesQuery = query(
+      collection(db, 'challenges'),
+      orderBy('createdAt', 'desc'),
+      limit(1)
+    );
+
+    const allSnapshot = await getDocs(allChallengesQuery);
+    if (!allSnapshot.empty) {
+      const challengeDoc = allSnapshot.docs[0];
+      return { id: challengeDoc.id, ...challengeDoc.data() };
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error getting daily challenge:', error);
+    return null;
+  }
+};
+
+/**
+ * Update user's challenge progress
+ * @param {string} uid - User ID
+ * @param {string} challengeId - Challenge ID
+ * @param {number} progress - Current progress value
+ * @returns {Promise<void>}
+ */
+export const updateChallengeProgress = async (uid, challengeId, progress) => {
+  try {
+    const progressRef = doc(db, 'users', uid, 'challengeProgress', challengeId);
+    await updateDoc(progressRef, {
+      currentProgress: progress,
+      lastActivityAt: serverTimestamp()
+    });
+  } catch (error) {
+    console.error('Error updating challenge progress:', error);
+    throw error;
+  }
+};
+
+/**
  * Get all available challenges with optional filtering
  * @param {Object} filters - Optional filters
  * @param {string} filters.type - Filter by challenge type ('solo', 'head_to_head', 'group')
@@ -2436,5 +2521,65 @@ export const areFriends = async (uid1, uid2) => {
   } catch (error) {
     console.error('Error checking friendship:', error);
     return false;
+  }
+};
+
+/**
+ * Get recent opponents from H2H challenge history
+ * @param {string} uid - User ID
+ * @param {number} limitCount - Max number of opponents to return
+ * @returns {Promise<Array>} Array of recent opponents with user info
+ */
+export const getRecentOpponents = async (uid, limitCount = 10) => {
+  try {
+    // Get user's H2H challenge progress
+    const q = query(
+      collection(db, 'users', uid, 'challengeProgress'),
+      where('challengeType', '==', 'head_to_head'),
+      orderBy('lastActivityAt', 'desc'),
+      limit(limitCount * 2) // Fetch more to handle duplicates
+    );
+
+    const snapshot = await getDocs(q);
+    const challenges = snapshot.docs.map(doc => doc.data());
+
+    // Extract unique opponents
+    const opponentMap = new Map();
+
+    for (const challenge of challenges) {
+      if (challenge.opponent?.uid && !opponentMap.has(challenge.opponent.uid)) {
+        // Get fresh user data for the opponent
+        try {
+          const opponentDoc = await getDoc(doc(db, 'users', challenge.opponent.uid));
+          if (opponentDoc.exists()) {
+            const opponentData = opponentDoc.data();
+            opponentMap.set(challenge.opponent.uid, {
+              uid: challenge.opponent.uid,
+              displayName: opponentData.displayName || challenge.opponent.displayName || 'Anonymous',
+              profileImage: opponentData.profileImage || null,
+              level: opponentData.gamification?.level || 1,
+              lastPlayed: challenge.lastActivityAt
+            });
+          }
+        } catch (err) {
+          // If we can't fetch user data, use cached data from challenge
+          opponentMap.set(challenge.opponent.uid, {
+            uid: challenge.opponent.uid,
+            displayName: challenge.opponent.displayName || 'Anonymous',
+            profileImage: null,
+            level: 1,
+            lastPlayed: challenge.lastActivityAt
+          });
+        }
+      }
+
+      // Stop if we have enough unique opponents
+      if (opponentMap.size >= limitCount) break;
+    }
+
+    return Array.from(opponentMap.values());
+  } catch (error) {
+    console.error('Error getting recent opponents:', error);
+    return [];
   }
 };
