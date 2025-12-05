@@ -19,6 +19,51 @@ import { useAppContext } from '../../context/AppContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getTheme } from '../../utils/theme';
 
+// Import thumbnail images for workouts
+const shootingThumbnail = require('../../../assets/shooting-thumbnail.jpg');
+const dribblingThumbnail = require('../../../assets/dribbling-thumbnail.png');
+
+// Map workout IDs to their thumbnail images
+const workoutThumbnails = {
+    'shooting_1': shootingThumbnail,  // Beginner Shooting Basics
+    'dribbling_1': dribblingThumbnail, // Ball Handling Fundamentals
+};
+
+// Helper functions for level/XP system
+const getLevelTitle = (level) => {
+    const titles = {
+        1: 'Rookie',
+        2: 'Beginner',
+        3: 'Amateur',
+        4: 'Intermediate',
+        5: 'Skilled',
+        6: 'Advanced',
+        7: 'Expert',
+        8: 'Pro',
+        9: 'Elite',
+        10: 'All-Star',
+        11: 'Superstar',
+        12: 'MVP',
+        13: 'Hall of Famer',
+        14: 'Legend',
+        15: 'GOAT'
+    };
+    return titles[Math.min(level, 15)] || 'Rookie';
+};
+
+const getXPForNextLevel = (level) => {
+    // XP required increases each level: 100, 200, 350, 550, 800...
+    const baseXP = 100;
+    return baseXP * level + (level > 1 ? (level - 1) * 50 : 0);
+};
+
+const getXPProgress = (currentXP, level) => {
+    const xpForNext = getXPForNextLevel(level);
+    const xpForCurrent = level > 1 ? getXPForNextLevel(level - 1) : 0;
+    const progressXP = currentXP - xpForCurrent;
+    const neededXP = xpForNext - xpForCurrent;
+    return Math.min(Math.max((progressXP / neededXP) * 100, 0), 100);
+};
 
 const HomeScreen = ({ navigation }) => {
     const {
@@ -82,8 +127,8 @@ const HomeScreen = ({ navigation }) => {
             onPress={() => navigation.navigate('WorkoutDetail', { workoutId: item.id })}
         >
             <View style={styles.workoutImageContainer}>
-                {item.image ? (
-                    <Image source={item.image} style={styles.workoutImage} />
+                {(item.image || workoutThumbnails[item.id]) ? (
+                    <Image source={item.image || workoutThumbnails[item.id]} style={styles.workoutImage} />
                 ) : (
                     <View style={[styles.workoutImage, styles.workoutImagePlaceholder]}>
                         <Ionicons name="basketball-outline" size={30} color="#FFF" />
@@ -152,20 +197,85 @@ const HomeScreen = ({ navigation }) => {
                     </View>
                 )}
 
-                <View style={styles.statsContainer}>
-                    <View style={[styles.statBox, { backgroundColor: theme.card }]}>
-                        <Text style={[styles.statValue, { color: theme.primary }]}>{userData.stats.shooting}%</Text>
-                        <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Shooting</Text>
+                {/* Level & Badge Card */}
+                <TouchableOpacity
+                    style={[styles.levelCard, { backgroundColor: theme.card }]}
+                    onPress={() => navigation.navigate('Progress', { screen: 'ProgressMain', params: { tab: 'achievements' } })}
+                >
+                    <View style={styles.levelHeader}>
+                        <View style={styles.levelInfo}>
+                            <View style={[styles.levelBadge, { backgroundColor: theme.primary + '20' }]}>
+                                <Ionicons name="basketball" size={24} color={theme.primary} />
+                            </View>
+                            <View style={styles.levelTextContainer}>
+                                <Text style={[styles.levelTitle, { color: theme.text }]}>
+                                    Level {userData?.gamification?.level || 1}
+                                </Text>
+                                <Text style={[styles.levelSubtitle, { color: theme.textSecondary }]}>
+                                    {getLevelTitle(userData?.gamification?.level || 1)}
+                                </Text>
+                            </View>
+                        </View>
+                        <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
                     </View>
-                    <View style={[styles.statBox, { backgroundColor: theme.card }]}>
-                        <Text style={[styles.statValue, { color: theme.primary }]}>{userData.stats.dribbling}%</Text>
-                        <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Dribbling</Text>
+
+                    {/* XP Progress Bar */}
+                    <View style={styles.xpContainer}>
+                        <View style={[styles.xpBar, { backgroundColor: theme.backgroundSecondary }]}>
+                            <View
+                                style={[
+                                    styles.xpFill,
+                                    {
+                                        backgroundColor: theme.primary,
+                                        width: `${getXPProgress(userData?.gamification?.xp || 0, userData?.gamification?.level || 1)}%`
+                                    }
+                                ]}
+                            />
+                        </View>
+                        <Text style={[styles.xpText, { color: theme.textSecondary }]}>
+                            {userData?.gamification?.xp || 0} / {getXPForNextLevel(userData?.gamification?.level || 1)} XP
+                        </Text>
                     </View>
-                    <View style={[styles.statBox, { backgroundColor: theme.card }]}>
-                        <Text style={[styles.statValue, { color: theme.primary }]}>{userData.stats.streak}</Text>
-                        <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Streak</Text>
+
+                    {/* Stats Row */}
+                    <View style={styles.statsRow}>
+                        <View style={styles.statItem}>
+                            <View style={[styles.statIcon, { backgroundColor: '#FF6B00' + '20' }]}>
+                                <Ionicons name="flame" size={16} color="#FF6B00" />
+                            </View>
+                            <View>
+                                <Text style={[styles.statValue, { color: theme.text }]}>
+                                    {userData?.gamification?.streak || userData?.stats?.streak || 0}
+                                </Text>
+                                <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Day Streak</Text>
+                            </View>
+                        </View>
+                        <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
+                        <View style={styles.statItem}>
+                            <View style={[styles.statIcon, { backgroundColor: '#FFD700' + '20' }]}>
+                                <Ionicons name="trophy" size={16} color="#FFD700" />
+                            </View>
+                            <View>
+                                <Text style={[styles.statValue, { color: theme.text }]}>
+                                    {userData?.gamification?.badges?.length || 0}
+                                </Text>
+                                <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Badges</Text>
+                            </View>
+                        </View>
+                        <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
+                        <View style={styles.statItem}>
+                            <View style={[styles.statIcon, { backgroundColor: '#4CAF50' + '20' }]}>
+                                <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
+                            </View>
+                            <View>
+                                <Text style={[styles.statValue, { color: theme.text }]}>
+                                    {userData?.gamification?.totalWorkouts || activities?.length || 0}
+                                </Text>
+                                <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Workouts</Text>
+                            </View>
+                        </View>
                     </View>
-                </View>
+                </TouchableOpacity>
 
                 {/* Continue Last Workout Card - if they have a recent unfinished workout */}
                 {userData.lastWorkout && (
@@ -259,50 +369,11 @@ const HomeScreen = ({ navigation }) => {
 
                     <TouchableOpacity
                         style={styles.challengeViewButton}
-                        onPress={() => navigation.navigate('ChallengeDetail', { id: 'monthly' })}
+                        onPress={() => navigation.navigate('Challenges', { screen: 'ChallengeDetail', params: { challengeId: 'challenge_1' } })}
                     >
                         <Text style={[styles.challengeViewText, { color: theme.primary }]}>View Challenge</Text>
                         <Ionicons name="arrow-forward" size={16} color={theme.primary} />
                     </TouchableOpacity>
-                </View>
-
-                {/* Quick Actions Card */}
-                <View style={[styles.quickActionsContainer, { backgroundColor: theme.card }]}>
-                    <Text style={[styles.sectionTitle, { color: theme.text }]}>Quick Actions</Text>
-                    <View style={styles.quickActionsGrid}>
-                        <TouchableOpacity
-                            style={[styles.quickActionCard, { backgroundColor: theme.backgroundSecondary }]}
-                            onPress={() => navigation.navigate('VideoLibrary')}
-                        >
-                            <View style={[styles.quickActionIcon, { backgroundColor: theme.primary + '20' }]}>
-                                <Ionicons name="videocam" size={24} color={theme.primary} />
-                            </View>
-                            <Text style={[styles.quickActionTitle, { color: theme.text }]}>Training Videos</Text>
-                            <Text style={[styles.quickActionSubtitle, { color: theme.textSecondary }]}>Watch & Learn</Text>
-                        </TouchableOpacity>
-                        
-                        <TouchableOpacity
-                            style={[styles.quickActionCard, { backgroundColor: theme.backgroundSecondary }]}
-                            onPress={() => navigation.navigate('ShootingAnalysis')}
-                        >
-                            <View style={[styles.quickActionIcon, { backgroundColor: '#4CAF5020' }]}>
-                                <Ionicons name="analytics" size={24} color="#4CAF50" />
-                            </View>
-                            <Text style={[styles.quickActionTitle, { color: theme.text }]}>Form Analysis</Text>
-                            <Text style={[styles.quickActionSubtitle, { color: theme.textSecondary }]}>Form Coaching</Text>
-                        </TouchableOpacity>
-                        
-                        <TouchableOpacity
-                            style={[styles.quickActionCard, { backgroundColor: theme.backgroundSecondary }]}
-                            onPress={() => navigation.navigate('YouTubeTest')}
-                        >
-                            <View style={[styles.quickActionIcon, { backgroundColor: '#FF000020' }]}>
-                                <Ionicons name="bug" size={24} color="#FF0000" />
-                            </View>
-                            <Text style={[styles.quickActionTitle, { color: theme.text }]}>API Test</Text>
-                            <Text style={[styles.quickActionSubtitle, { color: theme.textSecondary }]}>Debug YouTube</Text>
-                        </TouchableOpacity>
-                    </View>
                 </View>
 
                 {/* Spacer at bottom for better scrolling */}
@@ -388,33 +459,169 @@ const styles = StyleSheet.create({
         color: '#666',
         lineHeight: 20,
     },
-    statsContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 20,
-    },
-    statBox: {
-        flex: 1,
+    // Level Card Styles
+    levelCard: {
         backgroundColor: '#FFF',
-        borderRadius: 12,
-        padding: 15,
-        marginHorizontal: 5,
-        alignItems: 'center',
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 20,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 4,
-        elevation: 2,
+        elevation: 3,
     },
-    statValue: {
-        fontSize: 22,
+    levelHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    levelInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    levelBadge: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    levelTextContainer: {
+        justifyContent: 'center',
+    },
+    levelTitle: {
+        fontSize: 20,
         fontWeight: 'bold',
-        color: '#FF6B00',
+        color: '#333',
     },
-    statLabel: {
+    levelSubtitle: {
         fontSize: 14,
         color: '#666',
-        marginTop: 5,
+        marginTop: 2,
+    },
+    xpContainer: {
+        marginBottom: 16,
+    },
+    xpBar: {
+        height: 8,
+        backgroundColor: '#F0F0F0',
+        borderRadius: 4,
+        marginBottom: 6,
+        overflow: 'hidden',
+    },
+    xpFill: {
+        height: '100%',
+        borderRadius: 4,
+    },
+    xpText: {
+        fontSize: 12,
+        color: '#666',
+        textAlign: 'right',
+    },
+    statsRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        alignItems: 'center',
+        paddingTop: 12,
+        borderTopWidth: 1,
+        borderTopColor: '#F0F0F0',
+    },
+    statItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    statIcon: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    statValue: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#333',
+    },
+    statLabel: {
+        fontSize: 11,
+        color: '#666',
+    },
+    statDivider: {
+        width: 1,
+        height: 40,
+        backgroundColor: '#F0F0F0',
+    },
+    // Goals Summary Card Styles
+    goalsSummaryCard: {
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    goalsSummaryHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    goalsSummaryTitleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    goalsSummaryTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    goalsSummaryViewAll: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    goalsSummaryViewAllText: {
+        fontSize: 13,
+        fontWeight: '500',
+    },
+    goalsSummaryList: {
+        gap: 12,
+    },
+    goalSummaryItem: {
+        gap: 6,
+    },
+    goalSummaryInfo: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    goalSummaryName: {
+        fontSize: 14,
+        flex: 1,
+        marginRight: 8,
+    },
+    goalSummaryProgress: {
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    goalSummaryProgressBar: {
+        height: 6,
+        borderRadius: 3,
+        overflow: 'hidden',
+    },
+    goalSummaryProgressFill: {
+        height: '100%',
+        borderRadius: 3,
+    },
+    goalsSummaryMore: {
+        fontSize: 12,
+        textAlign: 'center',
+        marginTop: 10,
     },
     continueWorkoutCard: {
         backgroundColor: '#FF6B00',
@@ -681,67 +888,6 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         fontSize: 14,
         marginRight: 4,
-    },
-    
-    // Quick Actions Styles
-    quickActionsContainer: {
-        backgroundColor: '#FFF',
-        borderRadius: 12,
-        padding: 16,
-        marginHorizontal: 16,
-        marginBottom: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 2,
-    },
-    quickActionsGrid: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-    },
-    quickActionCard: {
-        flex: 1,
-        alignItems: 'center',
-        paddingVertical: 16,
-        paddingHorizontal: 8,
-        marginHorizontal: 4,
-        backgroundColor: '#F8F9FA',
-        borderRadius: 8,
-    },
-    quickActionIcon: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 8,
-    },
-    quickActionTitle: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#333',
-        textAlign: 'center',
-        marginBottom: 2,
-    },
-    quickActionSubtitle: {
-        fontSize: 12,
-        color: '#666',
-        textAlign: 'center',
-    },
-    challengeButton: {
-        backgroundColor: '#FF6B00',
-        paddingVertical: 12,
-        borderRadius: 8,
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    challengeButtonText: {
-        color: '#FFF',
-        fontWeight: 'bold',
-        fontSize: 16,
-        marginRight: 5,
     },
 });
 

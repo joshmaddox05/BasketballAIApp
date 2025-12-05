@@ -24,7 +24,10 @@ import {
     getWorkoutStreak,
     getWorkoutRecommendations,
     getGamificationStats,
-    getAchievementProgress
+    getAchievementProgress,
+    getUserShootingStats,
+    listenToUserActivities,
+    listenToUserProfile
 } from '../../services/firestoreService';
 import { ACHIEVEMENT_CATEGORIES } from '../../data/achievements';
 import UpgradePrompt from '../../components/shared/UpgradePrompt';
@@ -33,11 +36,10 @@ import { canAccessFeature } from '../../utils/subscription';
 
 const { width } = Dimensions.get('window');
 
-// Tab options for progress screen
+// Tab options for progress screen (consolidated Overview + Skills into Stats)
 const TABS = [
-    { id: 'overview', label: 'Overview' },
+    { id: 'stats', label: 'Stats' },
     { id: 'achievements', label: 'Achievements' },
-    { id: 'skills', label: 'Skills' },
     { id: 'goals', label: 'Goals' },
     { id: 'history', label: 'History' },
 ];
@@ -53,11 +55,12 @@ const ProgressScreen = ({ navigation }) => {
         isDarkMode
     } = useAppContext();
 
-    const [activeTab, setActiveTab] = useState('overview');
+    const [activeTab, setActiveTab] = useState('stats');
     const [expandedGoalId, setExpandedGoalId] = useState(null);
     const [selectedTimeframe, setSelectedTimeframe] = useState('month'); // week, month, year
     const [selectedSkill, setSelectedSkill] = useState('shooting'); // shooting, dribbling, etc.
     const [selectedCategory, setSelectedCategory] = useState('all'); // all, shooting, dribbling, physical, etc.
+    const [showCompletedGoals, setShowCompletedGoals] = useState(false); // For goals tab
 
     // Real analytics data
     const [workoutStats, setWorkoutStats] = useState(null);
@@ -65,6 +68,7 @@ const ProgressScreen = ({ navigation }) => {
     const [categoryBreakdown, setCategoryBreakdown] = useState({});
     const [currentStreak, setCurrentStreak] = useState(0);
     const [recommendations, setRecommendations] = useState(null);
+    const [shootingStats, setShootingStats] = useState(null);
     const [loading, setLoading] = useState(true);
 
     // Gamification data
@@ -83,14 +87,15 @@ const ProgressScreen = ({ navigation }) => {
             setLoading(true);
 
             // Fetch data in parallel
-            const [stats, history, breakdown, streak, recs, gamification, achievements] = await Promise.all([
+            const [stats, history, breakdown, streak, recs, gamification, achievements, shooting] = await Promise.all([
                 getWorkoutStats(userData.uid, selectedTimeframe),
                 getWorkoutHistory(userData.uid, { limitCount: 100 }),
                 getCategoryBreakdown(userData.uid, selectedTimeframe),
                 getWorkoutStreak(userData.uid),
                 getWorkoutRecommendations(userData.uid),
                 getGamificationStats(userData.uid),
-                getAchievementProgress(userData.uid)
+                getAchievementProgress(userData.uid),
+                getUserShootingStats(userData.uid)
             ]);
 
             setWorkoutStats(stats);
@@ -100,6 +105,7 @@ const ProgressScreen = ({ navigation }) => {
             setRecommendations(recs);
             setGamificationStats(gamification);
             setAchievementProgress(achievements);
+            setShootingStats(shooting);
         } catch (error) {
             console.error('Error fetching analytics data:', error);
         } finally {
@@ -111,6 +117,35 @@ const ProgressScreen = ({ navigation }) => {
     useEffect(() => {
         fetchAnalyticsData();
     }, [selectedTimeframe, userData?.uid]);
+
+    // Set up real-time listeners for activities
+    useEffect(() => {
+        if (!userData?.uid) return;
+
+        // Listen to activity updates in real-time
+        const unsubscribeActivities = listenToUserActivities(userData.uid, (newActivities) => {
+            // When activities update, recalculate stats
+            if (newActivities && newActivities.length > 0) {
+                // Refresh stats that depend on activities
+                Promise.all([
+                    getWorkoutStats(userData.uid, selectedTimeframe),
+                    getCategoryBreakdown(userData.uid, selectedTimeframe),
+                    getWorkoutStreak(userData.uid),
+                ]).then(([stats, breakdown, streak]) => {
+                    setWorkoutStats(stats);
+                    setCategoryBreakdown(breakdown);
+                    setCurrentStreak(streak);
+                }).catch(err => console.error('Error refreshing stats:', err));
+            }
+        });
+
+        // Cleanup listener on unmount
+        return () => {
+            if (unsubscribeActivities) {
+                unsubscribeActivities();
+            }
+        };
+    }, [userData?.uid, selectedTimeframe]);
 
     // Refresh data when screen comes into focus
     useFocusEffect(
@@ -167,55 +202,83 @@ const ProgressScreen = ({ navigation }) => {
         return actualProgress >= expectedProgress;
     };
 
-    // Get skill data for charts
+    // Get skill data for charts - now using real workout data
     const getSkillData = () => {
-        // In a real app, this would come from backend
-        switch(selectedSkill) {
-            case 'shooting':
-                return {
-                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-                    datasets: [
-                        {
-                            data: [65, 68, 72, 74, 78, userData.stats.shooting || 80],
-                            color: (opacity = 1) => `rgba(255, 107, 0, ${opacity})`,
-                            strokeWidth: 2
-                        }
-                    ]
-                };
-            case 'dribbling':
-                return {
-                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-                    datasets: [
-                        {
-                            data: [60, 63, 65, 68, 70, userData.stats.dribbling || 75],
-                            color: (opacity = 1) => `rgba(76, 175, 80, ${opacity})`,
-                            strokeWidth: 2
-                        }
-                    ]
-                };
-            case 'physical':
-                return {
-                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-                    datasets: [
-                        {
-                            data: [55, 60, 65, 70, 75, 80],
-                            color: (opacity = 1) => `rgba(33, 150, 243, ${opacity})`,
-                            strokeWidth: 2
-                        }
-                    ]
-                };
-            default:
-                return {
-                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-                    datasets: [
-                        {
-                            data: [50, 55, 60, 65, 70, 75],
-                            color: (opacity = 1) => `rgba(255, 107, 0, ${opacity})`,
-                            strokeWidth: 2
-                        }
-                    ]
-                };
-        }
+        const skillColors = {
+            shooting: (opacity = 1) => `rgba(255, 107, 0, ${opacity})`,
+            dribbling: (opacity = 1) => `rgba(76, 175, 80, ${opacity})`,
+            physical: (opacity = 1) => `rgba(33, 150, 243, ${opacity})`,
+            defense: (opacity = 1) => `rgba(156, 39, 176, ${opacity})`,
+            passing: (opacity = 1) => `rgba(255, 152, 0, ${opacity})`,
+        };
+
+        // Calculate skill progress from workout history
+        const calculateSkillProgress = () => {
+            if (!workoutHistory || workoutHistory.length === 0) {
+                // Return default progression if no workouts
+                return [50, 50, 50, 50, 50, 50];
+            }
+
+            // Get last 6 months of data
+            const monthlyData = [];
+            const today = new Date();
+
+            for (let i = 5; i >= 0; i--) {
+                const monthStart = new Date(today.getFullYear(), today.getMonth() - i, 1);
+                const monthEnd = new Date(today.getFullYear(), today.getMonth() - i + 1, 0);
+
+                // Filter workouts for this month and skill
+                const monthWorkouts = workoutHistory.filter(w => {
+                    if (!w.createdAt) return false;
+                    const wDate = w.createdAt.toDate ? w.createdAt.toDate() : new Date(w.createdAt);
+                    const category = (w.category || w.workoutCategory || '').toLowerCase();
+                    return wDate >= monthStart && wDate <= monthEnd && category === selectedSkill;
+                });
+
+                // Calculate skill score based on:
+                // - Number of workouts (frequency)
+                // - Average completion rate
+                // - Total minutes
+                const baseScore = 50;
+                const workoutBonus = Math.min(monthWorkouts.length * 5, 25); // Up to 25 points for 5+ workouts
+                const completionBonus = monthWorkouts.length > 0
+                    ? (monthWorkouts.reduce((sum, w) => sum + (w.completionRate || 80), 0) / monthWorkouts.length) * 0.25
+                    : 0;
+
+                const score = Math.min(Math.round(baseScore + workoutBonus + completionBonus), 100);
+                monthlyData.push(score || baseScore);
+            }
+
+            return monthlyData;
+        };
+
+        // Get month labels
+        const getMonthLabels = () => {
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const labels = [];
+            const today = new Date();
+
+            for (let i = 5; i >= 0; i--) {
+                const monthIndex = (today.getMonth() - i + 12) % 12;
+                labels.push(months[monthIndex]);
+            }
+
+            return labels;
+        };
+
+        const skillData = calculateSkillProgress();
+        const color = skillColors[selectedSkill] || skillColors.shooting;
+
+        return {
+            labels: getMonthLabels(),
+            datasets: [
+                {
+                    data: skillData,
+                    color: color,
+                    strokeWidth: 2
+                }
+            ]
+        };
     };
 
     // Get activity data for charts - now using real data
@@ -299,29 +362,40 @@ const ProgressScreen = ({ navigation }) => {
         { id: '5', name: 'Workout Warrior', icon: 'fitness', unlocked: false },
     ];
 
-    // Renders the Overview tab content
-    const renderOverviewTab = () => {
+    // Renders the unified Stats tab content (consolidated from Overview + Skills)
+    const renderStatsTab = () => {
         if (loading) {
             return (
                 <View style={[styles.tabContent, styles.loadingContainer]}>
-                    <ActivityIndicator size="large" color="#FF6B00" />
-                    <Text style={styles.loadingText}>Loading your progress...</Text>
+                    <ActivityIndicator size="large" color={theme.primary} />
+                    <Text style={[styles.loadingText, { color: theme.textSecondary }]}>Loading your stats...</Text>
                 </View>
             );
         }
 
         const totalWorkouts = workoutStats?.totalWorkouts || 0;
-        const totalCalories = workoutStats?.totalCalories || 0;
         const avgDuration = workoutStats?.averageDuration || 0;
+
+        // Calculate workouts this week
+        const thisWeekWorkouts = workoutHistory.filter(w => {
+            if (!w.createdAt) return false;
+            const wDate = w.createdAt.toDate ? w.createdAt.toDate() : new Date(w.createdAt);
+            const weekAgo = new Date();
+            weekAgo.setDate(weekAgo.getDate() - 7);
+            return wDate >= weekAgo;
+        }).length;
 
         return (
             <View style={styles.tabContent}>
-                {/* Progress Summary */}
-                <View style={styles.summaryContainer}>
+                {/* Training Summary Card */}
+                <View style={[styles.summaryContainer, { backgroundColor: theme.card }]}>
                     <View style={styles.summaryHeader}>
-                        <Text style={styles.summaryTitle}>Progress Summary</Text>
+                        <View style={styles.sectionTitleRow}>
+                            <Ionicons name="stats-chart" size={20} color={theme.primary} />
+                            <Text style={[styles.summaryTitle, { color: theme.text }]}>Training Summary</Text>
+                        </View>
                         <TouchableOpacity
-                            style={styles.timeframeSelector}
+                            style={[styles.timeframeSelector, { backgroundColor: theme.backgroundSecondary }]}
                             onPress={() => {
                                 const timeframes = ['week', 'month', 'year'];
                                 const currentIndex = timeframes.indexOf(selectedTimeframe);
@@ -329,234 +403,312 @@ const ProgressScreen = ({ navigation }) => {
                                 setSelectedTimeframe(timeframes[nextIndex]);
                             }}
                         >
-                            <Text style={styles.timeframeText}>
+                            <Text style={[styles.timeframeText, { color: theme.textSecondary }]}>
                                 {selectedTimeframe === 'week' ? 'This Week' : selectedTimeframe === 'month' ? 'This Month' : 'This Year'}
                             </Text>
-                            <Ionicons name="chevron-down" size={16} color="#666" />
+                            <Ionicons name="chevron-down" size={16} color={theme.textSecondary} />
                         </TouchableOpacity>
                     </View>
 
                     <View style={styles.metricsRow}>
-                        <View style={styles.metricCard}>
-                            <Ionicons name="fitness" size={24} color="#FF6B00" style={styles.metricIcon} />
-                            <Text style={styles.metricValue}>{totalWorkouts}</Text>
-                            <Text style={styles.metricLabel}>Workouts</Text>
+                        <View style={[styles.metricCard, { backgroundColor: theme.backgroundSecondary }]}>
+                            <Ionicons name="fitness" size={24} color={theme.primary} style={styles.metricIcon} />
+                            <Text style={[styles.metricValue, { color: theme.primary }]}>{totalWorkouts}</Text>
+                            <Text style={[styles.metricLabel, { color: theme.textSecondary }]}>Total Workouts</Text>
                         </View>
-                        <View style={styles.metricCard}>
+                        <View style={[styles.metricCard, { backgroundColor: theme.backgroundSecondary }]}>
                             <Ionicons name="flame" size={24} color="#FF6B00" style={styles.metricIcon} />
-                            <Text style={styles.metricValue}>{calculateStreak()}</Text>
-                            <Text style={styles.metricLabel}>Day Streak</Text>
-                        </View>
-                        <View style={styles.metricCard}>
-                            <Ionicons name="time" size={24} color="#FF6B00" style={styles.metricIcon} />
-                            <Text style={styles.metricValue}>{avgDuration}</Text>
-                            <Text style={styles.metricLabel}>Avg Minutes</Text>
+                            <Text style={[styles.metricValue, { color: '#FF6B00' }]}>{calculateStreak()}</Text>
+                            <Text style={[styles.metricLabel, { color: theme.textSecondary }]}>Day Streak</Text>
                         </View>
                     </View>
 
-                    {totalCalories > 0 && (
-                        <View style={styles.caloriesCard}>
-                            <Ionicons name="nutrition" size={20} color="#4CAF50" />
-                            <Text style={styles.caloriesText}>
-                                ~{totalCalories} calories burned this {selectedTimeframe}
-                            </Text>
+                    <View style={[styles.metricsRow, { marginTop: 8 }]}>
+                        <View style={[styles.metricCard, { backgroundColor: theme.backgroundSecondary }]}>
+                            <Ionicons name="calendar" size={24} color="#4CAF50" style={styles.metricIcon} />
+                            <Text style={[styles.metricValue, { color: '#4CAF50' }]}>{thisWeekWorkouts}</Text>
+                            <Text style={[styles.metricLabel, { color: theme.textSecondary }]}>This Week</Text>
                         </View>
-                    )}
+                        <View style={[styles.metricCard, { backgroundColor: theme.backgroundSecondary }]}>
+                            <Ionicons name="time" size={24} color="#2196F3" style={styles.metricIcon} />
+                            <Text style={[styles.metricValue, { color: '#2196F3' }]}>{avgDuration}</Text>
+                            <Text style={[styles.metricLabel, { color: theme.textSecondary }]}>Avg Minutes</Text>
+                        </View>
+                    </View>
                 </View>
 
-                {/* Activity Chart */}
-                <View style={styles.chartContainer}>
-                    <Text style={styles.chartTitle}>Activity Minutes</Text>
-                    <BarChart
-                        data={getActivityData()}
+                {/* Shooting Accuracy Card */}
+                <View style={[styles.shootingAccuracyCard, { backgroundColor: theme.card }]}>
+                    <View style={styles.sectionTitleRow}>
+                        <Ionicons name="basketball" size={20} color={theme.primary} />
+                        <Text style={[styles.sectionTitle, { color: theme.text }]}>Shooting Accuracy</Text>
+                        {shootingStats?.trend !== 0 && shootingStats?.totalShots > 0 && (
+                            <View style={[
+                                styles.trendBadge,
+                                { backgroundColor: shootingStats.trend > 0 ? '#4CAF5020' : '#F4433620' }
+                            ]}>
+                                <Ionicons
+                                    name={shootingStats.trend > 0 ? 'trending-up' : 'trending-down'}
+                                    size={14}
+                                    color={shootingStats.trend > 0 ? '#4CAF50' : '#F44336'}
+                                />
+                                <Text style={[
+                                    styles.trendText,
+                                    { color: shootingStats.trend > 0 ? '#4CAF50' : '#F44336' }
+                                ]}>
+                                    {shootingStats.trend > 0 ? '+' : ''}{shootingStats.trend}%
+                                </Text>
+                            </View>
+                        )}
+                    </View>
+
+                    <View style={styles.accuracyContent}>
+                        <View style={styles.accuracyMain}>
+                            <Text style={[styles.accuracyPercentage, { color: theme.primary }]}>
+                                {shootingStats?.totalShots > 0 ? shootingStats.accuracy : '--'}%
+                            </Text>
+                            <Text style={[styles.accuracyLabel, { color: theme.textSecondary }]}>Overall Accuracy</Text>
+                        </View>
+
+                        <View style={[styles.accuracyProgressBar, { backgroundColor: theme.backgroundSecondary }]}>
+                            <View
+                                style={[
+                                    styles.accuracyProgressFill,
+                                    {
+                                        width: `${shootingStats?.accuracy || 0}%`,
+                                        backgroundColor: theme.primary
+                                    }
+                                ]}
+                            />
+                        </View>
+
+                        <View style={styles.accuracyStats}>
+                            <View style={styles.accuracyStat}>
+                                <View style={[styles.accuracyDot, { backgroundColor: '#4CAF50' }]} />
+                                <Text style={[styles.accuracyStatText, { color: theme.text }]}>
+                                    Makes: {shootingStats?.makes || 0}
+                                </Text>
+                            </View>
+                            <View style={styles.accuracyStat}>
+                                <View style={[styles.accuracyDot, { backgroundColor: '#F44336' }]} />
+                                <Text style={[styles.accuracyStatText, { color: theme.text }]}>
+                                    Misses: {shootingStats?.misses || 0}
+                                </Text>
+                            </View>
+                            <View style={styles.accuracyStat}>
+                                <Ionicons name="basketball-outline" size={14} color={theme.textSecondary} />
+                                <Text style={[styles.accuracyStatText, { color: theme.textSecondary }]}>
+                                    Total: {shootingStats?.totalShots || 0}
+                                </Text>
+                            </View>
+                        </View>
+
+                        {shootingStats?.totalShots > 0 ? (
+                            <Text style={[styles.accuracyHint, { color: theme.textSecondary }]}>
+                                This week: {shootingStats.recentAccuracy}% accuracy
+                            </Text>
+                        ) : (
+                            <Text style={[styles.accuracyHint, { color: theme.textSecondary }]}>
+                                Track makes/misses during shooting workouts to see your stats
+                            </Text>
+                        )}
+                    </View>
+                </View>
+
+                {/* Skill Progress Chart */}
+                <View style={[styles.skillChartContainer, { backgroundColor: theme.card }]}>
+                    <View style={styles.sectionHeader}>
+                        <View style={styles.sectionTitleRow}>
+                            <Ionicons name="trending-up" size={20} color={theme.primary} />
+                            <Text style={[styles.sectionTitle, { color: theme.text }]}>Skill Progress</Text>
+                        </View>
+                        <Text style={[styles.chartPeriod, { color: theme.textSecondary }]}>6 Months</Text>
+                    </View>
+
+                    {/* Skill Selector */}
+                    <View style={styles.skillSelector}>
+                        <TouchableOpacity
+                            style={[
+                                styles.skillTab,
+                                selectedSkill === 'shooting' && styles.selectedSkillTab,
+                                selectedSkill === 'shooting' && { borderColor: '#FF6B00' }
+                            ]}
+                            onPress={() => setSelectedSkill('shooting')}
+                        >
+                            <Ionicons
+                                name="basketball"
+                                size={16}
+                                color={selectedSkill === 'shooting' ? '#FF6B00' : theme.textSecondary}
+                            />
+                            <Text
+                                style={[
+                                    styles.skillTabText,
+                                    { color: theme.textSecondary },
+                                    selectedSkill === 'shooting' && { color: '#FF6B00', fontWeight: '600' }
+                                ]}
+                            >
+                                Shooting
+                            </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[
+                                styles.skillTab,
+                                selectedSkill === 'dribbling' && styles.selectedSkillTab,
+                                selectedSkill === 'dribbling' && { borderColor: '#4CAF50' }
+                            ]}
+                            onPress={() => setSelectedSkill('dribbling')}
+                        >
+                            <Ionicons
+                                name="hand-left"
+                                size={16}
+                                color={selectedSkill === 'dribbling' ? '#4CAF50' : theme.textSecondary}
+                            />
+                            <Text
+                                style={[
+                                    styles.skillTabText,
+                                    { color: theme.textSecondary },
+                                    selectedSkill === 'dribbling' && { color: '#4CAF50', fontWeight: '600' }
+                                ]}
+                            >
+                                Dribbling
+                            </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[
+                                styles.skillTab,
+                                selectedSkill === 'physical' && styles.selectedSkillTab,
+                                selectedSkill === 'physical' && { borderColor: '#2196F3' }
+                            ]}
+                            onPress={() => setSelectedSkill('physical')}
+                        >
+                            <Ionicons
+                                name="fitness"
+                                size={16}
+                                color={selectedSkill === 'physical' ? '#2196F3' : theme.textSecondary}
+                            />
+                            <Text
+                                style={[
+                                    styles.skillTabText,
+                                    { color: theme.textSecondary },
+                                    selectedSkill === 'physical' && { color: '#2196F3', fontWeight: '600' }
+                                ]}
+                            >
+                                Physical
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Skill Progress Chart */}
+                    <LineChart
+                        data={getSkillData()}
                         width={width - 32}
-                        height={180}
-                        yAxisSuffix=" min"
-                        chartConfig={chartConfig}
+                        height={200}
+                        chartConfig={{
+                            ...chartConfig,
+                            color: (opacity = 1) => selectedSkill === 'shooting' ? `rgba(255, 107, 0, ${opacity})` :
+                                selectedSkill === 'dribbling' ? `rgba(76, 175, 80, ${opacity})` :
+                                    `rgba(33, 150, 243, ${opacity})`,
+                            propsForDots: {
+                                r: '5',
+                                strokeWidth: '2',
+                                stroke: selectedSkill === 'shooting' ? '#FF6B00' :
+                                    selectedSkill === 'dribbling' ? '#4CAF50' : '#2196F3'
+                            }
+                        }}
+                        bezier
                         style={styles.chart}
-                        showBarTops={false}
-                        fromZero
                     />
                 </View>
 
-                {/* Skills Snapshot */}
-                <View style={styles.skillsSnapshotContainer}>
-                    <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>Skills Progress</Text>
-                        <TouchableOpacity onPress={() => handleTabChange('skills')}>
-                            <Text style={styles.seeAllText}>See All</Text>
-                        </TouchableOpacity>
-                    </View>
-
-                    <View style={styles.skillProgressRow}>
-                        <View style={styles.skillProgress}>
-                            <View style={styles.skillHeader}>
-                                <Text style={styles.skillName}>Shooting</Text>
-                                <Text style={styles.skillValue}>{userData.stats.shooting || 0}%</Text>
-                            </View>
-                            <View style={styles.progressBar}>
-                                <View
-                                    style={[styles.progressFill, { width: `${userData.stats.shooting || 0}%`, backgroundColor: '#FF6B00' }]}
-                                />
-                            </View>
+                {/* Category Breakdown */}
+                {Object.keys(categoryBreakdown).length > 0 && (
+                    <View style={[styles.categoryDistributionContainer, { backgroundColor: theme.card }]}>
+                        <View style={styles.sectionTitleRow}>
+                            <Ionicons name="pie-chart" size={20} color={theme.primary} />
+                            <Text style={[styles.sectionTitle, { color: theme.text }]}>Category Breakdown</Text>
                         </View>
+                        <Text style={[styles.categorySubtitle, { color: theme.textSecondary }]}>
+                            Your workout focus for this {selectedTimeframe.toLowerCase()}
+                        </Text>
 
-                        <View style={styles.skillProgress}>
-                            <View style={styles.skillHeader}>
-                                <Text style={styles.skillName}>Dribbling</Text>
-                                <Text style={styles.skillValue}>{userData.stats.dribbling || 0}%</Text>
-                            </View>
-                            <View style={styles.progressBar}>
-                                <View
-                                    style={[styles.progressFill, { width: `${userData.stats.dribbling || 0}%`, backgroundColor: '#4CAF50' }]}
-                                />
-                            </View>
-                        </View>
+                        {Object.entries(categoryBreakdown)
+                            .sort((a, b) => b[1] - a[1])
+                            .map(([category, count]) => {
+                                const total = Object.values(categoryBreakdown).reduce((sum, val) => sum + val, 0);
+                                const percentage = Math.round((count / total) * 100);
 
-                        <View style={styles.skillProgress}>
-                            <View style={styles.skillHeader}>
-                                <Text style={styles.skillName}>Physical</Text>
-                                <Text style={styles.skillValue}>70%</Text>
-                            </View>
-                            <View style={styles.progressBar}>
-                                <View
-                                    style={[styles.progressFill, { width: '70%', backgroundColor: '#2196F3' }]}
-                                />
-                            </View>
-                        </View>
-                    </View>
-                </View>
+                                const categoryConfig = {
+                                    'Shooting': { icon: 'basketball', color: '#FF6B00' },
+                                    'Dribbling': { icon: 'hand-left', color: '#4CAF50' },
+                                    'Physical': { icon: 'fitness', color: '#2196F3' },
+                                    'Defense': { icon: 'shield', color: '#9C27B0' },
+                                    'Passing': { icon: 'swap-horizontal', color: '#FF9800' },
+                                };
 
-                {/* Goals Snapshot */}
-                <View style={styles.goalsSnapshotContainer}>
-                    <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>Goals</Text>
-                        <TouchableOpacity onPress={() => handleTabChange('goals')}>
-                            <Text style={styles.seeAllText}>See All</Text>
-                        </TouchableOpacity>
-                    </View>
+                                const config = categoryConfig[category] || { icon: 'fitness', color: theme.textSecondary };
 
-                    {goals.length === 0 ? (
-                        <View style={styles.emptyState}>
-                            <Text style={styles.emptyStateText}>No active goals yet.</Text>
-                            <TouchableOpacity
-                                style={styles.emptyStateButton}
-                                onPress={() => navigation.navigate('AddGoal')}
-                            >
-                                <Text style={styles.emptyStateButtonText}>Create Goal</Text>
-                            </TouchableOpacity>
-                        </View>
-                    ) : (
-                        <>
-                            {goals.slice(0, 2).map(goal => (
-                                <View key={goal.id} style={styles.goalItem}>
-                                    <View style={styles.goalInfo}>
-                                        <Text style={styles.goalName}>{goal.name}</Text>
-                                        <View style={styles.goalProgress}>
+                                return (
+                                    <View key={category} style={styles.categoryItem}>
+                                        <View style={styles.categoryHeader}>
+                                            <View style={styles.categoryNameContainer}>
+                                                <View style={[styles.categoryIcon, { backgroundColor: `${config.color}15` }]}>
+                                                    <Ionicons name={config.icon} size={18} color={config.color} />
+                                                </View>
+                                                <View>
+                                                    <Text style={[styles.categoryName, { color: theme.text }]}>{category}</Text>
+                                                    <Text style={[styles.categoryCount, { color: theme.textSecondary }]}>
+                                                        {count} workout{count !== 1 ? 's' : ''}
+                                                    </Text>
+                                                </View>
+                                            </View>
+                                            <Text style={[styles.categoryPercentage, { color: config.color }]}>
+                                                {percentage}%
+                                            </Text>
+                                        </View>
+                                        <View style={[styles.categoryBar, { backgroundColor: theme.backgroundSecondary }]}>
                                             <View
                                                 style={[
-                                                    styles.goalProgressFill,
-                                                    {
-                                                        width: `${calculateGoalProgress(goal)}%`,
-                                                        backgroundColor: isGoalOnTrack(goal) ? '#4CAF50' : '#FF9800'
-                                                    }
+                                                    styles.categoryBarFill,
+                                                    { width: `${percentage}%`, backgroundColor: config.color }
                                                 ]}
                                             />
                                         </View>
                                     </View>
-                                    <View style={styles.goalStats}>
-                                        <Text style={styles.goalPercentage}>{calculateGoalProgress(goal)}%</Text>
-                                        {goal.deadline && (
-                                            <Text style={styles.goalDeadline}>
-                                                {new Date(goal.deadline).toLocaleDateString()}
-                                            </Text>
-                                        )}
-                                    </View>
-                                </View>
-                            ))}
-
-                            {goals.length > 2 && (
-                                <Text style={styles.moreIndicator}>+{goals.length - 2} more goals</Text>
-                            )}
-                        </>
-                    )}
-                </View>
-
-                {/* Achievements */}
-                <View style={styles.achievementsContainer}>
-                    <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>Recent Achievements</Text>
-                        <TouchableOpacity>
-                            <Text style={styles.seeAllText}>See All</Text>
-                        </TouchableOpacity>
+                                );
+                            })}
                     </View>
-
-                    <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.achievementsScroll}
-                    >
-                        {achievements.map(achievement => (
-                            <View
-                                key={achievement.id}
-                                style={[
-                                    styles.achievementBadge,
-                                    !achievement.unlocked && styles.lockedAchievement
-                                ]}
-                            >
-                                <View style={styles.badgeIconContainer}>
-                                    <Ionicons
-                                        name={achievement.icon}
-                                        size={24}
-                                        color={achievement.unlocked ? '#FF6B00' : '#BBB'}
-                                    />
-                                </View>
-                                <Text
-                                    style={[
-                                        styles.badgeName,
-                                        !achievement.unlocked && styles.lockedBadgeName
-                                    ]}
-                                >
-                                    {achievement.name}
-                                </Text>
-                                {!achievement.unlocked && (
-                                    <View style={styles.lockIconContainer}>
-                                        <Ionicons name="lock-closed" size={12} color="#FFF" />
-                                    </View>
-                                )}
-                            </View>
-                        ))}
-                    </ScrollView>
-                </View>
+                )}
 
                 {/* Smart Recommendations */}
                 {recommendations && (
-                    <View style={styles.recommendationsContainer}>
-                        <View style={styles.sectionHeader}>
-                            <Ionicons name="bulb" size={20} color="#FF6B00" />
-                            <Text style={styles.sectionTitle}>Recommended For You</Text>
+                    <View style={[styles.recommendationsContainer, { backgroundColor: theme.card }]}>
+                        <View style={styles.sectionTitleRow}>
+                            <Ionicons name="bulb" size={20} color="#FFD700" />
+                            <Text style={[styles.sectionTitle, { color: theme.text }]}>Recommended For You</Text>
                         </View>
 
-                        <View style={styles.recommendationCard}>
+                        <View style={[styles.recommendationCard, { backgroundColor: theme.backgroundSecondary }]}>
                             <View style={styles.recommendationHeader}>
-                                <View style={styles.recommendationIconContainer}>
-                                    <Ionicons name="trophy" size={24} color="#FF6B00" />
+                                <View style={[styles.recommendationIconContainer, { backgroundColor: theme.primary + '20' }]}>
+                                    <Ionicons name="trophy" size={24} color={theme.primary} />
                                 </View>
                                 <View style={styles.recommendationInfo}>
-                                    <Text style={styles.recommendationTitle}>
+                                    <Text style={[styles.recommendationTitle, { color: theme.text }]}>
                                         Try {recommendations.nextWorkout} Next
                                     </Text>
-                                    <Text style={styles.recommendationReason}>
+                                    <Text style={[styles.recommendationReason, { color: theme.textSecondary }]}>
                                         {recommendations.reason}
                                     </Text>
                                 </View>
                             </View>
 
                             <TouchableOpacity
-                                style={styles.recommendationButton}
+                                style={[styles.recommendationButton, { backgroundColor: theme.primary }]}
                                 onPress={() => {
-                                    navigation.navigate('Train', {
-                                        screen: 'TrainMain',
+                                    navigation.navigate('Training', {
+                                        screen: 'TrainingMain',
                                         params: { filterCategory: recommendations.nextWorkout }
                                     });
                                 }}
@@ -566,28 +718,6 @@ const ProgressScreen = ({ navigation }) => {
                                 </Text>
                                 <Ionicons name="arrow-forward" size={18} color="#FFF" />
                             </TouchableOpacity>
-
-                            {recommendations.alternativeWorkouts && recommendations.alternativeWorkouts.length > 0 && (
-                                <View style={styles.alternativesSection}>
-                                    <Text style={styles.alternativesLabel}>Or try:</Text>
-                                    <View style={styles.alternativesChips}>
-                                        {recommendations.alternativeWorkouts.map((alt, index) => (
-                                            <TouchableOpacity
-                                                key={index}
-                                                style={styles.alternativeChip}
-                                                onPress={() => {
-                                                    navigation.navigate('Train', {
-                                                        screen: 'TrainMain',
-                                                        params: { filterCategory: alt }
-                                                    });
-                                                }}
-                                            >
-                                                <Text style={styles.alternativeChipText}>{alt}</Text>
-                                            </TouchableOpacity>
-                                        ))}
-                                    </View>
-                                </View>
-                            )}
                         </View>
                     </View>
                 )}
@@ -796,589 +926,90 @@ const ProgressScreen = ({ navigation }) => {
         );
     };
 
-    // Renders the Skills tab content
-    const renderSkillsTab = () => {
-        return (
-            <View style={styles.tabContent}>
-                {/* Skill Selector */}
-                <View style={styles.skillSelector}>
-                    <TouchableOpacity
-                        style={[styles.skillTab, selectedSkill === 'shooting' && styles.selectedSkillTab]}
-                        onPress={() => setSelectedSkill('shooting')}
-                    >
-                        <Ionicons
-                            name="basketball"
-                            size={18}
-                            color={selectedSkill === 'shooting' ? '#FF6B00' : '#666'}
-                        />
-                        <Text
-                            style={[
-                                styles.skillTabText,
-                                selectedSkill === 'shooting' && styles.selectedSkillTabText
-                            ]}
-                        >
-                            Shooting
-                        </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[styles.skillTab, selectedSkill === 'dribbling' && styles.selectedSkillTab]}
-                        onPress={() => setSelectedSkill('dribbling')}
-                    >
-                        <Ionicons
-                            name="hand-left"
-                            size={18}
-                            color={selectedSkill === 'dribbling' ? '#4CAF50' : '#666'}
-                        />
-                        <Text
-                            style={[
-                                styles.skillTabText,
-                                selectedSkill === 'dribbling' && styles.selectedSkillTabText,
-                                selectedSkill === 'dribbling' && { color: '#4CAF50' }
-                            ]}
-                        >
-                            Dribbling
-                        </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[styles.skillTab, selectedSkill === 'physical' && styles.selectedSkillTab]}
-                        onPress={() => setSelectedSkill('physical')}
-                    >
-                        <Ionicons
-                            name="fitness"
-                            size={18}
-                            color={selectedSkill === 'physical' ? '#2196F3' : '#666'}
-                        />
-                        <Text
-                            style={[
-                                styles.skillTabText,
-                                selectedSkill === 'physical' && styles.selectedSkillTabText,
-                                selectedSkill === 'physical' && { color: '#2196F3' }
-                            ]}
-                        >
-                            Physical
-                        </Text>
-                    </TouchableOpacity>
-                </View>
-
-                {/* Skill Details */}
-                <View style={styles.skillDetailContainer}>
-                    <View style={styles.skillDetailHeader}>
-                        <View>
-                            <Text style={styles.skillDetailName}>
-                                {selectedSkill === 'shooting' ? 'Shooting Form' :
-                                    selectedSkill === 'dribbling' ? 'Dribbling Control' : 'Physical Fitness'}
-                            </Text>
-                            <Text style={styles.skillDetailRating}>
-                                Current Rating:
-                                <Text style={{
-                                    fontWeight: 'bold',
-                                    color: selectedSkill === 'shooting' ? '#FF6B00' :
-                                        selectedSkill === 'dribbling' ? '#4CAF50' : '#2196F3'
-                                }}>
-                                    {' '}
-                                    {selectedSkill === 'shooting' ? userData.stats.shooting || 0 :
-                                        selectedSkill === 'dribbling' ? userData.stats.dribbling || 0 : 70}%
-                                </Text>
-                            </Text>
-                        </View>
-                        <TouchableOpacity style={styles.timeframeSelector}>
-                            <Text style={styles.timeframeText}>6 Months</Text>
-                            <Ionicons name="chevron-down" size={16} color="#666" />
-                        </TouchableOpacity>
-                    </View>
-
-                    {/* Skill Progress Chart */}
-                    <LineChart
-                        data={getSkillData()}
-                        width={width - 32}
-                        height={220}
-                        chartConfig={{
-                            ...chartConfig,
-                            color: (opacity = 1) => selectedSkill === 'shooting' ? `rgba(255, 107, 0, ${opacity})` :
-                                selectedSkill === 'dribbling' ? `rgba(76, 175, 80, ${opacity})` :
-                                    `rgba(33, 150, 243, ${opacity})`,
-                            propsForDots: {
-                                r: '6',
-                                strokeWidth: '2',
-                                stroke: selectedSkill === 'shooting' ? '#FF6B00' :
-                                    selectedSkill === 'dribbling' ? '#4CAF50' : '#2196F3'
-                            }
-                        }}
-                        bezier
-                        style={styles.chart}
-                    />
-                </View>
-
-                {/* Skill Breakdown */}
-                <View style={styles.skillBreakdownContainer}>
-                    <Text style={styles.skillBreakdownTitle}>Skill Breakdown</Text>
-
-                    <View style={styles.skillBreakdownItem}>
-                        <View style={styles.skillBreakdownHeader}>
-                            <View style={styles.skillBreakdownNameContainer}>
-                                <View
-                                    style={[
-                                        styles.skillBreakdownIcon,
-                                        {
-                                            backgroundColor: selectedSkill === 'shooting' ? '#FFF0E6' :
-                                                selectedSkill === 'dribbling' ? '#E8F5E9' : '#E3F2FD'
-                                        }
-                                    ]}
-                                >
-                                    <Ionicons
-                                        name={selectedSkill === 'shooting' ? 'analytics' :
-                                            selectedSkill === 'dribbling' ? 'hand-left' : 'fitness'}
-                                        size={18}
-                                        color={selectedSkill === 'shooting' ? '#FF6B00' :
-                                            selectedSkill === 'dribbling' ? '#4CAF50' : '#2196F3'}
-                                    />
-                                </View>
-                                <Text style={styles.skillBreakdownName}>
-                                    {selectedSkill === 'shooting' ? 'Form Accuracy' :
-                                        selectedSkill === 'dribbling' ? 'Ball Control' : 'Agility'}
-                                </Text>
-                            </View>
-                            <Text
-                                style={[
-                                    styles.skillBreakdownValue,
-                                    {
-                                        color: selectedSkill === 'shooting' ? '#FF6B00' :
-                                            selectedSkill === 'dribbling' ? '#4CAF50' : '#2196F3'
-                                    }
-                                ]}
-                            >
-                                85%
-                            </Text>
-                        </View>
-                        <View style={styles.skillBreakdownBar}>
-                            <View
-                                style={[
-                                    styles.skillBreakdownFill,
-                                    {
-                                        width: '85%',
-                                        backgroundColor: selectedSkill === 'shooting' ? '#FF6B00' :
-                                            selectedSkill === 'dribbling' ? '#4CAF50' : '#2196F3'
-                                    }
-                                ]}
-                            />
-                        </View>
-                    </View>
-
-                    <View style={styles.skillBreakdownItem}>
-                        <View style={styles.skillBreakdownHeader}>
-                            <View style={styles.skillBreakdownNameContainer}>
-                                <View
-                                    style={[
-                                        styles.skillBreakdownIcon,
-                                        {
-                                            backgroundColor: selectedSkill === 'shooting' ? '#FFF0E6' :
-                                                selectedSkill === 'dribbling' ? '#E8F5E9' : '#E3F2FD'
-                                        }
-                                    ]}
-                                >
-                                    <Ionicons
-                                        name="speedometer"
-                                        size={18}
-                                        color={selectedSkill === 'shooting' ? '#FF6B00' :
-                                            selectedSkill === 'dribbling' ? '#4CAF50' : '#2196F3'}
-                                    />
-                                </View>
-                                <Text style={styles.skillBreakdownName}>
-                                    {selectedSkill === 'shooting' ? 'Release Speed' :
-                                        selectedSkill === 'dribbling' ? 'Speed' : 'Strength'}
-                                </Text>
-                            </View>
-                            <Text
-                                style={[
-                                    styles.skillBreakdownValue,
-                                    {
-                                        color: selectedSkill === 'shooting' ? '#FF6B00' :
-                                            selectedSkill === 'dribbling' ? '#4CAF50' : '#2196F3'
-                                    }
-                                ]}
-                            >
-                                70%
-                            </Text>
-                        </View>
-                        <View style={styles.skillBreakdownBar}>
-                            <View
-                                style={[
-                                    styles.skillBreakdownFill,
-                                    {
-                                        width: '70%',
-                                        backgroundColor: selectedSkill === 'shooting' ? '#FF6B00' :
-                                            selectedSkill === 'dribbling' ? '#4CAF50' : '#2196F3'
-                                    }
-                                ]}
-                            />
-                        </View>
-                    </View>
-
-                    <View style={styles.skillBreakdownItem}>
-                        <View style={styles.skillBreakdownHeader}>
-                            <View style={styles.skillBreakdownNameContainer}>
-                                <View
-                                    style={[
-                                        styles.skillBreakdownIcon,
-                                        {
-                                            backgroundColor: selectedSkill === 'shooting' ? '#FFF0E6' :
-                                                selectedSkill === 'dribbling' ? '#E8F5E9' : '#E3F2FD'
-                                        }
-                                    ]}
-                                >
-                                    <Ionicons
-                                        name="repeat"
-                                        size={18}
-                                        color={selectedSkill === 'shooting' ? '#FF6B00' :
-                                            selectedSkill === 'dribbling' ? '#4CAF50' : '#2196F3'}
-                                    />
-                                </View>
-                                <Text style={styles.skillBreakdownName}>
-                                    {selectedSkill === 'shooting' ? 'Consistency' :
-                                        selectedSkill === 'dribbling' ? 'Versatility' : 'Endurance'}
-                                </Text>
-                            </View>
-                            <Text
-                                style={[
-                                    styles.skillBreakdownValue,
-                                    {
-                                        color: selectedSkill === 'shooting' ? '#FF6B00' :
-                                            selectedSkill === 'dribbling' ? '#4CAF50' : '#2196F3'
-                                    }
-                                ]}
-                            >
-                                75%
-                            </Text>
-                        </View>
-                        <View style={styles.skillBreakdownBar}>
-                            <View
-                                style={[
-                                    styles.skillBreakdownFill,
-                                    {
-                                        width: '75%',
-                                        backgroundColor: selectedSkill === 'shooting' ? '#FF6B00' :
-                                            selectedSkill === 'dribbling' ? '#4CAF50' : '#2196F3'
-                                    }
-                                ]}
-                            />
-                        </View>
-                    </View>
-                </View>
-
-                {/* Category Distribution */}
-                {loading ? (
-                    <View style={[styles.categoryDistributionContainer, styles.loadingContainer]}>
-                        <ActivityIndicator size="small" color="#FF6B00" />
-                    </View>
-                ) : Object.keys(categoryBreakdown).length > 0 && (
-                    <View style={styles.categoryDistributionContainer}>
-                        <Text style={styles.sectionTitle}>Training Distribution</Text>
-                        <Text style={styles.categorySubtitle}>
-                            Your workout focus for this {selectedTimeframe.toLowerCase()}
-                        </Text>
-
-                        {Object.entries(categoryBreakdown)
-                            .sort((a, b) => b[1] - a[1])
-                            .map(([category, count]) => {
-                                const total = Object.values(categoryBreakdown).reduce((sum, val) => sum + val, 0);
-                                const percentage = Math.round((count / total) * 100);
-
-                                // Map category to icon and color
-                                const categoryConfig = {
-                                    'Shooting': { icon: 'basketball', color: '#FF6B00' },
-                                    'Dribbling': { icon: 'hand-left', color: '#4CAF50' },
-                                    'Physical': { icon: 'fitness', color: '#2196F3' },
-                                    'Defense': { icon: 'shield', color: '#9C27B0' },
-                                    'Passing': { icon: 'swap-horizontal', color: '#FF9800' },
-                                };
-
-                                const config = categoryConfig[category] || { icon: 'fitness', color: '#666' };
-
-                                return (
-                                    <View key={category} style={styles.categoryItem}>
-                                        <View style={styles.categoryHeader}>
-                                            <View style={styles.categoryNameContainer}>
-                                                <View style={[styles.categoryIcon, { backgroundColor: `${config.color}15` }]}>
-                                                    <Ionicons name={config.icon} size={20} color={config.color} />
-                                                </View>
-                                                <View>
-                                                    <Text style={styles.categoryName}>{category}</Text>
-                                                    <Text style={styles.categoryCount}>{count} workout{count !== 1 ? 's' : ''}</Text>
-                                                </View>
-                                            </View>
-                                            <Text style={[styles.categoryPercentage, { color: config.color }]}>
-                                                {percentage}%
-                                            </Text>
-                                        </View>
-                                        <View style={styles.categoryBar}>
-                                            <View
-                                                style={[
-                                                    styles.categoryBarFill,
-                                                    { width: `${percentage}%`, backgroundColor: config.color }
-                                                ]}
-                                            />
-                                        </View>
-                                    </View>
-                                );
-                            })}
-                    </View>
-                )}
-
-                {/* Suggested Training */}
-                <View style={styles.suggestedTrainingContainer}>
-                    <Text style={styles.sectionTitle}>Suggested Training</Text>
-
-                    <TouchableOpacity
-                        style={styles.trainingItem}
-                        onPress={() => navigation.navigate('WorkoutDetail', { workoutId: '1' })}
-                    >
-                        <View style={styles.trainingItemContent}>
-                            <View
-                                style={[
-                                    styles.trainingItemIcon,
-                                    {
-                                        backgroundColor: selectedSkill === 'shooting' ? '#FFF0E6' :
-                                            selectedSkill === 'dribbling' ? '#E8F5E9' : '#E3F2FD'
-                                    }
-                                ]}
-                            >
-                                <Ionicons
-                                    name="basketball"
-                                    size={22}
-                                    color={selectedSkill === 'shooting' ? '#FF6B00' :
-                                        selectedSkill === 'dribbling' ? '#4CAF50' : '#2196F3'}
-                                />
-                            </View>
-                            <View style={styles.trainingItemInfo}>
-                                <Text style={styles.trainingItemTitle}>
-                                    {selectedSkill === 'shooting' ? 'Perfect Release Drill' :
-                                        selectedSkill === 'dribbling' ? 'Advanced Dribbling Circuit' :
-                                            'Agility Ladder Workout'}
-                                </Text>
-                                <Text style={styles.trainingItemDescription}>
-                                    {selectedSkill === 'shooting' ? 'Improve your release angle and consistency' :
-                                        selectedSkill === 'dribbling' ? 'Master complex dribbling patterns' :
-                                            'Enhance your footwork and agility'}
-                                </Text>
-                            </View>
-                        </View>
-                        <Ionicons name="chevron-forward" size={20} color="#666" />
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={styles.trainingItem}
-                        onPress={() => navigation.navigate('ShootingAnalysis')}
-                    >
-                        <View style={styles.trainingItemContent}>
-                            <View
-                                style={[
-                                    styles.trainingItemIcon,
-                                    {
-                                        backgroundColor: selectedSkill === 'shooting' ? '#FFF0E6' :
-                                            selectedSkill === 'dribbling' ? '#E8F5E9' : '#E3F2FD'
-                                    }
-                                ]}
-                            >
-                                <Ionicons
-                                    name="analytics"
-                                    size={22}
-                                    color={selectedSkill === 'shooting' ? '#FF6B00' :
-                                        selectedSkill === 'dribbling' ? '#4CAF50' : '#2196F3'}
-                                />
-                            </View>
-                            <View style={styles.trainingItemInfo}>
-                                <Text style={styles.trainingItemTitle}>
-                                    {selectedSkill === 'shooting' ? 'AI Shooting Analysis' :
-                                        selectedSkill === 'dribbling' ? 'Dribbling Assessment' :
-                                            'Fitness Evaluation'}
-                                </Text>
-                                <Text style={styles.trainingItemDescription}>
-                                    {selectedSkill === 'shooting' ? 'Get detailed feedback on your shooting form' :
-                                        selectedSkill === 'dribbling' ? 'Analyze your ball handling skills' :
-                                            'Measure your physical performance'}
-                                </Text>
-                            </View>
-                        </View>
-                        <Ionicons name="chevron-forward" size={20} color="#666" />
-                    </TouchableOpacity>
-                </View>
-            </View>
-        );
-    };
-
-    // Renders the Goals tab content
+    // Renders the Goals tab content - Coming Soon
     const renderGoalsTab = () => {
+        const plannedFeatures = [
+            {
+                icon: 'flag',
+                title: 'Custom Goals',
+                description: 'Set personalized targets for shooting accuracy, workouts, and more'
+            },
+            {
+                icon: 'analytics',
+                title: 'Progress Tracking',
+                description: 'Track your progress with visual charts and milestone notifications'
+            },
+            {
+                icon: 'trophy',
+                title: 'Achievement Goals',
+                description: 'Earn badges and rewards for hitting your training milestones'
+            },
+            {
+                icon: 'calendar',
+                title: 'Deadline Reminders',
+                description: 'Stay on track with smart reminders as deadlines approach'
+            }
+        ];
+
         return (
             <View style={styles.tabContent}>
-                <View style={styles.goalsHeader}>
-                    <Text style={styles.goalsTitle}>Your Training Goals</Text>
-                    <TouchableOpacity
-                        style={styles.addGoalButton}
-                        onPress={() => navigation.navigate('AddGoal')}
-                    >
-                        <Ionicons name="add" size={20} color="#FFF" />
-                        <Text style={styles.addGoalText}>Add Goal</Text>
-                    </TouchableOpacity>
+                {/* Coming Soon Hero */}
+                <View style={[styles.goalsSoonHero, { backgroundColor: theme.card }]}>
+                    <View style={[styles.goalsSoonIconContainer, { backgroundColor: theme.primary + '20' }]}>
+                        <Ionicons name="flag" size={48} color={theme.primary} />
+                    </View>
+                    <Text style={[styles.goalsSoonTitle, { color: theme.text }]}>Goals Coming Soon</Text>
+                    <Text style={[styles.goalsSoonSubtitle, { color: theme.textSecondary }]}>
+                        We're building powerful goal-setting tools to help you reach your full potential.
+                    </Text>
+                    <View style={[styles.goalsSoonBadge, { backgroundColor: theme.primary + '20' }]}>
+                        <Ionicons name="construct" size={14} color={theme.primary} />
+                        <Text style={[styles.goalsSoonBadgeText, { color: theme.primary }]}>In Development</Text>
+                    </View>
                 </View>
 
-                {goals.length === 0 ? (
-                    <View style={styles.emptyState}>
-                        <Text style={styles.emptyStateText}>
-                            You haven't set any goals yet. Goals help you stay motivated and track your progress.
-                        </Text>
-                        <TouchableOpacity
-                            style={styles.emptyStateButton}
-                            onPress={() => navigation.navigate('AddGoal')}
+                {/* Planned Features */}
+                <Text style={[styles.goalsSoonSectionTitle, { color: theme.text }]}>What's Coming</Text>
+                <View style={styles.goalsSoonFeatures}>
+                    {plannedFeatures.map((feature, index) => (
+                        <View
+                            key={index}
+                            style={[styles.goalsSoonFeatureCard, { backgroundColor: theme.card }]}
                         >
-                            <Text style={styles.emptyStateButtonText}>Create Your First Goal</Text>
-                        </TouchableOpacity>
-                    </View>
-                ) : (
-                    <View style={styles.goalsList}>
-                        {goals.map(goal => (
-                            <View key={goal.id} style={styles.goalCard}>
-                                <TouchableOpacity
-                                    style={styles.goalCardHeader}
-                                    onPress={() => toggleGoalExpansion(goal.id)}
-                                >
-                                    <View style={styles.goalCardHeaderContent}>
-                                        <View
-                                            style={[
-                                                styles.goalStatusIndicator,
-                                                {
-                                                    backgroundColor: isGoalOnTrack(goal) ? '#4CAF50' : '#FF9800'
-                                                }
-                                            ]}
-                                        />
-                                        <Text style={styles.goalCardTitle}>{goal.name}</Text>
-                                    </View>
-                                    <Ionicons
-                                        name={expandedGoalId === goal.id ? 'chevron-up' : 'chevron-down'}
-                                        size={20}
-                                        color="#666"
-                                    />
-                                </TouchableOpacity>
-
-                                <View style={styles.goalCardProgress}>
-                                    <View style={styles.goalCardProgressInfo}>
-                                        <Text style={styles.goalCardProgressText}>
-                                            {goal.current} / {goal.target}
-                                        </Text>
-                                        <Text style={styles.goalCardProgressPercentage}>
-                                            {calculateGoalProgress(goal)}%
-                                        </Text>
-                                    </View>
-                                    <View style={styles.goalCardProgressBar}>
-                                        <View
-                                            style={[
-                                                styles.goalCardProgressFill,
-                                                {
-                                                    width: `${calculateGoalProgress(goal)}%`,
-                                                    backgroundColor: isGoalOnTrack(goal) ? '#4CAF50' : '#FF9800'
-                                                }
-                                            ]}
-                                        />
-                                    </View>
-                                </View>
-
-                                {expandedGoalId === goal.id && (
-                                    <View style={styles.goalCardDetails}>
-                                        {goal.deadline && (
-                                            <View style={styles.goalCardDetailItem}>
-                                                <Ionicons name="calendar" size={16} color="#666" />
-                                                <Text style={styles.goalCardDetailText}>
-                                                    Deadline: {new Date(goal.deadline).toLocaleDateString()}
-                                                </Text>
-                                            </View>
-                                        )}
-
-                                        <View style={styles.goalCardDetailItem}>
-                                            <Ionicons
-                                                name={isGoalOnTrack(goal) ? 'trending-up' : 'trending-down'}
-                                                size={16}
-                                                color={isGoalOnTrack(goal) ? '#4CAF50' : '#FF9800'}
-                                            />
-                                            <Text
-                                                style={[
-                                                    styles.goalCardDetailText,
-                                                    { color: isGoalOnTrack(goal) ? '#4CAF50' : '#FF9800' }
-                                                ]}
-                                            >
-                                                {isGoalOnTrack(goal) ? 'On track' : 'Falling behind'}
-                                            </Text>
-                                        </View>
-
-                                        {/* Update Progress Controls */}
-                                        <View style={styles.updateProgressContainer}>
-                                            <Text style={styles.updateProgressTitle}>Update Progress</Text>
-                                            <View style={styles.updateProgressControls}>
-                                                <TouchableOpacity
-                                                    style={styles.updateProgressButton}
-                                                    onPress={() => {
-                                                        if (goal.current > 0) {
-                                                            updateGoalProgress(goal.id, goal.current - 1);
-                                                        }
-                                                    }}
-                                                >
-                                                    <Ionicons name="remove" size={18} color="#666" />
-                                                </TouchableOpacity>
-                                                <Text style={styles.currentProgressValue}>{goal.current}</Text>
-                                                <TouchableOpacity
-                                                    style={styles.updateProgressButton}
-                                                    onPress={() => {
-                                                        if (goal.current < goal.target) {
-                                                            updateGoalProgress(goal.id, goal.current + 1);
-                                                        }
-                                                    }}
-                                                >
-                                                    <Ionicons name="add" size={18} color="#666" />
-                                                </TouchableOpacity>
-                                            </View>
-                                        </View>
-
-                                        <View style={styles.goalCardActions}>
-                                            <TouchableOpacity
-                                                style={styles.goalCardActionButton}
-                                                onPress={() => {
-                                                    // Navigate to edit goal screen in a real app
-                                                    Alert.alert('Edit Goal', 'Edit goal functionality would be implemented in a full app.');
-                                                }}
-                                            >
-                                                <Ionicons name="create-outline" size={16} color="#666" />
-                                                <Text style={styles.goalCardActionText}>Edit</Text>
-                                            </TouchableOpacity>
-                                            <TouchableOpacity
-                                                style={[styles.goalCardActionButton, styles.goalCardActionDelete]}
-                                                onPress={() => {
-                                                    Alert.alert(
-                                                        'Delete Goal',
-                                                        'Are you sure you want to delete this goal?',
-                                                        [
-                                                            { text: 'Cancel', style: 'cancel' },
-                                                            {
-                                                                text: 'Delete',
-                                                                style: 'destructive',
-                                                                onPress: () => {
-                                                                    // Delete goal would be implemented in a full app
-                                                                    Alert.alert('Delete Goal', 'Goal would be deleted in a full app.');
-                                                                }
-                                                            }
-                                                        ]
-                                                    );
-                                                }}
-                                            >
-                                                <Ionicons name="trash-outline" size={16} color="#F44336" />
-                                                <Text style={[styles.goalCardActionText, { color: '#F44336' }]}>Delete</Text>
-                                            </TouchableOpacity>
-                                        </View>
-                                    </View>
-                                )}
+                            <View style={[styles.goalsSoonFeatureIcon, { backgroundColor: theme.primary + '15' }]}>
+                                <Ionicons name={feature.icon} size={24} color={theme.primary} />
                             </View>
-                        ))}
-                    </View>
-                )}
+                            <View style={styles.goalsSoonFeatureContent}>
+                                <Text style={[styles.goalsSoonFeatureTitle, { color: theme.text }]}>
+                                    {feature.title}
+                                </Text>
+                                <Text style={[styles.goalsSoonFeatureDesc, { color: theme.textSecondary }]}>
+                                    {feature.description}
+                                </Text>
+                            </View>
+                        </View>
+                    ))}
+                </View>
+
+                {/* Get Notified CTA */}
+                <View style={[styles.goalsSoonCta, { backgroundColor: theme.card }]}>
+                    <Text style={[styles.goalsSoonCtaTitle, { color: theme.text }]}>
+                        Want to be notified?
+                    </Text>
+                    <Text style={[styles.goalsSoonCtaText, { color: theme.textSecondary }]}>
+                        Enable notifications in Settings to know when Goals launches!
+                    </Text>
+                    <TouchableOpacity
+                        style={[styles.goalsSoonCtaButton, { backgroundColor: theme.primary }]}
+                        onPress={() => navigation.navigate('Profile', {
+                            screen: 'Settings',
+                            initial: false
+                        })}
+                    >
+                        <Ionicons name="notifications" size={18} color="#FFF" />
+                        <Text style={styles.goalsSoonCtaButtonText}>Go to Settings</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
         );
     };
@@ -1650,9 +1281,8 @@ const ProgressScreen = ({ navigation }) => {
 
             {/* Tab Content */}
             <ScrollView style={[styles.contentContainer, { backgroundColor: theme.background }]} showsVerticalScrollIndicator={false}>
-                {activeTab === 'overview' && renderOverviewTab()}
+                {activeTab === 'stats' && renderStatsTab()}
                 {activeTab === 'achievements' && renderAchievementsTab()}
-                {activeTab === 'skills' && renderSkillsTab()}
                 {activeTab === 'goals' && renderGoalsTab()}
                 {activeTab === 'history' && renderHistoryTab()}
             </ScrollView>
@@ -1809,6 +1439,87 @@ const styles = StyleSheet.create({
     chart: {
         borderRadius: 12,
         marginBottom: 8,
+    },
+    // Stats Tab Styles
+    sectionTitleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    chartPeriod: {
+        fontSize: 12,
+        fontWeight: '500',
+    },
+    shootingAccuracyCard: {
+        padding: 16,
+        marginTop: 8,
+    },
+    accuracyContent: {
+        marginTop: 16,
+    },
+    accuracyMain: {
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    accuracyPercentage: {
+        fontSize: 48,
+        fontWeight: 'bold',
+    },
+    accuracyLabel: {
+        fontSize: 14,
+        marginTop: 4,
+    },
+    accuracyProgressBar: {
+        height: 8,
+        borderRadius: 4,
+        overflow: 'hidden',
+        marginBottom: 16,
+    },
+    accuracyProgressFill: {
+        height: '100%',
+        borderRadius: 4,
+    },
+    accuracyStats: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        gap: 24,
+        marginBottom: 12,
+    },
+    accuracyStat: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    accuracyDot: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+    },
+    accuracyStatText: {
+        fontSize: 14,
+        fontWeight: '500',
+    },
+    accuracyHint: {
+        fontSize: 12,
+        textAlign: 'center',
+        fontStyle: 'italic',
+    },
+    trendBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+        marginLeft: 'auto',
+        gap: 4,
+    },
+    trendText: {
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    skillChartContainer: {
+        padding: 16,
+        marginTop: 8,
     },
     skillsSnapshotContainer: {
         backgroundColor: '#FFF',
@@ -2345,6 +2056,205 @@ const styles = StyleSheet.create({
     goalCardActionDelete: {
         borderWidth: 1,
         borderColor: '#F44336',
+    },
+    // Goal icon container
+    goalIconContainer: {
+        width: 48,
+        height: 48,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    goalHeaderInfo: {
+        flex: 1,
+    },
+    goalMetaRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 6,
+        gap: 8,
+    },
+    goalTimeBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 10,
+        gap: 4,
+    },
+    goalTimeText: {
+        fontSize: 11,
+        fontWeight: '500',
+    },
+    goalStatusBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 10,
+        gap: 4,
+    },
+    emptyGoalIcon: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    // Completed goals section
+    completedGoalsSection: {
+        borderRadius: 12,
+        marginTop: 16,
+        overflow: 'hidden',
+    },
+    completedGoalsHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: 16,
+    },
+    completedGoalsHeaderLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    completedGoalsTitle: {
+        fontSize: 15,
+        fontWeight: '600',
+    },
+    completedGoalsList: {
+        paddingHorizontal: 16,
+        paddingBottom: 16,
+    },
+    completedGoalItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 10,
+        borderTopWidth: 1,
+        borderTopColor: '#E0E0E0',
+    },
+    completedGoalIcon: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    completedGoalName: {
+        flex: 1,
+        fontSize: 14,
+    },
+    completedGoalValue: {
+        fontSize: 13,
+    },
+    // Goals Coming Soon Styles
+    goalsSoonHero: {
+        borderRadius: 16,
+        padding: 24,
+        margin: 16,
+        alignItems: 'center',
+    },
+    goalsSoonIconContainer: {
+        width: 96,
+        height: 96,
+        borderRadius: 48,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    goalsSoonTitle: {
+        fontSize: 22,
+        fontWeight: 'bold',
+        marginBottom: 8,
+        textAlign: 'center',
+    },
+    goalsSoonSubtitle: {
+        fontSize: 14,
+        textAlign: 'center',
+        lineHeight: 20,
+        marginBottom: 16,
+        paddingHorizontal: 20,
+    },
+    goalsSoonBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+        gap: 6,
+    },
+    goalsSoonBadgeText: {
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    goalsSoonSectionTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        marginHorizontal: 16,
+        marginBottom: 12,
+    },
+    goalsSoonFeatures: {
+        paddingHorizontal: 16,
+        marginBottom: 20,
+    },
+    goalsSoonFeatureCard: {
+        flexDirection: 'row',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 12,
+        alignItems: 'center',
+    },
+    goalsSoonFeatureIcon: {
+        width: 48,
+        height: 48,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 14,
+    },
+    goalsSoonFeatureContent: {
+        flex: 1,
+    },
+    goalsSoonFeatureTitle: {
+        fontSize: 15,
+        fontWeight: '600',
+        marginBottom: 4,
+    },
+    goalsSoonFeatureDesc: {
+        fontSize: 13,
+        lineHeight: 18,
+    },
+    goalsSoonCta: {
+        borderRadius: 16,
+        padding: 20,
+        margin: 16,
+        alignItems: 'center',
+    },
+    goalsSoonCtaTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        marginBottom: 6,
+    },
+    goalsSoonCtaText: {
+        fontSize: 13,
+        textAlign: 'center',
+        marginBottom: 16,
+    },
+    goalsSoonCtaButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        borderRadius: 24,
+        gap: 8,
+    },
+    goalsSoonCtaButtonText: {
+        color: '#FFF',
+        fontSize: 15,
+        fontWeight: '600',
     },
 
     // History Tab Styles

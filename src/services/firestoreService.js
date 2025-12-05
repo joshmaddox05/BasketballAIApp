@@ -406,6 +406,98 @@ export const getCategoryBreakdown = async (uid, timeRange = 'month') => {
 };
 
 /**
+ * Get user's aggregated shooting stats from all workouts
+ * @param {string} uid - User ID
+ * @param {string} timeRange - Time range ('week', 'month', 'year', 'all')
+ * @returns {Promise<Object>} Shooting statistics
+ */
+export const getUserShootingStats = async (uid, timeRange = 'all') => {
+  try {
+    const now = new Date();
+    let startDate;
+
+    switch (timeRange) {
+      case 'week':
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case 'month':
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
+      case 'year':
+        startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+        break;
+      default:
+        startDate = null; // All time
+    }
+
+    const workouts = await getWorkoutHistory(uid, { startDate, limitCount: 1000 });
+
+    // Aggregate shooting stats from all workouts that have shooting data
+    const stats = {
+      totalShots: 0,
+      makes: 0,
+      misses: 0,
+      accuracy: 0,
+      workoutsWithShooting: 0,
+      recentAccuracy: 0, // Last 7 days
+      trend: 0 // Positive = improving, negative = declining
+    };
+
+    const recentStats = {
+      makes: 0,
+      misses: 0
+    };
+
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    workouts.forEach(workout => {
+      if (workout.shootingStats) {
+        const shootingData = workout.shootingStats;
+        stats.totalShots += shootingData.totalShots || 0;
+        stats.makes += shootingData.makes || 0;
+        stats.misses += shootingData.misses || 0;
+        stats.workoutsWithShooting += 1;
+
+        // Check if this workout is from the last week
+        if (workout.createdAt) {
+          const workoutDate = workout.createdAt.toDate ? workout.createdAt.toDate() : new Date(workout.createdAt);
+          if (workoutDate >= weekAgo) {
+            recentStats.makes += shootingData.makes || 0;
+            recentStats.misses += shootingData.misses || 0;
+          }
+        }
+      }
+    });
+
+    // Calculate overall accuracy
+    if (stats.totalShots > 0) {
+      stats.accuracy = Math.round((stats.makes / stats.totalShots) * 100);
+    }
+
+    // Calculate recent accuracy (last 7 days)
+    const recentTotal = recentStats.makes + recentStats.misses;
+    if (recentTotal > 0) {
+      stats.recentAccuracy = Math.round((recentStats.makes / recentTotal) * 100);
+      // Calculate trend (recent vs overall)
+      stats.trend = stats.recentAccuracy - stats.accuracy;
+    }
+
+    return stats;
+  } catch (error) {
+    console.error('Error getting shooting stats:', error);
+    return {
+      totalShots: 0,
+      makes: 0,
+      misses: 0,
+      accuracy: 0,
+      workoutsWithShooting: 0,
+      recentAccuracy: 0,
+      trend: 0
+    };
+  }
+};
+
+/**
  * Calculate and get user's current workout streak
  * @param {string} uid - User ID
  * @returns {Promise<number>} Current streak in days
@@ -1476,5 +1568,873 @@ export const addCommunityPost = async (uid, postData) => {
   } catch (error) {
     console.error('Error adding community post:', error);
     throw error;
+  }
+};
+
+// ==================== CHALLENGE OPERATIONS ====================
+
+/**
+ * Get all available challenges with optional filtering
+ * @param {Object} filters - Optional filters
+ * @param {string} filters.type - Filter by challenge type ('solo', 'head_to_head', 'group')
+ * @param {string} filters.difficulty - Filter by difficulty
+ * @param {string} filters.category - Filter by category
+ * @returns {Promise<Array>} Array of challenges
+ */
+export const getChallenges = async (filters = {}) => {
+  try {
+    let q = query(
+      collection(db, 'challenges'),
+      orderBy('createdAt', 'desc')
+    );
+
+    const snapshot = await getDocs(q);
+    let challenges = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    // Apply filters in-memory to avoid complex index requirements
+    if (filters.type) {
+      challenges = challenges.filter(c => c.type === filters.type);
+    }
+    if (filters.difficulty) {
+      challenges = challenges.filter(c => c.difficulty === filters.difficulty);
+    }
+    if (filters.category) {
+      challenges = challenges.filter(c => c.category === filters.category);
+    }
+
+    return challenges;
+  } catch (error) {
+    console.error('Error getting challenges:', error);
+    return [];
+  }
+};
+
+/**
+ * Get a single challenge by ID
+ * @param {string} challengeId - Challenge ID
+ * @returns {Promise<Object|null>} Challenge data
+ */
+export const getChallenge = async (challengeId) => {
+  try {
+    const challengeDoc = await getDoc(doc(db, 'challenges', challengeId));
+    if (challengeDoc.exists()) {
+      return { id: challengeDoc.id, ...challengeDoc.data() };
+    }
+    return null;
+  } catch (error) {
+    console.error('Error getting challenge:', error);
+    throw error;
+  }
+};
+
+/**
+ * Listen to a challenge for real-time updates
+ * @param {string} challengeId - Challenge ID
+ * @param {Function} callback - Callback function
+ * @returns {Function} Unsubscribe function
+ */
+export const listenToChallenge = (challengeId, callback) => {
+  return onSnapshot(doc(db, 'challenges', challengeId), (doc) => {
+    if (doc.exists()) {
+      callback({ id: doc.id, ...doc.data() });
+    } else {
+      callback(null);
+    }
+  });
+};
+
+/**
+ * Join a challenge (solo or group)
+ * @param {string} uid - User ID
+ * @param {string} challengeId - Challenge ID
+ * @param {Object} challengeData - Challenge metadata (title, type, etc.)
+ * @returns {Promise<void>}
+ */
+export const joinChallenge = async (uid, challengeId, challengeData = {}) => {
+  try {
+    // Create user's challenge progress document
+    await setDoc(doc(db, 'users', uid, 'challengeProgress', challengeId), {
+      challengeId,
+      challengeTitle: challengeData.title || '',
+      challengeType: challengeData.type || 'solo',
+      joinedAt: serverTimestamp(),
+      status: 'active',
+      currentDay: 1,
+      completedDays: [],
+      dayProgress: [],
+      totalScore: 0,
+      lastActivityAt: serverTimestamp()
+    });
+
+    // Increment participant count on the challenge
+    await updateDoc(doc(db, 'challenges', challengeId), {
+      participantCount: increment(1),
+      updatedAt: serverTimestamp()
+    });
+
+    // Add initial leaderboard entry
+    const userDoc = await getDoc(doc(db, 'users', uid));
+    const userData = userDoc.exists() ? userDoc.data() : {};
+
+    await setDoc(doc(db, 'challengeLeaderboards', challengeId, 'entries', uid), {
+      odas: uid,
+      displayName: userData.displayName || 'Anonymous',
+      profileImage: userData.profileImage || null,
+      totalScore: 0,
+      completedDays: 0,
+      joinedAt: serverTimestamp(),
+      lastUpdated: serverTimestamp()
+    });
+  } catch (error) {
+    console.error('Error joining challenge:', error);
+    throw error;
+  }
+};
+
+/**
+ * Leave/abandon a challenge
+ * @param {string} uid - User ID
+ * @param {string} challengeId - Challenge ID
+ * @returns {Promise<void>}
+ */
+export const leaveChallenge = async (uid, challengeId) => {
+  try {
+    // Update status to abandoned
+    await updateDoc(doc(db, 'users', uid, 'challengeProgress', challengeId), {
+      status: 'abandoned',
+      abandonedAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+
+    // Decrement participant count
+    await updateDoc(doc(db, 'challenges', challengeId), {
+      participantCount: increment(-1),
+      updatedAt: serverTimestamp()
+    });
+  } catch (error) {
+    console.error('Error leaving challenge:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get user's challenge progress for a specific challenge
+ * @param {string} uid - User ID
+ * @param {string} challengeId - Challenge ID
+ * @returns {Promise<Object|null>} Challenge progress
+ */
+export const getUserChallengeProgress = async (uid, challengeId) => {
+  try {
+    const progressDoc = await getDoc(doc(db, 'users', uid, 'challengeProgress', challengeId));
+    if (progressDoc.exists()) {
+      return { id: progressDoc.id, ...progressDoc.data() };
+    }
+    return null;
+  } catch (error) {
+    console.error('Error getting user challenge progress:', error);
+    return null;
+  }
+};
+
+/**
+ * Get all of user's challenges (active and completed)
+ * @param {string} uid - User ID
+ * @param {string} status - Optional status filter ('active', 'completed', 'abandoned')
+ * @returns {Promise<Array>} Array of user's challenge progress
+ */
+export const getUserChallenges = async (uid, status = null) => {
+  try {
+    let q = query(
+      collection(db, 'users', uid, 'challengeProgress'),
+      orderBy('joinedAt', 'desc')
+    );
+
+    const snapshot = await getDocs(q);
+    let challenges = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    if (status) {
+      challenges = challenges.filter(c => c.status === status);
+    }
+
+    return challenges;
+  } catch (error) {
+    console.error('Error getting user challenges:', error);
+    return [];
+  }
+};
+
+/**
+ * Listen to user's challenges for real-time updates
+ * @param {string} uid - User ID
+ * @param {Function} callback - Callback function
+ * @returns {Function} Unsubscribe function
+ */
+export const listenToUserChallenges = (uid, callback) => {
+  const q = query(
+    collection(db, 'users', uid, 'challengeProgress'),
+    orderBy('joinedAt', 'desc')
+  );
+
+  return onSnapshot(q, (snapshot) => {
+    const challenges = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    callback(challenges);
+  });
+};
+
+/**
+ * Update day progress for a challenge (mark individual exercise as complete)
+ * @param {string} uid - User ID
+ * @param {string} challengeId - Challenge ID
+ * @param {number} day - Day number
+ * @param {number} exerciseIndex - Index of the exercise to mark complete
+ * @returns {Promise<void>}
+ */
+export const updateChallengeExerciseProgress = async (uid, challengeId, day, exerciseIndex) => {
+  try {
+    const progressDoc = await getDoc(doc(db, 'users', uid, 'challengeProgress', challengeId));
+    if (!progressDoc.exists()) {
+      throw new Error('Challenge progress not found');
+    }
+
+    const progress = progressDoc.data();
+    const dayProgress = progress.dayProgress || [];
+
+    // Find or create day progress entry
+    let dayEntry = dayProgress.find(d => d.day === day);
+    if (!dayEntry) {
+      dayEntry = { day, exercises: [], completedAt: null, score: 0 };
+      dayProgress.push(dayEntry);
+    }
+
+    // Mark exercise as complete
+    if (!dayEntry.exercises.includes(exerciseIndex)) {
+      dayEntry.exercises.push(exerciseIndex);
+    }
+
+    await updateDoc(doc(db, 'users', uid, 'challengeProgress', challengeId), {
+      dayProgress,
+      lastActivityAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+  } catch (error) {
+    console.error('Error updating challenge exercise progress:', error);
+    throw error;
+  }
+};
+
+/**
+ * Complete a day in a challenge
+ * @param {string} uid - User ID
+ * @param {string} challengeId - Challenge ID
+ * @param {number} day - Day number
+ * @param {number} score - Score earned for the day
+ * @returns {Promise<Object>} Updated progress
+ */
+export const completeChallengeDay = async (uid, challengeId, day, score) => {
+  try {
+    const progressDoc = await getDoc(doc(db, 'users', uid, 'challengeProgress', challengeId));
+    if (!progressDoc.exists()) {
+      throw new Error('Challenge progress not found');
+    }
+
+    const progress = progressDoc.data();
+    const completedDays = progress.completedDays || [];
+    const dayProgress = progress.dayProgress || [];
+
+    // Add day to completed list if not already there
+    if (!completedDays.includes(day)) {
+      completedDays.push(day);
+    }
+
+    // Update day progress with completion info
+    const dayEntry = dayProgress.find(d => d.day === day);
+    if (dayEntry) {
+      dayEntry.completedAt = new Date().toISOString();
+      dayEntry.score = score;
+    }
+
+    const newTotalScore = (progress.totalScore || 0) + score;
+    const newCurrentDay = day + 1;
+
+    // Update progress document
+    await updateDoc(doc(db, 'users', uid, 'challengeProgress', challengeId), {
+      completedDays,
+      dayProgress,
+      currentDay: newCurrentDay,
+      totalScore: newTotalScore,
+      lastActivityAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+
+    // Update leaderboard entry
+    await updateDoc(doc(db, 'challengeLeaderboards', challengeId, 'entries', uid), {
+      totalScore: newTotalScore,
+      completedDays: completedDays.length,
+      lastUpdated: serverTimestamp()
+    });
+
+    // Award XP for completing a day
+    await addXP(uid, score, `Completed day ${day} of challenge`);
+
+    return {
+      completedDays,
+      currentDay: newCurrentDay,
+      totalScore: newTotalScore
+    };
+  } catch (error) {
+    console.error('Error completing challenge day:', error);
+    throw error;
+  }
+};
+
+/**
+ * Complete an entire challenge
+ * @param {string} uid - User ID
+ * @param {string} challengeId - Challenge ID
+ * @param {Object} rewards - Optional rewards data
+ * @returns {Promise<void>}
+ */
+export const completeChallenge = async (uid, challengeId, rewards = {}) => {
+  try {
+    await updateDoc(doc(db, 'users', uid, 'challengeProgress', challengeId), {
+      status: 'completed',
+      completedAt: serverTimestamp(),
+      rewards: rewards,
+      updatedAt: serverTimestamp()
+    });
+
+    // Award bonus XP for challenge completion
+    const bonusXP = rewards.points || 100;
+    await addXP(uid, bonusXP, 'Challenge completed');
+
+    // Check for challenge-related achievements
+    await checkAndUnlockAchievements(uid);
+  } catch (error) {
+    console.error('Error completing challenge:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get challenge leaderboard
+ * @param {string} challengeId - Challenge ID
+ * @param {number} limitCount - Number of entries to fetch
+ * @returns {Promise<Array>} Leaderboard entries
+ */
+export const getChallengeLeaderboard = async (challengeId, limitCount = 50) => {
+  try {
+    const q = query(
+      collection(db, 'challengeLeaderboards', challengeId, 'entries'),
+      orderBy('totalScore', 'desc'),
+      limit(limitCount)
+    );
+
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((doc, index) => ({
+      id: doc.id,
+      rank: index + 1,
+      ...doc.data()
+    }));
+  } catch (error) {
+    console.error('Error getting challenge leaderboard:', error);
+    return [];
+  }
+};
+
+/**
+ * Listen to challenge leaderboard for real-time updates
+ * @param {string} challengeId - Challenge ID
+ * @param {Function} callback - Callback function
+ * @param {number} limitCount - Number of entries to fetch
+ * @returns {Function} Unsubscribe function
+ */
+export const listenToChallengeLeaderboard = (challengeId, callback, limitCount = 50) => {
+  const q = query(
+    collection(db, 'challengeLeaderboards', challengeId, 'entries'),
+    orderBy('totalScore', 'desc'),
+    limit(limitCount)
+  );
+
+  return onSnapshot(q, (snapshot) => {
+    const entries = snapshot.docs.map((doc, index) => ({
+      id: doc.id,
+      rank: index + 1,
+      ...doc.data()
+    }));
+    callback(entries);
+  });
+};
+
+/**
+ * Get user's rank in a challenge
+ * @param {string} uid - User ID
+ * @param {string} challengeId - Challenge ID
+ * @returns {Promise<Object>} User's rank and score
+ */
+export const getUserChallengeRank = async (uid, challengeId) => {
+  try {
+    const leaderboard = await getChallengeLeaderboard(challengeId, 1000);
+    const userEntry = leaderboard.find(entry => entry.id === uid);
+
+    return {
+      rank: userEntry?.rank || null,
+      totalScore: userEntry?.totalScore || 0,
+      totalParticipants: leaderboard.length
+    };
+  } catch (error) {
+    console.error('Error getting user challenge rank:', error);
+    return { rank: null, totalScore: 0, totalParticipants: 0 };
+  }
+};
+
+// ==================== HEAD-TO-HEAD CHALLENGE OPERATIONS ====================
+
+/**
+ * Send a head-to-head challenge invite to another user
+ * @param {string} challengeId - Challenge ID
+ * @param {string} inviterUid - Inviter's user ID
+ * @param {string} inviteeUid - Invitee's user ID
+ * @param {Object} challengeData - Challenge metadata
+ * @returns {Promise<string>} Invite ID
+ */
+export const sendChallengeInvite = async (challengeId, inviterUid, inviteeUid, challengeData = {}) => {
+  try {
+    // Get inviter's display name
+    const inviterDoc = await getDoc(doc(db, 'users', inviterUid));
+    const inviterName = inviterDoc.exists() ? inviterDoc.data().displayName : 'Someone';
+
+    // Create invite document for invitee
+    const inviteRef = await addDoc(collection(db, 'users', inviteeUid, 'challengeInvites'), {
+      challengeId,
+      challengeTitle: challengeData.title || '',
+      challengeType: 'head_to_head',
+      fromUid: inviterUid,
+      fromDisplayName: inviterName,
+      status: 'pending',
+      createdAt: serverTimestamp(),
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days expiry
+    });
+
+    return inviteRef.id;
+  } catch (error) {
+    console.error('Error sending challenge invite:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get pending challenge invites for a user
+ * @param {string} uid - User ID
+ * @returns {Promise<Array>} Array of pending invites
+ */
+export const getChallengeInvites = async (uid) => {
+  try {
+    const q = query(
+      collection(db, 'users', uid, 'challengeInvites'),
+      where('status', '==', 'pending'),
+      orderBy('createdAt', 'desc')
+    );
+
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  } catch (error) {
+    console.error('Error getting challenge invites:', error);
+    return [];
+  }
+};
+
+/**
+ * Listen to challenge invites for real-time notifications
+ * @param {string} uid - User ID
+ * @param {Function} callback - Callback function
+ * @returns {Function} Unsubscribe function
+ */
+export const listenToChallengeInvites = (uid, callback) => {
+  const q = query(
+    collection(db, 'users', uid, 'challengeInvites'),
+    where('status', '==', 'pending'),
+    orderBy('createdAt', 'desc')
+  );
+
+  return onSnapshot(q, (snapshot) => {
+    const invites = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    callback(invites);
+  });
+};
+
+/**
+ * Accept a head-to-head challenge invite
+ * @param {string} uid - Accepting user's ID
+ * @param {string} inviteId - Invite ID
+ * @returns {Promise<void>}
+ */
+export const acceptChallengeInvite = async (uid, inviteId) => {
+  try {
+    const inviteDoc = await getDoc(doc(db, 'users', uid, 'challengeInvites', inviteId));
+    if (!inviteDoc.exists()) {
+      throw new Error('Invite not found');
+    }
+
+    const invite = inviteDoc.data();
+    const { challengeId, fromUid, challengeTitle } = invite;
+
+    // Get challenge data
+    const challengeDoc = await getDoc(doc(db, 'challenges', challengeId));
+    const challengeData = challengeDoc.exists() ? challengeDoc.data() : {};
+
+    // Get both users' display names
+    const [inviterDoc, inviteeDoc] = await Promise.all([
+      getDoc(doc(db, 'users', fromUid)),
+      getDoc(doc(db, 'users', uid))
+    ]);
+
+    const inviterName = inviterDoc.exists() ? inviterDoc.data().displayName : 'Opponent';
+    const inviteeName = inviteeDoc.exists() ? inviteeDoc.data().displayName : 'Opponent';
+
+    // Create challenge progress for both users
+    const progressData = {
+      challengeId,
+      challengeTitle: challengeTitle || challengeData.title || '',
+      challengeType: 'head_to_head',
+      joinedAt: serverTimestamp(),
+      status: 'active',
+      currentDay: 1,
+      completedDays: [],
+      dayProgress: [],
+      totalScore: 0,
+      lastActivityAt: serverTimestamp()
+    };
+
+    // Invitee's progress (with opponent info)
+    await setDoc(doc(db, 'users', uid, 'challengeProgress', challengeId), {
+      ...progressData,
+      opponent: {
+        uid: fromUid,
+        displayName: inviterName
+      }
+    });
+
+    // Update inviter's progress with opponent info
+    await updateDoc(doc(db, 'users', fromUid, 'challengeProgress', challengeId), {
+      opponent: {
+        uid: uid,
+        displayName: inviteeName
+      },
+      status: 'active',
+      updatedAt: serverTimestamp()
+    });
+
+    // Update invite status
+    await updateDoc(doc(db, 'users', uid, 'challengeInvites', inviteId), {
+      status: 'accepted',
+      acceptedAt: serverTimestamp()
+    });
+
+    // Update participant count
+    await updateDoc(doc(db, 'challenges', challengeId), {
+      participantCount: increment(2),
+      updatedAt: serverTimestamp()
+    });
+
+    // Create leaderboard entries for both users
+    await Promise.all([
+      setDoc(doc(db, 'challengeLeaderboards', challengeId, 'entries', uid), {
+        odas: uid,
+        displayName: inviteeName,
+        totalScore: 0,
+        completedDays: 0,
+        joinedAt: serverTimestamp(),
+        lastUpdated: serverTimestamp()
+      }),
+      setDoc(doc(db, 'challengeLeaderboards', challengeId, 'entries', fromUid), {
+        odas: fromUid,
+        displayName: inviterName,
+        totalScore: 0,
+        completedDays: 0,
+        joinedAt: serverTimestamp(),
+        lastUpdated: serverTimestamp()
+      })
+    ]);
+  } catch (error) {
+    console.error('Error accepting challenge invite:', error);
+    throw error;
+  }
+};
+
+/**
+ * Decline a challenge invite
+ * @param {string} uid - User's ID
+ * @param {string} inviteId - Invite ID
+ * @returns {Promise<void>}
+ */
+export const declineChallengeInvite = async (uid, inviteId) => {
+  try {
+    await updateDoc(doc(db, 'users', uid, 'challengeInvites', inviteId), {
+      status: 'declined',
+      declinedAt: serverTimestamp()
+    });
+  } catch (error) {
+    console.error('Error declining challenge invite:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get opponent's progress in a head-to-head challenge
+ * @param {string} opponentUid - Opponent's user ID
+ * @param {string} challengeId - Challenge ID
+ * @returns {Promise<Object|null>} Opponent's progress
+ */
+export const getOpponentProgress = async (opponentUid, challengeId) => {
+  try {
+    const progressDoc = await getDoc(doc(db, 'users', opponentUid, 'challengeProgress', challengeId));
+    if (progressDoc.exists()) {
+      const data = progressDoc.data();
+      // Return limited info for privacy
+      return {
+        currentDay: data.currentDay,
+        completedDays: data.completedDays?.length || 0,
+        totalScore: data.totalScore,
+        lastActivityAt: data.lastActivityAt
+      };
+    }
+    return null;
+  } catch (error) {
+    console.error('Error getting opponent progress:', error);
+    return null;
+  }
+};
+
+// ==================== FRIENDS OPERATIONS (for H2H Challenges) ====================
+
+/**
+ * Search users by display name
+ * @param {string} searchQuery - Search query
+ * @param {number} limitCount - Number of results
+ * @returns {Promise<Array>} Array of users
+ */
+export const searchUsers = async (searchQuery, limitCount = 20) => {
+  try {
+    if (!searchQuery || searchQuery.length < 2) {
+      return [];
+    }
+
+    // Firestore doesn't support full-text search, so we do prefix matching
+    // For production, consider using Algolia or similar
+    const q = query(
+      collection(db, 'users'),
+      where('displayName', '>=', searchQuery),
+      where('displayName', '<=', searchQuery + '\uf8ff'),
+      limit(limitCount)
+    );
+
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({
+      uid: doc.id,
+      displayName: doc.data().displayName,
+      profileImage: doc.data().profileImage || null,
+      level: doc.data().gamification?.level || 1
+    }));
+  } catch (error) {
+    console.error('Error searching users:', error);
+    return [];
+  }
+};
+
+/**
+ * Send a friend request
+ * @param {string} fromUid - Sender's user ID
+ * @param {string} toUid - Recipient's user ID
+ * @returns {Promise<string>} Request ID
+ */
+export const sendFriendRequest = async (fromUid, toUid) => {
+  try {
+    // Check if already friends
+    const existingFriend = await getDoc(doc(db, 'users', fromUid, 'friends', toUid));
+    if (existingFriend.exists()) {
+      throw new Error('Already friends with this user');
+    }
+
+    // Get sender's info
+    const fromUserDoc = await getDoc(doc(db, 'users', fromUid));
+    const fromUser = fromUserDoc.data();
+
+    // Create friend request for recipient
+    const requestRef = await addDoc(collection(db, 'users', toUid, 'friendRequests'), {
+      fromUid,
+      fromDisplayName: fromUser?.displayName || 'Anonymous',
+      fromProfileImage: fromUser?.profileImage || null,
+      status: 'pending',
+      createdAt: serverTimestamp()
+    });
+
+    return requestRef.id;
+  } catch (error) {
+    console.error('Error sending friend request:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get pending friend requests for a user
+ * @param {string} uid - User ID
+ * @returns {Promise<Array>} Array of friend requests
+ */
+export const getFriendRequests = async (uid) => {
+  try {
+    const q = query(
+      collection(db, 'users', uid, 'friendRequests'),
+      where('status', '==', 'pending'),
+      orderBy('createdAt', 'desc')
+    );
+
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  } catch (error) {
+    console.error('Error getting friend requests:', error);
+    return [];
+  }
+};
+
+/**
+ * Listen to friend requests for real-time notifications
+ * @param {string} uid - User ID
+ * @param {Function} callback - Callback function
+ * @returns {Function} Unsubscribe function
+ */
+export const listenToFriendRequests = (uid, callback) => {
+  const q = query(
+    collection(db, 'users', uid, 'friendRequests'),
+    where('status', '==', 'pending'),
+    orderBy('createdAt', 'desc')
+  );
+
+  return onSnapshot(q, (snapshot) => {
+    const requests = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    callback(requests);
+  });
+};
+
+/**
+ * Accept a friend request
+ * @param {string} uid - Accepting user's ID
+ * @param {string} requestId - Request ID
+ * @returns {Promise<void>}
+ */
+export const acceptFriendRequest = async (uid, requestId) => {
+  try {
+    const requestDoc = await getDoc(doc(db, 'users', uid, 'friendRequests', requestId));
+    if (!requestDoc.exists()) {
+      throw new Error('Friend request not found');
+    }
+
+    const request = requestDoc.data();
+    const { fromUid, fromDisplayName, fromProfileImage } = request;
+
+    // Get accepting user's info
+    const toUserDoc = await getDoc(doc(db, 'users', uid));
+    const toUser = toUserDoc.data();
+
+    // Add friend to both users
+    await Promise.all([
+      // Add to accepting user's friends
+      setDoc(doc(db, 'users', uid, 'friends', fromUid), {
+        displayName: fromDisplayName,
+        profileImage: fromProfileImage || null,
+        addedAt: serverTimestamp(),
+        status: 'accepted'
+      }),
+      // Add to sender's friends
+      setDoc(doc(db, 'users', fromUid, 'friends', uid), {
+        displayName: toUser?.displayName || 'Anonymous',
+        profileImage: toUser?.profileImage || null,
+        addedAt: serverTimestamp(),
+        status: 'accepted'
+      }),
+      // Update request status
+      updateDoc(doc(db, 'users', uid, 'friendRequests', requestId), {
+        status: 'accepted',
+        acceptedAt: serverTimestamp()
+      })
+    ]);
+  } catch (error) {
+    console.error('Error accepting friend request:', error);
+    throw error;
+  }
+};
+
+/**
+ * Decline a friend request
+ * @param {string} uid - User's ID
+ * @param {string} requestId - Request ID
+ * @returns {Promise<void>}
+ */
+export const declineFriendRequest = async (uid, requestId) => {
+  try {
+    await updateDoc(doc(db, 'users', uid, 'friendRequests', requestId), {
+      status: 'declined',
+      declinedAt: serverTimestamp()
+    });
+  } catch (error) {
+    console.error('Error declining friend request:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get user's friends list
+ * @param {string} uid - User ID
+ * @returns {Promise<Array>} Array of friends
+ */
+export const getFriends = async (uid) => {
+  try {
+    const q = query(
+      collection(db, 'users', uid, 'friends'),
+      where('status', '==', 'accepted')
+    );
+
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({
+      uid: doc.id,
+      ...doc.data()
+    }));
+  } catch (error) {
+    console.error('Error getting friends:', error);
+    return [];
+  }
+};
+
+/**
+ * Remove a friend
+ * @param {string} uid - User's ID
+ * @param {string} friendUid - Friend's user ID
+ * @returns {Promise<void>}
+ */
+export const removeFriend = async (uid, friendUid) => {
+  try {
+    // Remove from both users' friends lists
+    await Promise.all([
+      deleteDoc(doc(db, 'users', uid, 'friends', friendUid)),
+      deleteDoc(doc(db, 'users', friendUid, 'friends', uid))
+    ]);
+  } catch (error) {
+    console.error('Error removing friend:', error);
+    throw error;
+  }
+};
+
+/**
+ * Check if two users are friends
+ * @param {string} uid1 - First user ID
+ * @param {string} uid2 - Second user ID
+ * @returns {Promise<boolean>} True if friends
+ */
+export const areFriends = async (uid1, uid2) => {
+  try {
+    const friendDoc = await getDoc(doc(db, 'users', uid1, 'friends', uid2));
+    return friendDoc.exists() && friendDoc.data().status === 'accepted';
+  } catch (error) {
+    console.error('Error checking friendship:', error);
+    return false;
   }
 };

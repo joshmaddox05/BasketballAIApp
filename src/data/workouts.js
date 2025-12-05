@@ -40,7 +40,7 @@ export const comprehensiveWorkouts = [
         tips: 'Keep your elbow in, eyes on the target, and follow through with your wrist. The ball should roll off your fingertips.',
         duration: '10 min',
         type: 'repetition',
-        reps: 20
+        rreps: 20
       },
       {
         title: 'Mid-Range Form',
@@ -88,7 +88,8 @@ export const comprehensiveWorkouts = [
         tips: 'Keep your shooting elbow in line with the basket. Follow through with your wrist pointing down.',
         duration: '15 min',
         type: 'repetition',
-        reps: 30
+        reps: 30,
+        videoReference: require('../../assets/FormShootingDemoFiveFeet.mp4')
       },
       {
         title: 'Pressure Practice',

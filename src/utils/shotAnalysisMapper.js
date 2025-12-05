@@ -432,21 +432,34 @@ function formatCues(cues) {
  * @returns {Object} UI-ready model with progressive disclosure
  */
 export function mapAnalysisToUI(apiResponse, history = []) {
-  // Extract metrics (handle both snake_case from API and camelCase)
+  // Extract metrics from API response
+  // The API returns metrics as objects like: { release_angle: { angle_deg: 58.2, ... }, ... }
+  // We need to extract the actual values from these nested objects
+  const metricsObj = apiResponse.metrics || {};
+
   const metrics = {
-    release_angle_deg: apiResponse.metrics?.release_angle_deg || 
-                       apiResponse.metrics?.find(m => m.id === 'release_angle')?.value,
-    elbow_flare_deg: apiResponse.metrics?.elbow_flare_deg ||
-                     apiResponse.metrics?.find(m => m.id === 'elbow_flare')?.value,
-    knee_load_deg: apiResponse.metrics?.knee_load_deg ||
-                   apiResponse.metrics?.find(m => m.id === 'knee_flexion')?.value,
-    time_load_to_release_ms: apiResponse.metrics?.time_load_to_release_ms || 300,
-    lateral_sway_cm: apiResponse.metrics?.lateral_sway_cm ||
-                     apiResponse.metrics?.find(m => m.id === 'lateral_sway')?.value,
-    base_width_ratio: apiResponse.metrics?.base_width_ratio ||
-                      apiResponse.metrics?.find(m => m.id === 'stance_width')?.value,
-    hip_shoulder_alignment_deg: apiResponse.metrics?.hip_shoulder_alignment_deg ||
-                                apiResponse.metrics?.find(m => m.id === 'hip_shoulder_alignment')?.value
+    release_angle_deg: metricsObj.release_angle?.angle_deg ||
+                       metricsObj.release_angle_deg ||
+                       apiResponse.metrics?.find?.(m => m.id === 'release_angle')?.value,
+    elbow_flare_deg: metricsObj.elbow_flare?.angle_deg ||
+                     metricsObj.elbow_flare_deg ||
+                     apiResponse.metrics?.find?.(m => m.id === 'elbow_flare')?.value,
+    knee_load_deg: metricsObj.knee_load?.angle_deg ||
+                   metricsObj.knee_load_deg ||
+                   apiResponse.metrics?.find?.(m => m.id === 'knee_flexion')?.value,
+    time_load_to_release_ms: metricsObj.time_load_to_release?.ms ||
+                             metricsObj.time_load_to_release_ms ||
+                             300,
+    lateral_sway_cm: metricsObj.lateral_sway?.sway_cm ||
+                     metricsObj.lateral_sway_cm ||
+                     apiResponse.metrics?.find?.(m => m.id === 'lateral_sway')?.value,
+    base_width_ratio: metricsObj.base_width?.ratio ||
+                      metricsObj.base_width?.value ||
+                      metricsObj.base_width_ratio ||
+                      apiResponse.metrics?.find?.(m => m.id === 'stance_width')?.value,
+    hip_shoulder_alignment_deg: metricsObj.hip_shoulder_alignment?.angle_deg ||
+                                metricsObj.hip_shoulder_alignment_deg ||
+                                apiResponse.metrics?.find?.(m => m.id === 'hip_shoulder_alignment')?.value
   };
   
   // Compute overall score

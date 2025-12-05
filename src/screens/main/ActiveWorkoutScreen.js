@@ -15,6 +15,7 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { VideoView, useVideoPlayer } from 'expo-video';
 import { useAppContext } from '../../context/AppContext';
 import { hasAccess } from '../../utils/subscription';
 import SubscriptionModal from '../../components/shared/SubscriptionModal';
@@ -24,15 +25,35 @@ import {
   updateUserStats,
   initializeGamification,
   addXP,
-  checkAndUnlockAchievements
+  checkAndUnlockAchievements,
+  getWorkoutHistory,
+  setUserStats
 } from '../../services/firestoreService';
 import { XP_REWARDS } from '../../data/achievements';
 
 const { width, height } = Dimensions.get('window');
 
+// Separate component for video player to avoid hooks issues
+const WorkoutVideoPlayer = ({ videoSource, style }) => {
+  const player = useVideoPlayer(videoSource, (p) => {
+    p.loop = true;
+    p.muted = true;
+    p.play();
+  });
+
+  return (
+    <VideoView
+      style={style}
+      player={player}
+      allowsFullscreen
+      allowsPictureInPicture
+    />
+  );
+};
+
 const ActiveWorkoutScreen = ({ route, navigation }) => {
   const { workoutId, resumeStep = 0, workout: passedWorkout, isCustom } = route.params;
-  const { userData, theme: contextTheme, isDarkMode, workouts } = useAppContext();
+  const { userData, theme: contextTheme, isDarkMode, workouts, dailyChallenge, updateChallenge } = useAppContext();
   const theme = contextTheme || getTheme(isDarkMode || false);
 
   // Workout state
@@ -53,6 +74,11 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
   // Rep counter state
   const [currentReps, setCurrentReps] = useState(0);
   const [targetReps, setTargetReps] = useState(0);
+
+  // Shooting stats state (for shooting drills)
+  const [makes, setMakes] = useState(0);
+  const [misses, setMisses] = useState(0);
+  const [stepShootingStats, setStepShootingStats] = useState([]); // Track stats for each step
 
   // Animation refs
   const progressAnimation = useRef(new Animated.Value(0)).current;
@@ -131,6 +157,24 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
 
   const currentStepData = workout.steps[currentStep];
 
+  // Debug logging
+  useEffect(() => {
+    console.log('📹 Current step data:', {
+      title: currentStepData?.title,
+      name: currentStepData?.name,
+      hasVideoReference: !!currentStepData?.videoReference,
+      videoReference: currentStepData?.videoReference,
+      duration: currentStepData?.duration,
+      reps: currentStepData?.reps,
+      category: currentStepData?.category,
+    });
+    console.log('🏋️ Workout data:', {
+      workoutTitle: workout.title,
+      workoutName: workout.name,
+      workoutCategory: workout.category,
+    });
+  }, [currentStepData]);
+
   // Initialize step when it changes with smooth transition
   useEffect(() => {
     if (currentStepData) {
@@ -151,6 +195,10 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
         setStepStartTime(Date.now());
         setCurrentReps(0);
         setTargetReps(currentStepData.reps || 0);
+
+        // Reset shooting stats for new step
+        setMakes(0);
+        setMisses(0);
 
         if (currentStepData.duration) {
           setTimeRemaining(currentStepData.duration * 60);
@@ -245,6 +293,11 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
   const handleStepComplete = async () => {
     const stepTime = Math.floor((Date.now() - stepStartTime) / 1000);
 
+    // Determine if this is a shooting drill
+    const isShootingDrill = isShootingWorkout();
+    const totalAttempts = makes + misses;
+    const shootingPercentage = totalAttempts > 0 ? Math.round((makes / totalAttempts) * 100) : 0;
+
     // Record step performance
     const performance = {
       stepIndex: currentStep,
@@ -252,10 +305,28 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
       timeSpent: stepTime,
       repsCompleted: currentReps,
       targetReps: targetReps,
-      completionPercentage: targetReps > 0 ? Math.round((currentReps / targetReps) * 100) : 100
+      completionPercentage: targetReps > 0 ? Math.round((currentReps / targetReps) * 100) : 100,
+      // Add shooting stats if it's a shooting drill
+      ...(isShootingDrill && totalAttempts > 0 && {
+        makes: makes,
+        misses: misses,
+        shootingPercentage: shootingPercentage,
+        totalShots: totalAttempts
+      })
     };
 
     setStepPerformance(prev => [...prev, performance]);
+
+    // Save to step shooting stats array for detailed tracking
+    if (isShootingDrill && totalAttempts > 0) {
+      setStepShootingStats(prev => [...prev, {
+        stepTitle: currentStepData.title,
+        makes: makes,
+        misses: misses,
+        percentage: shootingPercentage,
+        totalShots: totalAttempts
+      }]);
+    }
 
     if (currentStep < workout.steps.length - 1) {
       // Move to next step
@@ -293,6 +364,21 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
         else if (title.includes('passing')) category = 'Passing';
       }
 
+      // Calculate shooting stats if this was a shooting workout
+      const shootingStats = stepShootingStats.length > 0 ? {
+        totalMakes: stepShootingStats.reduce((sum, step) => sum + step.makes, 0),
+        totalMisses: stepShootingStats.reduce((sum, step) => sum + step.misses, 0),
+        totalShots: stepShootingStats.reduce((sum, step) => sum + step.totalShots, 0),
+        overallPercentage: 0,
+        stepBreakdown: stepShootingStats
+      } : null;
+
+      if (shootingStats) {
+        shootingStats.overallPercentage = shootingStats.totalShots > 0
+          ? Math.round((shootingStats.totalMakes / shootingStats.totalShots) * 100)
+          : 0;
+      }
+
       // Save detailed workout completion to Firestore
       await addWorkoutCompletion(userData.uid, {
         workoutId: workout.id,
@@ -306,6 +392,7 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
         totalReps: totalReps,
         completionPercentage: Math.round(avgCompletion),
         caloriesEstimate: caloriesEstimate,
+        ...(shootingStats && { shootingStats }), // Add shooting stats if available
         completedAt: new Date()
       });
 
@@ -321,10 +408,46 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
         statsUpdate.physical = 1;
       }
 
-      // Always increment streak
-      statsUpdate.streak = 1;
-
       await updateUserStats(userData.uid, statsUpdate);
+
+      // Calculate proper consecutive days streak
+      const workoutHistory = await getWorkoutHistory(userData.uid, { limitCount: 365 });
+
+      // Group workouts by date (including the one we just completed)
+      const workoutDates = new Set();
+      workoutHistory.forEach(workout => {
+        if (workout.completedAt && workout.completedAt.toDate) {
+          const date = workout.completedAt.toDate();
+          date.setHours(0, 0, 0, 0);
+          workoutDates.add(date.toDateString());
+        }
+      });
+
+      // Add today's workout
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      workoutDates.add(today.toDateString());
+
+      // Calculate streak from today backwards
+      let newStreak = 0;
+      for (let i = 0; i < 365; i++) {
+        const checkDate = new Date(today);
+        checkDate.setDate(today.getDate() - i);
+        const dateStr = checkDate.toDateString();
+
+        if (workoutDates.has(dateStr)) {
+          newStreak++;
+        } else if (i > 0) {
+          // Break on first gap (but allow today to have no workout yet)
+          break;
+        }
+      }
+
+      // Update the streak with the calculated value
+      await setUserStats(userData.uid, {
+        ...userData.stats,
+        streak: newStreak
+      });
 
       // ==================== GAMIFICATION ====================
       // Initialize gamification if needed
@@ -343,6 +466,41 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
         createdAt: new Date()
       };
       const newAchievements = await checkAndUnlockAchievements(userData.uid, workoutData);
+
+      // ==================== DAILY CHALLENGE UPDATE ====================
+      // Update daily challenge progress if there's an active challenge
+      if (dailyChallenge && !dailyChallenge.completed && updateChallenge) {
+        try {
+          let shouldUpdate = false;
+          let newProgress = dailyChallenge.current || 0;
+
+          // Check challenge type and update accordingly
+          if (dailyChallenge.type === 'workout') {
+            // "Complete X workouts" challenge
+            newProgress = (dailyChallenge.current || 0) + 1;
+            shouldUpdate = true;
+          } else if (dailyChallenge.type === 'streak') {
+            // "Maintain your streak" challenge - complete any workout
+            newProgress = (dailyChallenge.current || 0) + 1;
+            shouldUpdate = true;
+          } else if (dailyChallenge.type === 'category' && dailyChallenge.category === category) {
+            // "Complete X workouts in [category]" challenge
+            newProgress = (dailyChallenge.current || 0) + 1;
+            shouldUpdate = true;
+          } else if (dailyChallenge.type === 'time') {
+            // "Train for X minutes" challenge
+            newProgress = (dailyChallenge.current || 0) + Math.round(totalWorkoutTime / 60);
+            shouldUpdate = true;
+          }
+
+          if (shouldUpdate) {
+            await updateChallenge(newProgress);
+          }
+        } catch (error) {
+          console.error('Error updating daily challenge:', error);
+          // Don't fail the workout completion if challenge update fails
+        }
+      }
 
       // Build completion message
       let completionMessage = `Great job! You completed ${workout.title} in ${Math.floor(totalWorkoutTime / 60)} minutes.\n\n` +
@@ -401,6 +559,37 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
     );
   };
 
+  // Helper function to determine if current workout is shooting-related
+  const isShootingWorkout = () => {
+    const category = (workout.category || '').toLowerCase();
+    const title = (workout.title || workout.name || '').toLowerCase();
+    const stepTitle = (currentStepData?.title || currentStepData?.name || '').toLowerCase();
+    const stepCategory = (currentStepData?.category || '').toLowerCase();
+
+    const isShootingDrill = category === 'shooting' ||
+           stepCategory === 'shooting' ||
+           title.includes('shooting') ||
+           title.includes('shot') ||
+           stepTitle.includes('shooting') ||
+           stepTitle.includes('shot') ||
+           stepTitle.includes('free throw') ||
+           stepTitle.includes('three-point');
+
+    // Debug logging
+    console.log('🏀 Shooting workout check:', {
+      workoutCategory: category,
+      stepCategory,
+      title,
+      stepTitle,
+      isShootingDrill,
+      hasReps: targetReps > 0,
+      timerActive,
+      currentStep
+    });
+
+    return isShootingDrill;
+  };
+
   const handleRepComplete = () => {
     if (currentReps < targetReps) {
       setCurrentReps(prev => prev + 1);
@@ -420,6 +609,46 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
         })
       ]).start();
     }
+  };
+
+  const handleMake = () => {
+    setMakes(prev => prev + 1);
+    setCurrentReps(prev => prev + 1);
+    Vibration.vibrate(100);
+
+    // Success animation
+    Animated.sequence([
+      Animated.timing(scaleAnim, {
+        toValue: 1.1,
+        duration: 100,
+        useNativeDriver: true
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true
+      })
+    ]).start();
+  };
+
+  const handleMiss = () => {
+    setMisses(prev => prev + 1);
+    setCurrentReps(prev => prev + 1);
+    Vibration.vibrate([50, 50]);
+
+    // Miss animation
+    Animated.sequence([
+      Animated.timing(scaleAnim, {
+        toValue: 0.95,
+        duration: 100,
+        useNativeDriver: true
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true
+      })
+    ]).start();
   };
 
   const formatTime = (seconds) => {
@@ -525,12 +754,27 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
             </Text>
           </View>
           <Text style={[styles.stepTitle, { color: theme.text }]}>
-            {currentStepData.title}
+            {currentStepData.title || currentStepData.name}
           </Text>
         </View>
 
-        {/* Enhanced Timer or Rep Counter */}
-        {timerActive ? (
+        {/* Video Reference */}
+        {currentStepData.videoReference && (
+          <View style={[styles.videoContainer, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <View style={styles.videoHeader}>
+              <Ionicons name="play-circle-outline" size={24} color={theme.primary} />
+              <Text style={[styles.videoTitle, { color: theme.text }]}>Reference Video</Text>
+            </View>
+            <WorkoutVideoPlayer
+              key={`video-${currentStep}`}
+              videoSource={currentStepData.videoReference}
+              style={styles.video}
+            />
+          </View>
+        )}
+
+        {/* Enhanced Timer */}
+        {timerActive && (
           <View style={styles.timerWrapper}>
             <Animated.View
               style={[
@@ -555,44 +799,129 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
               )}
             </Animated.View>
           </View>
-        ) : targetReps > 0 ? (
-          <View style={styles.repWrapper}>
-            <View style={[styles.repContainer, { backgroundColor: theme.card }]}>
-              <View style={styles.repCounter}>
-                <Text style={[styles.repText, { color: theme.primary }]}>
-                  {currentReps}
+        )}
+
+        {/* Rep Counter or Shooting Tracker */}
+        {targetReps > 0 && (
+          isShootingWorkout() ? (
+            // Shooting tracker with makes/misses
+            <View style={styles.repWrapper}>
+              <View style={[styles.repContainer, { backgroundColor: theme.card }]}>
+                {/* Shot counter */}
+                <View style={styles.repCounter}>
+                  <Text style={[styles.repText, { color: theme.primary }]}>
+                    {currentReps}
+                  </Text>
+                  <Text style={[styles.repDivider, { color: theme.textTertiary }]}>/</Text>
+                  <Text style={[styles.repTargetText, { color: theme.textSecondary }]}>
+                    {targetReps}
+                  </Text>
+                </View>
+                <Text style={[styles.repLabel, { color: theme.textSecondary }]}>
+                  Shots Taken
                 </Text>
-                <Text style={[styles.repDivider, { color: theme.textTertiary }]}>/</Text>
-                <Text style={[styles.repTargetText, { color: theme.textSecondary }]}>
-                  {targetReps}
-                </Text>
+
+                {/* Makes/Misses stats */}
+                <View style={styles.shootingStatsRow}>
+                  <View style={styles.shootingStat}>
+                    <Ionicons name="checkmark-circle" size={24} color={theme.success} />
+                    <Text style={[styles.shootingStatNumber, { color: theme.success }]}>{makes}</Text>
+                    <Text style={[styles.shootingStatLabel, { color: theme.textSecondary }]}>Makes</Text>
+                  </View>
+                  <View style={styles.shootingStat}>
+                    <Ionicons name="close-circle" size={24} color={theme.error} />
+                    <Text style={[styles.shootingStatNumber, { color: theme.error }]}>{misses}</Text>
+                    <Text style={[styles.shootingStatLabel, { color: theme.textSecondary }]}>Misses</Text>
+                  </View>
+                  <View style={styles.shootingStat}>
+                    <Ionicons name="analytics" size={24} color={theme.primary} />
+                    <Text style={[styles.shootingStatNumber, { color: theme.primary }]}>
+                      {makes + misses > 0 ? Math.round((makes / (makes + misses)) * 100) : 0}%
+                    </Text>
+                    <Text style={[styles.shootingStatLabel, { color: theme.textSecondary }]}>FG%</Text>
+                  </View>
+                </View>
+
+                {/* Make/Miss buttons */}
+                <View style={styles.shootingButtonsRow}>
+                  <Animated.View style={{ transform: [{ scale: scaleAnim }], flex: 1 }}>
+                    <TouchableOpacity
+                      style={[
+                        styles.shootingButton,
+                        {
+                          backgroundColor: currentReps >= targetReps ? theme.success + '60' : theme.success,
+                          opacity: currentReps >= targetReps ? 0.6 : 1
+                        }
+                      ]}
+                      onPress={handleMake}
+                      disabled={currentReps >= targetReps}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="checkmark" size={28} color="#FFF" />
+                      <Text style={styles.shootingButtonText}>Make</Text>
+                    </TouchableOpacity>
+                  </Animated.View>
+                  <View style={{ width: 12 }} />
+                  <Animated.View style={{ transform: [{ scale: scaleAnim }], flex: 1 }}>
+                    <TouchableOpacity
+                      style={[
+                        styles.shootingButton,
+                        {
+                          backgroundColor: currentReps >= targetReps ? theme.error + '60' : theme.error,
+                          opacity: currentReps >= targetReps ? 0.6 : 1
+                        }
+                      ]}
+                      onPress={handleMiss}
+                      disabled={currentReps >= targetReps}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="close" size={28} color="#FFF" />
+                      <Text style={styles.shootingButtonText}>Miss</Text>
+                    </TouchableOpacity>
+                  </Animated.View>
+                </View>
               </View>
-              <Text style={[styles.repLabel, { color: theme.textSecondary }]}>
-                Repetitions Completed
-              </Text>
-              <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-                <TouchableOpacity
-                  style={[
-                    styles.repButton,
-                    {
-                      backgroundColor: currentReps >= targetReps ? theme.success : theme.primary,
-                      opacity: currentReps >= targetReps ? 0.6 : 1
-                    }
-                  ]}
-                  onPress={handleRepComplete}
-                  disabled={currentReps >= targetReps}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons
-                    name={currentReps >= targetReps ? "checkmark" : "add"}
-                    size={32}
-                    color="#FFF"
-                  />
-                </TouchableOpacity>
-              </Animated.View>
             </View>
-          </View>
-        ) : null}
+          ) : (
+            // Regular rep counter for non-shooting exercises
+            <View style={styles.repWrapper}>
+              <View style={[styles.repContainer, { backgroundColor: theme.card }]}>
+                <View style={styles.repCounter}>
+                  <Text style={[styles.repText, { color: theme.primary }]}>
+                    {currentReps}
+                  </Text>
+                  <Text style={[styles.repDivider, { color: theme.textTertiary }]}>/</Text>
+                  <Text style={[styles.repTargetText, { color: theme.textSecondary }]}>
+                    {targetReps}
+                  </Text>
+                </View>
+                <Text style={[styles.repLabel, { color: theme.textSecondary }]}>
+                  Repetitions Completed
+                </Text>
+                <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+                  <TouchableOpacity
+                    style={[
+                      styles.repButton,
+                      {
+                        backgroundColor: currentReps >= targetReps ? theme.success : theme.primary,
+                        opacity: currentReps >= targetReps ? 0.6 : 1
+                      }
+                    ]}
+                    onPress={handleRepComplete}
+                    disabled={currentReps >= targetReps}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons
+                      name={currentReps >= targetReps ? "checkmark" : "add"}
+                      size={32}
+                      color="#FFF"
+                    />
+                  </TouchableOpacity>
+                </Animated.View>
+              </View>
+            </View>
+          )
+        )}
 
         {/* Enhanced Instructions */}
         <View style={[styles.instructionsContainer, { backgroundColor: theme.card, borderColor: theme.border }]}>
@@ -601,7 +930,9 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
             <Text style={[styles.instructionsTitle, { color: theme.text }]}>Instructions</Text>
           </View>
           <Text style={[styles.instructionsText, { color: theme.textSecondary }]}>
-            {currentStepData.instructions}
+            {Array.isArray(currentStepData.instructions)
+              ? currentStepData.instructions.join('\n• ')
+              : currentStepData.instructions}
           </Text>
         </View>
 
@@ -829,6 +1160,80 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 6,
+  },
+  // Shooting tracker styles
+  shootingStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    width: '100%',
+    marginTop: 20,
+    marginBottom: 20,
+  },
+  shootingStat: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  shootingStatNumber: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    marginTop: 4,
+  },
+  shootingStatLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  shootingButtonsRow: {
+    flexDirection: 'row',
+    width: '100%',
+    marginTop: 16,
+  },
+  shootingButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    borderRadius: 12,
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  shootingButtonText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  videoContainer: {
+    marginBottom: 20,
+    borderRadius: 16,
+    borderWidth: 1,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  videoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    gap: 8,
+  },
+  videoTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  video: {
+    width: '100%',
+    height: 240,
+    backgroundColor: '#000',
   },
   instructionsContainer: {
     padding: 20,

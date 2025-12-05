@@ -327,7 +327,7 @@ const CommunityScreen = ({ navigation }) => {
     const handleUpgrade = () => {
         setShowUpgradePrompt(false);
         setLockedFeature(null);
-        navigation.navigate('Settings', { openSubscription: true });
+        navigation.navigate('Profile', { screen: 'Settings', params: { openSubscription: true }, initial: false });
     };
 
     // Handle connecting with a mentor

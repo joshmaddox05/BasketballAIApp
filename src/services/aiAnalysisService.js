@@ -691,9 +691,21 @@ class AIAnalysisService {
       }
     } catch (error) {
       console.error('❌ Comprehensive analysis error:', error);
-      console.log('⚠️ Falling back to simulated comprehensive analysis');
-      // Fallback to simulated analysis
-      return await this.simulateComprehensiveAnalysis(videoData);
+
+      // If this is an API error with tips, rethrow it so the UI can handle it
+      if (error.apiError || error.tips) {
+        throw error;
+      }
+
+      // For network errors or other issues, provide a helpful message
+      if (error.message.includes('Network') || error.message.includes('fetch')) {
+        const networkError = new Error('Unable to connect to the analysis server. Please check your internet connection and try again.');
+        networkError.apiError = true;
+        throw networkError;
+      }
+
+      // For other errors, rethrow with context
+      throw new Error(`Analysis failed: ${error.message}`);
     }
   }
 
@@ -708,7 +720,13 @@ class AIAnalysisService {
     // Check if API returned an error
     if (apiResults.success === false) {
       console.warn('⚠️ API returned failure:', apiResults.error);
-      throw new Error(apiResults.error || 'Analysis failed');
+
+      // Create a custom error object with tips if available
+      const error = new Error(apiResults.error || 'Analysis failed');
+      error.apiError = true;
+      error.tips = apiResults.tips || [];
+      error.confidence = apiResults.confidence;
+      throw error;
     }
 
     // Map the metrics from the API response to the UI format
@@ -727,15 +745,25 @@ class AIAnalysisService {
       metrics: metricsArray,
 
       // Coaching cues for the top fixes
-      coachingCues: (apiResults.coaching_cues || []).map((cue, idx) => ({
+      coachingCues: (apiResults.coaching_cues || []).map((cueData, idx) => ({
         priority: idx + 1,
-        cue: cue,
-        title: cue,
-        description: cue
+        cue: typeof cueData === 'string' ? cueData : cueData.cue || '',
+        title: typeof cueData === 'string' ? cueData : cueData.cue || '',
+        description: typeof cueData === 'string' ? cueData : cueData.why || cueData.description || '',
+        drill: typeof cueData === 'object' ? cueData.drill : null,
+        drillDescription: typeof cueData === 'object' ? cueData.drill_description : null,
+        metric: typeof cueData === 'object' ? cueData.metric : null,
+        currentValue: typeof cueData === 'object' ? cueData.current_value : null,
+        optimalRange: typeof cueData === 'object' ? cueData.optimal_range : null,
+        visualCue: typeof cueData === 'object' ? cueData.visual_cue : null,
+        commonMistakes: typeof cueData === 'object' ? cueData.common_mistakes : null
       })),
 
       // Improvement suggestions
       improvements: improvements,
+
+      // Visualization video URL from API (new field)
+      visualizationVideoUrl: apiResults.visualization_video_url || apiResults.annotated_video_url || null,
 
       // Phases data if available
       phases: apiResults.phases || {},
@@ -761,28 +789,35 @@ class AIAnalysisService {
     const metricsArray = [];
 
     const metricConfig = {
-      release_angle: { name: 'Release Angle', ideal: '45-55°', unit: '°' },
-      elbow_flare: { name: 'Elbow Alignment', ideal: '<10° flare', unit: '°' },
-      knee_load: { name: 'Knee Bend', ideal: '45-65°', unit: '°' },
-      hip_shoulder_alignment: { name: 'Body Alignment', ideal: 'Aligned', unit: '°' },
-      base_width: { name: 'Stance Width', ideal: 'Shoulder width', unit: '' },
-      lateral_sway: { name: 'Balance & Stability', ideal: '<3cm sway', unit: 'cm' },
-      arc_trajectory: { name: 'Shot Arc', ideal: '45-52°', unit: '°' }
+      release_angle: { name: 'Release Angle', ideal: '45-55°', unit: '°', valueField: 'angle_deg' },
+      elbow_flare: { name: 'Elbow Alignment', ideal: '<10° flare', unit: '°', valueField: 'angle_deg' },
+      knee_load: { name: 'Knee Bend', ideal: '45-65°', unit: '°', valueField: 'angle_deg' },
+      hip_shoulder_alignment: { name: 'Body Alignment', ideal: 'Aligned', unit: '°', valueField: 'angle_deg' },
+      base_width: { name: 'Stance Width', ideal: 'Shoulder width', unit: '', valueField: 'value' },
+      lateral_sway: { name: 'Balance & Stability', ideal: '<3cm sway', unit: 'cm', valueField: 'sway_cm' },
+      arc_trajectory: { name: 'Shot Arc', ideal: '45-52°', unit: '°', valueField: 'angle_deg' }
     };
 
     for (const [key, data] of Object.entries(metrics)) {
       if (data && metricConfig[key]) {
         const config = metricConfig[key];
         const qualityScore = data.quality_score || 0.5;
-        const status = data.in_optimal_range ? 'good' : (qualityScore >= 0.6 ? 'improve' : 'poor');
+
+        // API returns 'in_range' not 'in_optimal_range'
+        const inOptimalRange = data.in_range !== undefined ? data.in_range : data.in_optimal_range;
+        const status = inOptimalRange ? 'good' : (qualityScore >= 0.6 ? 'improve' : 'poor');
+
+        // Get the value from the appropriate field (angle_deg, sway_cm, etc.)
+        const valueField = config.valueField || 'value';
+        const rawValue = data[valueField] !== undefined ? data[valueField] : data.value;
 
         metricsArray.push({
           id: key,
           name: config.name,
           score: Math.round(qualityScore * 10),
-          value: `${typeof data.value === 'number' ? data.value.toFixed(1) : data.value}${config.unit}`,
+          value: `${typeof rawValue === 'number' ? rawValue.toFixed(1) : rawValue}${config.unit}`,
           ideal: data.optimal_range ? `${data.optimal_range[0]}-${data.optimal_range[1]}${config.unit}` : config.ideal,
-          feedback: data.status || (data.in_optimal_range ? 'Good form!' : 'Room for improvement'),
+          feedback: data.description || data.status || (inOptimalRange ? 'Good form!' : 'Room for improvement'),
           status: status
         });
       }
@@ -802,10 +837,12 @@ class AIAnalysisService {
       improvements.push(...apiResults.improvement_summary.areas_to_improve);
     }
 
-    // Add from coaching_cues if we need more
+    // Add from coaching_cues if we need more (extract string cues, not full objects)
     if (improvements.length < 3 && apiResults.coaching_cues) {
-      const additionalCues = apiResults.coaching_cues.slice(0, 3 - improvements.length);
-      improvements.push(...additionalCues);
+      const additionalCues = apiResults.coaching_cues
+        .slice(0, 3 - improvements.length)
+        .map(cue => typeof cue === 'string' ? cue : cue.cue || '');
+      improvements.push(...additionalCues.filter(c => c)); // Filter out empty strings
     }
 
     // Fallback if no improvements found
@@ -935,6 +972,9 @@ class AIAnalysisService {
             total_frames: 75,
             processed_frames: 60
           },
+
+          // Simulated visualization video URL (for testing)
+          visualization_video_url: null, // No visualization in simulation mode
 
           analyzed_at: new Date().toISOString()
         };

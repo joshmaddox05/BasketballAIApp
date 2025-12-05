@@ -6,8 +6,9 @@ React Native/Expo mobile application providing AI-powered basketball shot analys
 
 - Real-time shot recording with camera
 - AI-powered form analysis using MediaPipe
-- Stephen Curry shooting form comparison
-- Personalized coaching feedback
+- Visual shot breakdown with pose detection overlays
+- Personalized coaching feedback in plain language
+- Detailed biomechanical metrics and scoring
 - Progress tracking and statistics
 - Customized training plans
 - Video library and drills
@@ -126,7 +127,7 @@ BasketballAIApp/
 │   ├── screens/          # App screens
 │   │   ├── auth/        # Login, Register, ForgotPassword
 │   │   ├── onboarding/  # Welcome flow
-│   │   └── main/        # Home, Profile, Analysis, etc.
+│   │   └── shared/      # Shared screens (ShootingAnalysis, etc.)
 │   ├── services/         # Business logic services
 │   │   ├── authService.js
 │   │   ├── firestoreService.js
@@ -140,6 +141,8 @@ BasketballAIApp/
 ├── app.config.js         # Expo configuration
 └── package.json          # Dependencies
 ```
+
+**Note:** The backend API is maintained in a separate repository: [BasketballAIAppApi](https://github.com/joshmaddox05/BasketballAIAppApi.git)
 
 ## Key Services
 

@@ -1,4 +1,4 @@
-// ShotAnalysisResultsSimple.js - HS/College friendly shot analysis results with progressive disclosure
+// ShotAnalysisResultsSimple.js - Player-friendly shot analysis with actionable feedback
 import React, { useState, useRef, useEffect } from 'react';
 import {
     StyleSheet,
@@ -8,24 +8,142 @@ import {
     TouchableOpacity,
     Animated,
     Dimensions,
-    Platform
+    Platform,
+    ActivityIndicator
 } from 'react-native';
+import { Video, ResizeMode } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
-import { mapAnalysisToUI, getDrillDetails, getScoreColor, getConfidenceTip } from '../../utils/shotAnalysisMapper';
+import { getScoreColor, getConfidenceTip } from '../../utils/shotAnalysisMapper';
 
-const { width } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-const ShotAnalysisResultsSimple = ({ results, onClose, onTryAgain, history = [] }) => {
+// Actionable feedback messages for each metric based on status
+const METRIC_FEEDBACK = {
+    release_angle: {
+        good: { message: "Great release angle!", tip: "Keep shooting with this same motion." },
+        improve: { message: "Release could be higher", tip: "Try to release the ball at the top of your jump for better arc." },
+        poor: { message: "Release angle needs work", tip: "Focus on getting more arc - aim for the ball to drop into the basket from above." }
+    },
+    elbow_flare: {
+        good: { message: "Elbow nicely tucked!", tip: "Your alignment is creating a straight shot path." },
+        improve: { message: "Elbow drifting outward", tip: "Practice keeping your elbow directly under the ball as you shoot." },
+        poor: { message: "Elbow flaring out", tip: "Your elbow is causing the ball to curve. Try the 'Wall Elbow Slides' drill." }
+    },
+    knee_load: {
+        good: { message: "Strong leg power!", tip: "You're generating good power from your legs." },
+        improve: { message: "Could use more leg power", tip: "Bend your knees a bit more before shooting to add power." },
+        poor: { message: "Not enough leg drive", tip: "Your shot is mostly arms. Bend deeper and push up through your legs." }
+    },
+    hip_shoulder_alignment: {
+        good: { message: "Body well aligned!", tip: "Your shoulders and hips are square to the basket." },
+        improve: { message: "Slight body rotation", tip: "Try to keep your shoulders square to the basket." },
+        poor: { message: "Body twisting during shot", tip: "Face the basket directly and keep your core stable." }
+    },
+    base_width: {
+        good: { message: "Stable stance!", tip: "Your feet are well positioned for balance." },
+        improve: { message: "Stance slightly off", tip: "Position your feet about shoulder-width apart." },
+        poor: { message: "Unstable base", tip: "Your stance is affecting your balance. Set feet shoulder-width, shooting foot slightly forward." }
+    },
+    lateral_sway: {
+        good: { message: "Rock solid balance!", tip: "You're staying centered throughout your shot." },
+        improve: { message: "Some side movement", tip: "Focus on going straight up and down." },
+        poor: { message: "Too much lateral movement", tip: "You're drifting sideways. Practice shooting while focusing on landing in the same spot." }
+    },
+    arc_trajectory: {
+        good: { message: "Beautiful arc!", tip: "Your shot has great trajectory into the basket." },
+        improve: { message: "Arc could be higher", tip: "Aim for the ball to peak above the rim and drop in." },
+        poor: { message: "Shot is too flat", tip: "Line drives are hard to make. Focus on 'shooting over the rim' for better arc." }
+    }
+};
+
+// Get status label for display
+const getStatusLabel = (status) => {
+    switch(status) {
+        case 'good': return 'Great';
+        case 'improve': return 'Work on it';
+        case 'poor': return 'Focus here';
+        default: return 'Check';
+    }
+};
+
+// Get status icon
+const getStatusIcon = (status) => {
+    switch(status) {
+        case 'good': return 'checkmark-circle';
+        case 'improve': return 'arrow-up-circle';
+        case 'poor': return 'alert-circle';
+        default: return 'help-circle';
+    }
+};
+
+// Get status color
+const getStatusColor = (status) => {
+    switch(status) {
+        case 'good': return '#10B981';
+        case 'improve': return '#F59E0B';
+        case 'poor': return '#EF4444';
+        default: return '#6B7280';
+    }
+};
+
+const ShotAnalysisResultsSimple = ({ results, onClose, onTryAgain }) => {
     const [showDetails, setShowDetails] = useState(false);
-    const [selectedMetric, setSelectedMetric] = useState(null);
+    const [videoStatus, setVideoStatus] = useState({});
+    const [isVideoLoading, setIsVideoLoading] = useState(true);
+    const videoRef = useRef(null);
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(30)).current;
-    
-    // Map API results to UI model
-    const uiModel = mapAnalysisToUI(results, history);
-    
+
+    // Extract data from results
+    const score = results.overallScore || 0;
+    const grade = results.grade || 'C';
+    const confidence = results.confidence || 0.85;
+    const metrics = results.metrics || [];
+    const coachingCues = results.coachingCues || [];
+    const visualizationUrl = results.visualizationVideoUrl;
+    const improvements = results.improvements || [];
+
+    // Build UI-friendly data
+    const getVerdictFromScore = (score) => {
+        if (score >= 90) return "Pure stroke! Keep stacking reps.";
+        if (score >= 80) return "Game-ready form. Small tweaks left.";
+        if (score >= 70) return "Solid base. Focus on consistency.";
+        if (score >= 60) return "Good start. Keep practicing!";
+        return "Let's work on the fundamentals.";
+    };
+
+    const mapConfidenceScore = (score) => {
+        if (score >= 0.8) return 'High';
+        if (score >= 0.6) return 'Medium';
+        return 'Low';
+    };
+
+    const confidenceLabel = mapConfidenceScore(confidence);
+    const scoreColor = getScoreColor(score);
+    const confidenceTip = getConfidenceTip(confidenceLabel, []);
+
+    // Group metrics by category for highlights
+    const buildHighlights = () => {
+        const getAvgStatus = (ids) => {
+            const relevant = metrics.filter(m => ids.includes(m.id));
+            if (relevant.length === 0) return 'ok';
+            const goodCount = relevant.filter(m => m.status === 'good').length;
+            const poorCount = relevant.filter(m => m.status === 'poor').length;
+            if (goodCount === relevant.length) return 'good';
+            if (poorCount > 0) return 'needs work';
+            return 'ok';
+        };
+
+        return [
+            { label: 'Base', emoji: '🦵', status: getAvgStatus(['knee_load', 'base_width', 'hip_shoulder_alignment']) },
+            { label: 'Release', emoji: '🏀', status: getAvgStatus(['release_angle', 'arc_trajectory']) },
+            { label: 'Control', emoji: '🎯', status: getAvgStatus(['lateral_sway', 'elbow_flare']) }
+        ];
+    };
+
+    const highlights = buildHighlights();
+
     useEffect(() => {
-        // Entrance animation
         Animated.parallel([
             Animated.timing(fadeAnim, {
                 toValue: 1,
@@ -39,10 +157,7 @@ const ShotAnalysisResultsSimple = ({ results, onClose, onTryAgain, history = [] 
             }),
         ]).start();
     }, []);
-    
-    const scoreColor = getScoreColor(uiModel.score);
-    const confidenceTip = getConfidenceTip(uiModel.confidence, uiModel.warnings);
-    
+
     const getHighlightColor = (status) => {
         switch(status) {
             case 'good': return '#10B981';
@@ -51,124 +166,106 @@ const ShotAnalysisResultsSimple = ({ results, onClose, onTryAgain, history = [] 
             default: return '#6B7280';
         }
     };
-    
+
+    // Render visualization video section
+    const renderVisualizationVideo = () => {
+        if (!visualizationUrl) return null;
+
+        return (
+            <View style={styles.videoSection}>
+                <View style={styles.sectionHeader}>
+                    <Ionicons name="videocam" size={20} color="#1F2937" />
+                    <Text style={styles.sectionTitle}>Your Shot Analysis</Text>
+                </View>
+                <View style={styles.videoContainer}>
+                    {isVideoLoading && (
+                        <View style={styles.videoLoading}>
+                            <ActivityIndicator size="large" color="#6366F1" />
+                            <Text style={styles.videoLoadingText}>Loading analysis...</Text>
+                        </View>
+                    )}
+                    <Video
+                        ref={videoRef}
+                        source={{ uri: visualizationUrl }}
+                        style={styles.video}
+                        useNativeControls
+                        resizeMode={ResizeMode.CONTAIN}
+                        isLooping
+                        onLoadStart={() => setIsVideoLoading(true)}
+                        onLoad={() => setIsVideoLoading(false)}
+                        onPlaybackStatusUpdate={status => setVideoStatus(status)}
+                        onError={(error) => {
+                            console.log('Video error:', error);
+                            setIsVideoLoading(false);
+                        }}
+                    />
+                </View>
+                <Text style={styles.videoHint}>
+                    Watch how the AI tracked your form throughout the shot
+                </Text>
+            </View>
+        );
+    };
+
     const renderSummaryCard = () => (
-        <Animated.View 
+        <Animated.View
             style={[
                 styles.summaryCard,
                 { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
             ]}
         >
-            {/* Score Circle */}
             <View style={styles.scoreSection}>
                 <View style={[styles.scoreCircle, { borderColor: scoreColor }]}>
-                    <Text style={[styles.scoreValue, { color: scoreColor }]}>
-                        {uiModel.score}
-                    </Text>
+                    <Text style={[styles.scoreValue, { color: scoreColor }]}>{score}</Text>
                     <Text style={styles.scoreLabel}>SHOT SCORE</Text>
                 </View>
             </View>
-            
-            {/* Verdict */}
-            <Text style={styles.verdict}>{uiModel.verdict}</Text>
-            
-            {/* Confidence Badge */}
+
+            <Text style={styles.verdict}>{getVerdictFromScore(score)}</Text>
+
             <View style={styles.confidenceRow}>
                 <View style={[
                     styles.confidenceBadge,
-                    { 
-                        backgroundColor: uiModel.confidence === 'High' ? '#10B98120' : 
-                                       uiModel.confidence === 'Medium' ? '#F59E0B20' : '#EF444420'
-                    }
+                    { backgroundColor: confidenceLabel === 'High' ? '#10B98120' :
+                                     confidenceLabel === 'Medium' ? '#F59E0B20' : '#EF444420' }
                 ]}>
-                    <Ionicons 
-                        name="shield-checkmark" 
-                        size={14} 
-                        color={uiModel.confidence === 'High' ? '#10B981' : 
-                               uiModel.confidence === 'Medium' ? '#F59E0B' : '#EF4444'} 
+                    <Ionicons
+                        name="shield-checkmark"
+                        size={14}
+                        color={confidenceLabel === 'High' ? '#10B981' :
+                               confidenceLabel === 'Medium' ? '#F59E0B' : '#EF4444'}
                     />
                     <Text style={[
                         styles.confidenceText,
-                        { 
-                            color: uiModel.confidence === 'High' ? '#10B981' : 
-                                   uiModel.confidence === 'Medium' ? '#F59E0B' : '#EF4444'
-                        }
+                        { color: confidenceLabel === 'High' ? '#10B981' :
+                                 confidenceLabel === 'Medium' ? '#F59E0B' : '#EF4444' }
                     ]}>
-                        {uiModel.confidence} Confidence
+                        {confidenceLabel} Confidence
                     </Text>
                 </View>
             </View>
-            
-            {/* Low confidence tip */}
+
             {confidenceTip && (
                 <View style={styles.tipBanner}>
                     <Ionicons name="information-circle" size={16} color="#F59E0B" />
                     <Text style={styles.tipText}>{confidenceTip}</Text>
                 </View>
             )}
-            
-            {/* Badges */}
-            {uiModel.badges.length > 0 && (
-                <View style={styles.badgesRow}>
-                    {uiModel.badges.map((badge, index) => (
-                        <View key={badge.id} style={styles.badge}>
-                            <Text style={styles.badgeEmoji}>{badge.emoji}</Text>
-                            <Text style={styles.badgeName}>{badge.name}</Text>
-                        </View>
-                    ))}
-                </View>
-            )}
         </Animated.View>
     );
-    
-    const renderKeyFixes = () => (
-        <View style={styles.keyFixesSection}>
-            <View style={styles.sectionHeader}>
-                <Ionicons name="construct" size={20} color="#1F2937" />
-                <Text style={styles.sectionTitle}>Your Top 3 Fixes</Text>
-            </View>
-            
-            {uiModel.topCues.map((cue, index) => (
-                <View key={index} style={styles.cueCard}>
-                    <View style={styles.cueHeader}>
-                        <View style={[
-                            styles.cuePriority,
-                            { backgroundColor: index === 0 ? '#EF4444' : index === 1 ? '#F59E0B' : '#10B981' }
-                        ]}>
-                            <Text style={styles.cuePriorityText}>#{cue.priority}</Text>
-                        </View>
-                        <Text style={styles.cueText}>{cue.shortCue}</Text>
-                    </View>
-                    
-                    {cue.why && showDetails && (
-                        <Text style={styles.cueWhy}>{cue.why}</Text>
-                    )}
-                    
-                    {cue.drill && (
-                        <TouchableOpacity style={styles.drillButton}>
-                            <Ionicons name="play-circle" size={16} color="#6366F1" />
-                            <Text style={styles.drillButtonText}>
-                                Try: {cue.drill.name} ({cue.drill.duration})
-                            </Text>
-                        </TouchableOpacity>
-                    )}
-                </View>
-            ))}
-        </View>
-    );
-    
+
     const renderHighlights = () => (
         <View style={styles.highlightsSection}>
             <Text style={styles.sectionSubtitle}>Quick Glance</Text>
             <View style={styles.highlightsRow}>
-                {uiModel.highlights.map((highlight, index) => (
-                    <TouchableOpacity 
+                {highlights.map((highlight, index) => (
+                    <TouchableOpacity
                         key={index}
                         style={[
                             styles.highlightChip,
                             { borderColor: getHighlightColor(highlight.status) }
                         ]}
-                        onPress={() => setShowDetails(!showDetails)}
+                        onPress={() => setShowDetails(true)}
                     >
                         <Text style={styles.highlightEmoji}>{highlight.emoji}</Text>
                         <Text style={styles.highlightLabel}>{highlight.label}</Text>
@@ -181,109 +278,149 @@ const ShotAnalysisResultsSimple = ({ results, onClose, onTryAgain, history = [] 
             </View>
         </View>
     );
-    
-    const renderMetricCards = () => {
-        if (!showDetails) return null;
-        
+
+    // Render coaching cues with full drill info
+    const renderKeyFixes = () => {
+        const topCues = coachingCues.slice(0, 3);
+
+        if (topCues.length === 0) return null;
+
         return (
-            <View style={styles.metricsSection}>
+            <View style={styles.keyFixesSection}>
                 <View style={styles.sectionHeader}>
-                    <Ionicons name="analytics" size={20} color="#1F2937" />
-                    <Text style={styles.sectionTitle}>Detailed Breakdown</Text>
+                    <Ionicons name="bulb" size={20} color="#1F2937" />
+                    <Text style={styles.sectionTitle}>Your Top Fixes</Text>
                 </View>
-                
-                {uiModel.metrics.map((metric, index) => (
-                    <View key={metric.id} style={styles.metricCard}>
-                        <View style={styles.metricHeader}>
-                            <Text style={styles.metricLabel}>{metric.label}</Text>
+
+                {topCues.map((cue, index) => (
+                    <View key={index} style={styles.cueCard}>
+                        <View style={styles.cueHeader}>
                             <View style={[
-                                styles.metricGrade,
-                                { backgroundColor: metric.gradeColor + '20' }
+                                styles.cuePriority,
+                                { backgroundColor: index === 0 ? '#EF4444' : index === 1 ? '#F59E0B' : '#10B981' }
                             ]}>
-                                <Text style={[
-                                    styles.metricGradeText,
-                                    { color: metric.gradeColor }
-                                ]}>
-                                    {metric.grade}
-                                </Text>
+                                <Text style={styles.cuePriorityText}>#{index + 1}</Text>
                             </View>
+                            <Text style={styles.cueText}>{cue.cue || cue.title}</Text>
                         </View>
-                        
-                        {/* Value Display */}
-                        <View style={styles.metricValueRow}>
-                            <View>
-                                <Text style={styles.metricValueLabel}>Your Value</Text>
-                                <Text style={styles.metricValue}>
-                                    {metric.value}{metric.units}
-                                </Text>
+
+                        {cue.description && (
+                            <Text style={styles.cueWhy}>{cue.description}</Text>
+                        )}
+
+                        {cue.drill && (
+                            <View style={styles.drillCard}>
+                                <View style={styles.drillHeader}>
+                                    <Ionicons name="fitness" size={16} color="#6366F1" />
+                                    <Text style={styles.drillName}>{cue.drill}</Text>
+                                </View>
+                                {cue.drillDescription && (
+                                    <Text style={styles.drillDescription}>{cue.drillDescription}</Text>
+                                )}
                             </View>
-                            <View style={styles.metricArrow}>
-                                <Ionicons 
-                                    name={Math.abs(metric.delta) < 5 ? "checkmark-circle" : "arrow-forward"}
-                                    size={20} 
-                                    color="#9CA3AF" 
-                                />
+                        )}
+
+                        {cue.visualCue && (
+                            <View style={styles.visualCueRow}>
+                                <Ionicons name="eye" size={14} color="#6B7280" />
+                                <Text style={styles.visualCueText}>{cue.visualCue}</Text>
                             </View>
-                            <View>
-                                <Text style={styles.metricValueLabel}>Target</Text>
-                                <Text style={styles.metricTarget}>{metric.target}</Text>
-                            </View>
-                        </View>
-                        
-                        {/* Gauge Bar */}
-                        <View style={styles.gaugeContainer}>
-                            <View style={styles.gaugeBar}>
-                                <View 
-                                    style={[
-                                        styles.gaugeTargetBand,
-                                        { left: '30%', width: '40%' }
-                                    ]} 
-                                />
-                                <View 
-                                    style={[
-                                        styles.gaugeMarker,
-                                        { 
-                                            left: `${Math.min(Math.max(metric.delta + 50, 0), 100)}%`,
-                                            backgroundColor: metric.gradeColor
-                                        }
-                                    ]} 
-                                />
-                            </View>
-                        </View>
-                        
-                        {/* Why */}
-                        <View style={styles.metricWhy}>
-                            <Ionicons name="information-circle" size={14} color="#6366F1" />
-                            <Text style={styles.metricWhyText}>{metric.why}</Text>
-                        </View>
-                        
-                        {/* Drill CTA */}
-                        {metric.drill && (
-                            <TouchableOpacity 
-                                style={styles.metricDrillButton}
-                                onPress={() => {
-                                    const drill = getDrillDetails(metric.drill);
-                                    if (drill) {
-                                        // Open drill modal/screen
-                                        console.log('Open drill:', drill);
-                                    }
-                                }}
-                            >
-                                <Ionicons name="fitness" size={16} color="#fff" />
-                                <Text style={styles.metricDrillText}>
-                                    Try: {getDrillDetails(metric.drill)?.name || 'Practice Drill'}
-                                </Text>
-                            </TouchableOpacity>
                         )}
                     </View>
                 ))}
             </View>
         );
     };
-    
+
+    // Render actionable metric cards (no raw numbers)
+    const renderMetricCards = () => {
+        if (!showDetails) return null;
+
+        return (
+            <View style={styles.metricsSection}>
+                <View style={styles.sectionHeader}>
+                    <Ionicons name="body" size={20} color="#1F2937" />
+                    <Text style={styles.sectionTitle}>Form Breakdown</Text>
+                </View>
+
+                {metrics.map((metric) => {
+                    const feedback = METRIC_FEEDBACK[metric.id] || {};
+                    const statusFeedback = feedback[metric.status] || { message: metric.feedback, tip: '' };
+                    const statusColor = getStatusColor(metric.status);
+                    const statusIcon = getStatusIcon(metric.status);
+                    const statusLabel = getStatusLabel(metric.status);
+
+                    return (
+                        <View key={metric.id} style={styles.metricCard}>
+                            <View style={styles.metricHeader}>
+                                <View style={styles.metricTitleRow}>
+                                    <View style={[styles.metricIcon, { backgroundColor: statusColor + '20' }]}>
+                                        <Ionicons name={statusIcon} size={18} color={statusColor} />
+                                    </View>
+                                    <View style={styles.metricTitleContainer}>
+                                        <Text style={styles.metricLabel}>{metric.name}</Text>
+                                        <Text style={[styles.metricStatus, { color: statusColor }]}>
+                                            {statusLabel}
+                                        </Text>
+                                    </View>
+                                </View>
+                            </View>
+
+                            <Text style={styles.metricMessage}>{statusFeedback.message}</Text>
+
+                            {statusFeedback.tip && metric.status !== 'good' && (
+                                <View style={styles.metricTipBox}>
+                                    <Ionicons name="bulb-outline" size={16} color="#6366F1" />
+                                    <Text style={styles.metricTipText}>{statusFeedback.tip}</Text>
+                                </View>
+                            )}
+
+                            {/* Progress indicator */}
+                            <View style={styles.progressContainer}>
+                                <View style={styles.progressBar}>
+                                    <View
+                                        style={[
+                                            styles.progressFill,
+                                            {
+                                                width: `${Math.min(metric.score * 10, 100)}%`,
+                                                backgroundColor: statusColor
+                                            }
+                                        ]}
+                                    />
+                                </View>
+                            </View>
+                        </View>
+                    );
+                })}
+            </View>
+        );
+    };
+
+    // Render strengths section
+    const renderStrengths = () => {
+        const goodMetrics = metrics.filter(m => m.status === 'good');
+        if (goodMetrics.length === 0) return null;
+
+        return (
+            <View style={styles.strengthsSection}>
+                <View style={styles.sectionHeader}>
+                    <Ionicons name="trophy" size={20} color="#10B981" />
+                    <Text style={styles.sectionTitle}>What You're Doing Well</Text>
+                </View>
+                <View style={styles.strengthsList}>
+                    {goodMetrics.map((metric) => (
+                        <View key={metric.id} style={styles.strengthItem}>
+                            <Ionicons name="checkmark-circle" size={18} color="#10B981" />
+                            <Text style={styles.strengthText}>{metric.name}</Text>
+                        </View>
+                    ))}
+                </View>
+            </View>
+        );
+    };
+
     return (
         <View style={styles.container}>
-            {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity onPress={onClose} style={styles.closeButton}>
                     <Ionicons name="close" size={26} color="#1F2937" />
@@ -293,45 +430,44 @@ const ShotAnalysisResultsSimple = ({ results, onClose, onTryAgain, history = [] 
                     <Ionicons name="refresh" size={22} color="#6366F1" />
                 </TouchableOpacity>
             </View>
-            
-            {/* Content */}
-            <ScrollView 
+
+            <ScrollView
                 style={styles.content}
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.contentContainer}
             >
                 {renderSummaryCard()}
+                {renderVisualizationVideo()}
                 {renderHighlights()}
+                {renderStrengths()}
                 {renderKeyFixes()}
-                
-                {/* Toggle Details */}
-                <TouchableOpacity 
+
+                <TouchableOpacity
                     style={styles.toggleButton}
                     onPress={() => setShowDetails(!showDetails)}
                 >
                     <Text style={styles.toggleButtonText}>
-                        {showDetails ? 'Hide' : 'See'} Details
+                        {showDetails ? 'Hide' : 'See'} Full Breakdown
                     </Text>
-                    <Ionicons 
-                        name={showDetails ? "chevron-up" : "chevron-down"} 
-                        size={20} 
-                        color="#6366F1" 
+                    <Ionicons
+                        name={showDetails ? "chevron-up" : "chevron-down"}
+                        size={20}
+                        color="#6366F1"
                     />
                 </TouchableOpacity>
-                
+
                 {renderMetricCards()}
-                
-                {/* Action Buttons */}
+
                 <View style={styles.actionButtons}>
-                    <TouchableOpacity 
+                    <TouchableOpacity
                         style={styles.retryFullButton}
                         onPress={onTryAgain}
                     >
                         <Ionicons name="refresh" size={18} color="#6366F1" />
                         <Text style={styles.retryFullButtonText}>New Analysis</Text>
                     </TouchableOpacity>
-                    
-                    <TouchableOpacity 
+
+                    <TouchableOpacity
                         style={styles.saveButton}
                         onPress={onClose}
                     >
@@ -383,6 +519,41 @@ const styles = StyleSheet.create({
         padding: 20,
         paddingBottom: 40,
     },
+    // Video Section
+    videoSection: {
+        marginBottom: 20,
+    },
+    videoContainer: {
+        backgroundColor: '#000',
+        borderRadius: 16,
+        overflow: 'hidden',
+        aspectRatio: 16 / 9,
+        position: 'relative',
+    },
+    video: {
+        flex: 1,
+        width: '100%',
+        height: '100%',
+    },
+    videoLoading: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: '#1F2937',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1,
+    },
+    videoLoadingText: {
+        color: '#9CA3AF',
+        fontSize: 14,
+        marginTop: 12,
+    },
+    videoHint: {
+        fontSize: 12,
+        color: '#6B7280',
+        textAlign: 'center',
+        marginTop: 8,
+    },
+    // Summary Card
     summaryCard: {
         backgroundColor: '#fff',
         borderRadius: 20,
@@ -464,30 +635,7 @@ const styles = StyleSheet.create({
         color: '#92400E',
         lineHeight: 16,
     },
-    badgesRow: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 8,
-        marginTop: 12,
-        justifyContent: 'center',
-    },
-    badge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#EEF2FF',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 16,
-        gap: 6,
-    },
-    badgeEmoji: {
-        fontSize: 16,
-    },
-    badgeName: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: '#4F46E5',
-    },
+    // Highlights
     highlightsSection: {
         marginBottom: 16,
     },
@@ -535,6 +683,27 @@ const styles = StyleSheet.create({
         height: 8,
         borderRadius: 4,
     },
+    // Strengths
+    strengthsSection: {
+        backgroundColor: '#ECFDF5',
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 16,
+    },
+    strengthsList: {
+        gap: 8,
+    },
+    strengthItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    strengthText: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: '#065F46',
+    },
+    // Key Fixes
     keyFixesSection: {
         marginBottom: 16,
     },
@@ -552,8 +721,8 @@ const styles = StyleSheet.create({
     cueCard: {
         backgroundColor: '#fff',
         borderRadius: 12,
-        padding: 14,
-        marginBottom: 10,
+        padding: 16,
+        marginBottom: 12,
         ...Platform.select({
             ios: {
                 shadowColor: '#000',
@@ -568,8 +737,8 @@ const styles = StyleSheet.create({
     },
     cueHeader: {
         flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 8,
+        alignItems: 'flex-start',
+        marginBottom: 10,
     },
     cuePriority: {
         width: 28,
@@ -577,7 +746,7 @@ const styles = StyleSheet.create({
         borderRadius: 14,
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 10,
+        marginRight: 12,
     },
     cuePriorityText: {
         fontSize: 12,
@@ -586,38 +755,61 @@ const styles = StyleSheet.create({
     },
     cueText: {
         flex: 1,
-        fontSize: 14,
+        fontSize: 15,
         fontWeight: '600',
         color: '#1F2937',
-        lineHeight: 18,
+        lineHeight: 20,
     },
     cueWhy: {
-        fontSize: 13,
-        color: '#6B7280',
-        marginBottom: 8,
-        lineHeight: 18,
+        fontSize: 14,
+        color: '#4B5563',
+        marginBottom: 12,
+        lineHeight: 20,
+        marginLeft: 40,
     },
-    drillButton: {
+    drillCard: {
+        backgroundColor: '#EEF2FF',
+        borderRadius: 10,
+        padding: 12,
+        marginLeft: 40,
+        marginBottom: 8,
+    },
+    drillHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#EEF2FF',
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-        borderRadius: 8,
-        gap: 6,
-        alignSelf: 'flex-start',
+        gap: 8,
+        marginBottom: 6,
     },
-    drillButtonText: {
-        fontSize: 12,
+    drillName: {
+        fontSize: 14,
         fontWeight: '600',
         color: '#4F46E5',
     },
+    drillDescription: {
+        fontSize: 13,
+        color: '#4B5563',
+        lineHeight: 18,
+    },
+    visualCueRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 6,
+        marginLeft: 40,
+        marginTop: 4,
+    },
+    visualCueText: {
+        flex: 1,
+        fontSize: 12,
+        color: '#6B7280',
+        fontStyle: 'italic',
+    },
+    // Toggle Button
     toggleButton: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: '#fff',
-        paddingVertical: 12,
+        paddingVertical: 14,
         borderRadius: 12,
         marginBottom: 16,
         gap: 8,
@@ -638,6 +830,7 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: '#6366F1',
     },
+    // Metrics Section
     metricsSection: {
         marginBottom: 16,
     },
@@ -659,105 +852,68 @@ const styles = StyleSheet.create({
         }),
     },
     metricHeader: {
+        marginBottom: 10,
+    },
+    metricTitleRow: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 12,
+    },
+    metricIcon: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 12,
+    },
+    metricTitleContainer: {
+        flex: 1,
     },
     metricLabel: {
         fontSize: 15,
         fontWeight: '600',
         color: '#1F2937',
     },
-    metricGrade: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    metricGradeText: {
-        fontSize: 18,
-        fontWeight: '800',
-    },
-    metricValueRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: 12,
-    },
-    metricValueLabel: {
-        fontSize: 11,
-        color: '#9CA3AF',
-        marginBottom: 4,
+    metricStatus: {
+        fontSize: 12,
         fontWeight: '600',
+        marginTop: 2,
     },
-    metricValue: {
-        fontSize: 20,
-        fontWeight: '700',
+    metricMessage: {
+        fontSize: 14,
         color: '#1F2937',
+        fontWeight: '500',
+        marginBottom: 8,
     },
-    metricArrow: {
-        paddingHorizontal: 12,
-    },
-    metricTarget: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#6366F1',
-    },
-    gaugeContainer: {
-        marginBottom: 12,
-    },
-    gaugeBar: {
-        height: 8,
-        backgroundColor: '#E5E7EB',
-        borderRadius: 4,
-        position: 'relative',
-        overflow: 'visible',
-    },
-    gaugeTargetBand: {
-        position: 'absolute',
-        height: 8,
-        backgroundColor: '#10B98140',
-        borderRadius: 4,
-    },
-    gaugeMarker: {
-        position: 'absolute',
-        width: 4,
-        height: 16,
-        top: -4,
-        borderRadius: 2,
-        marginLeft: -2,
-    },
-    metricWhy: {
+    metricTipBox: {
         flexDirection: 'row',
         alignItems: 'flex-start',
-        backgroundColor: '#F9FAFB',
-        padding: 10,
+        backgroundColor: '#EEF2FF',
+        padding: 12,
         borderRadius: 8,
-        marginBottom: 10,
-        gap: 6,
+        marginBottom: 12,
+        gap: 8,
     },
-    metricWhyText: {
+    metricTipText: {
         flex: 1,
-        fontSize: 12,
-        color: '#4B5563',
-        lineHeight: 16,
-    },
-    metricDrillButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#6366F1',
-        paddingVertical: 10,
-        borderRadius: 8,
-        gap: 6,
-    },
-    metricDrillText: {
         fontSize: 13,
-        fontWeight: '600',
-        color: '#fff',
+        color: '#4338CA',
+        lineHeight: 18,
     },
+    progressContainer: {
+        marginTop: 4,
+    },
+    progressBar: {
+        height: 6,
+        backgroundColor: '#E5E7EB',
+        borderRadius: 3,
+        overflow: 'hidden',
+    },
+    progressFill: {
+        height: '100%',
+        borderRadius: 3,
+    },
+    // Action Buttons
     actionButtons: {
         flexDirection: 'row',
         gap: 12,

@@ -36,6 +36,26 @@ service cloud.firestore {
       match /achievements/{achievementId} {
         allow read, write: if true; // DEVELOPMENT ONLY
       }
+
+      // Challenge progress - only owner can read/write
+      match /challengeProgress/{challengeId} {
+        allow read, write: if true; // DEVELOPMENT ONLY
+      }
+
+      // Challenge invites - owner can read/write, any authenticated user can create
+      match /challengeInvites/{inviteId} {
+        allow read, write: if true; // DEVELOPMENT ONLY
+      }
+
+      // Friends - only owner can manage
+      match /friends/{friendUid} {
+        allow read, write: if true; // DEVELOPMENT ONLY
+      }
+
+      // Friend requests - owner can read/manage, anyone can create
+      match /friendRequests/{requestId} {
+        allow read, write: if true; // DEVELOPMENT ONLY
+      }
     }
     
     // Workout templates - public read, admin write only
@@ -70,6 +90,18 @@ service cloud.firestore {
         allow create: if isSignedIn();
         allow update, delete: if isSignedIn() && isOwner(resource.data.userId);
       }
+    }
+
+    // Challenges collection - readable by all authenticated users
+    match /challenges/{challengeId} {
+      allow read: if true; // Public challenges
+      allow write: if false; // Admin only
+    }
+
+    // Challenge leaderboards - readable by all, writable by participant
+    match /challengeLeaderboards/{challengeId}/entries/{odas} {
+      allow read: if true;
+      allow write: if true; // DEVELOPMENT ONLY
     }
   }
 }

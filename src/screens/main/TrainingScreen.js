@@ -21,6 +21,16 @@ import YouTubeService from '../../services/youtubeService';
 import { hasAccess } from '../../utils/subscription';
 import SubscriptionModal from '../../components/shared/SubscriptionModal';
 
+// Import thumbnail images for workouts
+const shootingThumbnail = require('../../../assets/shooting-thumbnail.jpg');
+const dribblingThumbnail = require('../../../assets/dribbling-thumbnail.png');
+
+// Map workout IDs to their thumbnail images
+const workoutThumbnails = {
+    'shooting_1': shootingThumbnail,  // Beginner Shooting Basics
+    'dribbling_1': dribblingThumbnail, // Ball Handling Fundamentals
+};
+
 const TrainingScreen = ({ navigation }) => {
     const { workouts, loading, userData, trainingVideos, setTrainingVideosData, theme, isDarkMode, getAccessibleWorkouts } = useAppContext();
     const [searchQuery, setSearchQuery] = useState('');
@@ -131,8 +141,8 @@ const TrainingScreen = ({ navigation }) => {
 
                 {/* Left: Workout Image */}
                 <View style={styles.workoutImageContainer}>
-                    {item.image ? (
-                        <Image source={item.image} style={styles.workoutImage} />
+                    {(item.image || workoutThumbnails[item.id]) ? (
+                        <Image source={item.image || workoutThumbnails[item.id]} style={styles.workoutImage} />
                     ) : (
                         <View style={[styles.workoutImage, { backgroundColor: theme.backgroundSecondary }]}>
                             <Ionicons name="basketball-outline" size={24} color={theme.textSecondary} />

@@ -14,6 +14,16 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
 
+// Import thumbnail images for workouts
+const shootingThumbnail = require('../../../assets/shooting-thumbnail.jpg');
+const dribblingThumbnail = require('../../../assets/dribbling-thumbnail.png');
+
+// Map workout IDs to their thumbnail images
+const workoutThumbnails = {
+    'shooting_1': shootingThumbnail,  // Beginner Shooting Basics
+    'dribbling_1': dribblingThumbnail, // Ball Handling Fundamentals
+};
+
 const TrainingCategoryScreen = ({ route, navigation }) => {
     const { category } = route.params;
     const { workouts, loading } = useAppContext();
@@ -74,8 +84,8 @@ const TrainingCategoryScreen = ({ route, navigation }) => {
             onPress={() => navigation.navigate('WorkoutDetail', { workoutId: item.id })}
         >
             <View style={styles.workoutImageContainer}>
-                {item.image ? (
-                    <Image source={item.image} style={styles.workoutImage} />
+                {(item.image || workoutThumbnails[item.id]) ? (
+                    <Image source={item.image || workoutThumbnails[item.id]} style={styles.workoutImage} />
                 ) : (
                     <View style={[styles.workoutImage, { backgroundColor: '#EEE' }]}>
                         <Ionicons name={getCategoryIcon()} size={24} color="#AAA" />

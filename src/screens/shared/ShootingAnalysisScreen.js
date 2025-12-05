@@ -11,9 +11,11 @@ import {
     SafeAreaView,
     StatusBar,
     Dimensions,
-    FlatList
+    FlatList,
+    ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Video } from 'expo-av';
 import { useAppContext } from '../../context/AppContext';
 import AICameraCapture from '../../components/shared/AICameraCapture';
 import ShotAnalysisResultsSimple from '../../components/shared/ShotAnalysisResultsSimple';
@@ -48,6 +50,11 @@ const ShootingAnalysisScreen = ({ navigation }) => {
     // Feature gate state
     const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
     const [lockedFeature, setLockedFeature] = useState(null);
+
+    // Video player state
+    const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+    const [videoLoading, setVideoLoading] = useState(false);
+    const videoRef = useRef(null);
 
     // Animation values
     const analysisProgressAnim = useRef(new Animated.Value(0)).current;
@@ -112,28 +119,59 @@ const ShootingAnalysisScreen = ({ navigation }) => {
             console.error('❌ Error details:', {
                 message: error.message,
                 stack: error.stack,
-                name: error.name
+                name: error.name,
+                apiError: error.apiError,
+                tips: error.tips
             });
-            
-            Alert.alert(
-                'Analysis Failed', 
-                `Unable to analyze your shooting form.\n\nError: ${error.message}\n\nPlease check your internet connection and try again.`,
-                [
-                    { 
-                        text: 'Try Again', 
-                        onPress: () => {
-                            setCurrentStage('intro');
-                            // Restart the process
-                            setTimeout(() => startCapture(), 500);
+
+            // Reset animation and stage
+            analysisProgressAnim.setValue(0);
+            setCurrentStage('intro');
+
+            // Check if this is the "Could not detect complete shooting motion" error
+            const isMotionDetectionError = error.message?.includes('Could not detect complete shooting motion');
+
+            if (isMotionDetectionError) {
+                // Show specific prompt for retaking the video
+                const tipsMessage = error.tips && error.tips.length > 0
+                    ? '\n\nTips:\n' + error.tips.map(tip => `• ${tip}`).join('\n')
+                    : '\n\nTips:\n• Make sure your full body is visible in the frame\n• Record from a side angle\n• Include the complete shooting motion from start to finish\n• Ensure good lighting';
+
+                Alert.alert(
+                    'Unable to Detect Shot',
+                    `We couldn't detect a complete shooting motion in your video.${tipsMessage}\n\nWould you like to try again?`,
+                    [
+                        {
+                            text: 'Retake Video',
+                            onPress: () => {
+                                setTimeout(() => startCapture(), 500);
+                            }
+                        },
+                        {
+                            text: 'Cancel',
+                            style: 'cancel'
                         }
-                    },
-                    { 
-                        text: 'Cancel', 
-                        onPress: () => setCurrentStage('intro'),
-                        style: 'cancel'
-                    }
-                ]
-            );
+                    ]
+                );
+            } else {
+                // Generic error handling for other errors
+                Alert.alert(
+                    'Analysis Failed',
+                    `Unable to analyze your shooting form.\n\nError: ${error.message}\n\nPlease check your internet connection and try again.`,
+                    [
+                        {
+                            text: 'Try Again',
+                            onPress: () => {
+                                setTimeout(() => startCapture(), 500);
+                            }
+                        },
+                        {
+                            text: 'Cancel',
+                            style: 'cancel'
+                        }
+                    ]
+                );
+            }
         }
     };
 
@@ -161,7 +199,7 @@ const ShootingAnalysisScreen = ({ navigation }) => {
     const handleUpgrade = (requiredTier) => {
         setShowUpgradePrompt(false);
         setLockedFeature(null);
-        navigation.navigate('Settings', { openSubscription: true });
+        navigation.navigate('Profile', { screen: 'Settings', params: { openSubscription: true }, initial: false });
     };
 
     // Handle modal close
@@ -425,12 +463,94 @@ const ShootingAnalysisScreen = ({ navigation }) => {
             {currentStage === 'results' && analysisResults && (
                 <ScrollView style={styles.container}>
                     {/* Simple Progressive Disclosure Analysis Results */}
-                    <ShotAnalysisResultsSimple 
+                    <ShotAnalysisResultsSimple
                         results={analysisResults}
                         onClose={() => navigation.goBack()}
                         onTryAgain={resetAnalysis}
                         history={historicalData}
                     />
+
+                    {/* Visualization Video Section */}
+                    {analysisResults.visualizationVideoUrl && (
+                        <View style={styles.visualizationContainer}>
+                            <View style={styles.visualizationHeader}>
+                                <Ionicons name="eye" size={20} color="#FF6B00" />
+                                <Text style={styles.visualizationTitle}>Shot Breakdown Video</Text>
+                            </View>
+                            <Text style={styles.visualizationDescription}>
+                                Watch your shot with AI overlays showing form analysis
+                            </Text>
+
+                            <View style={styles.videoPlayerContainer}>
+                                {videoLoading && (
+                                    <View style={styles.videoLoadingOverlay}>
+                                        <ActivityIndicator size="large" color="#FF6B00" />
+                                        <Text style={styles.videoLoadingText}>Loading video...</Text>
+                                    </View>
+                                )}
+                                <Video
+                                    ref={videoRef}
+                                    source={{ uri: analysisResults.visualizationVideoUrl }}
+                                    style={styles.videoPlayer}
+                                    useNativeControls
+                                    resizeMode="contain"
+                                    isLooping
+                                    onLoadStart={() => setVideoLoading(true)}
+                                    onLoad={() => setVideoLoading(false)}
+                                    onError={(error) => {
+                                        console.error('Video playback error:', error);
+                                        setVideoLoading(false);
+                                        Alert.alert(
+                                            'Video Error',
+                                            'Unable to load the visualization video. Please try again.',
+                                            [{ text: 'OK' }]
+                                        );
+                                    }}
+                                    onPlaybackStatusUpdate={(status) => {
+                                        if (status.isLoaded) {
+                                            setIsVideoPlaying(status.isPlaying);
+                                        }
+                                    }}
+                                />
+                            </View>
+
+                            <View style={styles.videoControls}>
+                                <TouchableOpacity
+                                    style={styles.videoControlButton}
+                                    onPress={async () => {
+                                        if (videoRef.current) {
+                                            if (isVideoPlaying) {
+                                                await videoRef.current.pauseAsync();
+                                            } else {
+                                                await videoRef.current.playAsync();
+                                            }
+                                        }
+                                    }}
+                                >
+                                    <Ionicons
+                                        name={isVideoPlaying ? 'pause' : 'play'}
+                                        size={20}
+                                        color="#FFF"
+                                    />
+                                    <Text style={styles.videoControlText}>
+                                        {isVideoPlaying ? 'Pause' : 'Play'}
+                                    </Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={styles.videoControlButton}
+                                    onPress={async () => {
+                                        if (videoRef.current) {
+                                            await videoRef.current.replayAsync();
+                                        }
+                                    }}
+                                >
+                                    <Ionicons name="refresh" size={20} color="#FFF" />
+                                    <Text style={styles.videoControlText}>Replay</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    )}
 
                     {/* Detailed Metrics */}
                     <View style={styles.metricsContainer}>
@@ -1508,6 +1628,75 @@ const styles = StyleSheet.create({
         fontStyle: 'italic',
     },
 
+    // Visualization Video Styles
+    visualizationContainer: {
+        backgroundColor: '#FFF',
+        padding: 16,
+        marginTop: 8,
+        borderRadius: 12,
+        marginHorizontal: 16,
+    },
+    visualizationHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    visualizationTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#333',
+        marginLeft: 8,
+    },
+    visualizationDescription: {
+        fontSize: 14,
+        color: '#666',
+        marginBottom: 16,
+        lineHeight: 20,
+    },
+    videoPlayerContainer: {
+        width: '100%',
+        height: 300,
+        backgroundColor: '#000',
+        borderRadius: 12,
+        overflow: 'hidden',
+        position: 'relative',
+    },
+    videoLoadingOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 10,
+    },
+    videoLoadingText: {
+        color: '#FFF',
+        marginTop: 12,
+        fontSize: 14,
+    },
+    videoControls: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        gap: 12,
+        marginTop: 16,
+    },
+    videoControlButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FF6B00',
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        borderRadius: 8,
+        gap: 8,
+    },
+    videoControlText: {
+        color: '#FFF',
+        fontSize: 14,
+        fontWeight: '600',
+    },
 });
 
 export default ShootingAnalysisScreen;
