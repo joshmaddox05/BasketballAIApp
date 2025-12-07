@@ -20,6 +20,9 @@ import VideoPlayer from '../../components/shared/VideoPlayer';
 import YouTubeService from '../../services/youtubeService';
 import { hasAccess } from '../../utils/subscription';
 import SubscriptionModal from '../../components/shared/SubscriptionModal';
+import { getActiveCustomPlan, getCustomPlans } from '../../services/firestoreService';
+import { auth } from '../../config/firebaseConfig';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // Import thumbnail images for workouts
 const shootingThumbnail = require('../../../assets/shooting-thumbnail.jpg');
@@ -38,6 +41,8 @@ const TrainingScreen = ({ navigation }) => {
     const [selectedCategory, setSelectedCategory] = useState('All');
     const [loadingVideos, setLoadingVideos] = useState(false);
     const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+    const [activePlan, setActivePlan] = useState(null);
+    const [myPlans, setMyPlans] = useState([]);
 
     const trainingCategories = [
         { id: '1', title: 'Shooting', icon: 'basketball-outline', color: '#FF6B00' },
@@ -82,6 +87,9 @@ const TrainingScreen = ({ navigation }) => {
             if (trainingVideos.length === 0) {
                 loadTrainingVideos();
             }
+
+            // Load custom plans
+            loadCustomPlans();
         }, [workouts, searchQuery, selectedCategory, userData])
     );
 
@@ -97,6 +105,34 @@ const TrainingScreen = ({ navigation }) => {
         }
     };
 
+    const loadCustomPlans = async () => {
+        try {
+            const uid = auth.currentUser?.uid;
+            if (!uid) return;
+
+            // Get active plan (only plans with status 'active')
+            const activeResult = await getActiveCustomPlan(uid);
+            if (activeResult.success && activeResult.plan) {
+                // Double check it's actually active and not completed
+                if (activeResult.plan.status === 'active') {
+                    setActivePlan(activeResult.plan);
+                } else {
+                    setActivePlan(null);
+                }
+            } else {
+                setActivePlan(null);
+            }
+
+            // Get all plans
+            const plansResult = await getCustomPlans(uid);
+            if (plansResult.success) {
+                setMyPlans(plansResult.plans);
+            }
+        } catch (error) {
+            console.error('Error loading custom plans:', error);
+        }
+    };
+
     const handleCategoryPress = (category) => {
         setSelectedCategory(category);
         navigation.navigate('TrainingCategory', { category });
@@ -104,13 +140,19 @@ const TrainingScreen = ({ navigation }) => {
 
     const renderCategoryItem = ({ item }) => (
         <TouchableOpacity
-            style={[styles.categoryCard, { backgroundColor: theme.card }]}
+            style={[styles.categoryCard, { backgroundColor: item.color }]}
             onPress={() => handleCategoryPress(item.title)}
+            activeOpacity={0.8}
         >
-            <View style={[styles.categoryIcon, { backgroundColor: `${item.color}20` }]}>
-                <Ionicons name={item.icon} size={32} color={item.color} />
+            <View style={styles.categoryContent}>
+                <View style={styles.categoryIconContainer}>
+                    <Ionicons name={item.icon} size={28} color="#FFF" />
+                </View>
+                <Text style={styles.categoryTitle}>{item.title}</Text>
             </View>
-            <Text style={[styles.categoryTitle, { color: theme.text }]}>{item.title}</Text>
+            <View style={styles.categoryArrow}>
+                <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.7)" />
+            </View>
         </TouchableOpacity>
     );
 
@@ -255,6 +297,67 @@ const TrainingScreen = ({ navigation }) => {
                 </View>
 
                 <ScrollView showsVerticalScrollIndicator={false}>
+                    {/* Build Your Workout Card */}
+                    <TouchableOpacity
+                        style={styles.buildWorkoutCard}
+                        onPress={() => navigation.navigate('BuildWorkout')}
+                        activeOpacity={0.9}
+                    >
+                        <LinearGradient
+                            colors={['#FF6B00', '#FF8C33']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={styles.buildWorkoutGradient}
+                        >
+                            <View style={styles.buildWorkoutContent}>
+                                <View style={styles.buildWorkoutLeft}>
+                                    <Text style={styles.buildWorkoutTitle}>Build Your Workout</Text>
+                                    <Text style={styles.buildWorkoutSubtitle}>
+                                        Create a personalized training plan for today, this week, or this month
+                                    </Text>
+                                    <View style={styles.buildWorkoutButton}>
+                                        <Text style={styles.buildWorkoutButtonText}>Get Started</Text>
+                                        <Ionicons name="arrow-forward" size={16} color="#FF6B00" />
+                                    </View>
+                                </View>
+                                <View style={styles.buildWorkoutIcon}>
+                                    <Ionicons name="create-outline" size={48} color="rgba(255,255,255,0.9)" />
+                                </View>
+                            </View>
+                        </LinearGradient>
+                    </TouchableOpacity>
+
+                    {/* Active Plan Card */}
+                    {activePlan && (
+                        <TouchableOpacity
+                            style={styles.activePlanCard}
+                            onPress={() => navigation.navigate('CustomPlanDetail', { planId: activePlan.id })}
+                            activeOpacity={0.8}
+                        >
+                            <View style={styles.activePlanHeader}>
+                                <View style={styles.activePlanBadge}>
+                                    <Ionicons name="flash" size={14} color="#FFD700" />
+                                    <Text style={styles.activePlanBadgeText}>Active Plan</Text>
+                                </View>
+                                <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
+                            </View>
+                            <Text style={[styles.activePlanTitle, { color: theme.text }]}>{activePlan.title}</Text>
+                            <View style={styles.activePlanProgress}>
+                                <View style={styles.activePlanProgressBar}>
+                                    <View
+                                        style={[
+                                            styles.activePlanProgressFill,
+                                            { width: `${activePlan.overallProgress || 0}%` }
+                                        ]}
+                                    />
+                                </View>
+                                <Text style={styles.activePlanProgressText}>
+                                    {activePlan.completedDays?.length || 0}/{activePlan.durationDays} days
+                                </Text>
+                            </View>
+                        </TouchableOpacity>
+                    )}
+
                     {/* Categories */}
                     <View style={styles.categoriesSection}>
                         <Text style={[styles.sectionTitle, { color: theme.text }]}>Training Categories</Text>
@@ -262,9 +365,9 @@ const TrainingScreen = ({ navigation }) => {
                             data={trainingCategories}
                             renderItem={renderCategoryItem}
                             keyExtractor={item => item.id}
-                            numColumns={3}
-                            scrollEnabled={false}
-                            contentContainerStyle={styles.categoriesGrid}
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={styles.categoriesList}
                         />
                     </View>
 
@@ -513,35 +616,44 @@ const styles = StyleSheet.create({
         color: '#FF6B00',
         fontWeight: '500',
     },
-    categoriesGrid: {
-        justifyContent: 'space-between',
+    categoriesList: {
+        paddingRight: 16,
     },
     categoryCard: {
-        width: '30%',
-        backgroundColor: '#FFF',
-        borderRadius: 12,
-        padding: 12,
-        marginBottom: 16,
+        width: 140,
+        height: 80,
+        borderRadius: 16,
+        padding: 14,
+        marginRight: 12,
+        flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'space-between',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 2,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.15,
+        shadowRadius: 6,
+        elevation: 4,
     },
-    categoryIcon: {
-        width: 60,
-        height: 60,
-        borderRadius: 30,
+    categoryContent: {
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+    },
+    categoryIconContainer: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: 'rgba(255,255,255,0.25)',
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 8,
+        marginBottom: 6,
     },
     categoryTitle: {
         fontSize: 14,
-        fontWeight: '600',
-        color: '#333',
-        textAlign: 'center',
+        fontWeight: '700',
+        color: '#FFF',
+    },
+    categoryArrow: {
+        opacity: 0.8,
     },
     analysisSection: {
         marginBottom: 24,
@@ -797,6 +909,120 @@ const styles = StyleSheet.create({
     retryButtonText: {
         color: '#FFF',
         fontSize: 14,
+        fontWeight: '500',
+    },
+    // Build Your Workout Card Styles
+    buildWorkoutCard: {
+        marginBottom: 16,
+        borderRadius: 16,
+        overflow: 'hidden',
+        shadowColor: '#FF6B00',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 6,
+    },
+    buildWorkoutGradient: {
+        padding: 20,
+    },
+    buildWorkoutContent: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    buildWorkoutLeft: {
+        flex: 1,
+        paddingRight: 16,
+    },
+    buildWorkoutTitle: {
+        fontSize: 20,
+        fontWeight: '800',
+        color: '#FFFFFF',
+        marginBottom: 6,
+    },
+    buildWorkoutSubtitle: {
+        fontSize: 14,
+        color: 'rgba(255,255,255,0.85)',
+        lineHeight: 20,
+        marginBottom: 14,
+    },
+    buildWorkoutButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFFFFF',
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        borderRadius: 25,
+        alignSelf: 'flex-start',
+    },
+    buildWorkoutButtonText: {
+        color: '#FF6B00',
+        fontWeight: '700',
+        fontSize: 14,
+        marginRight: 6,
+    },
+    buildWorkoutIcon: {
+        width: 70,
+        height: 70,
+        borderRadius: 35,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    // Active Plan Card Styles
+    activePlanCard: {
+        backgroundColor: '#1A1A1A',
+        borderRadius: 14,
+        padding: 16,
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: '#2A2A2A',
+    },
+    activePlanHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 10,
+    },
+    activePlanBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255,215,0,0.15)',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 12,
+    },
+    activePlanBadgeText: {
+        color: '#FFD700',
+        fontSize: 12,
+        fontWeight: '600',
+        marginLeft: 4,
+    },
+    activePlanTitle: {
+        fontSize: 17,
+        fontWeight: '700',
+        marginBottom: 12,
+    },
+    activePlanProgress: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    activePlanProgressBar: {
+        flex: 1,
+        height: 6,
+        backgroundColor: '#2A2A2A',
+        borderRadius: 3,
+        marginRight: 12,
+        overflow: 'hidden',
+    },
+    activePlanProgressFill: {
+        height: '100%',
+        backgroundColor: '#FF6B00',
+        borderRadius: 3,
+    },
+    activePlanProgressText: {
+        color: '#888888',
+        fontSize: 13,
         fontWeight: '500',
     },
 });

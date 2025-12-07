@@ -24,13 +24,13 @@ import {
     updateChallengeExerciseProgress,
     completeChallengeDay,
     completeChallenge,
-    getChallengeLeaderboard,
     listenToChallengeLeaderboard,
     getUserChallengeRank,
     getOpponentProgress,
-    sendChallengeInvite
+    sendChallengeInvite,
+    determineH2HWinner
 } from '../../services/firestoreService';
-import { OpponentSelector } from '../../components/challenges';
+import { OpponentSelector, WorkoutExerciseTracker } from '../../components/challenges';
 
 const { width } = Dimensions.get('window');
 
@@ -172,6 +172,9 @@ const ChallengeDetailScreen = ({ route, navigation }) => {
     const [completingExercise, setCompletingExercise] = useState(null);
     const [showOpponentSelector, setShowOpponentSelector] = useState(false);
     const [sendingInvite, setSendingInvite] = useState(false);
+    const [showWorkoutTracker, setShowWorkoutTracker] = useState(false);
+    const [activeExercise, setActiveExercise] = useState(null);
+    const [activeExerciseIndex, setActiveExerciseIndex] = useState(null);
 
     // Load challenge data and user progress
     useEffect(() => {
@@ -339,14 +342,191 @@ const ChallengeDetailScreen = ({ route, navigation }) => {
         );
     };
 
-    // Complete an exercise
+    // Open workout tracker for an exercise
+    const startExercise = (dayIndex, exerciseIndex) => {
+        if (!user?.uid || !userProgress) return;
+
+        const day = challenge.days[dayIndex];
+        const exercise = day.exercises[exerciseIndex];
+
+        setActiveExercise(exercise);
+        setActiveExerciseIndex({ dayIndex, exerciseIndex, dayNumber: day.day });
+        setShowWorkoutTracker(true);
+    };
+
+    // Handle workout tracker completion
+    const handleWorkoutComplete = async (workoutResult) => {
+        if (!user?.uid || !userProgress || !activeExerciseIndex) return;
+
+        setShowWorkoutTracker(false);
+        setCompletingExercise(`${activeExerciseIndex.dayIndex}-${activeExerciseIndex.exerciseIndex}`);
+
+        try {
+            const day = challenge.days[activeExerciseIndex.dayIndex];
+            const exerciseIndex = activeExerciseIndex.exerciseIndex;
+
+            // Update exercise progress in Firestore with actual workout data
+            await updateChallengeExerciseProgress(
+                user.uid,
+                challengeId,
+                day.day,
+                exerciseIndex,
+                workoutResult // Pass the makes/misses data
+            );
+
+            // Update local state
+            const updatedProgress = { ...userProgress };
+            const dayProgressEntry = updatedProgress.dayProgress?.find(d => d.day === day.day) || {
+                day: day.day,
+                exercises: [],
+                exerciseResults: []
+            };
+
+            if (!dayProgressEntry.exercises.includes(exerciseIndex)) {
+                dayProgressEntry.exercises.push(exerciseIndex);
+            }
+
+            // Store the workout result for this exercise
+            if (!dayProgressEntry.exerciseResults) {
+                dayProgressEntry.exerciseResults = [];
+            }
+            dayProgressEntry.exerciseResults[exerciseIndex] = workoutResult;
+
+            // Check if all exercises are completed for this day
+            const totalExercises = day.exercises.length;
+            const completedExercises = dayProgressEntry.exercises.length;
+
+            if (completedExercises >= totalExercises) {
+                // Day is complete - calculate score based on actual workout results
+                // Get all exercise results for this day and average the percentages
+                const allResults = dayProgressEntry.exerciseResults.filter(r => r);
+                const averageScore = allResults.length > 0
+                    ? Math.round(allResults.reduce((sum, r) => sum + r.percentage, 0) / allResults.length)
+                    : workoutResult.percentage;
+
+                const result = await completeChallengeDay(user.uid, challengeId, day.day, averageScore);
+
+                // Update local progress
+                updatedProgress.completedDays = result.completedDays;
+                updatedProgress.currentDay = result.currentDay;
+                updatedProgress.totalScore = result.totalScore;
+
+                // Add activity
+                addActivity({
+                    title: `${challenge.title} - Day ${day.day}`,
+                    progress: averageScore,
+                    date: 'Today'
+                });
+
+                // Check if challenge is complete
+                if (result.completedDays.length >= challenge.days.length) {
+                    // Complete the challenge first
+                    await completeChallenge(user.uid, challengeId, challenge.rewards);
+
+                    // Determine winner for H2H challenges
+                    const isH2HChallenge = challenge.type === 'head_to_head';
+                    let winnerMessage = '';
+
+                    if (isH2HChallenge && userProgress.opponent) {
+                        const oppProgress = await getOpponentProgress(userProgress.opponent.uid, challengeId);
+                        if (oppProgress?.status === 'completed') {
+                            // Both players finished - determine winner and award prizes
+                            const winnerResult = await determineH2HWinner(
+                                challengeId,
+                                user.uid,
+                                userProgress.opponent.uid,
+                                challenge.rewards
+                            );
+
+                            if (winnerResult.status === 'completed') {
+                                const userScore = result.totalScore;
+                                const oppScore = oppProgress.totalScore || 0;
+
+                                if (winnerResult.winnerUid === user.uid) {
+                                    winnerMessage = `\n\n🏆 You won! ${userScore} to ${oppScore}\nYou earned the ${challenge.rewards?.badge || 'Champion'} badge!`;
+                                } else if (winnerResult.winnerUid === userProgress.opponent.uid) {
+                                    winnerMessage = `\n\n${userProgress.opponent.displayName} won ${oppScore} to ${userScore}. Better luck next time!`;
+                                } else {
+                                    winnerMessage = `\n\nIt's a tie! Both scored ${userScore} points.`;
+                                }
+                            }
+                        } else {
+                            winnerMessage = `\n\nWaiting for ${userProgress.opponent.displayName} to finish...`;
+                        }
+                    }
+
+                    Alert.alert(
+                        '🎉 Challenge Complete!',
+                        `Congratulations! You've completed "${challenge.title}" with a total score of ${result.totalScore}!${winnerMessage}`,
+                        [{ text: 'Awesome!' }]
+                    );
+                } else {
+                    Alert.alert(
+                        '🏀 Day Completed!',
+                        `You've completed Day ${day.day} with a score of ${averageScore}%!\n\nMakes: ${workoutResult.makes} | Misses: ${workoutResult.misses}`,
+                        [{ text: 'Great!' }]
+                    );
+                }
+            } else {
+                // Just completed one exercise, show result
+                Alert.alert(
+                    '✅ Exercise Complete!',
+                    `${activeExercise.name}\n\nAccuracy: ${workoutResult.percentage}%\nMakes: ${workoutResult.makes} | Misses: ${workoutResult.misses}`,
+                    [{ text: 'Continue' }]
+                );
+            }
+
+            // Refresh progress
+            const freshProgress = await getUserChallengeProgress(user.uid, challengeId);
+            setUserProgress(freshProgress);
+
+            // Refresh rank
+            const rankData = await getUserChallengeRank(user.uid, challengeId);
+            setUserRank(rankData);
+
+            // Refresh opponent progress for H2H
+            if (userProgress.opponent?.uid) {
+                const oppProgress = await getOpponentProgress(userProgress.opponent.uid, challengeId);
+                setOpponentProgress(oppProgress);
+            }
+
+        } catch (error) {
+            console.error('Error completing exercise:', error);
+            Alert.alert('Error', 'Failed to save progress. Please try again.');
+        } finally {
+            setCompletingExercise(null);
+            setActiveExercise(null);
+            setActiveExerciseIndex(null);
+        }
+    };
+
+    // Legacy complete exercise (for non-shooting exercises)
     const completeExercise = async (dayIndex, exerciseIndex) => {
         if (!user?.uid || !userProgress) return;
 
+        // For shooting-related exercises, open the tracker
+        const day = challenge.days[dayIndex];
+        const exercise = day.exercises[exerciseIndex];
+        const exerciseName = exercise.name.toLowerCase();
+
+        // Check if this is a shooting/tracking exercise
+        const isTrackableExercise =
+            exerciseName.includes('shot') ||
+            exerciseName.includes('shooting') ||
+            exerciseName.includes('free throw') ||
+            exerciseName.includes('three') ||
+            exerciseName.includes('jumper') ||
+            exerciseName.includes('layup') ||
+            challenge.category?.toLowerCase() === 'shooting';
+
+        if (isTrackableExercise) {
+            startExercise(dayIndex, exerciseIndex);
+            return;
+        }
+
+        // For non-shooting exercises, use simple completion
         setCompletingExercise(`${dayIndex}-${exerciseIndex}`);
         try {
-            const day = challenge.days[dayIndex];
-
             // Update exercise progress in Firestore
             await updateChallengeExerciseProgress(user.uid, challengeId, day.day, exerciseIndex);
 
@@ -366,8 +546,8 @@ const ChallengeDetailScreen = ({ route, navigation }) => {
             const completedExercises = dayProgressEntry.exercises.length;
 
             if (completedExercises >= totalExercises) {
-                // Day is complete - calculate score
-                const score = Math.floor(Math.random() * 26) + 75; // 75-100
+                // Day is complete - use 85% as default for non-trackable exercises
+                const score = 85;
 
                 const result = await completeChallengeDay(user.uid, challengeId, day.day, score);
 
@@ -394,7 +574,7 @@ const ChallengeDetailScreen = ({ route, navigation }) => {
                 } else {
                     Alert.alert(
                         'Day Completed!',
-                        `You've completed Day ${day.day} with a score of ${score}%!`,
+                        `You've completed Day ${day.day}!`,
                         [{ text: 'Great!' }]
                     );
                 }
@@ -859,6 +1039,20 @@ const ChallengeDetailScreen = ({ route, navigation }) => {
                 onClose={() => setShowOpponentSelector(false)}
                 onSelectOpponent={handleSelectOpponent}
                 challengeTitle={challenge?.title}
+            />
+
+            {/* Workout Exercise Tracker Modal */}
+            <WorkoutExerciseTracker
+                visible={showWorkoutTracker}
+                exercise={activeExercise}
+                onComplete={handleWorkoutComplete}
+                onClose={() => {
+                    setShowWorkoutTracker(false);
+                    setActiveExercise(null);
+                    setActiveExerciseIndex(null);
+                }}
+                theme={theme}
+                isDarkMode={isDarkMode}
             />
 
             {/* Loading overlay when sending invite */}

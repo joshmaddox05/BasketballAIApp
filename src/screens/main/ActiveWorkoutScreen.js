@@ -10,7 +10,8 @@ import {
   Animated,
   Vibration,
   Dimensions,
-  Platform
+  Platform,
+  ScrollView
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -52,7 +53,7 @@ const WorkoutVideoPlayer = ({ videoSource, style }) => {
 };
 
 const ActiveWorkoutScreen = ({ route, navigation }) => {
-  const { workoutId, resumeStep = 0, workout: passedWorkout, isCustom } = route.params;
+  const { workoutId, resumeStep = 0, workout: passedWorkout, isCustom, fromCustomPlan, onWorkoutComplete } = route.params;
   const { userData, theme: contextTheme, isDarkMode, workouts, dailyChallenge, updateChallenge } = useAppContext();
   const theme = contextTheme || getTheme(isDarkMode || false);
 
@@ -201,7 +202,16 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
         setMisses(0);
 
         if (currentStepData.duration) {
-          setTimeRemaining(currentStepData.duration * 60);
+          // Parse duration - handle both number and string formats (e.g., "5 min", "10", 10)
+          let durationInMinutes = 0;
+          if (typeof currentStepData.duration === 'number') {
+            durationInMinutes = currentStepData.duration;
+          } else if (typeof currentStepData.duration === 'string') {
+            // Extract number from strings like "5 min", "10 minutes", etc.
+            const match = currentStepData.duration.match(/(\d+)/);
+            durationInMinutes = match ? parseInt(match[1]) : 5; // Default to 5 min if can't parse
+          }
+          setTimeRemaining(durationInMinutes * 60);
           setTimerType('duration');
           setTimerActive(true);
         } else {
@@ -520,20 +530,37 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
         });
       }
 
-      Alert.alert(
-        'Workout Complete! 🎉',
-        completionMessage,
-        [
-          {
-            text: 'View Progress',
-            onPress: () => navigation.navigate('Progress', { screen: 'ProgressMain' })
-          },
-          {
-            text: 'Done',
-            onPress: () => navigation.goBack()
-          }
-        ]
-      );
+      // If called from custom plan, return performance data via callback
+      if (fromCustomPlan && onWorkoutComplete) {
+        const performanceData = {
+          score: Math.round(avgCompletion),
+          makes: shootingStats?.totalMakes || 0,
+          misses: shootingStats?.totalMisses || 0,
+          completionPercentage: Math.round(avgCompletion),
+          totalReps,
+          duration: totalWorkoutTime
+        };
+
+        // Call the callback and navigate back
+        onWorkoutComplete(performanceData);
+        navigation.goBack();
+      } else {
+        // Normal completion flow
+        Alert.alert(
+          'Workout Complete! 🎉',
+          completionMessage,
+          [
+            {
+              text: 'View Progress',
+              onPress: () => navigation.navigate('Progress', { screen: 'ProgressMain' })
+            },
+            {
+              text: 'Done',
+              onPress: () => navigation.goBack()
+            }
+          ]
+        );
+      }
     } catch (error) {
       console.error('Error saving workout:', error);
       Alert.alert('Error', 'Failed to save workout progress. Please try again.');
@@ -737,15 +764,21 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
       </View>
 
       {/* Main Content */}
-      <Animated.View
-        style={[
-          styles.content,
-          {
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }]
-          }
-        ]}
+      <ScrollView
+        style={styles.scrollContent}
+        contentContainerStyle={styles.scrollContentContainer}
+        showsVerticalScrollIndicator={false}
+        bounces={true}
       >
+        <Animated.View
+          style={[
+            styles.content,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }]
+            }
+          ]}
+        >
         {/* Step Title with Badge */}
         <View style={styles.stepTitleContainer}>
           <View style={[styles.stepBadge, { backgroundColor: theme.primary + '20' }]}>
@@ -973,7 +1006,8 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
             </Text>
           </View>
         )}
-      </Animated.View>
+        </Animated.View>
+      </ScrollView>
 
       {/* Bottom Actions */}
       <View style={[styles.bottomActions, { backgroundColor: theme.card, borderTopColor: theme.border }]}>
@@ -1011,6 +1045,12 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  scrollContent: {
+    flex: 1,
+  },
+  scrollContentContainer: {
+    paddingBottom: 20,
   },
   header: {
     flexDirection: 'row',

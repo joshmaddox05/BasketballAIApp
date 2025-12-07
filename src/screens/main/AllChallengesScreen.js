@@ -26,9 +26,12 @@ import {
     getFriendRequests,
     acceptFriendRequest,
     declineFriendRequest,
-    listenToFriendRequests
+    listenToFriendRequests,
+    getDailyChallenge,
+    getDailyChallengeProgress
 } from '../../services/firestoreService';
 import { OpponentSelector, ChallengeInviteModal } from '../../components/challenges';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // Challenge type tabs
 const CHALLENGE_TYPES = [
@@ -154,6 +157,8 @@ const AllChallengesScreen = ({ navigation }) => {
     const [showInvitesModal, setShowInvitesModal] = useState(false);
     const [selectedFriendForChallenge, setSelectedFriendForChallenge] = useState(null);
     const [processingRequest, setProcessingRequest] = useState(null);
+    const [dailyChallenge, setDailyChallenge] = useState(null);
+    const [dailyChallengeProgress, setDailyChallengeProgress] = useState(null);
 
     const userSubscription = userData?.subscription || 'free';
 
@@ -188,6 +193,18 @@ const AllChallengesScreen = ({ navigation }) => {
                     // Load friend requests
                     const requests = await getFriendRequests(user.uid);
                     setFriendRequests(requests || []);
+
+                    // Load daily challenge
+                    const dailyChallengeResult = await getDailyChallenge();
+                    if (dailyChallengeResult.success && dailyChallengeResult.challenge) {
+                        setDailyChallenge(dailyChallengeResult.challenge);
+
+                        // Load user's progress on daily challenge
+                        const progressResult = await getDailyChallengeProgress(user.uid);
+                        if (progressResult.success && progressResult.progress) {
+                            setDailyChallengeProgress(progressResult.progress);
+                        }
+                    }
 
                     // Set up real-time listener for user challenges
                     unsubscribeUserChallenges = listenToUserChallenges(user.uid, (progress) => {
@@ -261,7 +278,24 @@ const AllChallengesScreen = ({ navigation }) => {
     const activeIds = userChallenges
         .filter(uc => uc.status === 'active')
         .map(uc => uc.challengeId);
-    const availableChallenges = filteredChallenges.filter(c => !activeIds.includes(c.id));
+
+    // Split available challenges into free and premium, putting premium at bottom
+    // Sort free challenges by difficulty (Beginner first)
+    const availableChallengesUnsorted = filteredChallenges.filter(c => !activeIds.includes(c.id));
+    const freeChallenges = availableChallengesUnsorted.filter(c => !c.isExclusive || hasAccess(userSubscription, c.requiredTier));
+    const premiumChallenges = availableChallengesUnsorted.filter(c => c.isExclusive && !hasAccess(userSubscription, c.requiredTier));
+
+    // Sort by difficulty: Beginner → Intermediate → Advanced → Expert
+    const difficultyOrder = { 'beginner': 0, 'intermediate': 1, 'advanced': 2, 'expert': 3 };
+    const sortByDifficulty = (a, b) => {
+        const aOrder = difficultyOrder[a.difficulty?.toLowerCase()] ?? 4;
+        const bOrder = difficultyOrder[b.difficulty?.toLowerCase()] ?? 4;
+        return aOrder - bOrder;
+    };
+
+    const sortedFreeChallenges = [...freeChallenges].sort(sortByDifficulty);
+    const sortedPremiumChallenges = [...premiumChallenges].sort(sortByDifficulty);
+    const availableChallenges = [...sortedFreeChallenges, ...sortedPremiumChallenges];
 
     // Track which challenges the user has previously completed (for showing "Rejoin" button)
     const completedIds = userChallenges
@@ -502,20 +536,28 @@ const AllChallengesScreen = ({ navigation }) => {
 
         return (
             <TouchableOpacity
-                style={[styles.challengeCard, { backgroundColor: theme.card }]}
-                onPress={() => handleChallengePress(challenge, progress)}
-                disabled={isLocked}
+                style={[
+                    styles.challengeCard,
+                    { backgroundColor: theme.card },
+                    isLocked && styles.lockedChallengeCard
+                ]}
+                onPress={() => isLocked
+                    ? navigation.navigate('Profile', { screen: 'Settings', params: { openSubscription: true }, initial: false })
+                    : handleChallengePress(challenge, progress)
+                }
+                activeOpacity={isLocked ? 0.8 : 0.7}
             >
-                {/* Lock overlay for premium challenges */}
+
+                {/* Premium banner for locked challenges */}
                 {isLocked && (
-                    <View style={styles.lockOverlay}>
-                        <Ionicons name="lock-closed" size={24} color="#FFF" />
-                        <Text style={styles.lockText}>Premium</Text>
+                    <View style={styles.premiumBanner}>
+                        <Ionicons name="diamond" size={14} color="#FFF" />
+                        <Text style={styles.premiumBannerText}>Premium Challenge</Text>
                     </View>
                 )}
 
                 {/* Header with badges */}
-                <View style={styles.cardHeader}>
+                <View style={[styles.cardHeader, isLocked && { marginTop: 24 }]}>
                     <View style={styles.badgeRow}>
                         {/* Category badge */}
                         <View style={[styles.categoryBadge, { backgroundColor: getCategoryColor(challenge.category) + '20' }]}>
@@ -540,8 +582,8 @@ const AllChallengesScreen = ({ navigation }) => {
                         </View>
                     </View>
 
-                    {/* Premium star */}
-                    {challenge.isExclusive && (
+                    {/* Premium star for exclusive (but unlocked) challenges */}
+                    {challenge.isExclusive && !isLocked && (
                         <View style={styles.premiumStar}>
                             <Ionicons name="star" size={16} color="#FFD700" />
                         </View>
@@ -621,6 +663,16 @@ const AllChallengesScreen = ({ navigation }) => {
                                             : 'Join'}
                                 </Text>
                             )}
+                        </TouchableOpacity>
+                    )}
+                    {/* Unlock button for locked premium challenges */}
+                    {isLocked && (
+                        <TouchableOpacity
+                            style={styles.unlockButton}
+                            onPress={() => navigation.navigate('Profile', { screen: 'Settings', params: { openSubscription: true }, initial: false })}
+                        >
+                            <Ionicons name="lock-open-outline" size={14} color="#FFF" />
+                            <Text style={styles.unlockButtonText}>Upgrade</Text>
                         </TouchableOpacity>
                     )}
                     {isActive && (
@@ -748,6 +800,83 @@ const AllChallengesScreen = ({ navigation }) => {
                     />
                 }
             >
+                {/* Daily Challenge Card */}
+                {dailyChallenge && (
+                    <TouchableOpacity
+                        style={styles.dailyChallengeCard}
+                        onPress={() => navigation.navigate('DailyChallengeDetail', { challenge: dailyChallenge, progress: dailyChallengeProgress })}
+                        activeOpacity={0.9}
+                    >
+                        <LinearGradient
+                            colors={['#9C27B0', '#E040FB']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={styles.dailyChallengeGradient}
+                        >
+                            <View style={styles.dailyChallengeHeader}>
+                                <View style={styles.dailyChallengeBadge}>
+                                    <Ionicons name="flash" size={14} color="#FFD700" />
+                                    <Text style={styles.dailyChallengeBadgeText}>Daily Challenge</Text>
+                                </View>
+                                <Text style={styles.dailyChallengeReward}>
+                                    +{dailyChallenge.rewards?.xp || 75} XP
+                                </Text>
+                            </View>
+
+                            <Text style={styles.dailyChallengeTitle}>{dailyChallenge.title}</Text>
+                            <Text style={styles.dailyChallengeDescription} numberOfLines={2}>
+                                {dailyChallenge.description}
+                            </Text>
+
+                            <View style={styles.dailyChallengeFooter}>
+                                <View style={styles.dailyChallengeStats}>
+                                    <View style={styles.dailyChallengeStat}>
+                                        <Ionicons name="trophy-outline" size={14} color="rgba(255,255,255,0.8)" />
+                                        <Text style={styles.dailyChallengeStatText}>
+                                            {dailyChallenge.targetValue} {dailyChallenge.targetMetric}
+                                        </Text>
+                                    </View>
+                                    <View style={styles.dailyChallengeStat}>
+                                        <Ionicons name="time-outline" size={14} color="rgba(255,255,255,0.8)" />
+                                        <Text style={styles.dailyChallengeStatText}>
+                                            ~{dailyChallenge.estimatedTime || 15} min
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                {dailyChallengeProgress?.completed ? (
+                                    <View style={styles.dailyChallengeCompletedBadge}>
+                                        <Ionicons name="checkmark-circle" size={18} color="#4CAF50" />
+                                        <Text style={styles.dailyChallengeCompletedText}>Done!</Text>
+                                    </View>
+                                ) : (
+                                    <View style={styles.dailyChallengeStartButton}>
+                                        <Text style={styles.dailyChallengeStartText}>Start</Text>
+                                        <Ionicons name="arrow-forward" size={16} color="#9C27B0" />
+                                    </View>
+                                )}
+                            </View>
+
+                            {/* Progress bar if in progress */}
+                            {dailyChallengeProgress && !dailyChallengeProgress.completed && dailyChallengeProgress.currentValue > 0 && (
+                                <View style={styles.dailyChallengeProgressContainer}>
+                                    <View style={styles.dailyChallengeProgressBar}>
+                                        <View
+                                            style={[
+                                                styles.dailyChallengeProgressFill,
+                                                { width: `${Math.min((dailyChallengeProgress.currentValue / dailyChallenge.targetValue) * 100, 100)}%` }
+                                            ]}
+                                        />
+                                    </View>
+                                    <Text style={styles.dailyChallengeProgressText}>
+                                        {dailyChallengeProgress.currentValue}/{dailyChallenge.targetValue}
+                                    </Text>
+                                </View>
+                            )}
+                        </LinearGradient>
+                    </TouchableOpacity>
+                )}
+
                 {/* Friend Requests Section */}
                 {friendRequests.length > 0 && (
                     <View style={styles.section}>
@@ -961,20 +1090,46 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 4,
         elevation: 3,
+        overflow: 'hidden',
     },
-    lockOverlay: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(0,0,0,0.7)',
-        borderRadius: 12,
-        justifyContent: 'center',
+    lockedChallengeCard: {
+        borderWidth: 1.5,
+        borderColor: '#9C27B0',
+        opacity: 0.9,
+    },
+    premiumBanner: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: '#9C27B0',
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
         zIndex: 10,
     },
-    lockText: {
+    premiumBannerText: {
+        color: '#FFF',
+        fontSize: 12,
+        fontWeight: '700',
+        letterSpacing: 0.5,
+    },
+    unlockButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#9C27B0',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        gap: 6,
+    },
+    unlockButtonText: {
         color: '#FFF',
         fontSize: 14,
         fontWeight: '600',
-        marginTop: 4,
     },
     cardHeader: {
         flexDirection: 'row',
@@ -1245,6 +1400,126 @@ const styles = StyleSheet.create({
     findFriendsButtonText: {
         color: '#FFF',
         fontSize: 15,
+        fontWeight: '600',
+    },
+    // Daily Challenge Card Styles
+    dailyChallengeCard: {
+        marginBottom: 20,
+        borderRadius: 16,
+        overflow: 'hidden',
+        shadowColor: '#9C27B0',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 6,
+    },
+    dailyChallengeGradient: {
+        padding: 18,
+    },
+    dailyChallengeHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    dailyChallengeBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 12,
+    },
+    dailyChallengeBadgeText: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: '700',
+        marginLeft: 5,
+    },
+    dailyChallengeReward: {
+        color: '#FFD700',
+        fontSize: 14,
+        fontWeight: '700',
+    },
+    dailyChallengeTitle: {
+        color: '#FFFFFF',
+        fontSize: 20,
+        fontWeight: '800',
+        marginBottom: 6,
+    },
+    dailyChallengeDescription: {
+        color: 'rgba(255,255,255,0.85)',
+        fontSize: 14,
+        lineHeight: 20,
+        marginBottom: 14,
+    },
+    dailyChallengeFooter: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    dailyChallengeStats: {
+        flexDirection: 'row',
+        gap: 16,
+    },
+    dailyChallengeStat: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+    },
+    dailyChallengeStatText: {
+        color: 'rgba(255,255,255,0.8)',
+        fontSize: 13,
+    },
+    dailyChallengeStartButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFFFFF',
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        borderRadius: 20,
+        gap: 6,
+    },
+    dailyChallengeStartText: {
+        color: '#9C27B0',
+        fontSize: 14,
+        fontWeight: '700',
+    },
+    dailyChallengeCompletedBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(76, 175, 80, 0.2)',
+        paddingVertical: 8,
+        paddingHorizontal: 14,
+        borderRadius: 20,
+        gap: 6,
+    },
+    dailyChallengeCompletedText: {
+        color: '#4CAF50',
+        fontSize: 14,
+        fontWeight: '700',
+    },
+    dailyChallengeProgressContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 14,
+    },
+    dailyChallengeProgressBar: {
+        flex: 1,
+        height: 6,
+        backgroundColor: 'rgba(255,255,255,0.3)',
+        borderRadius: 3,
+        marginRight: 10,
+        overflow: 'hidden',
+    },
+    dailyChallengeProgressFill: {
+        height: '100%',
+        backgroundColor: '#FFFFFF',
+        borderRadius: 3,
+    },
+    dailyChallengeProgressText: {
+        color: '#FFFFFF',
+        fontSize: 12,
         fontWeight: '600',
     },
 });

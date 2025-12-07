@@ -54,7 +54,7 @@ service cloud.firestore {
 
       // Friend requests - owner can read/manage, anyone can create
       match /friendRequests/{requestId} {
-        allow read, write: if true; // DEVELOPMENT ONLY
+        allow read, write: if true; // D                                                                                                                            EVELOPMENT ONLY
       }
     }
     

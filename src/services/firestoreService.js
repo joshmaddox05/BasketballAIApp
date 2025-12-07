@@ -498,6 +498,44 @@ export const getUserShootingStats = async (uid, timeRange = 'all') => {
 };
 
 /**
+ * Get AI analysis statistics for a user
+ * @param {string} uid - User ID
+ * @param {string} period - Time period ('week', 'month', 'year')
+ * @returns {Promise<Object>} AI analysis statistics
+ */
+export const getAIAnalysisStats = async (uid, period = 'month') => {
+  try {
+    const startDate = new Date();
+    if (period === 'month') {
+      startDate.setMonth(startDate.getMonth() - 1);
+    } else if (period === 'week') {
+      startDate.setDate(startDate.getDate() - 7);
+    } else if (period === 'year') {
+      startDate.setFullYear(startDate.getFullYear() - 1);
+    }
+
+    // Query the ai_analyses subcollection for this user
+    const analysesRef = collection(db, 'users', uid, 'ai_analyses');
+    const q = query(
+      analysesRef,
+      where('createdAt', '>=', startDate),
+      orderBy('createdAt', 'desc')
+    );
+
+    const snapshot = await getDocs(q);
+
+    return {
+      totalAnalyses: snapshot.size,
+      analyses: snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+    };
+  } catch (error) {
+    console.error('Error getting AI analysis stats:', error);
+    // Return empty stats on error to prevent crashes
+    return { totalAnalyses: 0, analyses: [] };
+  }
+};
+
+/**
  * Calculate and get user's current workout streak
  * @param {string} uid - User ID
  * @returns {Promise<number>} Current streak in days
@@ -1574,11 +1612,11 @@ export const addCommunityPost = async (uid, postData) => {
 // ==================== CHALLENGE OPERATIONS ====================
 
 /**
- * Get the user's daily challenge (first active challenge or a featured one)
+ * Get the user's featured challenge (first active challenge or a featured one)
  * @param {string} uid - User ID
- * @returns {Promise<Object|null>} Daily challenge data
+ * @returns {Promise<Object|null>} Featured challenge data
  */
-export const getDailyChallenge = async (uid) => {
+export const getUserFeaturedChallenge = async (uid) => {
   try {
     // First, check if user has any active challenges
     const userChallengesQuery = query(
@@ -1633,7 +1671,7 @@ export const getDailyChallenge = async (uid) => {
 
     return null;
   } catch (error) {
-    console.error('Error getting daily challenge:', error);
+    console.error('Error getting featured challenge:', error);
     return null;
   }
 };
@@ -1872,9 +1910,10 @@ export const listenToUserChallenges = (uid, callback) => {
  * @param {string} challengeId - Challenge ID
  * @param {number} day - Day number
  * @param {number} exerciseIndex - Index of the exercise to mark complete
+ * @param {Object} workoutResult - Optional workout tracking result (makes, misses, percentage, score)
  * @returns {Promise<void>}
  */
-export const updateChallengeExerciseProgress = async (uid, challengeId, day, exerciseIndex) => {
+export const updateChallengeExerciseProgress = async (uid, challengeId, day, exerciseIndex, workoutResult = null) => {
   try {
     const progressDoc = await getDoc(doc(db, 'users', uid, 'challengeProgress', challengeId));
     if (!progressDoc.exists()) {
@@ -1887,13 +1926,36 @@ export const updateChallengeExerciseProgress = async (uid, challengeId, day, exe
     // Find or create day progress entry
     let dayEntry = dayProgress.find(d => d.day === day);
     if (!dayEntry) {
-      dayEntry = { day, exercises: [], completedAt: null, score: 0 };
+      dayEntry = {
+        day,
+        exercises: [],
+        exerciseResults: [],
+        completedAt: null,
+        score: 0
+      };
       dayProgress.push(dayEntry);
+    }
+
+    // Initialize exerciseResults array if not present
+    if (!dayEntry.exerciseResults) {
+      dayEntry.exerciseResults = [];
     }
 
     // Mark exercise as complete
     if (!dayEntry.exercises.includes(exerciseIndex)) {
       dayEntry.exercises.push(exerciseIndex);
+    }
+
+    // Store workout result if provided (for shooting/tracking exercises)
+    if (workoutResult) {
+      dayEntry.exerciseResults[exerciseIndex] = {
+        makes: workoutResult.makes,
+        misses: workoutResult.misses,
+        totalAttempts: workoutResult.totalAttempts,
+        percentage: workoutResult.percentage,
+        score: workoutResult.score,
+        completedAt: new Date().toISOString()
+      };
     }
 
     await updateDoc(doc(db, 'users', uid, 'challengeProgress', challengeId), {
@@ -1997,6 +2059,139 @@ export const completeChallenge = async (uid, challengeId, rewards = {}) => {
   } catch (error) {
     console.error('Error completing challenge:', error);
     throw error;
+  }
+};
+
+/**
+ * Determine and record winner for H2H challenge
+ * @param {string} challengeId - Challenge ID
+ * @param {string} player1Uid - First player's UID
+ * @param {string} player2Uid - Second player's UID
+ * @param {Object} rewards - Challenge rewards
+ * @returns {Promise<Object>} Winner determination result
+ */
+export const determineH2HWinner = async (challengeId, player1Uid, player2Uid, rewards = {}) => {
+  try {
+    // Get both players' progress
+    const [player1Progress, player2Progress] = await Promise.all([
+      getUserChallengeProgress(player1Uid, challengeId),
+      getUserChallengeProgress(player2Uid, challengeId)
+    ]);
+
+    // Both must have completed the challenge
+    if (player1Progress?.status !== 'completed' || player2Progress?.status !== 'completed') {
+      return {
+        status: 'pending',
+        message: 'Both players must complete the challenge first'
+      };
+    }
+
+    const player1Score = player1Progress.totalScore || 0;
+    const player2Score = player2Progress.totalScore || 0;
+
+    let winnerUid = null;
+    let loserUid = null;
+    let result = 'tie';
+
+    if (player1Score > player2Score) {
+      winnerUid = player1Uid;
+      loserUid = player2Uid;
+      result = 'player1_won';
+    } else if (player2Score > player1Score) {
+      winnerUid = player2Uid;
+      loserUid = player1Uid;
+      result = 'player2_won';
+    }
+
+    // Record the match result
+    const matchResult = {
+      challengeId,
+      player1Uid,
+      player2Uid,
+      player1Score,
+      player2Score,
+      winnerUid,
+      loserUid,
+      result,
+      completedAt: serverTimestamp()
+    };
+
+    // Store in a matches collection
+    await setDoc(doc(db, 'challengeMatches', `${challengeId}_${player1Uid}_${player2Uid}`), matchResult);
+
+    // Update both players' progress with match result
+    await Promise.all([
+      updateDoc(doc(db, 'users', player1Uid, 'challengeProgress', challengeId), {
+        matchResult: {
+          opponentScore: player2Score,
+          won: winnerUid === player1Uid,
+          tied: result === 'tie'
+        }
+      }),
+      updateDoc(doc(db, 'users', player2Uid, 'challengeProgress', challengeId), {
+        matchResult: {
+          opponentScore: player1Score,
+          won: winnerUid === player2Uid,
+          tied: result === 'tie'
+        }
+      })
+    ]);
+
+    // Award winner bonus points and badge
+    if (winnerUid) {
+      const winnerBonus = (rewards.points || 100) * 0.5; // 50% bonus for winning
+      await addXP(winnerUid, winnerBonus, 'Won H2H challenge');
+
+      // Award winner badge if specified
+      if (rewards.badge) {
+        await addBadgeToUser(winnerUid, {
+          id: `${challengeId}_winner`,
+          name: `${rewards.badge} Champion`,
+          description: `Won the ${rewards.badge} challenge`,
+          earnedAt: new Date().toISOString()
+        });
+      }
+    }
+
+    return {
+      status: 'completed',
+      result,
+      winnerUid,
+      loserUid,
+      player1Score,
+      player2Score,
+      matchResult
+    };
+  } catch (error) {
+    console.error('Error determining H2H winner:', error);
+    throw error;
+  }
+};
+
+/**
+ * Add a badge to user's profile
+ * @param {string} uid - User ID
+ * @param {Object} badge - Badge data
+ */
+export const addBadgeToUser = async (uid, badge) => {
+  try {
+    const userDoc = await getDoc(doc(db, 'users', uid));
+    if (!userDoc.exists()) return;
+
+    const userData = userDoc.data();
+    const badges = userData.badges || [];
+
+    // Don't add duplicate badges
+    if (badges.some(b => b.id === badge.id)) return;
+
+    badges.push(badge);
+
+    await updateDoc(doc(db, 'users', uid), {
+      badges,
+      updatedAt: serverTimestamp()
+    });
+  } catch (error) {
+    console.error('Error adding badge to user:', error);
   }
 };
 
@@ -2581,5 +2776,396 @@ export const getRecentOpponents = async (uid, limitCount = 10) => {
   } catch (error) {
     console.error('Error getting recent opponents:', error);
     return [];
+  }
+};
+
+// ==================== CUSTOM WORKOUT PLANS ====================
+
+/**
+ * Create a new custom workout plan
+ * @param {string} uid - User ID
+ * @param {Object} planData - Plan configuration data
+ * @returns {Promise<string>} Plan ID
+ */
+export const createCustomPlan = async (uid, planData) => {
+  try {
+    const planRef = await addDoc(collection(db, 'users', uid, 'customPlans'), {
+      ...planData,
+      status: 'active',
+      currentDay: 1,
+      completedDays: [],
+      totalScore: 0,
+      overallProgress: 0,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      startDate: serverTimestamp()
+    });
+    return { success: true, planId: planRef.id };
+  } catch (error) {
+    console.error('Error creating custom plan:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Get all custom plans for a user
+ * @param {string} uid - User ID
+ * @param {string} status - Filter by status ('active', 'completed', 'abandoned', or null for all)
+ * @returns {Promise<Array>} Array of custom plans
+ */
+export const getCustomPlans = async (uid, status = null) => {
+  try {
+    let q;
+    if (status) {
+      q = query(
+        collection(db, 'users', uid, 'customPlans'),
+        where('status', '==', status),
+        orderBy('createdAt', 'desc')
+      );
+    } else {
+      q = query(
+        collection(db, 'users', uid, 'customPlans'),
+        orderBy('createdAt', 'desc')
+      );
+    }
+    const snapshot = await getDocs(q);
+    const plans = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    return { success: true, plans };
+  } catch (error) {
+    console.error('Error getting custom plans:', error);
+    return { success: false, plans: [], error: error.message };
+  }
+};
+
+/**
+ * Get the user's currently active custom plan
+ * @param {string} uid - User ID
+ * @returns {Promise<Object|null>} Active plan or null
+ */
+export const getActiveCustomPlan = async (uid) => {
+  try {
+    const result = await getCustomPlans(uid, 'active');
+    if (result.success && result.plans.length > 0) {
+      return { success: true, plan: result.plans[0] };
+    }
+    return { success: true, plan: null };
+  } catch (error) {
+    console.error('Error getting active custom plan:', error);
+    return { success: false, plan: null, error: error.message };
+  }
+};
+
+/**
+ * Get a specific custom plan by ID
+ * @param {string} uid - User ID
+ * @param {string} planId - Plan ID
+ * @returns {Promise<Object|null>} Plan data or null
+ */
+export const getCustomPlan = async (uid, planId) => {
+  try {
+    const planDoc = await getDoc(doc(db, 'users', uid, 'customPlans', planId));
+    if (planDoc.exists()) {
+      return { success: true, plan: { id: planDoc.id, ...planDoc.data() } };
+    }
+    return { success: false, plan: null, error: 'Plan not found' };
+  } catch (error) {
+    console.error('Error getting custom plan:', error);
+    return { success: false, plan: null, error: error.message };
+  }
+};
+
+/**
+ * Update a custom plan day's progress
+ * @param {string} uid - User ID
+ * @param {string} planId - Plan ID
+ * @param {number} dayIndex - Day index (0-based)
+ * @param {Object} performance - Performance data (shootingStats, completionPercentage, etc.)
+ * @returns {Promise<void>}
+ */
+export const updateCustomPlanDayProgress = async (uid, planId, dayIndex, performance) => {
+  try {
+    const planDoc = await getDoc(doc(db, 'users', uid, 'customPlans', planId));
+    if (!planDoc.exists()) {
+      throw new Error('Plan not found');
+    }
+
+    const planData = planDoc.data();
+    const schedule = [...planData.schedule];
+
+    // Update the specific day's performance
+    schedule[dayIndex] = {
+      ...schedule[dayIndex],
+      performance: {
+        ...schedule[dayIndex].performance,
+        ...performance
+      }
+    };
+
+    await updateDoc(doc(db, 'users', uid, 'customPlans', planId), {
+      schedule,
+      updatedAt: serverTimestamp()
+    });
+  } catch (error) {
+    console.error('Error updating custom plan day progress:', error);
+    throw error;
+  }
+};
+
+/**
+ * Complete a custom plan day
+ * @param {string} uid - User ID
+ * @param {string} planId - Plan ID
+ * @param {number} dayIndex - Day index (0-based)
+ * @param {number} score - Day score (0-100)
+ * @returns {Promise<Object>} Updated plan data
+ */
+export const completeCustomPlanDay = async (uid, planId, dayIndex, score) => {
+  try {
+    const planDoc = await getDoc(doc(db, 'users', uid, 'customPlans', planId));
+    if (!planDoc.exists()) {
+      return { success: false, error: 'Plan not found' };
+    }
+
+    const planData = planDoc.data();
+    const schedule = [...planData.schedule];
+    const dayNumber = dayIndex + 1;
+
+    // Mark day as completed
+    schedule[dayIndex] = {
+      ...schedule[dayIndex],
+      completed: true,
+      completedAt: new Date().toISOString(),
+      score
+    };
+
+    // Update completed days array
+    const completedDays = planData.completedDays.includes(dayNumber)
+      ? planData.completedDays
+      : [...planData.completedDays, dayNumber];
+
+    // Calculate overall progress
+    const overallProgress = Math.round((completedDays.length / planData.durationDays) * 100);
+
+    // Calculate total score (average of all completed days)
+    const totalScore = Math.round(
+      schedule
+        .filter(day => day.completed && day.score !== null)
+        .reduce((sum, day) => sum + day.score, 0) / completedDays.length
+    );
+
+    // Check if plan is complete
+    const isComplete = completedDays.length >= planData.durationDays;
+    const nextDay = isComplete ? planData.durationDays : Math.min(dayNumber + 1, planData.durationDays);
+
+    const updates = {
+      schedule,
+      completedDays,
+      overallProgress,
+      totalScore,
+      currentDay: nextDay,
+      status: isComplete ? 'completed' : 'active',
+      updatedAt: serverTimestamp()
+    };
+
+    if (isComplete) {
+      updates.completedAt = serverTimestamp();
+    }
+
+    await updateDoc(doc(db, 'users', uid, 'customPlans', planId), updates);
+
+    return { success: true, plan: { ...planData, ...updates, id: planId } };
+  } catch (error) {
+    console.error('Error completing custom plan day:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Abandon a custom plan
+ * @param {string} uid - User ID
+ * @param {string} planId - Plan ID
+ * @returns {Promise<void>}
+ */
+export const abandonCustomPlan = async (uid, planId) => {
+  try {
+    await updateDoc(doc(db, 'users', uid, 'customPlans', planId), {
+      status: 'abandoned',
+      abandonedAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+  } catch (error) {
+    console.error('Error abandoning custom plan:', error);
+    throw error;
+  }
+};
+
+/**
+ * Delete a custom plan
+ * @param {string} uid - User ID
+ * @param {string} planId - Plan ID
+ * @returns {Promise<void>}
+ */
+export const deleteCustomPlan = async (uid, planId) => {
+  try {
+    await deleteDoc(doc(db, 'users', uid, 'customPlans', planId));
+  } catch (error) {
+    console.error('Error deleting custom plan:', error);
+    throw error;
+  }
+};
+
+// ==================== DAILY CHALLENGES ====================
+
+/**
+ * Get the daily challenge for a specific date
+ * @param {string} date - Date string in YYYY-MM-DD format (defaults to today)
+ * @returns {Promise<Object|null>} Daily challenge or null
+ */
+export const getDailyChallenge = async (date = null) => {
+  try {
+    const targetDate = date || new Date().toISOString().split('T')[0];
+    const challengeDoc = await getDoc(doc(db, 'dailyChallenges', targetDate));
+
+    if (challengeDoc.exists()) {
+      return { id: challengeDoc.id, ...challengeDoc.data() };
+    }
+
+    // If no challenge for today, get a rotating challenge based on day of year
+    const dayOfYear = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / 86400000);
+    const q = query(collection(db, 'dailyChallengeTemplates'), limit(30));
+    const snapshot = await getDocs(q);
+
+    if (snapshot.empty) {
+      return null;
+    }
+
+    const templates = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const todaysChallenge = templates[dayOfYear % templates.length];
+
+    return {
+      ...todaysChallenge,
+      id: targetDate,
+      date: targetDate
+    };
+  } catch (error) {
+    console.error('Error getting daily challenge:', error);
+    return null;
+  }
+};
+
+/**
+ * Get user's progress on the daily challenge
+ * @param {string} uid - User ID
+ * @param {string} date - Date string in YYYY-MM-DD format (defaults to today)
+ * @returns {Promise<Object|null>} User's daily challenge progress
+ */
+export const getDailyChallengeProgress = async (uid, date = null) => {
+  try {
+    const targetDate = date || new Date().toISOString().split('T')[0];
+    const progressDoc = await getDoc(doc(db, 'users', uid, 'dailyChallengeProgress', targetDate));
+
+    if (progressDoc.exists()) {
+      return { id: progressDoc.id, ...progressDoc.data() };
+    }
+    return null;
+  } catch (error) {
+    console.error('Error getting daily challenge progress:', error);
+    return null;
+  }
+};
+
+/**
+ * Update user's daily challenge progress
+ * @param {string} uid - User ID
+ * @param {string} date - Date string in YYYY-MM-DD format
+ * @param {Object} progressData - Progress data (current, target, percentage, etc.)
+ * @returns {Promise<void>}
+ */
+export const updateDailyChallengeProgress = async (uid, date, progressData) => {
+  try {
+    const targetDate = date || new Date().toISOString().split('T')[0];
+    const existingProgress = await getDailyChallengeProgress(uid, targetDate);
+
+    const updateData = {
+      ...progressData,
+      updatedAt: serverTimestamp()
+    };
+
+    if (!existingProgress) {
+      updateData.startedAt = serverTimestamp();
+      updateData.status = 'in_progress';
+    }
+
+    // Check if challenge is complete
+    if (progressData.progress?.current >= progressData.progress?.target) {
+      updateData.status = 'completed';
+      updateData.completedAt = serverTimestamp();
+    }
+
+    await setDoc(doc(db, 'users', uid, 'dailyChallengeProgress', targetDate), updateData, { merge: true });
+  } catch (error) {
+    console.error('Error updating daily challenge progress:', error);
+    throw error;
+  }
+};
+
+/**
+ * Complete daily challenge and award rewards
+ * @param {string} uid - User ID
+ * @param {string} date - Date string in YYYY-MM-DD format
+ * @param {Object} rewards - Rewards to give (xp, badge, etc.)
+ * @returns {Promise<void>}
+ */
+export const completeDailyChallenge = async (uid, date, rewards) => {
+  try {
+    const targetDate = date || new Date().toISOString().split('T')[0];
+
+    // Mark as complete
+    await setDoc(doc(db, 'users', uid, 'dailyChallengeProgress', targetDate), {
+      status: 'completed',
+      completedAt: serverTimestamp(),
+      xpEarned: rewards.xp || 0,
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+
+    // Award XP
+    if (rewards.xp > 0) {
+      await addXP(uid, rewards.xp, 'Daily Challenge Complete');
+    }
+  } catch (error) {
+    console.error('Error completing daily challenge:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get user's daily challenge streak
+ * @param {string} uid - User ID
+ * @returns {Promise<number>} Streak count
+ */
+export const getDailyChallengeStreak = async (uid) => {
+  try {
+    const today = new Date();
+    let streak = 0;
+
+    // Check backwards from yesterday (today might not be complete yet)
+    for (let i = 1; i <= 365; i++) {
+      const checkDate = new Date(today);
+      checkDate.setDate(checkDate.getDate() - i);
+      const dateStr = checkDate.toISOString().split('T')[0];
+
+      const progress = await getDailyChallengeProgress(uid, dateStr);
+
+      if (progress?.status === 'completed') {
+        streak++;
+      } else {
+        break;
+      }
+    }
+
+    return streak;
+  } catch (error) {
+    console.error('Error getting daily challenge streak:', error);
+    return 0;
   }
 };

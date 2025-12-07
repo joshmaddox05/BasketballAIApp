@@ -175,8 +175,11 @@ const SkillAssessmentScreen = ({ navigation }) => {
         // Use the selected skill level if manually chosen, otherwise use the assessed one
         const finalSkillLevel = selectedSkillLevel || assessedSkillLevel;
 
+        // Capitalize the skill level for proper display (e.g., 'beginner' -> 'Beginner')
+        const capitalizedLevel = finalSkillLevel.charAt(0).toUpperCase() + finalSkillLevel.slice(1);
+
         // Update the user's skill level in the context
-        updateUserSkillLevel(finalSkillLevel);
+        updateUserSkillLevel(capitalizedLevel);
 
         // Navigate to the next screen
         navigation.navigate('GoalSetting');
@@ -340,6 +343,38 @@ const SkillAssessmentScreen = ({ navigation }) => {
         );
     };
 
+    // Calculate current step based on question progress (maps 5 questions to 3 steps)
+    const getStepFromQuestion = (questionIndex) => {
+        if (questionIndex < 2) return 1;  // Questions 1-2 = Step 1
+        if (questionIndex < 4) return 2;  // Questions 3-4 = Step 2
+        return 3;                          // Question 5 = Step 3
+    };
+
+    const currentStep = showQuestionnaire ? getStepFromQuestion(currentQuestionIndex) : 1;
+
+    // Render a single step dot with dynamic styling
+    const renderStepDot = (step) => {
+        const isCompleted = step < currentStep;
+        const isActive = step === currentStep;
+
+        return (
+            <View
+                key={step}
+                style={[
+                    styles.stepDot,
+                    isCompleted && styles.completedStepDot,
+                    isActive && styles.activeStepDot
+                ]}
+            >
+                {isCompleted ? (
+                    <Ionicons name="checkmark" size={16} color="#FFF" />
+                ) : (
+                    <Text style={[styles.stepNumber, isActive && { color: '#FFF' }]}>{step}</Text>
+                )}
+            </View>
+        );
+    };
+
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor="#FFF" />
@@ -347,17 +382,11 @@ const SkillAssessmentScreen = ({ navigation }) => {
             {/* Header */}
             <View style={styles.header}>
                 <View style={styles.stepIndicator}>
-                    <View style={[styles.stepDot, styles.activeStepDot]}>
-                        <Text style={styles.stepNumber}>1</Text>
-                    </View>
-                    <View style={styles.stepLine} />
-                    <View style={styles.stepDot}>
-                        <Text style={styles.stepNumber}>2</Text>
-                    </View>
-                    <View style={styles.stepLine} />
-                    <View style={styles.stepDot}>
-                        <Text style={styles.stepNumber}>3</Text>
-                    </View>
+                    {renderStepDot(1)}
+                    <View style={[styles.stepLine, currentStep > 1 && styles.completedStepLine]} />
+                    {renderStepDot(2)}
+                    <View style={[styles.stepLine, currentStep > 2 && styles.completedStepLine]} />
+                    {renderStepDot(3)}
                 </View>
 
                 <Text style={styles.headerTitle}>Basketball Skill Assessment</Text>
@@ -400,6 +429,9 @@ const styles = StyleSheet.create({
     activeStepDot: {
         backgroundColor: '#FF6B00',
     },
+    completedStepDot: {
+        backgroundColor: '#4CAF50',
+    },
     stepNumber: {
         fontSize: 14,
         fontWeight: 'bold',
@@ -410,6 +442,9 @@ const styles = StyleSheet.create({
         height: 2,
         backgroundColor: '#F0F0F0',
         marginHorizontal: 8,
+    },
+    completedStepLine: {
+        backgroundColor: '#4CAF50',
     },
     headerTitle: {
         fontSize: 20,

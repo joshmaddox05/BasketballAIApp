@@ -1,5 +1,5 @@
 // HomeScreen.js
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
     StyleSheet,
     Text,
@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getTheme } from '../../utils/theme';
+import { getUserChallenges, getChallenge, getGamificationStats } from '../../services/firestoreService';
 
 // Import thumbnail images for workouts
 const shootingThumbnail = require('../../../assets/shooting-thumbnail.jpg');
@@ -82,21 +83,70 @@ const HomeScreen = ({ navigation }) => {
     const theme = contextTheme || getTheme(isDarkMode || false);
 
     const [refreshing, setRefreshing] = React.useState(false);
+    const [activeChallenge, setActiveChallenge] = useState(null);
+    const [activeChallengeData, setActiveChallengeData] = useState(null);
+    const [loadingChallenge, setLoadingChallenge] = useState(false);
+    const [gamificationStats, setGamificationStats] = useState(null);
+
+    // Fetch user's gamification stats (XP, level, etc.)
+    const fetchGamificationStats = useCallback(async () => {
+        if (!userData?.uid) return;
+
+        try {
+            const stats = await getGamificationStats(userData.uid);
+            setGamificationStats(stats);
+        } catch (error) {
+            console.error('Error fetching gamification stats:', error);
+        }
+    }, [userData?.uid]);
+
+    // Fetch user's active challenge
+    const fetchActiveChallenge = useCallback(async () => {
+        if (!userData?.uid) return;
+
+        try {
+            setLoadingChallenge(true);
+            // Get user's challenges with 'active' or 'in_progress' status
+            const userChallenges = await getUserChallenges(userData.uid);
+
+            // Find active challenge (not completed)
+            const active = userChallenges.find(c =>
+                c.status === 'active' || c.status === 'in_progress' || c.status === 'joined'
+            );
+
+            if (active) {
+                setActiveChallenge(active);
+                // Fetch the full challenge data for title, description, etc.
+                const challengeData = await getChallenge(active.id);
+                setActiveChallengeData(challengeData);
+            } else {
+                setActiveChallenge(null);
+                setActiveChallengeData(null);
+            }
+        } catch (error) {
+            console.error('Error fetching active challenge:', error);
+        } finally {
+            setLoadingChallenge(false);
+        }
+    }, [userData?.uid]);
 
     // Refresh data when screen comes into focus
     useFocusEffect(
         useCallback(() => {
-            // Could fetch updated data here
+            fetchActiveChallenge();
+            fetchGamificationStats();
             return () => {};
-        }, [])
+        }, [fetchActiveChallenge, fetchGamificationStats])
     );
 
     const onRefresh = React.useCallback(async () => {
         setRefreshing(true);
         await refreshUserData();
         await fetchDailyTip();
+        await fetchActiveChallenge();
+        await fetchGamificationStats();
         setRefreshing(false);
-    }, [refreshUserData, fetchDailyTip]);
+    }, [refreshUserData, fetchDailyTip, fetchActiveChallenge, fetchGamificationStats]);
 
     if (loading) {
         return (
@@ -205,35 +255,49 @@ const HomeScreen = ({ navigation }) => {
                     <View style={styles.levelHeader}>
                         <View style={styles.levelInfo}>
                             <View style={[styles.levelBadge, { backgroundColor: theme.primary + '20' }]}>
-                                <Ionicons name="basketball" size={24} color={theme.primary} />
+                                <Text style={[styles.levelNumber, { color: theme.primary }]}>
+                                    {gamificationStats?.levelInfo?.level || userData?.gamification?.level || 1}
+                                </Text>
                             </View>
                             <View style={styles.levelTextContainer}>
                                 <Text style={[styles.levelTitle, { color: theme.text }]}>
-                                    Level {userData?.gamification?.level || 1}
+                                    {gamificationStats?.levelInfo?.title || getLevelTitle(userData?.gamification?.level || 1)}
                                 </Text>
                                 <Text style={[styles.levelSubtitle, { color: theme.textSecondary }]}>
-                                    {getLevelTitle(userData?.gamification?.level || 1)}
+                                    {gamificationStats?.totalXP || userData?.gamification?.xp || 0} XP Total
                                 </Text>
                             </View>
                         </View>
                         <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
                     </View>
 
-                    {/* XP Progress Bar */}
+                    {/* XP Progress Bar - using gamificationStats for accurate progress */}
                     <View style={styles.xpContainer}>
+                        <View style={styles.xpProgressHeader}>
+                            <Text style={[styles.xpProgressLabel, { color: theme.textSecondary }]}>
+                                Progress to Level {(gamificationStats?.levelInfo?.level || userData?.gamification?.level || 1) + 1}
+                            </Text>
+                            <Text style={[styles.xpProgressPercent, { color: theme.primary }]}>
+                                {Math.round(gamificationStats?.levelInfo?.progressToNextLevel || getXPProgress(userData?.gamification?.xp || 0, userData?.gamification?.level || 1))}%
+                            </Text>
+                        </View>
                         <View style={[styles.xpBar, { backgroundColor: theme.backgroundSecondary }]}>
                             <View
                                 style={[
                                     styles.xpFill,
                                     {
                                         backgroundColor: theme.primary,
-                                        width: `${getXPProgress(userData?.gamification?.xp || 0, userData?.gamification?.level || 1)}%`
+                                        width: `${gamificationStats?.levelInfo?.progressToNextLevel || getXPProgress(userData?.gamification?.xp || 0, userData?.gamification?.level || 1)}%`
                                     }
                                 ]}
                             />
                         </View>
                         <Text style={[styles.xpText, { color: theme.textSecondary }]}>
-                            {userData?.gamification?.xp || 0} / {getXPForNextLevel(userData?.gamification?.level || 1)} XP
+                            {gamificationStats?.levelInfo ? (
+                                `${gamificationStats.levelInfo.currentXP - gamificationStats.levelInfo.xpForCurrentLevel} / ${gamificationStats.levelInfo.xpForNextLevel - gamificationStats.levelInfo.xpForCurrentLevel} XP`
+                            ) : (
+                                `${userData?.gamification?.xp || 0} / ${getXPForNextLevel(userData?.gamification?.level || 1)} XP`
+                            )}
                         </Text>
                     </View>
 
@@ -245,7 +309,7 @@ const HomeScreen = ({ navigation }) => {
                             </View>
                             <View>
                                 <Text style={[styles.statValue, { color: theme.text }]}>
-                                    {userData?.gamification?.streak || userData?.stats?.streak || 0}
+                                    {gamificationStats?.streak || userData?.gamification?.streak || userData?.stats?.streak || 0}
                                 </Text>
                                 <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Day Streak</Text>
                             </View>
@@ -257,7 +321,7 @@ const HomeScreen = ({ navigation }) => {
                             </View>
                             <View>
                                 <Text style={[styles.statValue, { color: theme.text }]}>
-                                    {userData?.gamification?.badges?.length || 0}
+                                    {gamificationStats?.achievementCount || userData?.gamification?.badges?.length || 0}
                                 </Text>
                                 <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Badges</Text>
                             </View>
@@ -269,7 +333,7 @@ const HomeScreen = ({ navigation }) => {
                             </View>
                             <View>
                                 <Text style={[styles.statValue, { color: theme.text }]}>
-                                    {userData?.gamification?.totalWorkouts || activities?.length || 0}
+                                    {gamificationStats?.totalWorkouts || userData?.gamification?.totalWorkouts || activities?.length || 0}
                                 </Text>
                                 <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Workouts</Text>
                             </View>
@@ -350,31 +414,136 @@ const HomeScreen = ({ navigation }) => {
                     )}
                 </View>
 
-                {/* Monthly Challenge Card - more visually appealing */}
-                <View style={[styles.challengeContainer, { backgroundColor: theme.card }]}>
-                    <View style={styles.challengeHeader}>
-                        <Text style={[styles.challengeTitle, { color: theme.text }]}>Monthly Challenge</Text>
-                        <View style={[styles.challengeBadge, { backgroundColor: isDarkMode ? theme.primaryLight + '30' : '#E0F7FA' }]}>
-                            <Text style={[styles.challengeBadgeText, { color: isDarkMode ? theme.primary : '#0097A7' }]}>ACTIVE</Text>
-                        </View>
+                {/* Active Challenge Section */}
+                {loadingChallenge ? (
+                    <View style={[styles.challengeContainer, { backgroundColor: theme.card }]}>
+                        <ActivityIndicator size="small" color={theme.primary} />
                     </View>
-                    <Text style={[styles.challengeName, { color: theme.primary }]}>"Perfect Your Free Throw"</Text>
-
-                    <View style={styles.challengeProgressContainer}>
-                        <View style={[styles.challengeProgressBar, { backgroundColor: theme.backgroundTertiary }]}>
-                            <View style={[styles.challengeProgressFill, { backgroundColor: theme.primary, width: '40%' }]} />
+                ) : activeChallenge && activeChallengeData ? (
+                    // Show active challenge with real progress
+                    <View style={[styles.challengeContainer, { backgroundColor: theme.card }]}>
+                        <View style={styles.challengeHeader}>
+                            <Text style={[styles.challengeTitle, { color: theme.text }]}>Your Active Challenge</Text>
+                            <View style={[styles.challengeBadge, { backgroundColor: isDarkMode ? theme.primaryLight + '30' : '#E0F7FA' }]}>
+                                <Text style={[styles.challengeBadgeText, { color: isDarkMode ? theme.primary : '#0097A7' }]}>
+                                    {activeChallenge.status?.toUpperCase() || 'ACTIVE'}
+                                </Text>
+                            </View>
                         </View>
-                        <Text style={[styles.challengeProgressText, { color: theme.textSecondary }]}>12/30 days completed</Text>
-                    </View>
+                        <Text style={[styles.challengeName, { color: theme.primary }]}>
+                            {activeChallengeData.title || 'Challenge'}
+                        </Text>
 
+                        {/* Progress Info */}
+                        <View style={styles.challengeProgressContainer}>
+                            <View style={[styles.challengeProgressBar, { backgroundColor: theme.backgroundTertiary }]}>
+                                <View
+                                    style={[
+                                        styles.challengeProgressFill,
+                                        {
+                                            backgroundColor: theme.primary,
+                                            width: `${activeChallengeData.days?.length > 0
+                                                ? ((activeChallenge.completedDays?.length || 0) / activeChallengeData.days.length) * 100
+                                                : 0}%`
+                                        }
+                                    ]}
+                                />
+                            </View>
+                            <Text style={[styles.challengeProgressText, { color: theme.textSecondary }]}>
+                                {activeChallenge.completedDays?.length || 0}/{activeChallengeData.days?.length || 0} days completed
+                            </Text>
+                        </View>
+
+                        {/* Today's Tasks Summary */}
+                        {activeChallengeData.days && activeChallenge.currentDay && (
+                            <View style={styles.todayTasksContainer}>
+                                <View style={styles.todayTasksHeader}>
+                                    <Ionicons name="today-outline" size={16} color={theme.textSecondary} />
+                                    <Text style={[styles.todayTasksTitle, { color: theme.textSecondary }]}>
+                                        Day {activeChallenge.currentDay || 1}
+                                    </Text>
+                                </View>
+                                {(() => {
+                                    const currentDayData = activeChallengeData.days.find(d => d.day === (activeChallenge.currentDay || 1));
+                                    const dayProgress = activeChallenge.dayProgress?.find(d => d.day === (activeChallenge.currentDay || 1));
+                                    const completedExercises = dayProgress?.exercises?.length || 0;
+                                    const totalExercises = currentDayData?.exercises?.length || 0;
+                                    const remainingExercises = totalExercises - completedExercises;
+
+                                    return remainingExercises > 0 ? (
+                                        <Text style={[styles.todayTasksRemaining, { color: theme.primary }]}>
+                                            {remainingExercises} exercise{remainingExercises !== 1 ? 's' : ''} remaining
+                                        </Text>
+                                    ) : (
+                                        <Text style={[styles.todayTasksComplete, { color: '#4CAF50' }]}>
+                                            ✓ Day complete!
+                                        </Text>
+                                    );
+                                })()}
+                            </View>
+                        )}
+
+                        {/* Score display for H2H */}
+                        {activeChallenge.totalScore !== undefined && (
+                            <View style={styles.challengeScoreContainer}>
+                                <View style={styles.challengeScoreItem}>
+                                    <Text style={[styles.challengeScoreValue, { color: theme.primary }]}>
+                                        {activeChallenge.totalScore || 0}
+                                    </Text>
+                                    <Text style={[styles.challengeScoreLabel, { color: theme.textSecondary }]}>
+                                        Your Score
+                                    </Text>
+                                </View>
+                                {activeChallenge.opponent && (
+                                    <>
+                                        <Text style={[styles.challengeVs, { color: theme.textSecondary }]}>vs</Text>
+                                        <View style={styles.challengeScoreItem}>
+                                            <Text style={[styles.challengeScoreValue, { color: theme.textSecondary }]}>
+                                                {activeChallenge.opponentScore || '?'}
+                                            </Text>
+                                            <Text style={[styles.challengeScoreLabel, { color: theme.textSecondary }]}>
+                                                {activeChallenge.opponent.displayName?.split(' ')[0] || 'Opponent'}
+                                            </Text>
+                                        </View>
+                                    </>
+                                )}
+                            </View>
+                        )}
+
+                        <TouchableOpacity
+                            style={styles.challengeViewButton}
+                            onPress={() => navigation.navigate('Challenges', { screen: 'ChallengeDetail', params: { challengeId: activeChallenge.id } })}
+                        >
+                            <Text style={[styles.challengeViewText, { color: theme.primary }]}>Continue Challenge</Text>
+                            <Ionicons name="arrow-forward" size={16} color={theme.primary} />
+                        </TouchableOpacity>
+                    </View>
+                ) : (
+                    // No active challenge - show join prompt
                     <TouchableOpacity
-                        style={styles.challengeViewButton}
-                        onPress={() => navigation.navigate('Challenges', { screen: 'ChallengeDetail', params: { challengeId: 'challenge_1' } })}
+                        style={[styles.joinChallengeContainer, { backgroundColor: theme.card }]}
+                        onPress={() => navigation.navigate('Challenges')}
+                        activeOpacity={0.8}
                     >
-                        <Text style={[styles.challengeViewText, { color: theme.primary }]}>View Challenge</Text>
-                        <Ionicons name="arrow-forward" size={16} color={theme.primary} />
+                        <View style={styles.joinChallengeContent}>
+                            <View style={[styles.joinChallengeIcon, { backgroundColor: theme.primary + '20' }]}>
+                                <Ionicons name="trophy-outline" size={32} color={theme.primary} />
+                            </View>
+                            <View style={styles.joinChallengeText}>
+                                <Text style={[styles.joinChallengeTitle, { color: theme.text }]}>
+                                    No Active Challenge
+                                </Text>
+                                <Text style={[styles.joinChallengeSubtitle, { color: theme.textSecondary }]}>
+                                    Join a challenge to compete and earn rewards!
+                                </Text>
+                            </View>
+                        </View>
+                        <View style={[styles.joinChallengeButton, { backgroundColor: theme.primary }]}>
+                            <Text style={styles.joinChallengeButtonText}>Browse Challenges</Text>
+                            <Ionicons name="chevron-forward" size={18} color="#FFF" />
+                        </View>
                     </TouchableOpacity>
-                </View>
+                )}
 
                 {/* Spacer at bottom for better scrolling */}
                 <View style={{ height: 20 }} />
@@ -489,37 +658,55 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginRight: 12,
     },
+    levelNumber: {
+        fontSize: 22,
+        fontWeight: 'bold',
+    },
     levelTextContainer: {
         justifyContent: 'center',
     },
     levelTitle: {
-        fontSize: 20,
+        fontSize: 18,
         fontWeight: 'bold',
         color: '#333',
     },
     levelSubtitle: {
-        fontSize: 14,
+        fontSize: 13,
         color: '#666',
         marginTop: 2,
     },
     xpContainer: {
         marginBottom: 16,
     },
+    xpProgressHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    xpProgressLabel: {
+        fontSize: 13,
+        fontWeight: '500',
+    },
+    xpProgressPercent: {
+        fontSize: 13,
+        fontWeight: '700',
+    },
     xpBar: {
-        height: 8,
+        height: 10,
         backgroundColor: '#F0F0F0',
-        borderRadius: 4,
+        borderRadius: 5,
         marginBottom: 6,
         overflow: 'hidden',
     },
     xpFill: {
         height: '100%',
-        borderRadius: 4,
+        borderRadius: 5,
     },
     xpText: {
         fontSize: 12,
         color: '#666',
-        textAlign: 'right',
+        textAlign: 'center',
     },
     statsRow: {
         flexDirection: 'row',
@@ -888,6 +1075,107 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         fontSize: 14,
         marginRight: 4,
+    },
+    // Today's tasks styles
+    todayTasksContainer: {
+        backgroundColor: '#F8F9FA',
+        borderRadius: 8,
+        padding: 12,
+        marginBottom: 12,
+    },
+    todayTasksHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 4,
+    },
+    todayTasksTitle: {
+        fontSize: 13,
+        fontWeight: '500',
+        marginLeft: 6,
+    },
+    todayTasksRemaining: {
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    todayTasksComplete: {
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    // Challenge score styles (for H2H)
+    challengeScoreContainer: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingVertical: 12,
+        marginBottom: 8,
+        borderTopWidth: 1,
+        borderTopColor: '#F0F0F0',
+    },
+    challengeScoreItem: {
+        alignItems: 'center',
+        paddingHorizontal: 20,
+    },
+    challengeScoreValue: {
+        fontSize: 28,
+        fontWeight: 'bold',
+    },
+    challengeScoreLabel: {
+        fontSize: 12,
+        marginTop: 2,
+    },
+    challengeVs: {
+        fontSize: 14,
+        fontWeight: '600',
+        paddingHorizontal: 12,
+    },
+    // Join challenge prompt styles
+    joinChallengeContainer: {
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    joinChallengeContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    joinChallengeIcon: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 14,
+    },
+    joinChallengeText: {
+        flex: 1,
+    },
+    joinChallengeTitle: {
+        fontSize: 17,
+        fontWeight: '700',
+        marginBottom: 4,
+    },
+    joinChallengeSubtitle: {
+        fontSize: 14,
+        lineHeight: 18,
+    },
+    joinChallengeButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+        borderRadius: 12,
+    },
+    joinChallengeButtonText: {
+        color: '#FFF',
+        fontSize: 15,
+        fontWeight: '600',
+        marginRight: 6,
     },
 });
 
