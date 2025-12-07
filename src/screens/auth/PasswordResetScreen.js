@@ -17,12 +17,16 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { resetPassword } from '../../services/authService';
+import { useAppContext } from '../../context/AppContext';
 import { getTheme } from '../../utils/theme';
 
 const PasswordResetScreen = ({ navigation }) => {
     const [email, setEmail] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [emailSent, setEmailSent] = useState(false);
+
+    const { theme: contextTheme, isDarkMode } = useAppContext();
+    const theme = contextTheme || getTheme(isDarkMode || false);
 
     const validateEmail = (email) => {
         const re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
@@ -66,36 +70,36 @@ const PasswordResetScreen = ({ navigation }) => {
 
     if (emailSent) {
         return (
-            <SafeAreaView style={styles.container}>
-                <StatusBar barStyle="dark-content" backgroundColor="#FFF" />
-                
+            <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+                <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={theme.background} />
+
                 <View style={styles.header}>
                     <TouchableOpacity
                         style={styles.backButton}
                         onPress={handleBackToLogin}
                     >
-                        <Ionicons name="arrow-back" size={24} color="#333" />
+                        <Ionicons name="arrow-back" size={24} color={theme.text} />
                     </TouchableOpacity>
                 </View>
 
                 <View style={styles.content}>
                     <View style={styles.successContainer}>
-                        <View style={styles.successIconContainer}>
-                            <Ionicons name="mail" size={60} color="#4CAF50" />
+                        <View style={[styles.successIconContainer, { backgroundColor: theme.success + '20' }]}>
+                            <Ionicons name="mail" size={60} color={theme.success} />
                         </View>
-                        
-                        <Text style={styles.successTitle}>Check Your Email</Text>
-                        <Text style={styles.successMessage}>
+
+                        <Text style={[styles.successTitle, { color: theme.text }]}>Check Your Email</Text>
+                        <Text style={[styles.successMessage, { color: theme.textSecondary }]}>
                             We've sent password reset instructions to:
                         </Text>
-                        <Text style={styles.emailText}>{email}</Text>
-                        
-                        <Text style={styles.instructionsText}>
+                        <Text style={[styles.emailText, { color: theme.primary }]}>{email}</Text>
+
+                        <Text style={[styles.instructionsText, { color: theme.textSecondary }]}>
                             Click the link in the email to reset your password. If you don't see the email, check your spam folder.
                         </Text>
 
                         <TouchableOpacity
-                            style={styles.backToLoginButton}
+                            style={[styles.backToLoginButton, { backgroundColor: theme.primary }]}
                             onPress={handleBackToLogin}
                         >
                             <Text style={styles.backToLoginButtonText}>Back to Sign In</Text>
@@ -108,7 +112,7 @@ const PasswordResetScreen = ({ navigation }) => {
                                 handlePasswordReset();
                             }}
                         >
-                            <Text style={styles.resendButtonText}>Resend Email</Text>
+                            <Text style={[styles.resendButtonText, { color: theme.primary }]}>Resend Email</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -118,15 +122,15 @@ const PasswordResetScreen = ({ navigation }) => {
 
     return (
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-            <SafeAreaView style={styles.container}>
-                <StatusBar barStyle="dark-content" backgroundColor="#FFF" />
+            <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+                <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={theme.background} />
 
                 <View style={styles.header}>
                     <TouchableOpacity
                         style={styles.backButton}
                         onPress={() => navigation.goBack()}
                     >
-                        <Ionicons name="arrow-back" size={24} color="#333" />
+                        <Ionicons name="arrow-back" size={24} color={theme.text} />
                     </TouchableOpacity>
                 </View>
 
@@ -135,18 +139,19 @@ const PasswordResetScreen = ({ navigation }) => {
                     style={styles.content}
                 >
                     <View style={styles.titleContainer}>
-                        <Text style={styles.title}>Reset Password</Text>
-                        <Text style={styles.subtitle}>
+                        <Text style={[styles.title, { color: theme.text }]}>Reset Password</Text>
+                        <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
                             Enter your email address and we'll send you instructions to reset your password
                         </Text>
                     </View>
 
                     <View style={styles.form}>
-                        <View style={styles.inputContainer}>
-                            <Ionicons name="mail-outline" size={20} color="#999" style={styles.inputIcon} />
+                        <View style={[styles.inputContainer, { backgroundColor: theme.input }]}>
+                            <Ionicons name="mail-outline" size={20} color={theme.textSecondary} style={styles.inputIcon} />
                             <TextInput
-                                style={styles.input}
+                                style={[styles.input, { color: theme.text }]}
                                 placeholder="Email"
+                                placeholderTextColor={theme.inputPlaceholder}
                                 value={email}
                                 onChangeText={setEmail}
                                 autoCapitalize="none"
@@ -156,7 +161,7 @@ const PasswordResetScreen = ({ navigation }) => {
                         </View>
 
                         <TouchableOpacity
-                            style={styles.resetButton}
+                            style={[styles.resetButton, { backgroundColor: theme.primary }]}
                             onPress={handlePasswordReset}
                             disabled={isLoading}
                         >
@@ -169,12 +174,12 @@ const PasswordResetScreen = ({ navigation }) => {
                     </View>
 
                     <View style={styles.helpContainer}>
-                        <Text style={styles.helpText}>
+                        <Text style={[styles.helpText, { color: theme.textSecondary }]}>
                             Remember your password?{' '}
-                            <TouchableOpacity onPress={() => navigation.goBack()}>
-                                <Text style={styles.helpLink}>Sign In</Text>
-                            </TouchableOpacity>
                         </Text>
+                        <TouchableOpacity onPress={() => navigation.goBack()}>
+                            <Text style={[styles.helpLink, { color: theme.primary }]}>Sign In</Text>
+                        </TouchableOpacity>
                     </View>
                 </KeyboardAvoidingView>
             </SafeAreaView>
@@ -247,16 +252,16 @@ const styles = StyleSheet.create({
         color: '#FFF',
     },
     helpContainer: {
+        flexDirection: 'row',
+        justifyContent: 'center',
         alignItems: 'center',
     },
     helpText: {
         fontSize: 14,
-        color: '#666',
     },
     helpLink: {
         fontSize: 14,
         fontWeight: 'bold',
-        color: '#FF6B00',
     },
     successContainer: {
         flex: 1,

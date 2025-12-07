@@ -417,21 +417,21 @@ const ProgressScreen = ({ navigation }) => {
                             <Text style={[styles.metricLabel, { color: theme.textSecondary }]}>Total Workouts</Text>
                         </View>
                         <View style={[styles.metricCard, { backgroundColor: theme.backgroundSecondary }]}>
-                            <Ionicons name="flame" size={24} color="#FF6B00" style={styles.metricIcon} />
-                            <Text style={[styles.metricValue, { color: '#FF6B00' }]}>{calculateStreak()}</Text>
+                            <Ionicons name="flame" size={24} color={theme.primary} style={styles.metricIcon} />
+                            <Text style={[styles.metricValue, { color: theme.primary }]}>{calculateStreak()}</Text>
                             <Text style={[styles.metricLabel, { color: theme.textSecondary }]}>Day Streak</Text>
                         </View>
                     </View>
 
                     <View style={[styles.metricsRow, { marginTop: 8 }]}>
                         <View style={[styles.metricCard, { backgroundColor: theme.backgroundSecondary }]}>
-                            <Ionicons name="calendar" size={24} color="#4CAF50" style={styles.metricIcon} />
-                            <Text style={[styles.metricValue, { color: '#4CAF50' }]}>{thisWeekWorkouts}</Text>
+                            <Ionicons name="calendar" size={24} color={theme.success} style={styles.metricIcon} />
+                            <Text style={[styles.metricValue, { color: theme.success }]}>{thisWeekWorkouts}</Text>
                             <Text style={[styles.metricLabel, { color: theme.textSecondary }]}>This Week</Text>
                         </View>
                         <View style={[styles.metricCard, { backgroundColor: theme.backgroundSecondary }]}>
-                            <Ionicons name="time" size={24} color="#2196F3" style={styles.metricIcon} />
-                            <Text style={[styles.metricValue, { color: '#2196F3' }]}>{avgDuration}</Text>
+                            <Ionicons name="time" size={24} color={theme.info} style={styles.metricIcon} />
+                            <Text style={[styles.metricValue, { color: theme.info }]}>{avgDuration}</Text>
                             <Text style={[styles.metricLabel, { color: theme.textSecondary }]}>Avg Minutes</Text>
                         </View>
                     </View>
@@ -445,16 +445,16 @@ const ProgressScreen = ({ navigation }) => {
                         {shootingStats?.trend !== 0 && shootingStats?.totalShots > 0 && (
                             <View style={[
                                 styles.trendBadge,
-                                { backgroundColor: shootingStats.trend > 0 ? '#4CAF5020' : '#F4433620' }
+                                { backgroundColor: shootingStats.trend > 0 ? theme.success + '20' : theme.error + '20' }
                             ]}>
                                 <Ionicons
                                     name={shootingStats.trend > 0 ? 'trending-up' : 'trending-down'}
                                     size={14}
-                                    color={shootingStats.trend > 0 ? '#4CAF50' : '#F44336'}
+                                    color={shootingStats.trend > 0 ? theme.success : theme.error}
                                 />
                                 <Text style={[
                                     styles.trendText,
-                                    { color: shootingStats.trend > 0 ? '#4CAF50' : '#F44336' }
+                                    { color: shootingStats.trend > 0 ? theme.success : theme.error }
                                 ]}>
                                     {shootingStats.trend > 0 ? '+' : ''}{shootingStats.trend}%
                                 </Text>
@@ -484,13 +484,13 @@ const ProgressScreen = ({ navigation }) => {
 
                         <View style={styles.accuracyStats}>
                             <View style={styles.accuracyStat}>
-                                <View style={[styles.accuracyDot, { backgroundColor: '#4CAF50' }]} />
+                                <View style={[styles.accuracyDot, { backgroundColor: theme.success }]} />
                                 <Text style={[styles.accuracyStatText, { color: theme.text }]}>
                                     Makes: {shootingStats?.makes || 0}
                                 </Text>
                             </View>
                             <View style={styles.accuracyStat}>
-                                <View style={[styles.accuracyDot, { backgroundColor: '#F44336' }]} />
+                                <View style={[styles.accuracyDot, { backgroundColor: theme.error }]} />
                                 <Text style={[styles.accuracyStatText, { color: theme.text }]}>
                                     Misses: {shootingStats?.misses || 0}
                                 </Text>
@@ -685,7 +685,7 @@ const ProgressScreen = ({ navigation }) => {
                 {recommendations && (
                     <View style={[styles.recommendationsContainer, { backgroundColor: theme.card }]}>
                         <View style={styles.sectionTitleRow}>
-                            <Ionicons name="bulb" size={20} color="#FFD700" />
+                            <Ionicons name="bulb" size={20} color={theme.warning} />
                             <Text style={[styles.sectionTitle, { color: theme.text }]}>Recommended For You</Text>
                         </View>
 
@@ -730,7 +730,7 @@ const ProgressScreen = ({ navigation }) => {
         if (!gamificationStats || !achievementProgress) {
             return (
                 <View style={styles.tabContent}>
-                    <ActivityIndicator size="large" color="#FF6B00" />
+                    <ActivityIndicator size="large" color={theme.primary} />
                 </View>
             );
         }

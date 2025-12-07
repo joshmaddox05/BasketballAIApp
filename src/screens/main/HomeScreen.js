@@ -238,9 +238,9 @@ const HomeScreen = ({ navigation }) => {
 
                 {/* Daily Tip Card */}
                 {dailyTip && (
-                    <View style={[styles.tipCard, { backgroundColor: isDarkMode ? theme.backgroundSecondary : '#FFF8E1' }]}>
+                    <View style={[styles.tipCard, { backgroundColor: theme.tipCard, borderLeftColor: theme.tipBorder }]}>
                         <View style={styles.tipHeader}>
-                            <Ionicons name="bulb" size={20} color="#FFD700" />
+                            <Ionicons name="bulb" size={20} color={theme.tipBorder} />
                             <Text style={[styles.tipTitle, { color: theme.text }]}>Tip of the Day</Text>
                         </View>
                         <Text style={[styles.tipText, { color: theme.textSecondary }]}>{dailyTip}</Text>
@@ -281,7 +281,7 @@ const HomeScreen = ({ navigation }) => {
                                 {Math.round(gamificationStats?.levelInfo?.progressToNextLevel || getXPProgress(userData?.gamification?.xp || 0, userData?.gamification?.level || 1))}%
                             </Text>
                         </View>
-                        <View style={[styles.xpBar, { backgroundColor: theme.backgroundSecondary }]}>
+                        <View style={[styles.xpBar, { backgroundColor: theme.progressBar }]}>
                             <View
                                 style={[
                                     styles.xpFill,
@@ -302,10 +302,10 @@ const HomeScreen = ({ navigation }) => {
                     </View>
 
                     {/* Stats Row */}
-                    <View style={styles.statsRow}>
+                    <View style={[styles.statsRow, { borderTopColor: theme.divider }]}>
                         <View style={styles.statItem}>
-                            <View style={[styles.statIcon, { backgroundColor: '#FF6B00' + '20' }]}>
-                                <Ionicons name="flame" size={16} color="#FF6B00" />
+                            <View style={[styles.statIcon, { backgroundColor: theme.primary + '20' }]}>
+                                <Ionicons name="flame" size={16} color={theme.primary} />
                             </View>
                             <View>
                                 <Text style={[styles.statValue, { color: theme.text }]}>
@@ -314,10 +314,10 @@ const HomeScreen = ({ navigation }) => {
                                 <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Day Streak</Text>
                             </View>
                         </View>
-                        <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
+                        <View style={[styles.statDivider, { backgroundColor: theme.divider }]} />
                         <View style={styles.statItem}>
-                            <View style={[styles.statIcon, { backgroundColor: '#FFD700' + '20' }]}>
-                                <Ionicons name="trophy" size={16} color="#FFD700" />
+                            <View style={[styles.statIcon, { backgroundColor: theme.warning + '20' }]}>
+                                <Ionicons name="trophy" size={16} color={theme.warning} />
                             </View>
                             <View>
                                 <Text style={[styles.statValue, { color: theme.text }]}>
@@ -326,10 +326,10 @@ const HomeScreen = ({ navigation }) => {
                                 <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Badges</Text>
                             </View>
                         </View>
-                        <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
+                        <View style={[styles.statDivider, { backgroundColor: theme.divider }]} />
                         <View style={styles.statItem}>
-                            <View style={[styles.statIcon, { backgroundColor: '#4CAF50' + '20' }]}>
-                                <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
+                            <View style={[styles.statIcon, { backgroundColor: theme.success + '20' }]}>
+                                <Ionicons name="checkmark-circle" size={16} color={theme.success} />
                             </View>
                             <View>
                                 <Text style={[styles.statValue, { color: theme.text }]}>
@@ -424,8 +424,8 @@ const HomeScreen = ({ navigation }) => {
                     <View style={[styles.challengeContainer, { backgroundColor: theme.card }]}>
                         <View style={styles.challengeHeader}>
                             <Text style={[styles.challengeTitle, { color: theme.text }]}>Your Active Challenge</Text>
-                            <View style={[styles.challengeBadge, { backgroundColor: isDarkMode ? theme.primaryLight + '30' : '#E0F7FA' }]}>
-                                <Text style={[styles.challengeBadgeText, { color: isDarkMode ? theme.primary : '#0097A7' }]}>
+                            <View style={[styles.challengeBadge, { backgroundColor: theme.info + '25' }]}>
+                                <Text style={[styles.challengeBadgeText, { color: theme.info }]}>
                                     {activeChallenge.status?.toUpperCase() || 'ACTIVE'}
                                 </Text>
                             </View>
@@ -436,7 +436,7 @@ const HomeScreen = ({ navigation }) => {
 
                         {/* Progress Info */}
                         <View style={styles.challengeProgressContainer}>
-                            <View style={[styles.challengeProgressBar, { backgroundColor: theme.backgroundTertiary }]}>
+                            <View style={[styles.challengeProgressBar, { backgroundColor: theme.progressBar }]}>
                                 <View
                                     style={[
                                         styles.challengeProgressFill,
@@ -456,7 +456,7 @@ const HomeScreen = ({ navigation }) => {
 
                         {/* Today's Tasks Summary */}
                         {activeChallengeData.days && activeChallenge.currentDay && (
-                            <View style={styles.todayTasksContainer}>
+                            <View style={[styles.todayTasksContainer, { backgroundColor: theme.backgroundTertiary }]}>
                                 <View style={styles.todayTasksHeader}>
                                     <Ionicons name="today-outline" size={16} color={theme.textSecondary} />
                                     <Text style={[styles.todayTasksTitle, { color: theme.textSecondary }]}>
@@ -485,7 +485,7 @@ const HomeScreen = ({ navigation }) => {
 
                         {/* Score display for H2H */}
                         {activeChallenge.totalScore !== undefined && (
-                            <View style={styles.challengeScoreContainer}>
+                            <View style={[styles.challengeScoreContainer, { borderTopColor: theme.divider }]}>
                                 <View style={styles.challengeScoreItem}>
                                     <Text style={[styles.challengeScoreValue, { color: theme.primary }]}>
                                         {activeChallenge.totalScore || 0}

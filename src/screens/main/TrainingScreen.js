@@ -270,13 +270,13 @@ const TrainingScreen = ({ navigation }) => {
                     <Text style={[styles.headerTitle, { color: theme.text }]}>Training Programs</Text>
                     <View style={styles.headerActions}>
                         <TouchableOpacity
-                            style={styles.headerButton}
+                            style={[styles.headerButton, { backgroundColor: theme.highlight }]}
                             onPress={() => navigation.navigate('MyWorkouts')}
                         >
                             <Ionicons name="folder-outline" size={22} color={theme.primary} />
                         </TouchableOpacity>
                         <TouchableOpacity
-                            style={styles.filterButton}
+                            style={[styles.filterButton, { backgroundColor: theme.backgroundTertiary }]}
                             onPress={() => navigation.navigate('TrainingFilters')}
                         >
                             <Ionicons name="options-outline" size={22} color={theme.textSecondary} />
@@ -330,28 +330,28 @@ const TrainingScreen = ({ navigation }) => {
                     {/* Active Plan Card */}
                     {activePlan && (
                         <TouchableOpacity
-                            style={styles.activePlanCard}
+                            style={[styles.activePlanCard, { backgroundColor: theme.card, borderColor: theme.border }]}
                             onPress={() => navigation.navigate('CustomPlanDetail', { planId: activePlan.id })}
                             activeOpacity={0.8}
                         >
                             <View style={styles.activePlanHeader}>
-                                <View style={styles.activePlanBadge}>
-                                    <Ionicons name="flash" size={14} color="#FFD700" />
-                                    <Text style={styles.activePlanBadgeText}>Active Plan</Text>
+                                <View style={[styles.activePlanBadge, { backgroundColor: theme.warning + '20' }]}>
+                                    <Ionicons name="flash" size={14} color={theme.warning} />
+                                    <Text style={[styles.activePlanBadgeText, { color: theme.warning }]}>Active Plan</Text>
                                 </View>
                                 <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
                             </View>
                             <Text style={[styles.activePlanTitle, { color: theme.text }]}>{activePlan.title}</Text>
                             <View style={styles.activePlanProgress}>
-                                <View style={styles.activePlanProgressBar}>
+                                <View style={[styles.activePlanProgressBar, { backgroundColor: theme.progressBar }]}>
                                     <View
                                         style={[
                                             styles.activePlanProgressFill,
-                                            { width: `${activePlan.overallProgress || 0}%` }
+                                            { width: `${activePlan.overallProgress || 0}%`, backgroundColor: theme.primary }
                                         ]}
                                     />
                                 </View>
-                                <Text style={styles.activePlanProgressText}>
+                                <Text style={[styles.activePlanProgressText, { color: theme.textSecondary }]}>
                                     {activePlan.completedDays?.length || 0}/{activePlan.durationDays} days
                                 </Text>
                             </View>
@@ -373,17 +373,17 @@ const TrainingScreen = ({ navigation }) => {
 
                     {/* AI-Powered Analysis Feature */}
                     <View style={styles.analysisSection}>
-                        <View style={[styles.analysisCard, { backgroundColor: theme.card }]}>
+                        <View style={[styles.analysisCard, { backgroundColor: theme.primary }]}>
                             <View style={styles.analysisContent}>
-                                <Text style={[styles.analysisTitle, { color: theme.text }]}>AI Shooting Analysis</Text>
-                                <Text style={[styles.analysisDescription, { color: theme.textSecondary }]}>
+                                <Text style={styles.analysisTitle}>AI Shooting Analysis</Text>
+                                <Text style={styles.analysisDescription}>
                                     Get personalized feedback on your shooting form with our AI-powered analysis
                                 </Text>
                                 <TouchableOpacity
                                     style={styles.analysisButton}
                                     onPress={() => navigation.navigate('ShootingAnalysis')}
                                 >
-                                    <Text style={styles.analysisButtonText}>Analyze Your Shot</Text>
+                                    <Text style={[styles.analysisButtonText, { color: theme.primary }]}>Analyze Your Shot</Text>
                                 </TouchableOpacity>
                             </View>
                             <View style={styles.analysisImageContainer}>
@@ -467,10 +467,10 @@ const TrainingScreen = ({ navigation }) => {
 
                         {filteredWorkouts.length > 5 && (
                             <TouchableOpacity
-                                style={styles.viewMoreButton}
+                                style={[styles.viewMoreButton, { backgroundColor: theme.backgroundTertiary }]}
                                 onPress={() => navigation.navigate('AllWorkouts')}
                             >
-                                <Text style={styles.viewMoreText}>View More Workouts</Text>
+                                <Text style={[styles.viewMoreText, { color: theme.textSecondary }]}>View More Workouts</Text>
                             </TouchableOpacity>
                         )}
                     </View>
@@ -478,16 +478,16 @@ const TrainingScreen = ({ navigation }) => {
                     {/* YouTube Training Videos Section */}
                     <View style={styles.videoSection}>
                         <View style={styles.sectionTitleRow}>
-                            <Text style={styles.sectionTitle}>Training Videos</Text>
+                            <Text style={[styles.sectionTitle, { color: theme.text }]}>Training Videos</Text>
                             <TouchableOpacity onPress={() => navigation.navigate('VideoLibrary')}>
-                                <Text style={styles.seeAllText}>See All</Text>
+                                <Text style={[styles.seeAllText, { color: theme.primary }]}>See All</Text>
                             </TouchableOpacity>
                         </View>
 
                         {loadingVideos ? (
                             <View style={styles.videoLoadingContainer}>
-                                <ActivityIndicator size="small" color="#FF6B00" />
-                                <Text style={styles.loadingVideoText}>Loading videos...</Text>
+                                <ActivityIndicator size="small" color={theme.primary} />
+                                <Text style={[styles.loadingVideoText, { color: theme.textSecondary }]}>Loading videos...</Text>
                             </View>
                         ) : trainingVideos.length > 0 ? (
                             <FlatList
@@ -499,12 +499,12 @@ const TrainingScreen = ({ navigation }) => {
                                 contentContainerStyle={styles.videosList}
                             />
                         ) : (
-                            <View style={styles.emptyStateContainer}>
-                                <Text style={styles.emptyStateText}>
+                            <View style={[styles.emptyStateContainer, { backgroundColor: theme.card }]}>
+                                <Text style={[styles.emptyStateText, { color: theme.textSecondary }]}>
                                     Unable to load training videos. Check your connection.
                                 </Text>
                                 <TouchableOpacity
-                                    style={styles.retryButton}
+                                    style={[styles.retryButton, { backgroundColor: theme.primary }]}
                                     onPress={loadTrainingVideos}
                                 >
                                     <Text style={styles.retryButtonText}>Retry</Text>
