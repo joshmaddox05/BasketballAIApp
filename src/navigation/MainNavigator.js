@@ -1,16 +1,17 @@
 // MainNavigator.js
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { View, Text } from 'react-native';
 import { useAppContext } from '../context/AppContext';
+import FriendRequestModal from '../components/shared/FriendRequestModal';
+import { listenToFriendRequests } from '../services/firestoreService';
 
 // Import your main app screens
 import HomeScreen from '../screens/main/HomeScreen';
 import TrainingScreen from '../screens/main/TrainingScreen';
 import ProgressScreen from '../screens/main/ProgressScreen';
-import CommunityScreen from '../screens/main/CommunityScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
 import SettingsScreen from '../screens/main/SettingsScreen';
 
@@ -22,11 +23,13 @@ import TrainingFiltersScreen from "../screens/main/TrainingFiltersScreen";
 import AllActivitiesScreen from "../screens/main/AllActivitiesScreen";
 import ChallengeDetailScreen from "../screens/main/ChallengeDetailScreen";
 import ActivityDetailScreen from "../screens/main/ActivityDetailScreen";
+import AllChallengesScreen from "../screens/main/AllChallengesScreen";
 
 // For nested navigation within tabs
 const HomeStack = createStackNavigator();
 const TrainingStack = createStackNavigator();
 const ProgressStack = createStackNavigator();
+const ChallengesStack = createStackNavigator();
 const CommunityStack = createStackNavigator();
 const ProfileStack = createStackNavigator();
 
@@ -79,18 +82,16 @@ function ProgressStackNavigator() {
     );
 }
 
-// Community stack navigator
-function CommunityStackNavigator() {
+// Challenges stack navigator
+function ChallengesStackNavigator() {
     return (
-        <CommunityStack.Navigator screenOptions={{ headerShown: false }}>
-            <CommunityStack.Screen name="CommunityMain" component={CommunityScreen} />
-            {/* Add Community-specific screens */}
-            <CommunityStack.Screen name="CreatePost" component={CreatePostScreen} options={{ headerShown: false }} />
-            <CommunityStack.Screen name="AllChallenges" component={AllChallengesScreen} options={{ headerShown: false }} />
+        <ChallengesStack.Navigator screenOptions={{ headerShown: false }}>
+            <ChallengesStack.Screen name="ChallengesMain" component={AllChallengesScreen} />
+            <ChallengesStack.Screen name="ChallengeDetail" component={ChallengeDetailScreen} options={{ headerShown: false }} />
 
-            {/* Add shared screens to Community stack */}
-            {addSharedScreensToStack(CommunityStack)}
-        </CommunityStack.Navigator>
+            {/* Add shared screens to Challenges stack */}
+            {addSharedScreensToStack(ChallengesStack)}
+        </ChallengesStack.Navigator>
     );
 }
 
@@ -119,9 +120,27 @@ function ProfileStackNavigator() {
 const Tab = createBottomTabNavigator();
 
 export default function MainNavigator() {
-    const { theme } = useAppContext();
+    const { theme, user } = useAppContext();
+    const [showFriendRequestModal, setShowFriendRequestModal] = useState(false);
+    const [hasShownModal, setHasShownModal] = useState(false);
+
+    // Listen for friend requests and show modal on login
+    useEffect(() => {
+        if (!user?.uid) return;
+
+        const unsubscribe = listenToFriendRequests(user.uid, (requests) => {
+            // Show modal automatically if there are pending requests and we haven't shown it yet
+            if (requests.length > 0 && !hasShownModal) {
+                setShowFriendRequestModal(true);
+                setHasShownModal(true);
+            }
+        });
+
+        return () => unsubscribe();
+    }, [user?.uid, hasShownModal]);
 
     return (
+        <>
         <Tab.Navigator
             screenOptions={({ route }) => ({
                 tabBarIcon: ({ focused, color, size }) => {
@@ -131,10 +150,10 @@ export default function MainNavigator() {
                         iconName = focused ? 'home' : 'home-outline';
                     } else if (route.name === 'Training') {
                         iconName = focused ? 'basketball' : 'basketball-outline';
+                    } else if (route.name === 'Challenges') {
+                        iconName = focused ? 'trophy' : 'trophy-outline';
                     } else if (route.name === 'Progress') {
                         iconName = focused ? 'stats-chart' : 'stats-chart-outline';
-                    } else if (route.name === 'Community') {
-                        iconName = focused ? 'people' : 'people-outline';
                     } else if (route.name === 'Profile') {
                         iconName = focused ? 'person' : 'person-outline';
                     }
@@ -154,10 +173,17 @@ export default function MainNavigator() {
         >
             <Tab.Screen name="Home" component={HomeStackNavigator} />
             <Tab.Screen name="Training" component={TrainingStackNavigator} />
+            <Tab.Screen name="Challenges" component={ChallengesStackNavigator} />
             <Tab.Screen name="Progress" component={ProgressStackNavigator} />
-            <Tab.Screen name="Community" component={CommunityStackNavigator} />
             <Tab.Screen name="Profile" component={ProfileStackNavigator} />
         </Tab.Navigator>
+
+        {/* Friend Request Modal - shows on login if there are pending requests */}
+        <FriendRequestModal
+            visible={showFriendRequestModal}
+            onClose={() => setShowFriendRequestModal(false)}
+        />
+        </>
     );
 }
 
@@ -167,7 +193,6 @@ const ShootingHistoryScreen = () => <View style={{flex:1, justifyContent:'center
 const AchievementsScreen = () => <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><Text>Achievements Screen</Text></View>;
 const AllGoalsScreen = () => <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><Text>All Goals Screen</Text></View>;
 const CreatePostScreen = () => <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><Text>Create Post Screen</Text></View>;
-const AllChallengesScreen = () => <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><Text>All Challenges Screen</Text></View>;
 const EditProfileScreen = () => <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><Text>Edit Profile Screen</Text></View>;
 const NotificationsScreen = () => <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><Text>Notifications Screen</Text></View>;
 const AccountPrivacyScreen = () => <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><Text>Account Privacy Screen</Text></View>;

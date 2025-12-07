@@ -13,6 +13,11 @@ import VideoLibraryScreen from '../screens/main/VideoLibraryScreen';
 import VideoDetailScreen from '../screens/main/VideoDetailScreen';
 import YouTubeTestScreen from '../screens/main/YouTubeTestScreen';
 
+// Import build workout screens
+import BuildWorkoutScreen from '../screens/main/BuildWorkoutScreen';
+import CustomPlanDetailScreen from '../screens/main/CustomPlanDetailScreen';
+import CustomPlanDayScreen from '../screens/main/CustomPlanDayScreen';
+
 // Create a stack for shared screens
 const SharedStack = createStackNavigator();
 
@@ -51,6 +56,21 @@ export const sharedScreens = [
     {
         name: 'YouTubeTest',
         component: YouTubeTestScreen,
+        options: { headerShown: false }
+    },
+    {
+        name: 'BuildWorkout',
+        component: BuildWorkoutScreen,
+        options: { headerShown: false }
+    },
+    {
+        name: 'CustomPlanDetail',
+        component: CustomPlanDetailScreen,
+        options: { headerShown: false }
+    },
+    {
+        name: 'CustomPlanDay',
+        component: CustomPlanDayScreen,
         options: { headerShown: false }
     }
 ];

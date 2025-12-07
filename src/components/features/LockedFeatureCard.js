@@ -52,7 +52,7 @@ const LockedFeatureCard = ({
     const handleUpgrade = () => {
         setShowUpgradePrompt(false);
         if (navigation) {
-            navigation.navigate('Settings', { openSubscription: true });
+            navigation.navigate('Profile', { screen: 'Settings', params: { openSubscription: true }, initial: false });
         }
     };
 

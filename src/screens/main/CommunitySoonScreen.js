@@ -56,11 +56,6 @@ const CommunitySoonScreen = ({ navigation }) => {
       description: 'Share your progress, achievements, and training videos with the community'
     },
     {
-      icon: 'trophy',
-      title: 'Challenges',
-      description: 'Participate in daily, weekly, and monthly basketball challenges'
-    },
-    {
       icon: 'people',
       title: 'Find Mentors',
       description: 'Connect with experienced players and coaches for guidance'
@@ -69,11 +64,6 @@ const CommunitySoonScreen = ({ navigation }) => {
       icon: 'calendar',
       title: 'Local Events',
       description: 'Discover basketball events, tournaments, and pickup games in your area'
-    },
-    {
-      icon: 'star',
-      title: 'Achievements',
-      description: 'Earn badges and recognition for your dedication and improvement'
     },
     {
       icon: 'videocam',
@@ -86,23 +76,16 @@ const CommunitySoonScreen = ({ navigation }) => {
     {
       phase: 'Phase 1',
       title: 'Player Feed & Basic Sharing',
-      description: 'Share posts, photos, and achievements',
+      description: 'Share posts, photos, and achievements with the community',
       status: 'In Development',
-      estimatedDate: 'Q2 2024'
+      estimatedDate: 'Q1 2025'
     },
     {
       phase: 'Phase 2',
-      title: 'Challenges & Competitions',
-      description: 'Daily challenges and community competitions',
-      status: 'Planned',
-      estimatedDate: 'Q3 2024'
-    },
-    {
-      phase: 'Phase 3',
       title: 'Mentorship & Events',
       description: 'Connect with mentors and discover local events',
       status: 'Planned',
-      estimatedDate: 'Q4 2024'
+      estimatedDate: 'Q2 2025'
     }
   ];
 
@@ -113,14 +96,7 @@ const CommunitySoonScreen = ({ navigation }) => {
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity 
-            onPress={() => navigation.goBack()} 
-            style={styles.backButton}
-          >
-            <Ionicons name="arrow-back" size={24} color={theme.text} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: theme.text }]}>Community</Text>
-          <View style={styles.placeholder} />
+          <Text style={[styles.headerTitleMain, { color: theme.text }]}>Community</Text>
         </View>
 
         {/* Hero Section */}
@@ -314,21 +290,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 15,
   },
-  backButton: {
-    padding: 5,
-  },
-  headerTitle: {
-    fontSize: 20,
+  headerTitleMain: {
+    fontSize: 28,
     fontWeight: 'bold',
-  },
-  placeholder: {
-    width: 34,
   },
   heroSection: {
     margin: 20,

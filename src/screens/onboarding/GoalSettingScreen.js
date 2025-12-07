@@ -176,7 +176,7 @@ const GoalSettingScreen = ({ navigation }) => {
                     <View style={styles.recommendedSection}>
                         <View style={styles.recommendedHeader}>
                             <Ionicons name="star" size={20} color="#FF6B00" />
-                            <Text style={styles.recommendedTitle}>Recommended for {userData.level || 'Beginner'}s</Text>
+                            <Text style={styles.recommendedTitle}>Recommended for {userData.level ? userData.level.charAt(0).toUpperCase() + userData.level.slice(1) : 'Beginner'}s</Text>
                         </View>
                         <View style={styles.goalsContainer}>
                             {recommendedGoals.map(goal => (
@@ -189,9 +189,12 @@ const GoalSettingScreen = ({ navigation }) => {
                                     ]}
                                     onPress={() => handleToggleGoal(goal.id)}
                                 >
-                                    <View style={styles.goalCheckbox}>
+                                    <View style={[
+                                        styles.goalCheckbox,
+                                        selectedGoals[goal.id] && styles.selectedGoalCheckbox
+                                    ]}>
                                         {selectedGoals[goal.id] && (
-                                            <Ionicons name="checkmark" size={16} color="#FFF" />
+                                            <Ionicons name="checkmark" size={14} color="#FFF" />
                                         )}
                                     </View>
 
@@ -242,9 +245,12 @@ const GoalSettingScreen = ({ navigation }) => {
                                 ]}
                                 onPress={() => handleToggleGoal(goal.id)}
                             >
-                                <View style={styles.goalCheckbox}>
+                                <View style={[
+                                    styles.goalCheckbox,
+                                    selectedGoals[goal.id] && styles.selectedGoalCheckbox
+                                ]}>
                                     {selectedGoals[goal.id] && (
-                                        <Ionicons name="checkmark" size={16} color="#FFF" />
+                                        <Ionicons name="checkmark" size={14} color="#FFF" />
                                     )}
                                 </View>
 
@@ -484,9 +490,9 @@ const styles = StyleSheet.create({
         marginLeft: 8,
     },
     recommendedGoalCard: {
-        borderWidth: 2,
-        borderColor: '#FF6B00',
-        backgroundColor: '#FFF8F0',
+        borderWidth: 1,
+        borderColor: '#E0E0E0',
+        backgroundColor: '#FFF',
     },
     allGoalsSection: {
         marginBottom: 24,
@@ -513,21 +519,26 @@ const styles = StyleSheet.create({
         position: 'relative',
     },
     selectedGoalCard: {
-        backgroundColor: '#FFF9F5',
+        backgroundColor: '#FFF0E6',
         borderColor: '#FF6B00',
+        borderWidth: 2,
     },
     goalCheckbox: {
         position: 'absolute',
         top: 12,
         right: 12,
-        width: 20,
-        height: 20,
-        borderRadius: 10,
-        borderWidth: 1,
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        borderWidth: 2,
         borderColor: '#CCC',
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: selectedGoals => selectedGoals ? '#FF6B00' : 'transparent',
+        backgroundColor: 'transparent',
+    },
+    selectedGoalCheckbox: {
+        backgroundColor: '#FF6B00',
+        borderColor: '#FF6B00',
     },
     goalIconContainer: {
         width: 40,

@@ -40,7 +40,7 @@ export const comprehensiveWorkouts = [
         tips: 'Keep your elbow in, eyes on the target, and follow through with your wrist. The ball should roll off your fingertips.',
         duration: '10 min',
         type: 'repetition',
-        reps: 20
+        rreps: 20
       },
       {
         title: 'Mid-Range Form',
@@ -1271,6 +1271,1317 @@ export const comprehensiveWorkouts = [
     coachNotes: 'Daily nutrition is the foundation of your performance. Learn how to fuel your body properly every day.',
     benefits: ['Better daily energy', 'Improved performance', 'Optimal nutrition', 'Healthy habits'],
     videoUrl: 'https://www.youtube.com/watch?v=example30'
+  },
+
+  // ==================== ADDITIONAL SHOOTING WORKOUTS (5) ====================
+  {
+    id: 'shooting-9',
+    title: 'Quick Release Training',
+    description: 'Develop a lightning-fast release for catch-and-shoot situations. Perfect for players who want to get their shot off before defenders can close out.',
+    category: workoutCategories.SHOOTING,
+    level: difficultyLevels.INTERMEDIATE,
+    duration: '30 min',
+    featured: false,
+    isPremium: false,
+    requiredSubscription: 'free',
+    steps: [
+      {
+        title: 'Form Speed Drill',
+        instructions: 'Practice your shooting motion without the ball, focusing on speed while maintaining proper form. Do 50 repetitions.',
+        tips: 'Your release should be fluid, not rushed. Speed comes from efficiency of motion.',
+        duration: '5 min',
+        type: 'repetition',
+        reps: 50
+      },
+      {
+        title: 'Quick Catch Practice',
+        instructions: 'Have a partner pass you the ball. Catch and release as quickly as possible while maintaining form. Take 25 shots.',
+        tips: 'Start with hands ready in shooting position before catching.',
+        duration: '10 min',
+        type: 'repetition',
+        reps: 25
+      },
+      {
+        title: 'Timed Release Drill',
+        instructions: 'Set a 2-second timer. Catch the ball and get your shot off before the timer ends. Take 30 shots.',
+        tips: 'Focus on footwork - have your feet set as you catch.',
+        duration: '10 min',
+        type: 'repetition',
+        reps: 30
+      },
+      {
+        title: 'Game Speed Practice',
+        instructions: 'Simulate game situations with catch-and-shoot opportunities. Take 20 shots at game speed.',
+        tips: 'Visualize a defender closing out on you.',
+        duration: '5 min',
+        type: 'repetition',
+        reps: 20
+      }
+    ],
+    equipment: ['Basketball', 'Hoop', 'Partner (recommended)', 'Timer'],
+    coachNotes: 'A quick release is essential in modern basketball. Practice until it becomes second nature.',
+    benefits: ['Faster release', 'Better catch-and-shoot', 'Game-ready shooting', 'Improved reaction time']
+  },
+  {
+    id: 'shooting-10',
+    title: 'Bank Shot Mastery',
+    description: 'Master the lost art of the bank shot. Learn the angles and touch needed to use the backboard effectively.',
+    category: workoutCategories.SHOOTING,
+    level: difficultyLevels.INTERMEDIATE,
+    duration: '25 min',
+    featured: false,
+    isPremium: false,
+    requiredSubscription: 'free',
+    steps: [
+      {
+        title: 'Close Range Bank Shots',
+        instructions: 'From 5 feet away at a 45-degree angle, practice bank shots. Aim for the top corner of the square. Take 20 shots each side.',
+        tips: 'The ball should hit the backboard softly with good arc.',
+        duration: '8 min',
+        type: 'repetition',
+        reps: 40
+      },
+      {
+        title: 'Mid-Range Bank Shots',
+        instructions: 'Move to 10 feet away at various angles. Take 15 bank shots from each position.',
+        tips: 'Adjust your aim point on the backboard based on the angle.',
+        duration: '10 min',
+        type: 'repetition',
+        reps: 30
+      },
+      {
+        title: 'Game Situation Banks',
+        instructions: 'Practice bank shots off the dribble. Take 15 shots mixing angles and distances.',
+        tips: 'Bank shots are especially effective when driving to the basket.',
+        duration: '7 min',
+        type: 'repetition',
+        reps: 15
+      }
+    ],
+    equipment: ['Basketball', 'Hoop'],
+    coachNotes: 'Tim Duncan mastered the bank shot - it gives you a bigger target and higher percentage.',
+    benefits: ['Higher percentage shots', 'More shooting options', 'Better touch', 'Expanded shot arsenal']
+  },
+  {
+    id: 'shooting-11',
+    title: 'Shot Correction Drill',
+    description: 'Identify and fix common shooting mistakes. A systematic approach to improving your shooting form.',
+    category: workoutCategories.SHOOTING,
+    level: difficultyLevels.BEGINNER,
+    duration: '25 min',
+    featured: false,
+    isPremium: false,
+    requiredSubscription: 'free',
+    steps: [
+      {
+        title: 'One-Hand Form Shooting',
+        instructions: 'Using only your shooting hand, take 25 close-range shots. Focus on elbow alignment and follow-through.',
+        tips: 'Your elbow should be directly under the ball, not flared out.',
+        duration: '8 min',
+        type: 'repetition',
+        reps: 25
+      },
+      {
+        title: 'Guide Hand Check',
+        instructions: 'Add your guide hand but focus on it not affecting the shot. Take 25 shots checking that guide hand releases cleanly.',
+        tips: 'The guide hand should come off the ball before release.',
+        duration: '7 min',
+        type: 'repetition',
+        reps: 25
+      },
+      {
+        title: 'Balance and Base',
+        instructions: 'Focus on your stance and balance. Take 20 shots with emphasis on consistent footwork.',
+        tips: 'Your feet should be shoulder-width apart, knees slightly bent.',
+        duration: '5 min',
+        type: 'repetition',
+        reps: 20
+      },
+      {
+        title: 'Complete Form Practice',
+        instructions: 'Put it all together. Take 30 shots focusing on all corrections.',
+        tips: 'Go slow and prioritize form over makes.',
+        duration: '5 min',
+        type: 'repetition',
+        reps: 30
+      }
+    ],
+    equipment: ['Basketball', 'Hoop', 'Video camera (optional)'],
+    coachNotes: 'Recording yourself can help identify issues you cannot feel. Good form leads to consistency.',
+    benefits: ['Improved form', 'Identified weaknesses', 'Better consistency', 'Foundation for advanced skills']
+  },
+  {
+    id: 'shooting-12',
+    title: 'Deep Range Extension',
+    description: 'Extend your shooting range beyond the three-point line. Build the leg strength and technique for deep shots.',
+    category: workoutCategories.SHOOTING,
+    level: difficultyLevels.ADVANCED,
+    duration: '35 min',
+    featured: true,
+    isPremium: true,
+    requiredSubscription: 'premium',
+    steps: [
+      {
+        title: 'Progressive Distance',
+        instructions: 'Start at the free throw line and gradually move back. Take 10 shots at each distance: free throw, mid-range, three-point, deep three.',
+        tips: 'Focus on using your legs more as you move back.',
+        duration: '15 min',
+        type: 'repetition',
+        reps: 40
+      },
+      {
+        title: 'NBA Range Practice',
+        instructions: 'From 25+ feet, take 25 shots focusing on maintaining form with the added distance.',
+        tips: 'Generate power from your legs and core, not your arms.',
+        duration: '10 min',
+        type: 'repetition',
+        reps: 25
+      },
+      {
+        title: 'Logo Shots',
+        instructions: 'From near half-court, practice the mechanics of very deep shots. Take 15 attempts.',
+        tips: 'This is about building range - dont worry about percentage yet.',
+        duration: '10 min',
+        type: 'repetition',
+        reps: 15
+      }
+    ],
+    equipment: ['Basketball', 'Full court'],
+    coachNotes: 'Players like Steph Curry and Damian Lillard have made deep threes a weapon. Build your range gradually.',
+    benefits: ['Extended range', 'Better leg power', 'Confidence from distance', 'Defensive pressure creation']
+  },
+  {
+    id: 'shooting-13',
+    title: 'Floater & Runner Practice',
+    description: 'Master the floater and running shots in the lane. Essential skills for scoring against bigger defenders.',
+    category: workoutCategories.SHOOTING,
+    level: difficultyLevels.INTERMEDIATE,
+    duration: '30 min',
+    featured: false,
+    isPremium: false,
+    requiredSubscription: 'free',
+    steps: [
+      {
+        title: 'Stationary Floater Form',
+        instructions: 'From the lane, practice the floater motion without moving. Focus on the high release point. Take 20 shots.',
+        tips: 'The floater should have a high arc to go over defenders.',
+        duration: '5 min',
+        type: 'repetition',
+        reps: 20
+      },
+      {
+        title: 'One-Dribble Floater',
+        instructions: 'Take one dribble into the lane and shoot a floater. Practice from both sides. Take 30 total shots.',
+        tips: 'Push off your inside foot and extend upward.',
+        duration: '10 min',
+        type: 'repetition',
+        reps: 30
+      },
+      {
+        title: 'Running Floater',
+        instructions: 'Drive from the three-point line and finish with a floater in the lane. Take 20 shots from each side.',
+        tips: 'Control your speed - you need balance to execute the floater.',
+        duration: '10 min',
+        type: 'repetition',
+        reps: 40
+      },
+      {
+        title: 'Contested Floaters',
+        instructions: 'Have a partner provide light contest as you shoot floaters. Take 15 shots.',
+        tips: 'Use your body to create space before releasing.',
+        duration: '5 min',
+        type: 'repetition',
+        reps: 15
+      }
+    ],
+    equipment: ['Basketball', 'Hoop', 'Partner (optional)'],
+    coachNotes: 'The floater is a must-have skill for guards. It allows you to score in the paint against bigger players.',
+    benefits: ['Scoring in the lane', 'Avoiding blocks', 'Versatile finishing', 'Guard skill development']
+  },
+
+  // ==================== ADDITIONAL DRIBBLING WORKOUTS (5) ====================
+  {
+    id: 'dribbling-7',
+    title: 'Point Guard Drills',
+    description: 'Train like a point guard with ball handling drills designed to improve your ability to run an offense.',
+    category: workoutCategories.DRIBBLING,
+    level: difficultyLevels.INTERMEDIATE,
+    duration: '35 min',
+    featured: true,
+    isPremium: false,
+    requiredSubscription: 'free',
+    steps: [
+      {
+        title: 'Ball Control Warmup',
+        instructions: 'Perform figure-8s, spider dribbles, and around-the-body dribbles for 5 minutes.',
+        tips: 'Keep your head up throughout these warmup drills.',
+        duration: '5 min',
+        type: 'timed'
+      },
+      {
+        title: 'Change of Direction',
+        instructions: 'Dribble full court using a different move at each cone: crossover, between legs, behind back, spin. Repeat 10 times.',
+        tips: 'Make each move sharp and decisive.',
+        duration: '10 min',
+        type: 'repetition',
+        reps: 10
+      },
+      {
+        title: 'Retreat Dribble',
+        instructions: 'Practice the retreat dribble - moving backward while maintaining control. Go 15 feet back and forward. Repeat 15 times.',
+        tips: 'Keep your body low and eyes up.',
+        duration: '8 min',
+        type: 'repetition',
+        reps: 15
+      },
+      {
+        title: 'Split the Defense',
+        instructions: 'Set up two cones as defenders. Practice splitting through them with various dribble moves. 20 reps.',
+        tips: 'Accelerate through the gap.',
+        duration: '7 min',
+        type: 'repetition',
+        reps: 20
+      },
+      {
+        title: 'Pick and Roll Handling',
+        instructions: 'Practice dribbling around a screen (use cone). Make decisions: pull up, drive, or pass. 15 reps.',
+        tips: 'Read the imaginary defense and make the right play.',
+        duration: '5 min',
+        type: 'repetition',
+        reps: 15
+      }
+    ],
+    equipment: ['Basketball', 'Cones', 'Full court'],
+    coachNotes: 'Point guards need to control the game. These drills develop the skills needed to run an offense.',
+    benefits: ['Point guard skills', 'Court vision', 'Decision making', 'Ball security']
+  },
+  {
+    id: 'dribbling-8',
+    title: 'Euro Step & Finish',
+    description: 'Master the Euro step - one of the most effective moves in basketball for finishing at the rim.',
+    category: workoutCategories.DRIBBLING,
+    level: difficultyLevels.ADVANCED,
+    duration: '30 min',
+    featured: true,
+    isPremium: true,
+    requiredSubscription: 'premium',
+    steps: [
+      {
+        title: 'Footwork Foundation',
+        instructions: 'Without the ball, practice the Euro step footwork. Step wide to one side, then back across. 30 reps each direction.',
+        tips: 'The first step should be long and to the side, the second step crosses back.',
+        duration: '5 min',
+        type: 'repetition',
+        reps: 60
+      },
+      {
+        title: 'With Ball - Walking',
+        instructions: 'Add the basketball at walking speed. Take two dribbles, gather, and Euro step. 20 reps each side.',
+        tips: 'Gather the ball low and explode into the move.',
+        duration: '8 min',
+        type: 'repetition',
+        reps: 40
+      },
+      {
+        title: 'Full Speed Euro Steps',
+        instructions: 'Drive from the three-point line and finish with a Euro step layup. 15 reps each side.',
+        tips: 'Sell the first step - make defenders commit.',
+        duration: '10 min',
+        type: 'repetition',
+        reps: 30
+      },
+      {
+        title: 'Euro Step Variations',
+        instructions: 'Practice Euro step to reverse layup, Euro step to floater, and Euro step to power finish. 5 each.',
+        tips: 'Being able to finish multiple ways makes the move even deadlier.',
+        duration: '7 min',
+        type: 'repetition',
+        reps: 15
+      }
+    ],
+    equipment: ['Basketball', 'Hoop', 'Full court'],
+    coachNotes: 'The Euro step creates space and avoids charges. Master it to become a more effective scorer.',
+    benefits: ['Elite finishing', 'Avoid charges', 'Create space', 'Versatile scoring']
+  },
+  {
+    id: 'dribbling-9',
+    title: 'Change of Pace Mastery',
+    description: 'Learn to use speed changes to freeze defenders. Sometimes slowing down is the best way to get past someone.',
+    category: workoutCategories.DRIBBLING,
+    level: difficultyLevels.INTERMEDIATE,
+    duration: '30 min',
+    featured: false,
+    isPremium: false,
+    requiredSubscription: 'free',
+    steps: [
+      {
+        title: 'Speed Ladder Dribbling',
+        instructions: 'Dribble at 50% speed, then explode to 100% on command. Practice for 5 minutes.',
+        tips: 'The contrast is what freezes defenders.',
+        duration: '5 min',
+        type: 'timed'
+      },
+      {
+        title: 'Slow-to-Fast Drill',
+        instructions: 'Dribble slowly for 3 dribbles, then explode past a cone. Repeat 20 times.',
+        tips: 'Lower your dribble before accelerating.',
+        duration: '8 min',
+        type: 'repetition',
+        reps: 20
+      },
+      {
+        title: 'Hesitation Moves',
+        instructions: 'Practice the hesitation dribble - pause like you are stopping, then explode. 25 reps.',
+        tips: 'Sell the stop with your body language.',
+        duration: '8 min',
+        type: 'repetition',
+        reps: 25
+      },
+      {
+        title: 'In-and-Out Speed Change',
+        instructions: 'Combine the in-and-out dribble with a speed change. 20 reps each hand.',
+        tips: 'The in-and-out looks like a crossover, then you go same direction.',
+        duration: '9 min',
+        type: 'repetition',
+        reps: 40
+      }
+    ],
+    equipment: ['Basketball', 'Cones', 'Court space'],
+    coachNotes: 'Change of pace is one of the most underrated skills. It makes your speed more effective.',
+    benefits: ['Better first step', 'Freeze defenders', 'Efficient movement', 'Basketball IQ']
+  },
+  {
+    id: 'dribbling-10',
+    title: 'Double Move Combos',
+    description: 'Chain multiple dribble moves together to create unstoppable combinations.',
+    category: workoutCategories.DRIBBLING,
+    level: difficultyLevels.ADVANCED,
+    duration: '35 min',
+    featured: false,
+    isPremium: true,
+    requiredSubscription: 'premium',
+    steps: [
+      {
+        title: 'Basic Combinations',
+        instructions: 'Practice: crossover to between legs, between legs to behind back, behind back to crossover. 15 each combo.',
+        tips: 'Each move should flow into the next without pause.',
+        duration: '10 min',
+        type: 'repetition',
+        reps: 45
+      },
+      {
+        title: 'Triple Move Sequences',
+        instructions: 'Add a third move to your combinations. Example: crossover, between legs, spin. 10 reps of 3 different combos.',
+        tips: 'The third move often gets you past the defender.',
+        duration: '10 min',
+        type: 'repetition',
+        reps: 30
+      },
+      {
+        title: 'Game Speed Combos',
+        instructions: 'Execute your combinations at full speed going to the basket. 15 reps.',
+        tips: 'In games, you wont have time to think - make it automatic.',
+        duration: '8 min',
+        type: 'repetition',
+        reps: 15
+      },
+      {
+        title: 'Create Your Signature',
+        instructions: 'Develop your own signature combination and practice it 25 times.',
+        tips: 'The best players have go-to moves defenders cant stop.',
+        duration: '7 min',
+        type: 'repetition',
+        reps: 25
+      }
+    ],
+    equipment: ['Basketball', 'Cones', 'Full court'],
+    coachNotes: 'The best ball handlers string moves together. Practice until combinations feel natural.',
+    benefits: ['Elite handles', 'Unpredictability', 'Signature moves', 'Confidence with ball']
+  },
+  {
+    id: 'dribbling-11',
+    title: 'Tight Space Handling',
+    description: 'Learn to maintain control in traffic and tight spaces. Essential for playing in crowded lanes.',
+    category: workoutCategories.DRIBBLING,
+    level: difficultyLevels.INTERMEDIATE,
+    duration: '30 min',
+    featured: false,
+    isPremium: false,
+    requiredSubscription: 'free',
+    steps: [
+      {
+        title: 'Low Dribble Control',
+        instructions: 'Dribble as low as possible while moving. Keep the ball below knee height for 5 minutes.',
+        tips: 'Low dribbles are harder to steal in traffic.',
+        duration: '5 min',
+        type: 'timed'
+      },
+      {
+        title: 'Cone Forest',
+        instructions: 'Set up 10 cones randomly. Dribble through them without touching any. 10 trips through.',
+        tips: 'Use your body to protect the ball.',
+        duration: '8 min',
+        type: 'repetition',
+        reps: 10
+      },
+      {
+        title: 'Power Dribble',
+        instructions: 'Practice the power dribble - a strong, low dribble while absorbing contact. 30 reps.',
+        tips: 'Pound the ball into the ground with force.',
+        duration: '7 min',
+        type: 'repetition',
+        reps: 30
+      },
+      {
+        title: 'Protect and Advance',
+        instructions: 'Dribble while a partner tries to poke the ball away (light pressure). Maintain possession for 1 minute. Repeat 5 times.',
+        tips: 'Keep your body between the defender and the ball.',
+        duration: '10 min',
+        type: 'repetition',
+        reps: 5
+      }
+    ],
+    equipment: ['Basketball', 'Cones', 'Partner'],
+    coachNotes: 'Tight space handling separates good ball handlers from great ones. Dont avoid contact - learn to handle it.',
+    benefits: ['Ball security', 'Traffic handling', 'Confidence in lane', 'Reduced turnovers']
+  },
+
+  // ==================== ADDITIONAL PHYSICAL WORKOUTS (5) ====================
+  {
+    id: 'physical-7',
+    title: 'Basketball-Specific HIIT',
+    description: 'High-intensity interval training designed specifically for basketball players. Build game-ready conditioning.',
+    category: workoutCategories.PHYSICAL,
+    level: difficultyLevels.INTERMEDIATE,
+    duration: '25 min',
+    featured: true,
+    isPremium: false,
+    requiredSubscription: 'free',
+    steps: [
+      {
+        title: 'Dynamic Warmup',
+        instructions: 'High knees, butt kicks, lateral shuffles, and arm circles for 3 minutes.',
+        tips: 'Get your heart rate up gradually.',
+        duration: '3 min',
+        type: 'timed'
+      },
+      {
+        title: 'Sprint Intervals',
+        instructions: 'Sprint baseline to baseline, walk back. Repeat 8 times.',
+        tips: 'Give maximum effort on each sprint.',
+        duration: '6 min',
+        type: 'repetition',
+        reps: 8
+      },
+      {
+        title: 'Defensive Slides',
+        instructions: '30 seconds of defensive slides, 15 seconds rest. Repeat 6 times.',
+        tips: 'Stay low and dont cross your feet.',
+        duration: '5 min',
+        type: 'repetition',
+        reps: 6
+      },
+      {
+        title: 'Jump Series',
+        instructions: '10 squat jumps, 10 tuck jumps, 10 split jumps. Repeat 3 sets.',
+        tips: 'Focus on explosive power, not just completion.',
+        duration: '6 min',
+        type: 'repetition',
+        reps: 90
+      },
+      {
+        title: 'Cooldown',
+        instructions: 'Light jogging and stretching for 5 minutes.',
+        tips: 'Bring your heart rate down gradually.',
+        duration: '5 min',
+        type: 'timed'
+      }
+    ],
+    equipment: ['Full court', 'Timer', 'Water bottle'],
+    coachNotes: 'This workout simulates the stop-start nature of basketball. Build the conditioning to play hard all game.',
+    benefits: ['Game conditioning', 'Explosive power', 'Recovery speed', 'Mental toughness']
+  },
+  {
+    id: 'physical-8',
+    title: 'Explosive First Step',
+    description: 'Develop a lightning-quick first step to blow by defenders. Focuses on acceleration and explosiveness.',
+    category: workoutCategories.PHYSICAL,
+    level: difficultyLevels.ADVANCED,
+    duration: '30 min',
+    featured: true,
+    isPremium: true,
+    requiredSubscription: 'premium',
+    steps: [
+      {
+        title: 'Stance Explosions',
+        instructions: 'From triple threat position, explode forward for 3 steps. Reset and repeat 20 times.',
+        tips: 'Drive off your back foot with maximum force.',
+        duration: '5 min',
+        type: 'repetition',
+        reps: 20
+      },
+      {
+        title: 'Reaction Starts',
+        instructions: 'Have a partner give a visual or audio cue, then explode. 15 reps.',
+        tips: 'The fastest players react instantly.',
+        duration: '6 min',
+        type: 'repetition',
+        reps: 15
+      },
+      {
+        title: 'Resistance Band Explosions',
+        instructions: 'With a band around your waist (partner holding), explode forward against resistance. 15 reps.',
+        tips: 'This builds the power for your first step.',
+        duration: '7 min',
+        type: 'repetition',
+        reps: 15
+      },
+      {
+        title: 'Multi-Directional Bursts',
+        instructions: 'Explode in different directions: forward, left, right, 45-degree angles. 20 total bursts.',
+        tips: 'You need to be explosive in all directions.',
+        duration: '7 min',
+        type: 'repetition',
+        reps: 20
+      },
+      {
+        title: 'First Step to Finish',
+        instructions: 'Combine first step explosion with a finish at the rim. 10 reps each side.',
+        tips: 'Put it all together in a game-like situation.',
+        duration: '5 min',
+        type: 'repetition',
+        reps: 20
+      }
+    ],
+    equipment: ['Basketball', 'Hoop', 'Resistance band', 'Partner'],
+    coachNotes: 'A quick first step is often the difference between getting to the rim or getting stopped.',
+    benefits: ['Quicker first step', 'Beat defenders', 'Explosive acceleration', 'Improved quickness']
+  },
+  {
+    id: 'physical-9',
+    title: 'Endurance Circuit',
+    description: 'Build basketball stamina with this beginner-friendly circuit workout. Perfect for getting in playing shape.',
+    category: workoutCategories.PHYSICAL,
+    level: difficultyLevels.BEGINNER,
+    duration: '25 min',
+    featured: false,
+    isPremium: false,
+    requiredSubscription: 'free',
+    steps: [
+      {
+        title: 'Light Jog',
+        instructions: 'Jog around the court for 3 minutes to warm up.',
+        tips: 'Keep a comfortable pace - you have a workout ahead.',
+        duration: '3 min',
+        type: 'timed'
+      },
+      {
+        title: 'Walking Lunges',
+        instructions: 'Lunge walk the length of the court. 4 trips total.',
+        tips: 'Keep your front knee over your ankle.',
+        duration: '5 min',
+        type: 'repetition',
+        reps: 4
+      },
+      {
+        title: 'Lateral Movement',
+        instructions: 'Defensive slides across the width of the court. 10 trips.',
+        tips: 'Stay low and move your feet quickly.',
+        duration: '4 min',
+        type: 'repetition',
+        reps: 10
+      },
+      {
+        title: 'Basketball Push-ups',
+        instructions: 'Push-ups with hands on a basketball (or regular if too difficult). 3 sets of 10.',
+        tips: 'This adds core stability work to your push-ups.',
+        duration: '5 min',
+        type: 'repetition',
+        reps: 30
+      },
+      {
+        title: 'Court Sprints',
+        instructions: 'Sprint baseline to free throw line, jog to half court, sprint to far free throw line, jog to end. 5 trips.',
+        tips: 'This mimics the pace changes of a real game.',
+        duration: '5 min',
+        type: 'repetition',
+        reps: 5
+      },
+      {
+        title: 'Cool Down Walk',
+        instructions: 'Walk around the court and stretch for 3 minutes.',
+        tips: 'Let your heart rate come down gradually.',
+        duration: '3 min',
+        type: 'timed'
+      }
+    ],
+    equipment: ['Full court', 'Basketball (optional)', 'Water bottle'],
+    coachNotes: 'Consistency is key with conditioning. Do this workout 3 times per week to build your base.',
+    benefits: ['Improved stamina', 'Better conditioning', 'Foundational fitness', 'Injury prevention']
+  },
+  {
+    id: 'physical-10',
+    title: 'Lateral Quickness Drill',
+    description: 'Improve your side-to-side speed and agility. Essential for defensive movement and driving to the basket.',
+    category: workoutCategories.PHYSICAL,
+    level: difficultyLevels.INTERMEDIATE,
+    duration: '25 min',
+    featured: false,
+    isPremium: false,
+    requiredSubscription: 'free',
+    steps: [
+      {
+        title: 'Lateral Bounds',
+        instructions: 'Jump side to side, landing on one foot and sticking the landing. 20 each direction.',
+        tips: 'Focus on balance and control on each landing.',
+        duration: '5 min',
+        type: 'repetition',
+        reps: 40
+      },
+      {
+        title: 'Speed Ladder Laterals',
+        instructions: 'Move laterally through an agility ladder. 10 trips each direction.',
+        tips: 'Quick feet, stay on the balls of your feet.',
+        duration: '6 min',
+        type: 'repetition',
+        reps: 20
+      },
+      {
+        title: 'Mirror Drill',
+        instructions: 'With a partner, mirror their lateral movements for 30 seconds. Repeat 6 times.',
+        tips: 'React as quickly as possible to direction changes.',
+        duration: '6 min',
+        type: 'repetition',
+        reps: 6
+      },
+      {
+        title: 'Cone Weaves',
+        instructions: 'Set up 5 cones in a line. Weave through laterally as fast as possible. 10 trips.',
+        tips: 'Stay low and push off the outside foot.',
+        duration: '5 min',
+        type: 'repetition',
+        reps: 10
+      },
+      {
+        title: 'Lateral Shuffle to Sprint',
+        instructions: 'Shuffle laterally for 10 feet, then sprint forward. Alternate directions. 12 reps.',
+        tips: 'This simulates transitioning from defense to offense.',
+        duration: '3 min',
+        type: 'repetition',
+        reps: 12
+      }
+    ],
+    equipment: ['Cones', 'Agility ladder', 'Partner', 'Court space'],
+    coachNotes: 'Lateral quickness is crucial for both offense and defense. Train it specifically to see improvement.',
+    benefits: ['Better defense', 'Improved agility', 'Quicker direction changes', 'Enhanced footwork']
+  },
+  {
+    id: 'physical-11',
+    title: 'Full-Body Power Training',
+    description: 'Build explosive power throughout your body for dunking, rebounding, and physical play.',
+    category: workoutCategories.PHYSICAL,
+    level: difficultyLevels.ADVANCED,
+    duration: '40 min',
+    featured: false,
+    isPremium: true,
+    requiredSubscription: 'premium',
+    steps: [
+      {
+        title: 'Power Warmup',
+        instructions: 'Jump rope for 3 minutes, then dynamic stretches for 2 minutes.',
+        tips: 'Prepare your muscles for explosive movements.',
+        duration: '5 min',
+        type: 'timed'
+      },
+      {
+        title: 'Box Jumps',
+        instructions: 'Jump onto a box or platform and step down. 4 sets of 8 reps.',
+        tips: 'Land softly with bent knees. Increase box height as you improve.',
+        duration: '8 min',
+        type: 'repetition',
+        reps: 32
+      },
+      {
+        title: 'Medicine Ball Slams',
+        instructions: 'Slam a medicine ball into the ground with full force. 3 sets of 12.',
+        tips: 'Use your entire body - hips, core, and arms.',
+        duration: '6 min',
+        type: 'repetition',
+        reps: 36
+      },
+      {
+        title: 'Broad Jumps',
+        instructions: 'Jump forward as far as possible, landing and immediately jumping again. 3 sets of 5.',
+        tips: 'Swing your arms to generate momentum.',
+        duration: '5 min',
+        type: 'repetition',
+        reps: 15
+      },
+      {
+        title: 'Power Push-ups',
+        instructions: 'Explosive push-ups where your hands leave the ground. 3 sets of 8.',
+        tips: 'If too difficult, start on your knees.',
+        duration: '5 min',
+        type: 'repetition',
+        reps: 24
+      },
+      {
+        title: 'Single Leg Hops',
+        instructions: 'Hop on one foot as high as possible. 10 on each leg, 3 sets.',
+        tips: 'Focus on maximum height, not speed.',
+        duration: '6 min',
+        type: 'repetition',
+        reps: 60
+      },
+      {
+        title: 'Power Cool Down',
+        instructions: 'Light stretching and foam rolling for 5 minutes.',
+        tips: 'Recovery is crucial after power training.',
+        duration: '5 min',
+        type: 'timed'
+      }
+    ],
+    equipment: ['Box or platform', 'Medicine ball', 'Jump rope', 'Foam roller'],
+    coachNotes: 'Power training should be done when fresh. Allow 48 hours between sessions for recovery.',
+    benefits: ['Explosive power', 'Vertical leap', 'Physical strength', 'Rebounding ability']
+  },
+
+  // ==================== DEFENSE WORKOUTS (5) ====================
+  {
+    id: 'defense-1',
+    title: 'Defensive Stance Fundamentals',
+    description: 'Master the basic defensive stance. The foundation of all good defense starts with proper positioning.',
+    category: workoutCategories.DRIBBLING,
+    level: difficultyLevels.BEGINNER,
+    duration: '20 min',
+    featured: true,
+    isPremium: false,
+    requiredSubscription: 'free',
+    steps: [
+      {
+        title: 'Stance Check',
+        instructions: 'Hold defensive stance for 30 seconds, rest 15 seconds. Focus on form: feet wide, knees bent, butt down, hands active.',
+        tips: 'Your weight should be on the balls of your feet.',
+        duration: '5 min',
+        type: 'repetition',
+        reps: 6
+      },
+      {
+        title: 'Slide Drill',
+        instructions: 'In stance, slide 10 feet left, then right. Repeat 20 times.',
+        tips: 'Never bring your feet together - maintain wide base.',
+        duration: '5 min',
+        type: 'repetition',
+        reps: 20
+      },
+      {
+        title: 'Drop Step Practice',
+        instructions: 'Practice drop stepping (opening hips to run) when beaten. 15 reps each direction.',
+        tips: 'The drop step prevents getting blown by.',
+        duration: '5 min',
+        type: 'repetition',
+        reps: 30
+      },
+      {
+        title: 'Stance Endurance',
+        instructions: 'Hold defensive stance for 1 minute, focusing on not rising up.',
+        tips: 'This builds the leg strength for sustained defense.',
+        duration: '5 min',
+        type: 'repetition',
+        reps: 3
+      }
+    ],
+    equipment: ['Court space', 'Timer'],
+    coachNotes: 'Defense starts with stance. If your stance is wrong, everything else will be harder.',
+    benefits: ['Proper positioning', 'Defensive foundation', 'Leg strength', 'Ready position']
+  },
+  {
+    id: 'defense-2',
+    title: 'Closeout Drills',
+    description: 'Learn to closeout on shooters effectively without fouling or getting beaten off the dribble.',
+    category: workoutCategories.DRIBBLING,
+    level: difficultyLevels.BEGINNER,
+    duration: '20 min',
+    featured: false,
+    isPremium: false,
+    requiredSubscription: 'free',
+    steps: [
+      {
+        title: 'Basic Closeouts',
+        instructions: 'Start at the basket, sprint out to a cone, break down into stance. 20 reps.',
+        tips: 'Sprint until the last few steps, then choppy steps to break down.',
+        duration: '6 min',
+        type: 'repetition',
+        reps: 20
+      },
+      {
+        title: 'Hand Up Closeouts',
+        instructions: 'Same as before, but focus on getting a hand up to contest. 15 reps.',
+        tips: 'One hand high to contest, one hand low to prevent the drive.',
+        duration: '5 min',
+        type: 'repetition',
+        reps: 15
+      },
+      {
+        title: 'Closeout and Slide',
+        instructions: 'Closeout, then immediately slide in one direction as if the offense drove. 10 reps each direction.',
+        tips: 'Be ready to move after the closeout.',
+        duration: '5 min',
+        type: 'repetition',
+        reps: 20
+      },
+      {
+        title: 'Live Closeouts',
+        instructions: 'With a partner who can shoot or drive, practice live closeouts. 10 reps.',
+        tips: 'Read the offensive players eyes and hips.',
+        duration: '4 min',
+        type: 'repetition',
+        reps: 10
+      }
+    ],
+    equipment: ['Cones', 'Partner (optional)', 'Basketball'],
+    coachNotes: 'Bad closeouts lead to easy baskets. Control your momentum so you can react.',
+    benefits: ['Contest shots', 'Prevent easy baskets', 'Defensive recovery', 'Active hands']
+  },
+  {
+    id: 'defense-3',
+    title: 'Lateral Slide Training',
+    description: 'Improve your lateral movement speed for staying in front of quick guards.',
+    category: workoutCategories.DRIBBLING,
+    level: difficultyLevels.INTERMEDIATE,
+    duration: '25 min',
+    featured: false,
+    isPremium: false,
+    requiredSubscription: 'free',
+    steps: [
+      {
+        title: 'Slide Warmup',
+        instructions: 'Defensive slides across the lane, 10 trips.',
+        tips: 'Get low and stay low throughout.',
+        duration: '3 min',
+        type: 'repetition',
+        reps: 10
+      },
+      {
+        title: 'Speed Slides',
+        instructions: 'Slide as fast as possible for 5 seconds, rest 10 seconds. Repeat 10 times.',
+        tips: 'Push hard off the trailing foot.',
+        duration: '5 min',
+        type: 'repetition',
+        reps: 10
+      },
+      {
+        title: 'Zig-Zag Slides',
+        instructions: 'Slide diagonally forward, then back, creating a zig-zag pattern. Full court 5 times.',
+        tips: 'This simulates cutting off a driving player.',
+        duration: '5 min',
+        type: 'repetition',
+        reps: 5
+      },
+      {
+        title: 'Reaction Slides',
+        instructions: 'Partner points direction, you slide that way. React as quickly as possible. 30 commands.',
+        tips: 'Stay low so you are ready to move any direction.',
+        duration: '6 min',
+        type: 'repetition',
+        reps: 30
+      },
+      {
+        title: 'Full Court Pursuit',
+        instructions: 'Slide the full length of the court as fast as possible. 4 trips.',
+        tips: 'This builds defensive endurance.',
+        duration: '6 min',
+        type: 'repetition',
+        reps: 4
+      }
+    ],
+    equipment: ['Full court', 'Partner (optional)'],
+    coachNotes: 'The best defenders can move laterally as fast as guards can move with the ball.',
+    benefits: ['Faster lateral movement', 'Stay in front', 'Defensive endurance', 'Quick feet']
+  },
+  {
+    id: 'defense-4',
+    title: 'Help Defense Positioning',
+    description: 'Learn where to be when you are not guarding the ball. Good help defense wins championships.',
+    category: workoutCategories.DRIBBLING,
+    level: difficultyLevels.INTERMEDIATE,
+    duration: '25 min',
+    featured: false,
+    isPremium: false,
+    requiredSubscription: 'free',
+    steps: [
+      {
+        title: 'Triangle Positioning',
+        instructions: 'Practice being in the help triangle between your man, the ball, and the basket. Hold position 20 seconds, 8 reps.',
+        tips: 'You should be able to see both your man and the ball.',
+        duration: '5 min',
+        type: 'repetition',
+        reps: 8
+      },
+      {
+        title: 'Jump to Ball',
+        instructions: 'When the ball moves, jump toward it while maintaining vision of your man. Practice with passes. 20 reps.',
+        tips: 'Always move when the ball moves.',
+        duration: '6 min',
+        type: 'repetition',
+        reps: 20
+      },
+      {
+        title: 'Help and Recover',
+        instructions: 'Help on a driving player, then recover to your man. 15 reps.',
+        tips: 'Help with your body, hands active but dont foul.',
+        duration: '6 min',
+        type: 'repetition',
+        reps: 15
+      },
+      {
+        title: 'Rotation Drill',
+        instructions: 'With partners, practice rotating help defense as the ball moves. 5 minutes continuous.',
+        tips: 'Communication is key - call out who has help.',
+        duration: '5 min',
+        type: 'timed'
+      },
+      {
+        title: 'Help on Drives',
+        instructions: 'Practice stepping in to take a charge or deter a drive. 10 reps.',
+        tips: 'Set your feet before contact to draw the charge.',
+        duration: '3 min',
+        type: 'repetition',
+        reps: 10
+      }
+    ],
+    equipment: ['Full court', '2-4 partners', 'Basketball'],
+    coachNotes: 'Great team defense requires everyone to be in the right position. Its not just about your man.',
+    benefits: ['Team defense', 'Defensive IQ', 'Help positioning', 'Rotation awareness']
+  },
+  {
+    id: 'defense-5',
+    title: 'On-Ball Pressure Defense',
+    description: 'Learn to apply intense pressure on the ball handler without fouling.',
+    category: workoutCategories.DRIBBLING,
+    level: difficultyLevels.ADVANCED,
+    duration: '30 min',
+    featured: true,
+    isPremium: true,
+    requiredSubscription: 'premium',
+    steps: [
+      {
+        title: 'Trace the Ball',
+        instructions: 'Practice mirroring the ball with your hand as a partner dribbles. 2 minutes continuous, 3 sets.',
+        tips: 'Your hand should follow the ball like a shadow.',
+        duration: '8 min',
+        type: 'repetition',
+        reps: 3
+      },
+      {
+        title: 'Pressure Without Fouling',
+        instructions: 'Guard a dribbler at full intensity. Focus on active hands without reaching. 1 minute each, 6 sets.',
+        tips: 'Discipline is key - dont reach, move your feet.',
+        duration: '8 min',
+        type: 'repetition',
+        reps: 6
+      },
+      {
+        title: 'Force Direction',
+        instructions: 'Practice forcing the dribbler to their weak hand or toward help. 15 reps.',
+        tips: 'Position your body to take away their strong hand.',
+        duration: '6 min',
+        type: 'repetition',
+        reps: 15
+      },
+      {
+        title: 'Full Court Press',
+        instructions: 'Apply full court pressure on a ball handler. 5 full court trips.',
+        tips: 'Maintain intensity but stay under control.',
+        duration: '5 min',
+        type: 'repetition',
+        reps: 5
+      },
+      {
+        title: 'Steal Attempts',
+        instructions: 'Practice timing steals when the dribbler exposes the ball. 10 attempts.',
+        tips: 'Only go for steals when you can get the ball, not just a deflection.',
+        duration: '3 min',
+        type: 'repetition',
+        reps: 10
+      }
+    ],
+    equipment: ['Full court', 'Partner', 'Basketball'],
+    coachNotes: 'Pressure defense disrupts offenses but requires conditioning and discipline.',
+    benefits: ['Ball pressure', 'Force turnovers', 'Disrupt rhythm', 'Defensive intensity']
+  },
+
+  // ==================== PASSING WORKOUTS (5) ====================
+  {
+    id: 'passing-1',
+    title: 'Chest Pass Fundamentals',
+    description: 'Master the basic chest pass - the most common and reliable pass in basketball.',
+    category: workoutCategories.DRIBBLING,
+    level: difficultyLevels.BEGINNER,
+    duration: '20 min',
+    featured: true,
+    isPremium: false,
+    requiredSubscription: 'free',
+    steps: [
+      {
+        title: 'Form Practice',
+        instructions: 'Against a wall, practice proper chest pass form. Thumbs down on follow-through. 50 passes.',
+        tips: 'Step into your pass for power and accuracy.',
+        duration: '5 min',
+        type: 'repetition',
+        reps: 50
+      },
+      {
+        title: 'Partner Passing',
+        instructions: 'With a partner at 15 feet, exchange chest passes. Focus on crisp, accurate passes. 50 each.',
+        tips: 'Hit your partner in the chest every time.',
+        duration: '6 min',
+        type: 'repetition',
+        reps: 50
+      },
+      {
+        title: 'Moving Target',
+        instructions: 'Partner moves laterally. Lead them with your pass. 30 passes.',
+        tips: 'Pass to where they will be, not where they are.',
+        duration: '5 min',
+        type: 'repetition',
+        reps: 30
+      },
+      {
+        title: 'Quick Release',
+        instructions: 'Catch and pass as quickly as possible. Focus on receiving and releasing in one motion. 40 passes.',
+        tips: 'Soft hands to catch, quick hands to release.',
+        duration: '4 min',
+        type: 'repetition',
+        reps: 40
+      }
+    ],
+    equipment: ['Basketball', 'Wall or partner'],
+    coachNotes: 'The chest pass is your bread and butter. Master it before moving to fancier passes.',
+    benefits: ['Fundamental passing', 'Accuracy', 'Quick release', 'Team play']
+  },
+  {
+    id: 'passing-2',
+    title: 'Bounce Pass Accuracy',
+    description: 'Perfect the bounce pass for getting the ball into the post and through traffic.',
+    category: workoutCategories.DRIBBLING,
+    level: difficultyLevels.BEGINNER,
+    duration: '20 min',
+    featured: false,
+    isPremium: false,
+    requiredSubscription: 'free',
+    steps: [
+      {
+        title: 'Bounce Point Practice',
+        instructions: 'Mark a spot on the floor 2/3 of the way to your target. Hit that spot with your bounce pass. 40 passes.',
+        tips: 'The ball should bounce up to waist height for easy catching.',
+        duration: '5 min',
+        type: 'repetition',
+        reps: 40
+      },
+      {
+        title: 'Two-Hand Bounce Pass',
+        instructions: 'Standard bounce pass to a partner. Snap your wrists and follow through low. 40 passes.',
+        tips: 'A good bounce pass is harder to intercept than a chest pass.',
+        duration: '5 min',
+        type: 'repetition',
+        reps: 40
+      },
+      {
+        title: 'One-Hand Bounce Pass',
+        instructions: 'Practice one-hand bounce passes with each hand. 20 each hand.',
+        tips: 'One-hand passes are quicker in game situations.',
+        duration: '5 min',
+        type: 'repetition',
+        reps: 40
+      },
+      {
+        title: 'Post Entry Passes',
+        instructions: 'Partner sets up in the post. Deliver bounce passes around an imaginary defender. 30 passes.',
+        tips: 'Pass to the hand away from the defender.',
+        duration: '5 min',
+        type: 'repetition',
+        reps: 30
+      }
+    ],
+    equipment: ['Basketball', 'Partner'],
+    coachNotes: 'Bounce passes are essential for feeding the post and passing through traffic.',
+    benefits: ['Post feeding', 'Traffic passing', 'Accurate delivery', 'Reduced turnovers']
+  },
+  {
+    id: 'passing-3',
+    title: 'Skip Pass & Court Vision',
+    description: 'Develop the ability to throw skip passes and see the whole court. A guard essential skill.',
+    category: workoutCategories.DRIBBLING,
+    level: difficultyLevels.INTERMEDIATE,
+    duration: '25 min',
+    featured: false,
+    isPremium: false,
+    requiredSubscription: 'free',
+    steps: [
+      {
+        title: 'Long Distance Passing',
+        instructions: 'From one wing, throw skip passes to the opposite corner. 25 passes.',
+        tips: 'Use a high arc and put snap on the ball.',
+        duration: '6 min',
+        type: 'repetition',
+        reps: 25
+      },
+      {
+        title: 'Cross-Court Vision',
+        instructions: 'Look one way, pass the other. Practice disguising your skip pass. 20 passes.',
+        tips: 'Your eyes can freeze defenders.',
+        duration: '6 min',
+        type: 'repetition',
+        reps: 20
+      },
+      {
+        title: 'Skip Pass off Dribble',
+        instructions: 'Dribble toward one side, throw skip pass to the weak side. 20 passes.',
+        tips: 'Draw the defense then find the open man.',
+        duration: '6 min',
+        type: 'repetition',
+        reps: 20
+      },
+      {
+        title: 'Full Court Vision',
+        instructions: 'Practice outlet passes and full court skip passes. 15 passes.',
+        tips: 'Hit your target in stride for fast break opportunities.',
+        duration: '5 min',
+        type: 'repetition',
+        reps: 15
+      },
+      {
+        title: 'No-Look Skip Pass',
+        instructions: 'Throw skip passes without looking at your target. 10 attempts.',
+        tips: 'Only do this when you are confident in your partners position.',
+        duration: '2 min',
+        type: 'repetition',
+        reps: 10
+      }
+    ],
+    equipment: ['Basketball', '2+ partners', 'Full court'],
+    coachNotes: 'Skip passes create easy shots by swinging the ball faster than the defense can rotate.',
+    benefits: ['Court vision', 'Long passes', 'Ball movement', 'Defensive breakdown']
+  },
+  {
+    id: 'passing-4',
+    title: 'Entry Pass Techniques',
+    description: 'Learn various methods to get the ball inside to post players and cutters.',
+    category: workoutCategories.DRIBBLING,
+    level: difficultyLevels.INTERMEDIATE,
+    duration: '25 min',
+    featured: false,
+    isPremium: false,
+    requiredSubscription: 'free',
+    steps: [
+      {
+        title: 'High-Low Entry',
+        instructions: 'Pass from the high post to the low post. Practice over and around defenders. 25 passes.',
+        tips: 'Use a quick overhead pass to get over fronting defenders.',
+        duration: '6 min',
+        type: 'repetition',
+        reps: 25
+      },
+      {
+        title: 'Wing Entry',
+        instructions: 'From the wing, get the ball into the post against imaginary denial. 25 passes.',
+        tips: 'Wait for the post player to seal their defender.',
+        duration: '6 min',
+        type: 'repetition',
+        reps: 25
+      },
+      {
+        title: 'Lob Entry',
+        instructions: 'Practice lobbing the ball over fronting defenders. 15 passes.',
+        tips: 'The post player needs to call for it and position correctly.',
+        duration: '5 min',
+        type: 'repetition',
+        reps: 15
+      },
+      {
+        title: 'Dribble Entry',
+        instructions: 'Use a dribble to improve the passing angle, then deliver. 20 passes.',
+        tips: 'Sometimes one dribble opens up the passing lane.',
+        duration: '5 min',
+        type: 'repetition',
+        reps: 20
+      },
+      {
+        title: 'Cutter Feeds',
+        instructions: 'Hit a cutting teammate with a pass as they go to the basket. 15 passes.',
+        tips: 'Timing is everything - pass into their path.',
+        duration: '3 min',
+        type: 'repetition',
+        reps: 15
+      }
+    ],
+    equipment: ['Basketball', '2+ partners', 'Half court'],
+    coachNotes: 'Getting the ball inside creates high-percentage shots. Master these entry techniques.',
+    benefits: ['Post feeding', 'Inside scoring', 'Pass timing', 'Offensive efficiency']
+  },
+  {
+    id: 'passing-5',
+    title: 'No-Look & Flashy Passes',
+    description: 'Advanced passing techniques for players who have mastered the fundamentals.',
+    category: workoutCategories.DRIBBLING,
+    level: difficultyLevels.ADVANCED,
+    duration: '30 min',
+    featured: true,
+    isPremium: true,
+    requiredSubscription: 'premium',
+    steps: [
+      {
+        title: 'Look-Away Passes',
+        instructions: 'Look at one target, pass to another. Start with stationary receivers. 30 passes.',
+        tips: 'You need to know exactly where your teammate is without looking.',
+        duration: '7 min',
+        type: 'repetition',
+        reps: 30
+      },
+      {
+        title: 'Behind-the-Back Pass',
+        instructions: 'Practice behind-the-back passes to a partner. 20 with each hand.',
+        tips: 'Use a wrapping motion, not a throw.',
+        duration: '6 min',
+        type: 'repetition',
+        reps: 40
+      },
+      {
+        title: 'Wrap-Around Pass',
+        instructions: 'Pass around a defender (use cone) with a wrap-around motion. 25 passes.',
+        tips: 'Get low and extend around the obstacle.',
+        duration: '5 min',
+        type: 'repetition',
+        reps: 25
+      },
+      {
+        title: 'Off-the-Dribble No-Look',
+        instructions: 'Dribble toward a defender, look them off, and hit the open man without looking. 15 passes.',
+        tips: 'This is the ultimate misdirection.',
+        duration: '5 min',
+        type: 'repetition',
+        reps: 15
+      },
+      {
+        title: 'Alley-Oop Passes',
+        instructions: 'Practice throwing accurate lob passes for alley-oops. 15 attempts.',
+        tips: 'The pass should reach its peak at the rim.',
+        duration: '5 min',
+        type: 'repetition',
+        reps: 15
+      },
+      {
+        title: 'Full Court Showtime',
+        instructions: 'Combine all flashy passes in a full court setting. Get creative. 5 minutes.',
+        tips: 'In games, only use these when appropriate - fundamentals first.',
+        duration: '2 min',
+        type: 'timed'
+      }
+    ],
+    equipment: ['Basketball', '2+ partners', 'Full court', 'Cone'],
+    coachNotes: 'Flashy passes are fun but only effective after mastering fundamentals. Use them wisely.',
+    benefits: ['Misdirection', 'Highlight plays', 'Court vision', 'Teammate confidence']
   }
 ];
 

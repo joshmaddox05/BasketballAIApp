@@ -15,7 +15,12 @@ import {
   getUserAchievements,
   getWorkouts,
   getVideos,
-  updateUserProfile
+  updateUserProfile,
+  getDailyChallenge,
+  updateChallengeProgress,
+  getAIAnalysisStats,
+  getWorkoutHistory,
+  setUserStats
 } from '../services/firestoreService';
 
 // Import workout templates
@@ -50,7 +55,8 @@ const convertTemplateToWorkout = (template) => {
         steps: template.steps.map(step => ({
             title: step.name,
             instructions: step.instructions.join(' '),
-            tips: `Reps: ${step.reps || 'As needed'} | Duration: ${Math.floor(step.duration / 60)} min`
+            tips: `Reps: ${step.reps || 'As needed'} | Duration: ${Math.floor(step.duration / 60)} min`,
+            ...(step.videoReference && { videoReference: step.videoReference })
         })),
         equipment: ['Basketball', 'Court space', 'Water bottle'],
         coachNotes: `This ${template.difficulty.toLowerCase()} workout focuses on ${template.category.toLowerCase()} and takes approximately ${template.estimatedDuration} minutes to complete.`
@@ -102,6 +108,7 @@ const AppContext = createContext();
 // Provider component
 export const AppProvider = ({ children }) => {
     const [userData, setUserData] = useState(initialUserData);
+    const [user, setUser] = useState(null); // Firebase auth user object
     const [activities, setActivities] = useState(initialActivities);
     const [workouts, setWorkouts] = useState(initialWorkouts);
     const [goals, setGoals] = useState(initialGoals);
@@ -112,6 +119,13 @@ export const AppProvider = ({ children }) => {
     const [bookmarkedVideos, setBookmarkedVideos] = useState([]);
     const [achievements, setAchievements] = useState([]);
 
+    // Daily challenge and milestone state
+    const [dailyChallenge, setDailyChallenge] = useState(null);
+    const [showChallengeModal, setShowChallengeModal] = useState(false);
+    const [currentMilestone, setCurrentMilestone] = useState(null);
+    const [showMilestoneCelebration, setShowMilestoneCelebration] = useState(false);
+    const [aiAnalysisStats, setAIAnalysisStats] = useState(null);
+
     // Dark mode state management
     const systemColorScheme = useColorScheme();
     const [isDarkMode, setIsDarkMode] = useState(false);
@@ -121,10 +135,13 @@ export const AppProvider = ({ children }) => {
 
     // Firebase auth state listener
     useEffect(() => {
-        const unsubscribe = onAuthStateChange(async ({ user, profile }) => {
-            console.log('AppContext - Auth state changed:', { user: !!user, profile: !!profile });
+        const unsubscribe = onAuthStateChange(async ({ user: authUser, profile }) => {
+            console.log('AppContext - Auth state changed:', { user: !!authUser, profile: !!profile });
             
-            if (user) {
+            // Store the auth user object
+            setUser(authUser);
+            
+            if (authUser) {
                 // User is signed in
                 setIsAuthenticated(true);
                 
@@ -140,31 +157,88 @@ export const AppProvider = ({ children }) => {
 
                     // Load user-specific data from Firestore
                     try {
-                        const [userActivities, userGoals, userAchievements] = await Promise.all([
-                            getUserActivities(user.uid),
-                            getUserGoals(user.uid),
-                            getUserAchievements(user.uid)
+                        const [userActivities, userGoals, userAchievements, challenge, aiStats, workoutHistory] = await Promise.all([
+                            getUserActivities(authUser.uid),
+                            getUserGoals(authUser.uid),
+                            getUserAchievements(authUser.uid),
+                            getDailyChallenge(authUser.uid),
+                            getAIAnalysisStats(authUser.uid, 'month'),
+                            getWorkoutHistory(authUser.uid, { limitCount: 365 })
                         ]);
+
+                        // Calculate proper streak based on consecutive days with workouts
+                        const workoutDates = new Set();
+                        workoutHistory.forEach(workout => {
+                            if (workout.completedAt && workout.completedAt.toDate) {
+                                const date = workout.completedAt.toDate();
+                                date.setHours(0, 0, 0, 0);
+                                workoutDates.add(date.toDateString());
+                            }
+                        });
+
+                        let correctStreak = 0;
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+
+                        for (let i = 0; i < 365; i++) {
+                            const checkDate = new Date(today);
+                            checkDate.setDate(today.getDate() - i);
+                            const dateStr = checkDate.toDateString();
+
+                            if (workoutDates.has(dateStr)) {
+                                correctStreak++;
+                            } else if (i > 0) {
+                                break; // Break on first gap
+                            }
+                        }
+
+                        // Update streak if it's different from the stored value
+                        if (normalizedProfile.stats?.streak !== correctStreak) {
+                            console.log(`Correcting streak from ${normalizedProfile.stats?.streak} to ${correctStreak}`);
+                            await setUserStats(authUser.uid, {
+                                ...normalizedProfile.stats,
+                                streak: correctStreak
+                            });
+                            // Update local state with correct streak
+                            normalizedProfile.stats = {
+                                ...normalizedProfile.stats,
+                                streak: correctStreak
+                            };
+                            setUserData(normalizedProfile);
+                        }
 
                         setActivities(userActivities.length > 0 ? userActivities : []);
                         setGoals(userGoals.length > 0 ? userGoals : []);
                         setAchievements(userAchievements.length > 0 ? userAchievements : []);
+                        setDailyChallenge(challenge);
+                        setAIAnalysisStats(aiStats);
+
+                        // Check if we should show the challenge modal (only if not completed and not shown today)
+                        if (challenge && !challenge.completed) {
+                            const hasSeenToday = await AsyncStorage.getItem(`challenge_seen_${challenge.id}`);
+                            if (!hasSeenToday) {
+                                setShowChallengeModal(true);
+                                await AsyncStorage.setItem(`challenge_seen_${challenge.id}`, 'true');
+                            }
+                        }
                     } catch (error) {
                         console.error('Error loading user data:', error);
                         // Use empty arrays as fallback
                         setActivities([]);
                         setGoals([]);
                         setAchievements([]);
+                        setDailyChallenge(null);
+                        setAIAnalysisStats(null);
                     }
                 } else {
                     // User is authenticated but doesn't have a profile yet (during registration)
                     console.log('User authenticated but no profile found - likely during registration');
                     setUserData({
                         ...initialUserData,
-                        displayName: user.displayName,
-                        name: user.displayName,
-                        email: user.email,
-                        uid: user.uid
+                        displayName: authUser.displayName,
+                        name: authUser.displayName,
+                        email: authUser.email,
+                        uid: authUser.uid
                     });
                     setActivities([]);
                     setGoals([]);
@@ -173,6 +247,7 @@ export const AppProvider = ({ children }) => {
             } else {
                 // User is signed out
                 setIsAuthenticated(false);
+                setUser(null);
                 setUserData(initialUserData);
                 setActivities(initialActivities);
                 setGoals(initialGoals);
@@ -557,9 +632,62 @@ export const AppProvider = ({ children }) => {
         );
     };
 
+    // Challenge management functions
+    const refreshDailyChallenge = async () => {
+        if (!userData?.uid) return;
+        try {
+            const challenge = await getDailyChallenge(userData.uid);
+            setDailyChallenge(challenge);
+        } catch (error) {
+            console.error('Error refreshing daily challenge:', error);
+        }
+    };
+
+    const updateChallenge = async (current) => {
+        if (!userData?.uid || !dailyChallenge?.id) return;
+        try {
+            await updateChallengeProgress(userData.uid, dailyChallenge.id, current);
+            await refreshDailyChallenge();
+        } catch (error) {
+            console.error('Error updating challenge:', error);
+        }
+    };
+
+    const dismissChallengeModal = () => {
+        setShowChallengeModal(false);
+    };
+
+    const acceptChallenge = () => {
+        setShowChallengeModal(false);
+        // Challenge is automatically active, no need to do anything else
+    };
+
+    // Milestone celebration functions
+    const triggerMilestone = (milestone) => {
+        setCurrentMilestone(milestone);
+        setShowMilestoneCelebration(true);
+    };
+
+    const dismissMilestone = () => {
+        setShowMilestoneCelebration(false);
+        setCurrentMilestone(null);
+    };
+
+    // Refresh AI analysis stats
+    const refreshAIStats = async () => {
+        if (!userData?.uid) return;
+        try {
+            const stats = await getAIAnalysisStats(userData.uid, 'month');
+            setAIAnalysisStats(stats);
+        } catch (error) {
+            console.error('Error refreshing AI stats:', error);
+        }
+    };
+
     return (
         <AppContext.Provider value={{
             userData,
+            user,
             activities,
             workouts,
             goals,
@@ -596,7 +724,21 @@ export const AppProvider = ({ children }) => {
             removeBookmarkedVideo,
             setTrainingVideosData,
             getAccessibleWorkouts,
-            getLockedWorkouts
+            getLockedWorkouts,
+            // Challenge and milestone state
+            dailyChallenge,
+            showChallengeModal,
+            currentMilestone,
+            showMilestoneCelebration,
+            aiAnalysisStats,
+            // Challenge and milestone functions
+            refreshDailyChallenge,
+            updateChallenge,
+            dismissChallengeModal,
+            acceptChallenge,
+            triggerMilestone,
+            dismissMilestone,
+            refreshAIStats
         }}>
             {children}
         </AppContext.Provider>

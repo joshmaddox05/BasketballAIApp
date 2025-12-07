@@ -97,7 +97,7 @@ export const useFeatureAccess = () => {
         closeUpgradePrompt();
         // Navigate to subscription screen
         if (navigation) {
-            navigation.navigate('Settings', { openSubscription: true });
+            navigation.navigate('Profile', { screen: 'Settings', params: { openSubscription: true }, initial: false });
         }
     };
 

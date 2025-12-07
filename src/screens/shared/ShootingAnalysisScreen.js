@@ -5,19 +5,17 @@ import {
     Text,
     View,
     TouchableOpacity,
-    Image,
     ScrollView,
-    ActivityIndicator,
     Animated,
     Alert,
     SafeAreaView,
     StatusBar,
     Dimensions,
-    Modal,
-    FlatList
+    FlatList,
+    ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { VideoView, useVideoPlayer } from 'expo-video';
+import { Video } from 'expo-av';
 import { useAppContext } from '../../context/AppContext';
 import AICameraCapture from '../../components/shared/AICameraCapture';
 import ShotAnalysisResultsSimple from '../../components/shared/ShotAnalysisResultsSimple';
@@ -26,13 +24,6 @@ import aiAnalysisService from '../../services/aiAnalysisService';
 import { canAccessFeature, getRequiredSubscription } from '../../utils/subscription';
 
 const { width } = Dimensions.get('window');
-
-// Professional model reference images (would come from assets in real app)
-const PRO_MODELS = [
-    { id: '1', name: 'Stephen Curry', position: 'PG', team: 'Warriors' },
-    { id: '2', name: 'Kevin Durant', position: 'SF', team: 'Suns' },
-    { id: '3', name: 'LeBron James', position: 'SF', team: 'Lakers' },
-];
 
 // Default improvement suggestions when none are provided
 const getDefaultImprovements = () => [
@@ -48,47 +39,22 @@ const ShootingAnalysisScreen = ({ navigation }) => {
 
     // State management
     const [currentStage, setCurrentStage] = useState('intro'); // intro, recording, analyzing, results
-    const [selectedProModel, setSelectedProModel] = useState(PRO_MODELS[0]);
     const [capturedVideoData, setCapturedVideoData] = useState(null);
-    const [showProSelection, setShowProSelection] = useState(false);
     const [analysisResults, setAnalysisResults] = useState(null);
     const [historicalData, setHistoricalData] = useState([
         { date: '2023-03-01', score: 68 },
         { date: '2023-03-15', score: 72 },
         { date: '2023-04-02', score: 75 },
     ]);
-    const [useComprehensiveAnalysis, setUseComprehensiveAnalysis] = useState(true); // NEW: Toggle for comprehensive analysis
 
     // Feature gate state
     const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
     const [lockedFeature, setLockedFeature] = useState(null);
 
-    // Video playback state using expo-video
-    const curryVideoPlayer = useVideoPlayer(require('../../../assets/StephCurryShot.mp4'), (player) => {
-        player.loop = false;
-        player.muted = false;
-    });
-    
-    // Always create user video player with static source to avoid hooks order issues
-    const userVideoPlayer = useVideoPlayer(require('../../../assets/StephCurryShot.mp4'), (player) => {
-        player.loop = false;
-        player.muted = false;
-    });
-    
-    const [isPlayingCurryVideo, setIsPlayingCurryVideo] = useState(false);
-    const [isPlayingUserVideo, setIsPlayingUserVideo] = useState(false);
-    const [hasValidUserVideo, setHasValidUserVideo] = useState(false);
-
-    // Update user video source when captured video changes
-    useEffect(() => {
-        if (capturedVideoData?.videoUri && !capturedVideoData.videoUri.includes('simulated')) {
-            // Replace the user video player source asynchronously for better performance
-            userVideoPlayer.replaceAsync({ uri: capturedVideoData.videoUri });
-            setHasValidUserVideo(true);
-        } else {
-            setHasValidUserVideo(false);
-        }
-    }, [capturedVideoData]);
+    // Video player state
+    const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+    const [videoLoading, setVideoLoading] = useState(false);
+    const videoRef = useRef(null);
 
     // Animation values
     const analysisProgressAnim = useRef(new Animated.Value(0)).current;
@@ -122,8 +88,8 @@ const ShootingAnalysisScreen = ({ navigation }) => {
             }).start();
 
             // Perform comprehensive AI analysis with phase detection and biomechanics
-            console.log('🏀 Using comprehensive analysis with baseline:', selectedProModel.name);
-            const results = await aiAnalysisService.analyzeComprehensive(videoData, selectedProModel.name);
+            console.log('🏀 Using comprehensive analysis for feedback-based improvement');
+            const results = await aiAnalysisService.analyzeComprehensive(videoData);
             
             console.log('✅ Comprehensive analysis complete!');
             console.log('📊 Results:', results);
@@ -139,7 +105,7 @@ const ShootingAnalysisScreen = ({ navigation }) => {
 
             // Add to activities
             addActivity({
-                title: `AI Shooting Analysis ${selectedProModel.name === 'Stephen Curry' ? '(vs Curry)' : ''}`,
+                title: 'AI Shooting Analysis',
                 progress: score,
                 date: 'Today'
             });
@@ -153,28 +119,59 @@ const ShootingAnalysisScreen = ({ navigation }) => {
             console.error('❌ Error details:', {
                 message: error.message,
                 stack: error.stack,
-                name: error.name
+                name: error.name,
+                apiError: error.apiError,
+                tips: error.tips
             });
-            
-            Alert.alert(
-                'Analysis Failed', 
-                `Unable to analyze your shooting form.\n\nError: ${error.message}\n\nPlease check your internet connection and try again.`,
-                [
-                    { 
-                        text: 'Try Again', 
-                        onPress: () => {
-                            setCurrentStage('intro');
-                            // Restart the process
-                            setTimeout(() => startCapture(), 500);
+
+            // Reset animation and stage
+            analysisProgressAnim.setValue(0);
+            setCurrentStage('intro');
+
+            // Check if this is the "Could not detect complete shooting motion" error
+            const isMotionDetectionError = error.message?.includes('Could not detect complete shooting motion');
+
+            if (isMotionDetectionError) {
+                // Show specific prompt for retaking the video
+                const tipsMessage = error.tips && error.tips.length > 0
+                    ? '\n\nTips:\n' + error.tips.map(tip => `• ${tip}`).join('\n')
+                    : '\n\nTips:\n• Make sure your full body is visible in the frame\n• Record from a side angle\n• Include the complete shooting motion from start to finish\n• Ensure good lighting';
+
+                Alert.alert(
+                    'Unable to Detect Shot',
+                    `We couldn't detect a complete shooting motion in your video.${tipsMessage}\n\nWould you like to try again?`,
+                    [
+                        {
+                            text: 'Retake Video',
+                            onPress: () => {
+                                setTimeout(() => startCapture(), 500);
+                            }
+                        },
+                        {
+                            text: 'Cancel',
+                            style: 'cancel'
                         }
-                    },
-                    { 
-                        text: 'Cancel', 
-                        onPress: () => setCurrentStage('intro'),
-                        style: 'cancel'
-                    }
-                ]
-            );
+                    ]
+                );
+            } else {
+                // Generic error handling for other errors
+                Alert.alert(
+                    'Analysis Failed',
+                    `Unable to analyze your shooting form.\n\nError: ${error.message}\n\nPlease check your internet connection and try again.`,
+                    [
+                        {
+                            text: 'Try Again',
+                            onPress: () => {
+                                setTimeout(() => startCapture(), 500);
+                            }
+                        },
+                        {
+                            text: 'Cancel',
+                            style: 'cancel'
+                        }
+                    ]
+                );
+            }
         }
     };
 
@@ -189,7 +186,7 @@ const ShootingAnalysisScreen = ({ navigation }) => {
             setLockedFeature({
                 name: 'AI Shot Analysis',
                 requiredTier,
-                customMessage: 'Unlock AI-powered shooting form analysis with professional player comparisons. Get detailed feedback on your technique and track your improvements over time.'
+                customMessage: 'Unlock AI-powered shooting form analysis with personalized feedback to improve your shot. Get detailed insights on your technique and track your improvements over time.'
             });
             setShowUpgradePrompt(true);
             return;
@@ -202,7 +199,7 @@ const ShootingAnalysisScreen = ({ navigation }) => {
     const handleUpgrade = (requiredTier) => {
         setShowUpgradePrompt(false);
         setLockedFeature(null);
-        navigation.navigate('Settings', { openSubscription: true });
+        navigation.navigate('Profile', { screen: 'Settings', params: { openSubscription: true }, initial: false });
     };
 
     // Handle modal close
@@ -217,83 +214,6 @@ const ShootingAnalysisScreen = ({ navigation }) => {
         setAnalysisResults(null);
         analysisProgressAnim.setValue(0);
     };
-
-    // Video playback helper functions
-    const handlePlayCurryVideo = () => {
-        try {
-            if (isPlayingCurryVideo) {
-                curryVideoPlayer.pause();
-                setIsPlayingCurryVideo(false);
-            } else {
-                curryVideoPlayer.play();
-                setIsPlayingCurryVideo(true);
-            }
-        } catch (error) {
-            console.error('Error controlling Curry video:', error);
-            Alert.alert('Video Error', 'Unable to play Curry video.');
-        }
-    };
-
-    const handlePlayUserVideo = () => {
-        if (!hasValidUserVideo || !userVideoPlayer) return;
-        
-        try {
-            if (isPlayingUserVideo) {
-                userVideoPlayer.pause();
-                setIsPlayingUserVideo(false);
-            } else {
-                userVideoPlayer.play();
-                setIsPlayingUserVideo(true);
-            }
-        } catch (error) {
-            console.error('Error controlling user video:', error);
-            Alert.alert('Video Error', 'Unable to play your video.');
-        }
-    };
-
-
-
-    // Listen to video status changes
-    useEffect(() => {
-        const currySubscription = curryVideoPlayer.addListener('playingChange', (isPlaying) => {
-            setIsPlayingCurryVideo(isPlaying);
-        });
-
-        let userSubscription;
-        if (userVideoPlayer) {
-            userSubscription = userVideoPlayer.addListener('playingChange', (isPlaying) => {
-                setIsPlayingUserVideo(isPlaying);
-            });
-        }
-
-        return () => {
-            currySubscription?.remove();
-            userSubscription?.remove();
-        };
-    }, [curryVideoPlayer, userVideoPlayer]);
-
-    const renderProModelItem = ({ item }) => (
-        <TouchableOpacity
-            style={[
-                styles.proModelItem,
-                selectedProModel.id === item.id && styles.selectedProModelItem
-            ]}
-            onPress={() => {
-                setSelectedProModel(item);
-                setShowProSelection(false);
-            }}
-        >
-            <View style={styles.proModelImageContainer}>
-                <View style={styles.proModelImage}>
-                    <Text style={styles.proModelInitials}>
-                        {item.name.split(' ').map(n => n[0]).join('')}
-                    </Text>
-                </View>
-            </View>
-            <Text style={styles.proModelName}>{item.name}</Text>
-            <Text style={styles.proModelDetails}>{item.position} • {item.team}</Text>
-        </TouchableOpacity>
-    );
 
     const renderMetricItem = ({ item }) => {
         let statusColor;
@@ -401,29 +321,6 @@ const ShootingAnalysisScreen = ({ navigation }) => {
                             Record a video of your shooting form from the side angle for best results.
                         </Text>
 
-                        <View style={styles.proModelSection}>
-                            <Text style={styles.proModelTitle}>Compare with Pro Form:</Text>
-                            <TouchableOpacity
-                                style={styles.proModelSelector}
-                                onPress={() => setShowProSelection(true)}
-                            >
-                                <View style={styles.selectedProModel}>
-                                    <View style={styles.selectedProModelImage}>
-                                        <Text style={styles.proModelInitials}>
-                                            {selectedProModel.name.split(' ').map(n => n[0]).join('')}
-                                        </Text>
-                                    </View>
-                                    <View>
-                                        <Text style={styles.selectedProModelName}>{selectedProModel.name}</Text>
-                                        <Text style={styles.selectedProModelDetails}>
-                                            {selectedProModel.position} • {selectedProModel.team}
-                                        </Text>
-                                    </View>
-                                </View>
-                                <Ionicons name="chevron-down" size={24} color="#666" />
-                            </TouchableOpacity>
-                        </View>
-
                         <View style={styles.tipContainer}>
                             <View style={styles.tipHeader}>
                                 <Ionicons name="bulb" size={20} color="#FFD700" />
@@ -470,43 +367,22 @@ const ShootingAnalysisScreen = ({ navigation }) => {
             {/* Analyzing Screen */}
             {currentStage === 'analyzing' && (
                 <View style={styles.analyzingContainer}>
-                    <View style={styles.videoComparisonContainer}>
-                        <View style={styles.userVideoContainer}>
-                            <View style={styles.userVideo}>
-                                {capturedVideoData?.videoUri && !capturedVideoData.videoUri.includes('test://') ? (
-                                    <View style={styles.videoThumbnailContainer}>
-                                        <View style={styles.videoPlaceholder}>
-                                            <Ionicons name="videocam" size={40} color="#666" />
-                                            <Text style={styles.videoPlaceholderText}>Your Recording</Text>
-                                        </View>
-                                    </View>
-                                ) : (
+                    <View style={styles.analyzingVideoContainer}>
+                        <View style={styles.userVideo}>
+                            {capturedVideoData?.videoUri && !capturedVideoData.videoUri.includes('test://') ? (
+                                <View style={styles.videoThumbnailContainer}>
                                     <View style={styles.videoPlaceholder}>
-                                        <Ionicons name="person" size={40} color="#666" />
-                                        <Text style={styles.videoPlaceholderText}>Your Form</Text>
+                                        <Ionicons name="videocam" size={40} color="#666" />
+                                        <Text style={styles.videoPlaceholderText}>Your Recording</Text>
                                     </View>
-                                )}
-                                <Text style={styles.videoLabel}>Your Form</Text>
-                            </View>
-                        </View>
-                        <View style={styles.proVideoContainer}>
-                            <View style={styles.proVideo}>
-                                {selectedProModel.name === 'Stephen Curry' ? (
-                                    <View style={styles.videoThumbnailContainer}>
-                                        <View style={styles.curryVideoPlaceholder}>
-                                            <Ionicons name="basketball" size={40} color="#FFD700" />
-                                            <Text style={styles.curryVideoText}>Curry's Form</Text>
-                                            <Text style={styles.curryVideoSubtext}>Golden State Warrior</Text>
-                                        </View>
-                                    </View>
-                                ) : (
-                                    <View style={styles.videoPlaceholder}>
-                                        <Ionicons name="star" size={40} color="#666" />
-                                        <Text style={styles.videoPlaceholderText}>{selectedProModel.name}</Text>
-                                    </View>
-                                )}
-                                <Text style={styles.videoLabel}>{selectedProModel.name}</Text>
-                            </View>
+                                </View>
+                            ) : (
+                                <View style={styles.videoPlaceholder}>
+                                    <Ionicons name="person" size={40} color="#666" />
+                                    <Text style={styles.videoPlaceholderText}>Your Form</Text>
+                                </View>
+                            )}
+                            <Text style={styles.videoLabel}>Your Form</Text>
                         </View>
                     </View>
 
@@ -587,215 +463,94 @@ const ShootingAnalysisScreen = ({ navigation }) => {
             {currentStage === 'results' && analysisResults && (
                 <ScrollView style={styles.container}>
                     {/* Simple Progressive Disclosure Analysis Results */}
-                    <ShotAnalysisResultsSimple 
+                    <ShotAnalysisResultsSimple
                         results={analysisResults}
                         onClose={() => navigation.goBack()}
                         onTryAgain={resetAnalysis}
                         history={historicalData}
                     />
 
-                    {/* Video Comparison Section - Only show if comprehensive analysis available */}
-                    {analysisResults.similarityScore && (
-                        <View style={styles.curryComparisonContainer}>
-                            <View style={styles.curryComparisonHeader}>
-                                <Ionicons name="trophy" size={24} color="#FFD700" />
-                                <Text style={styles.curryComparisonTitle}>Comparison with Steph Curry</Text>
+                    {/* Visualization Video Section */}
+                    {analysisResults.visualizationVideoUrl && (
+                        <View style={styles.visualizationContainer}>
+                            <View style={styles.visualizationHeader}>
+                                <Ionicons name="eye" size={20} color="#FF6B00" />
+                                <Text style={styles.visualizationTitle}>Shot Breakdown Video</Text>
                             </View>
-                            
-                            <View style={styles.similarityScoreCard}>
-                                <Text style={styles.similarityLabel}>Form Similarity</Text>
-                                <Text style={styles.similarityScore}>
-                                    {Math.round(analysisResults.similarityScore)}%
-                                </Text>
-                                <Text style={styles.similarityDescription}>
-                                    {analysisResults.similarityScore >= 80 
-                                        ? "Exceptional! Your form closely matches Curry's mechanics."
-                                        : analysisResults.similarityScore >= 70
-                                        ? "Great! You're on the right track to matching Curry's form."
-                                        : "Good start! Focus on the areas below to improve."}
-                                </Text>
-                            </View>
+                            <Text style={styles.visualizationDescription}>
+                                Watch your shot with AI overlays showing form analysis
+                            </Text>
 
-                            {/* Metric Breakdown */}
-                            {analysisResults.visualData?.similarity_breakdown && Array.isArray(analysisResults.visualData.similarity_breakdown) && (
-                                <View style={styles.metricBreakdownContainer}>
-                                    <Text style={styles.metricBreakdownTitle}>Metric Comparison</Text>
-                                    {(analysisResults.visualData.similarity_breakdown || []).map((metric, index) => (
-                                        <View key={`metric-${index}`} style={styles.metricComparisonRow}>
-                                            <Text style={styles.metricName}>{metric.metric}</Text>
-                                            <View style={styles.metricBarContainer}>
-                                                <View style={styles.metricBar}>
-                                                    <View 
-                                                        style={[
-                                                            styles.metricBarFill, 
-                                                            { 
-                                                                width: `${metric.similarity}%`,
-                                                                backgroundColor: metric.similarity >= 80 ? '#4CAF50' : 
-                                                                                 metric.similarity >= 70 ? '#FFC107' : '#FF6B00'
-                                                            }
-                                                        ]} 
-                                                    />
-                                                </View>
-                                                <Text style={styles.metricPercentage}>
-                                                    {Math.round(metric.similarity)}%
-                                                </Text>
-                                            </View>
-                                        </View>
-                                    ))}
-                                </View>
-                            )}
-
-                            {/* Strengths and Improvements */}
-                            {analysisResults.comparison && (
-                                <View style={styles.curryFeedbackContainer}>
-                                    {analysisResults.comparison.strengths?.length > 0 && (
-                                        <View style={styles.feedbackSection}>
-                                            <View style={styles.feedbackHeader}>
-                                                <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
-                                                <Text style={styles.feedbackHeaderText}>Your Strengths</Text>
-                                            </View>
-                                            {(analysisResults.comparison.strengths || []).map((strength, index) => (
-                                                <Text key={`strength-${index}`} style={styles.feedbackItem}>
-                                                    • {strength}
-                                                </Text>
-                                            ))}
-                                        </View>
-                                    )}
-                                    
-                                    {analysisResults.comparison.areas_for_improvement?.length > 0 && (
-                                        <View style={styles.feedbackSection}>
-                                            <View style={styles.feedbackHeader}>
-                                                <Ionicons name="alert-circle" size={20} color="#FF6B00" />
-                                                <Text style={styles.feedbackHeaderText}>Areas to Improve</Text>
-                                            </View>
-                                            {(analysisResults.comparison.areas_for_improvement || []).map((area, index) => (
-                                                <Text key={`improve-${index}`} style={styles.feedbackItem}>
-                                                    • {area}
-                                                </Text>
-                                            ))}
-                                        </View>
-                                    )}
-                                </View>
-                            )}
-                        </View>
-                    )}
-
-                    {/* Video Comparison */}
-                    <View style={styles.resultVideoContainer}>
-                        <Text style={styles.resultSectionTitle}>Your Form vs {selectedProModel.name}</Text>
-                        <View style={styles.videoComparisonRow}>
-                            {/* User Video */}
-                            <View style={styles.videoThumbnail}>
-                                <View style={styles.videoFrame}>
-                                    {hasValidUserVideo ? (
-                                        <VideoView
-                                            style={styles.videoPlayer}
-                                            player={userVideoPlayer}
-                                            fullscreenOptions={{ enabled: false }}
-                                            allowsPictureInPicture={false}
-                                        />
-                                    ) : (
-                                        <View style={styles.videoPlaceholder}>
-                                            <Ionicons name="videocam" size={32} color="#FF6B35" />
-                                            <Text style={styles.videoPlaceholderText}>Your Form</Text>
-                                        </View>
-                                    )}
-                                    <View style={styles.videoOverlay}>
-                                        <Text style={styles.videoFrameText}>Your Form</Text>
-                                        {capturedVideoData?.timestamp && (
-                                            <Text style={styles.videoTimestamp}>
-                                                {new Date(capturedVideoData.timestamp).toLocaleTimeString()}
-                                            </Text>
-                                        )}
-                                        {capturedVideoData?.mediaAsset?.duration && (
-                                            <Text style={styles.videoDuration}>
-                                                {capturedVideoData.mediaAsset.duration.toFixed(1)}s
-                                            </Text>
-                                        )}
+                            <View style={styles.videoPlayerContainer}>
+                                {videoLoading && (
+                                    <View style={styles.videoLoadingOverlay}>
+                                        <ActivityIndicator size="large" color="#FF6B00" />
+                                        <Text style={styles.videoLoadingText}>Loading video...</Text>
                                     </View>
-                                </View>
-                                <View style={styles.videoControls}>
-                                    <TouchableOpacity 
-                                        style={styles.videoControlButton}
-                                        onPress={handlePlayUserVideo}
-                                        disabled={!hasValidUserVideo}
-                                    >
-                                        <Ionicons 
-                                            name={isPlayingUserVideo ? "pause" : "play"} 
-                                            size={16} 
-                                            color="#FFF" 
-                                        />
-                                        <Text style={styles.videoButtonText}>
-                                            {hasValidUserVideo ? (isPlayingUserVideo ? 'Pause' : 'Play') : 'No Video'}
-                                        </Text>
-                                    </TouchableOpacity>
-                                </View>
+                                )}
+                                <Video
+                                    ref={videoRef}
+                                    source={{ uri: analysisResults.visualizationVideoUrl }}
+                                    style={styles.videoPlayer}
+                                    useNativeControls
+                                    resizeMode="contain"
+                                    isLooping
+                                    onLoadStart={() => setVideoLoading(true)}
+                                    onLoad={() => setVideoLoading(false)}
+                                    onError={(error) => {
+                                        console.error('Video playback error:', error);
+                                        setVideoLoading(false);
+                                        Alert.alert(
+                                            'Video Error',
+                                            'Unable to load the visualization video. Please try again.',
+                                            [{ text: 'OK' }]
+                                        );
+                                    }}
+                                    onPlaybackStatusUpdate={(status) => {
+                                        if (status.isLoaded) {
+                                            setIsVideoPlaying(status.isPlaying);
+                                        }
+                                    }}
+                                />
                             </View>
 
-                            {/* Pro Model Video */}
-                            <View style={styles.videoThumbnail}>
-                                <View style={styles.videoFrame}>
-                                    {selectedProModel.name === 'Stephen Curry' ? (
-                                        <View style={styles.curryVideoContainer}>
-                                            <VideoView
-                                                style={styles.videoPlayer}
-                                                player={curryVideoPlayer}
-                                                fullscreenOptions={{ enabled: false }}
-                                                allowsPictureInPicture={false}
-                                            />
-                                            <View style={styles.videoOverlay}>
-                                                <Text style={styles.proVideoLabel}>Curry's Perfect Form</Text>
-                                                <Text style={styles.proVideoStats}>48.5° Release | 90% FG</Text>
-                                            </View>
-                                        </View>
-                                    ) : (
-                                        <View style={styles.videoPlaceholder}>
-                                            <Ionicons name="star" size={32} color="#FFD700" />
-                                            <Text style={styles.videoPlaceholderText}>{selectedProModel.name}</Text>
-                                        </View>
-                                    )}
-                                    <Text style={styles.videoFrameText}>{selectedProModel.name}</Text>
-                                </View>
-                                <View style={styles.videoControls}>
-                                    <TouchableOpacity 
-                                        style={styles.videoControlButton}
-                                        onPress={selectedProModel.name === 'Stephen Curry' ? 
-                                            handlePlayCurryVideo : () => {
-                                                Alert.alert(
-                                                    `${selectedProModel.name} Form Video`,
-                                                    'Additional professional form videos coming soon!',
-                                                    [{ text: 'OK' }]
-                                                );
+                            <View style={styles.videoControls}>
+                                <TouchableOpacity
+                                    style={styles.videoControlButton}
+                                    onPress={async () => {
+                                        if (videoRef.current) {
+                                            if (isVideoPlaying) {
+                                                await videoRef.current.pauseAsync();
+                                            } else {
+                                                await videoRef.current.playAsync();
                                             }
                                         }
-                                    >
-                                        <Ionicons 
-                                            name={selectedProModel.name === 'Stephen Curry' && isPlayingCurryVideo ? "pause" : "play"} 
-                                            size={16} 
-                                            color="#FFF" 
-                                        />
-                                        <Text style={styles.videoButtonText}>
-                                            {selectedProModel.name === 'Stephen Curry' ? 
-                                                (isPlayingCurryVideo ? 'Pause' : 'Study') : 
-                                                'Coming Soon'
-                                            }
-                                        </Text>
-                                    </TouchableOpacity>
-                                </View>
+                                    }}
+                                >
+                                    <Ionicons
+                                        name={isVideoPlaying ? 'pause' : 'play'}
+                                        size={20}
+                                        color="#FFF"
+                                    />
+                                    <Text style={styles.videoControlText}>
+                                        {isVideoPlaying ? 'Pause' : 'Play'}
+                                    </Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={styles.videoControlButton}
+                                    onPress={async () => {
+                                        if (videoRef.current) {
+                                            await videoRef.current.replayAsync();
+                                        }
+                                    }}
+                                >
+                                    <Ionicons name="refresh" size={20} color="#FFF" />
+                                    <Text style={styles.videoControlText}>Replay</Text>
+                                </TouchableOpacity>
                             </View>
                         </View>
-                        <View style={styles.comparisonStats}>
-                            <Text style={styles.comparisonStatsText}>
-                                Similarity: {analysisResults.similarity_to_curry || 75}% • 
-                                Confidence: {Math.round((analysisResults.confidence || 0.85) * 100)}%
-                            </Text>
-                            {selectedProModel.name === 'Stephen Curry' && (
-                                <Text style={styles.videoSourceText}>
-                                    🏀 Baseline video: Stephen Curry's shooting form
-                                </Text>
-                            )}
-                        </View>
-                    </View>
+                    )}
 
                     {/* Detailed Metrics */}
                     <View style={styles.metricsContainer}>
@@ -919,33 +674,6 @@ const ShootingAnalysisScreen = ({ navigation }) => {
                     </View>
                 </ScrollView>
             )}
-
-            {/* Pro Model Selection Modal */}
-            <Modal
-                visible={showProSelection}
-                animationType="slide"
-                transparent={true}
-                onRequestClose={() => setShowProSelection(false)}
-            >
-                <View style={styles.modalContainer}>
-                    <View style={styles.modalContent}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Select Pro Player</Text>
-                            <TouchableOpacity
-                                style={styles.modalCloseButton}
-                                onPress={() => setShowProSelection(false)}
-                            >
-                                <Ionicons name="close" size={24} color="#666" />
-                            </TouchableOpacity>
-                        </View>
-                        <FlatList
-                            data={PRO_MODELS}
-                            renderItem={renderProModelItem}
-                            keyExtractor={item => item.id}
-                        />
-                    </View>
-                </View>
-            </Modal>
 
             {/* Upgrade Prompt for Locked Features */}
             <UpgradePrompt
@@ -1237,6 +965,10 @@ const styles = StyleSheet.create({
         backgroundColor: '#F8F9FA',
         padding: 16,
     },
+    analyzingVideoContainer: {
+        alignItems: 'center',
+        marginBottom: 24,
+    },
     videoComparisonContainer: {
         flexDirection: 'row',
         marginBottom: 24,
@@ -1249,7 +981,8 @@ const styles = StyleSheet.create({
     userVideo: {
         backgroundColor: '#DDD',
         borderRadius: 12,
-        flex: 1,
+        width: 200,
+        height: 200,
         justifyContent: 'center',
         alignItems: 'center',
         position: 'relative',
@@ -1895,6 +1628,75 @@ const styles = StyleSheet.create({
         fontStyle: 'italic',
     },
 
+    // Visualization Video Styles
+    visualizationContainer: {
+        backgroundColor: '#FFF',
+        padding: 16,
+        marginTop: 8,
+        borderRadius: 12,
+        marginHorizontal: 16,
+    },
+    visualizationHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    visualizationTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#333',
+        marginLeft: 8,
+    },
+    visualizationDescription: {
+        fontSize: 14,
+        color: '#666',
+        marginBottom: 16,
+        lineHeight: 20,
+    },
+    videoPlayerContainer: {
+        width: '100%',
+        height: 300,
+        backgroundColor: '#000',
+        borderRadius: 12,
+        overflow: 'hidden',
+        position: 'relative',
+    },
+    videoLoadingOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 10,
+    },
+    videoLoadingText: {
+        color: '#FFF',
+        marginTop: 12,
+        fontSize: 14,
+    },
+    videoControls: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        gap: 12,
+        marginTop: 16,
+    },
+    videoControlButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FF6B00',
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        borderRadius: 8,
+        gap: 8,
+    },
+    videoControlText: {
+        color: '#FFF',
+        fontSize: 14,
+        fontWeight: '600',
+    },
 });
 
 export default ShootingAnalysisScreen;

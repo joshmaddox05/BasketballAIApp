@@ -13,11 +13,61 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
+import { hasAccess, SUBSCRIPTION_TIERS } from '../../utils/subscription';
+
+// Import thumbnail images for workouts
+const shootingThumbnail = require('../../../assets/shooting-thumbnail.jpg');
+const dribblingThumbnail = require('../../../assets/dribbling-thumbnail.png');
+
+// Map workout IDs to their thumbnail images
+const workoutThumbnails = {
+    'shooting_1': shootingThumbnail,  // Beginner Shooting Basics
+    'dribbling_1': dribblingThumbnail, // Ball Handling Fundamentals
+};
 
 const TrainingCategoryScreen = ({ route, navigation }) => {
     const { category } = route.params;
-    const { workouts, loading } = useAppContext();
+    const { workouts, loading, userData } = useAppContext();
     const [filteredWorkouts, setFilteredWorkouts] = useState([]);
+
+    const userSubscription = userData?.subscription || SUBSCRIPTION_TIERS.FREE;
+
+    // Check if a workout is locked (premium)
+    const isWorkoutLocked = (workout) => {
+        const requiredTier = workout.requiredTier || SUBSCRIPTION_TIERS.FREE;
+        return !hasAccess(userSubscription, requiredTier);
+    };
+
+    // Get display name for required tier
+    const getTierDisplayName = (tier) => {
+        switch (tier) {
+            case SUBSCRIPTION_TIERS.BASIC: return 'Basic';
+            case SUBSCRIPTION_TIERS.PREMIUM: return 'Premium';
+            case SUBSCRIPTION_TIERS.PRO: return 'Pro';
+            default: return 'Premium';
+        }
+    };
+
+    // Check if a workout is recommended for the current user
+    const isRecommendedForUser = (workout) => {
+        if (!userData) return false;
+
+        const userLevel = userData?.level?.toLowerCase();
+        const workoutLevel = workout?.level?.toLowerCase();
+        const focusAreas = userData?.preferences?.focusAreas || [];
+
+        // Match by skill level (allow workouts at or below user level)
+        const levelMatch = userLevel === workoutLevel ||
+            (userLevel === 'intermediate' && workoutLevel === 'beginner') ||
+            (userLevel === 'advanced');
+
+        // Match by focus area
+        const focusMatch = focusAreas.some(area =>
+            area.toLowerCase() === workout.category?.toLowerCase()
+        );
+
+        return levelMatch || focusMatch;
+    };
     
     // Set up colors based on category
     const getCategoryColor = () => {
@@ -58,55 +108,116 @@ const TrainingCategoryScreen = ({ route, navigation }) => {
         }
     };
 
-    // Filter workouts based on category
+    // Filter workouts based on category and sort by recommendation
     useEffect(() => {
         if (workouts) {
-            const filtered = workouts.filter(workout => 
+            const filtered = workouts.filter(workout =>
                 workout.category && workout.category.toLowerCase() === category.toLowerCase()
             );
-            setFilteredWorkouts(filtered);
-        }
-    }, [workouts, category]);
+            // Sort: free workouts first (with recommended at top), then locked workouts
+            const sorted = [...filtered].sort((a, b) => {
+                const aLocked = isWorkoutLocked(a);
+                const bLocked = isWorkoutLocked(b);
 
-    const renderWorkoutItem = ({ item }) => (
-        <TouchableOpacity
-            style={styles.workoutItem}
-            onPress={() => navigation.navigate('WorkoutDetail', { workoutId: item.id })}
-        >
-            <View style={styles.workoutImageContainer}>
-                {item.image ? (
-                    <Image source={item.image} style={styles.workoutImage} />
-                ) : (
-                    <View style={[styles.workoutImage, { backgroundColor: '#EEE' }]}>
-                        <Ionicons name={getCategoryIcon()} size={24} color="#AAA" />
+                // Locked workouts go to the bottom
+                if (aLocked && !bLocked) return 1;
+                if (!aLocked && bLocked) return -1;
+
+                // Within each group, recommended workouts first
+                const aRecommended = isRecommendedForUser(a);
+                const bRecommended = isRecommendedForUser(b);
+                if (aRecommended && !bRecommended) return -1;
+                if (!aRecommended && bRecommended) return 1;
+                return 0;
+            });
+            setFilteredWorkouts(sorted);
+        }
+    }, [workouts, category, userData, userSubscription]);
+
+    const renderWorkoutItem = ({ item }) => {
+        const isLocked = isWorkoutLocked(item);
+        const tierName = getTierDisplayName(item.requiredTier);
+
+        return (
+            <TouchableOpacity
+                style={[styles.workoutCard, isLocked && styles.lockedWorkoutCard]}
+                onPress={() => isLocked
+                    ? navigation.navigate('Profile', { screen: 'Settings', params: { openSubscription: true }, initial: false })
+                    : navigation.navigate('WorkoutDetail', { workoutId: item.id })
+                }
+                activeOpacity={isLocked ? 0.8 : 0.9}
+            >
+                {/* Premium banner for locked workouts */}
+                {isLocked && (
+                    <View style={styles.premiumBanner}>
+                        <Ionicons name="diamond" size={14} color="#FFF" />
+                        <Text style={styles.premiumBannerText}>{tierName} Workout</Text>
                     </View>
                 )}
-            </View>
 
-            <View style={styles.workoutInfo}>
-                <Text style={styles.workoutTitle}>{item.title}</Text>
-                <View style={styles.workoutMeta}>
-                    <Text style={styles.workoutLevel}>{item.level}</Text>
-                    <View style={styles.workoutDuration}>
-                        <Ionicons name="time-outline" size={14} color="#666" />
-                        <Text style={styles.workoutDurationText}>{item.duration}</Text>
+                {/* Full-width image section */}
+                <View style={[styles.workoutImageContainer, isLocked && { marginTop: 28 }]}>
+                    {(item.image || workoutThumbnails[item.id]) ? (
+                        <Image
+                            source={item.image || workoutThumbnails[item.id]}
+                            style={styles.workoutImage}
+                            resizeMode="cover"
+                        />
+                    ) : (
+                        <View style={[styles.workoutImage, styles.workoutImagePlaceholder]}>
+                            <Ionicons name={getCategoryIcon()} size={48} color="#CCC" />
+                        </View>
+                    )}
+                    {/* Level badge overlay */}
+                    <View style={[styles.levelBadge, { backgroundColor: getCategoryColor() }]}>
+                        <Text style={styles.levelBadgeText}>{item.level}</Text>
+                    </View>
+                    {/* Recommended badge - only show for unlocked workouts */}
+                    {!isLocked && isRecommendedForUser(item) && (
+                        <View style={styles.recommendedBadge}>
+                            <Ionicons name="star" size={12} color="#FFF" />
+                            <Text style={styles.recommendedBadgeText}>For You</Text>
+                        </View>
+                    )}
+                </View>
+
+                {/* Content section */}
+                <View style={styles.workoutContent}>
+                    <Text style={styles.workoutTitle}>{item.title}</Text>
+                    {item.description && (
+                        <Text style={styles.workoutDescription} numberOfLines={2}>
+                            {item.description}
+                        </Text>
+                    )}
+
+                    {/* Footer with duration and action button */}
+                    <View style={styles.workoutFooter}>
+                        <View style={styles.workoutDuration}>
+                            <Ionicons name="time-outline" size={16} color="#666" />
+                            <Text style={styles.workoutDurationText}>{item.duration}</Text>
+                        </View>
+                        {isLocked ? (
+                            <TouchableOpacity
+                                style={styles.unlockButton}
+                                onPress={() => navigation.navigate('Profile', { screen: 'Settings', params: { openSubscription: true }, initial: false })}
+                            >
+                                <Ionicons name="lock-open-outline" size={14} color="#FFF" />
+                                <Text style={styles.unlockButtonText}>Upgrade</Text>
+                            </TouchableOpacity>
+                        ) : (
+                            <TouchableOpacity
+                                style={[styles.startButton, { backgroundColor: getCategoryColor() }]}
+                                onPress={() => navigation.navigate('WorkoutDetail', { workoutId: item.id, autoStart: true })}
+                            >
+                                <Text style={styles.startButtonText}>Start</Text>
+                                <Ionicons name="play" size={16} color="#FFF" />
+                            </TouchableOpacity>
+                        )}
                     </View>
                 </View>
-                {item.description && (
-                    <Text style={styles.workoutDescription} numberOfLines={2}>
-                        {item.description}
-                    </Text>
-                )}
-            </View>
-
-            <TouchableOpacity
-                style={styles.startButton}
-                onPress={() => navigation.navigate('WorkoutDetail', { workoutId: item.id, autoStart: true })}
-            >
-                <Ionicons name="play" size={18} color="#FFF" />
             </TouchableOpacity>
-        </TouchableOpacity>
-    );
+        );
+    };
 
     if (loading) {
         return (
@@ -248,72 +359,142 @@ const styles = StyleSheet.create({
     workoutsList: {
         padding: 16,
     },
-    workoutItem: {
+    workoutCard: {
         backgroundColor: '#FFF',
-        borderRadius: 12,
+        borderRadius: 16,
         marginBottom: 16,
+        overflow: 'hidden',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 2,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+        elevation: 3,
+    },
+    lockedWorkoutCard: {
+        borderWidth: 1.5,
+        borderColor: '#9C27B0',
+        opacity: 0.9,
+    },
+    premiumBanner: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: '#9C27B0',
+        paddingVertical: 6,
+        paddingHorizontal: 12,
         flexDirection: 'row',
-        padding: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        zIndex: 10,
+    },
+    premiumBannerText: {
+        color: '#FFF',
+        fontSize: 12,
+        fontWeight: '700',
+        letterSpacing: 0.5,
+    },
+    unlockButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#9C27B0',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 20,
+        gap: 6,
+    },
+    unlockButtonText: {
+        color: '#FFF',
+        fontSize: 14,
+        fontWeight: '600',
     },
     workoutImageContainer: {
-        width: 80,
-        height: 80,
-        borderRadius: 8,
-        overflow: 'hidden',
-        marginRight: 12,
+        width: '100%',
+        height: 160,
+        position: 'relative',
+        backgroundColor: '#F5F5F5',
     },
     workoutImage: {
         width: '100%',
         height: '100%',
+    },
+    workoutImagePlaceholder: {
         justifyContent: 'center',
         alignItems: 'center',
+        backgroundColor: '#F0F0F0',
     },
-    workoutInfo: {
-        flex: 1,
-        marginRight: 8,
+    levelBadge: {
+        position: 'absolute',
+        top: 12,
+        left: 12,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 12,
     },
-    workoutTitle: {
-        fontSize: 16,
+    levelBadgeText: {
+        color: '#FFF',
+        fontSize: 12,
         fontWeight: '600',
-        color: '#333',
-        marginBottom: 6,
     },
-    workoutMeta: {
+    recommendedBadge: {
+        position: 'absolute',
+        top: 12,
+        right: 12,
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 6,
+        backgroundColor: '#4CAF50',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 12,
+        gap: 4,
     },
-    workoutLevel: {
+    recommendedBadgeText: {
+        color: '#FFF',
+        fontSize: 11,
+        fontWeight: '600',
+    },
+    workoutContent: {
+        padding: 16,
+    },
+    workoutTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#333',
+        marginBottom: 8,
+    },
+    workoutDescription: {
         fontSize: 14,
-        color: '#FF6B00',
-        marginRight: 12,
+        color: '#666',
+        lineHeight: 20,
+        marginBottom: 16,
+    },
+    workoutFooter: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
     },
     workoutDuration: {
         flexDirection: 'row',
         alignItems: 'center',
     },
     workoutDurationText: {
+        marginLeft: 6,
         fontSize: 14,
         color: '#666',
-        marginLeft: 4,
-    },
-    workoutDescription: {
-        fontSize: 14,
-        color: '#666',
-        lineHeight: 20,
     },
     startButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: '#FF6B00',
-        justifyContent: 'center',
+        flexDirection: 'row',
         alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 20,
+        gap: 6,
+    },
+    startButtonText: {
+        color: '#FFF',
+        fontSize: 14,
+        fontWeight: '600',
     },
     emptyState: {
         flex: 1,
