@@ -50,16 +50,25 @@ export const TOUR_STEPS = [
         description: 'Complete daily challenges to earn XP and keep your streak going!',
         tooltipPosition: 'bottom',
     },
-    // Step 6: Show Challenge type tabs
+    // Step 6: Show Add Friends section
     {
-        id: 'challenge-type-tabs',
-        target: 'challenge-type-tabs',
+        id: 'add-friends-section',
+        target: 'add-friends-section',
         tab: 'Challenges',
-        title: 'Challenge Types',
-        description: 'Filter between Solo challenges, Head-to-Head battles, and Group competitions.',
+        title: 'Add Friends',
+        description: 'Find and add friends to challenge them in head-to-head battles!',
         tooltipPosition: 'bottom',
     },
-    // Step 7: Prompt user to tap Progress tab
+    // Step 7: Show Available Challenges
+    {
+        id: 'available-challenges-section',
+        target: 'available-challenges-section',
+        tab: 'Challenges',
+        title: 'Available Challenges',
+        description: 'Browse and join solo, head-to-head, or group challenges to test your skills.',
+        tooltipPosition: 'top',
+    },
+    // Step 8: Prompt user to tap Progress tab
     {
         id: 'progress-tab',
         target: 'progress-tab',
@@ -70,7 +79,7 @@ export const TOUR_STEPS = [
         tooltipPosition: 'top',
         isTabStep: true,
     },
-    // Step 8: Show Training Summary card
+    // Step 9: Show Training Summary card
     {
         id: 'training-summary-card',
         target: 'training-summary-card',
@@ -79,13 +88,22 @@ export const TOUR_STEPS = [
         description: 'Track your total workouts, current streak, and average session duration.',
         tooltipPosition: 'bottom',
     },
-    // Step 9: Show Progress tabs
+    // Step 10: Show Shooting Accuracy card
     {
-        id: 'progress-tabs',
-        target: 'progress-tabs',
+        id: 'shooting-accuracy-card',
+        target: 'shooting-accuracy-card',
         tab: 'Progress',
-        title: 'Explore Your Stats',
-        description: 'View detailed stats, achievements, goals, and your complete workout history!',
+        title: 'Shooting Accuracy',
+        description: 'Monitor your shooting percentage and see trends in your accuracy over time.',
         tooltipPosition: 'bottom',
+    },
+    // Step 11: Show Skill Progress chart
+    {
+        id: 'skill-progress-chart',
+        target: 'skill-progress-chart',
+        tab: 'Progress',
+        title: 'Skill Progress',
+        description: 'Track your improvement in shooting, dribbling, and physical training over the past 6 months.',
+        tooltipPosition: 'top',
     },
 ];

@@ -896,54 +896,58 @@ const AllChallengesScreen = ({ navigation }) => {
                     </View>
                 )}
 
-                {/* Friends Section - Challenge Your Friends */}
+                {/* Friends Section - Challenge Your Friends - wrapped with TourStep for onboarding */}
                 {friends.length > 0 && (
-                    <View style={styles.section}>
-                        <View style={styles.sectionHeader}>
-                            <View style={styles.sectionHeaderLeft}>
-                                <Text style={[styles.sectionTitle, { color: theme.text }]}>Challenge Friends</Text>
-                                <Text style={[styles.sectionCount, { color: theme.textSecondary }]}>{friends.length}</Text>
+                    <TourStep stepId="add-friends-section">
+                        <View style={styles.section}>
+                            <View style={styles.sectionHeader}>
+                                <View style={styles.sectionHeaderLeft}>
+                                    <Text style={[styles.sectionTitle, { color: theme.text }]}>Challenge Friends</Text>
+                                    <Text style={[styles.sectionCount, { color: theme.textSecondary }]}>{friends.length}</Text>
+                                </View>
+                                <TouchableOpacity onPress={() => setShowFriendsModal(true)}>
+                                    <View style={styles.addFriendButton}>
+                                        <Ionicons name="person-add" size={16} color={theme.primary} />
+                                        <Text style={[styles.addFriendText, { color: theme.primary }]}>Add</Text>
+                                    </View>
+                                </TouchableOpacity>
                             </View>
-                            <TouchableOpacity onPress={() => setShowFriendsModal(true)}>
-                                <View style={styles.addFriendButton}>
-                                    <Ionicons name="person-add" size={16} color={theme.primary} />
-                                    <Text style={[styles.addFriendText, { color: theme.primary }]}>Add</Text>
+                            <FlatList
+                                data={friends.slice(0, 10)}
+                                renderItem={renderFriendCard}
+                                keyExtractor={item => item.uid}
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                contentContainerStyle={styles.horizontalListContent}
+                            />
+                        </View>
+                    </TourStep>
+                )}
+
+                {/* No Friends Yet - CTA - wrapped with TourStep for onboarding */}
+                {friends.length === 0 && user?.uid && (
+                    <TourStep stepId="add-friends-section">
+                        <View style={styles.section}>
+                            <TouchableOpacity
+                                style={[styles.findFriendsCard, { backgroundColor: theme.card }]}
+                                onPress={() => setShowFriendsModal(true)}
+                            >
+                                <View style={[styles.findFriendsIcon, { backgroundColor: theme.primary + '15' }]}>
+                                    <Ionicons name="people" size={32} color={theme.primary} />
+                                </View>
+                                <Text style={[styles.findFriendsTitle, { color: theme.text }]}>
+                                    Find Friends to Challenge
+                                </Text>
+                                <Text style={[styles.findFriendsSubtitle, { color: theme.textSecondary }]}>
+                                    Search for other players and start head-to-head battles
+                                </Text>
+                                <View style={[styles.findFriendsButton, { backgroundColor: theme.primary }]}>
+                                    <Ionicons name="search" size={16} color="#FFF" />
+                                    <Text style={styles.findFriendsButtonText}>Search Players</Text>
                                 </View>
                             </TouchableOpacity>
                         </View>
-                        <FlatList
-                            data={friends.slice(0, 10)}
-                            renderItem={renderFriendCard}
-                            keyExtractor={item => item.uid}
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={styles.horizontalListContent}
-                        />
-                    </View>
-                )}
-
-                {/* No Friends Yet - CTA */}
-                {friends.length === 0 && user?.uid && (
-                    <View style={styles.section}>
-                        <TouchableOpacity
-                            style={[styles.findFriendsCard, { backgroundColor: theme.card }]}
-                            onPress={() => setShowFriendsModal(true)}
-                        >
-                            <View style={[styles.findFriendsIcon, { backgroundColor: theme.primary + '15' }]}>
-                                <Ionicons name="people" size={32} color={theme.primary} />
-                            </View>
-                            <Text style={[styles.findFriendsTitle, { color: theme.text }]}>
-                                Find Friends to Challenge
-                            </Text>
-                            <Text style={[styles.findFriendsSubtitle, { color: theme.textSecondary }]}>
-                                Search for other players and start head-to-head battles
-                            </Text>
-                            <View style={[styles.findFriendsButton, { backgroundColor: theme.primary }]}>
-                                <Ionicons name="search" size={16} color="#FFF" />
-                                <Text style={styles.findFriendsButtonText}>Search Players</Text>
-                            </View>
-                        </TouchableOpacity>
-                    </View>
+                    </TourStep>
                 )}
 
                 {/* Active Challenges */}
@@ -958,24 +962,26 @@ const AllChallengesScreen = ({ navigation }) => {
                     </View>
                 )}
 
-                {/* Available Challenges */}
-                <View style={styles.section}>
-                    {renderSectionHeader('Available Challenges')}
-                    {availableChallenges.length > 0 ? (
-                        availableChallenges.map(challenge => (
-                            <View key={challenge.id}>
-                                {renderChallengeCard({ item: challenge })}
+                {/* Available Challenges - wrapped with TourStep for onboarding */}
+                <TourStep stepId="available-challenges-section">
+                    <View style={styles.section}>
+                        {renderSectionHeader('Available Challenges')}
+                        {availableChallenges.length > 0 ? (
+                            availableChallenges.map(challenge => (
+                                <View key={challenge.id}>
+                                    {renderChallengeCard({ item: challenge })}
+                                </View>
+                            ))
+                        ) : (
+                            <View style={[styles.emptyState, { backgroundColor: theme.card }]}>
+                                <Ionicons name="trophy-outline" size={48} color={theme.textSecondary} />
+                                <Text style={[styles.emptyStateText, { color: theme.textSecondary }]}>
+                                    No challenges available for this category
+                                </Text>
                             </View>
-                        ))
-                    ) : (
-                        <View style={[styles.emptyState, { backgroundColor: theme.card }]}>
-                            <Ionicons name="trophy-outline" size={48} color={theme.textSecondary} />
-                            <Text style={[styles.emptyStateText, { color: theme.textSecondary }]}>
-                                No challenges available for this category
-                            </Text>
-                        </View>
-                    )}
-                </View>
+                        )}
+                    </View>
+                </TourStep>
 
                 {/* Completed Challenges */}
                 {completedChallenges.length > 0 && (

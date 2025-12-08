@@ -440,11 +440,12 @@ const ProgressScreen = ({ navigation }) => {
                     </View>
                 </TourStep>
 
-                {/* Shooting Accuracy Card */}
-                <View style={[styles.shootingAccuracyCard, { backgroundColor: theme.card }]}>
-                    <View style={styles.sectionTitleRow}>
-                        <Ionicons name="basketball" size={20} color={theme.primary} />
-                        <Text style={[styles.sectionTitle, { color: theme.text }]}>Shooting Accuracy</Text>
+                {/* Shooting Accuracy Card - wrapped with TourStep for onboarding */}
+                <TourStep stepId="shooting-accuracy-card">
+                    <View style={[styles.shootingAccuracyCard, { backgroundColor: theme.card }]}>
+                        <View style={styles.sectionTitleRow}>
+                            <Ionicons name="basketball" size={20} color={theme.primary} />
+                            <Text style={[styles.sectionTitle, { color: theme.text }]}>Shooting Accuracy</Text>
                         {shootingStats?.trend !== 0 && shootingStats?.totalShots > 0 && (
                             <View style={[
                                 styles.trendBadge,
@@ -517,8 +518,10 @@ const ProgressScreen = ({ navigation }) => {
                         )}
                     </View>
                 </View>
+                </TourStep>
 
-                {/* Skill Progress Chart */}
+                {/* Skill Progress Chart - wrapped with TourStep for onboarding */}
+                <TourStep stepId="skill-progress-chart">
                 <View style={[styles.skillChartContainer, { backgroundColor: theme.card }]}>
                     <View style={styles.sectionHeader}>
                         <View style={styles.sectionTitleRow}>
@@ -624,6 +627,7 @@ const ProgressScreen = ({ navigation }) => {
                         style={styles.chart}
                     />
                 </View>
+                </TourStep>
 
                 {/* Category Breakdown */}
                 {Object.keys(categoryBreakdown).length > 0 && (
