@@ -13,10 +13,12 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
+import { useTour } from '../../components/tour';
 import i18n from '../../i18n/i18n';
 import SubscriptionModal from '../../components/shared/SubscriptionModal';
 import { getTheme } from '../../utils/theme';
 import { seedChallenges, checkChallengesExist } from '../../scripts/seedChallenges';
+import { seedDailyChallenges } from '../../scripts/seedDailyChallenges';
 
 const SettingsScreen = ({ navigation }) => {
     const {
@@ -29,16 +31,28 @@ const SettingsScreen = ({ navigation }) => {
         upgradeSubscription
     } = useAppContext();
 
+    const { resetTour, startTour } = useTour();
+
     // Fallback to default theme if context theme is undefined
     const theme = contextTheme || getTheme(isDarkMode || false);
 
     const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
     const [seedingChallenges, setSeedingChallenges] = useState(false);
 
+    const handleStartTour = async () => {
+        // Navigate back to Home first, then start the tour
+        navigation.navigate('Home');
+        // Small delay to allow navigation to complete
+        setTimeout(async () => {
+            await resetTour();
+            startTour();
+        }, 500);
+    };
+
     const handleSeedChallenges = async () => {
         Alert.alert(
             'Seed Challenges',
-            'This will add sample challenges to the database. Continue?',
+            'This will add sample challenges and daily challenge templates to the database. Continue?',
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
@@ -46,19 +60,32 @@ const SettingsScreen = ({ navigation }) => {
                     onPress: async () => {
                         setSeedingChallenges(true);
                         try {
+                            let seededCount = 0;
+                            let messages = [];
+
+                            // Seed multi-day challenges
                             const exists = await checkChallengesExist();
                             if (exists) {
-                                Alert.alert('Info', 'Challenges already exist in the database.');
-                                setSeedingChallenges(false);
-                                return;
+                                messages.push('Multi-day challenges already exist');
+                            } else {
+                                const result = await seedChallenges();
+                                if (result.success) {
+                                    seededCount += result.count;
+                                    messages.push(`${result.count} multi-day challenges seeded`);
+                                }
                             }
 
-                            const result = await seedChallenges();
-                            if (result.success) {
-                                Alert.alert('Success', `Successfully seeded ${result.count} challenges!`);
-                            } else {
-                                Alert.alert('Error', `Failed to seed challenges: ${result.error}`);
+                            // Seed daily challenge templates
+                            try {
+                                const dailyResult = await seedDailyChallenges();
+                                if (dailyResult.success) {
+                                    messages.push(`Daily challenge templates seeded`);
+                                }
+                            } catch (dailyError) {
+                                messages.push(`Daily challenges: ${dailyError.message}`);
                             }
+
+                            Alert.alert('Complete', messages.join('\n'));
                         } catch (error) {
                             Alert.alert('Error', `Failed to seed challenges: ${error.message}`);
                         } finally {
@@ -195,6 +222,14 @@ const SettingsScreen = ({ navigation }) => {
 
                 {/* Support Section */}
                 <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>SUPPORT</Text>
+
+                <SettingRow
+                    icon="map-outline"
+                    title="App Tour"
+                    subtitle="Take a guided tour of the app"
+                    onPress={handleStartTour}
+                    rightComponent={<Ionicons name="chevron-forward" size={20} color={theme.textTertiary} />}
+                />
 
                 <SettingRow
                     icon="help-circle-outline"

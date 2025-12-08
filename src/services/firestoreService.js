@@ -454,16 +454,17 @@ export const getUserShootingStats = async (uid, timeRange = 'all') => {
       if (workout.shootingStats) {
         const shootingData = workout.shootingStats;
         stats.totalShots += shootingData.totalShots || 0;
-        stats.makes += shootingData.makes || 0;
-        stats.misses += shootingData.misses || 0;
+        // Support both field naming conventions (totalMakes/totalMisses and makes/misses)
+        stats.makes += shootingData.totalMakes || shootingData.makes || 0;
+        stats.misses += shootingData.totalMisses || shootingData.misses || 0;
         stats.workoutsWithShooting += 1;
 
         // Check if this workout is from the last week
         if (workout.createdAt) {
           const workoutDate = workout.createdAt.toDate ? workout.createdAt.toDate() : new Date(workout.createdAt);
           if (workoutDate >= weekAgo) {
-            recentStats.makes += shootingData.makes || 0;
-            recentStats.misses += shootingData.misses || 0;
+            recentStats.makes += shootingData.totalMakes || shootingData.makes || 0;
+            recentStats.misses += shootingData.totalMisses || shootingData.misses || 0;
           }
         }
       }

@@ -56,6 +56,9 @@ const convertTemplateToWorkout = (template) => {
             title: step.name,
             instructions: step.instructions.join(' '),
             tips: `Reps: ${step.reps || 'As needed'} | Duration: ${Math.floor(step.duration / 60)} min`,
+            reps: step.reps || 0,
+            duration: step.duration ? Math.floor(step.duration / 60) : 0,
+            category: step.category || template.category.toLowerCase(),
             ...(step.videoReference && { videoReference: step.videoReference })
         })),
         equipment: ['Basketball', 'Court space', 'Water bottle'],
@@ -66,41 +69,11 @@ const convertTemplateToWorkout = (template) => {
 // Load all workout templates and convert them
 const initialWorkouts = getAllWorkoutTemplates().map(convertTemplateToWorkout);
 
-// Sample initial activities
-const initialActivities = [
-    {
-        id: '1',
-        title: 'Shooting Practice',
-        progress: 85,
-        date: 'Today'
-    },
-    {
-        id: '2',
-        title: 'Dribbling Drills',
-        progress: 70,
-        date: 'Yesterday'
-    }
-];
+// Initial activities (empty for new users - will be populated from Firestore)
+const initialActivities = [];
 
-// Sample initial goals
-const initialGoals = [
-    {
-        id: '1',
-        name: 'Improve Free Throw Percentage',
-        current: 65,
-        target: 90,
-        deadline: new Date(Date.now() + 30*24*60*60*1000).toISOString(),
-        startDate: new Date(Date.now() - 7*24*60*60*1000).toISOString()
-    },
-    {
-        id: '2',
-        name: 'Master Crossover Dribble',
-        current: 30,
-        target: 100,
-        deadline: new Date(Date.now() + 14*24*60*60*1000).toISOString(),
-        startDate: new Date(Date.now() - 3*24*60*60*1000).toISOString()
-    }
-];
+// Initial goals (empty for new users - will be populated from Firestore)
+const initialGoals = [];
 
 // Create context
 const AppContext = createContext();
@@ -161,7 +134,7 @@ export const AppProvider = ({ children }) => {
                             getUserActivities(authUser.uid),
                             getUserGoals(authUser.uid),
                             getUserAchievements(authUser.uid),
-                            getDailyChallenge(authUser.uid),
+                            getDailyChallenge(), // No parameter needed - fetches today's challenge
                             getAIAnalysisStats(authUser.uid, 'month'),
                             getWorkoutHistory(authUser.uid, { limitCount: 365 })
                         ]);
@@ -213,13 +186,9 @@ export const AppProvider = ({ children }) => {
                         setDailyChallenge(challenge);
                         setAIAnalysisStats(aiStats);
 
-                        // Check if we should show the challenge modal (only if not completed and not shown today)
+                        // Show the challenge modal on every login unless already completed
                         if (challenge && !challenge.completed) {
-                            const hasSeenToday = await AsyncStorage.getItem(`challenge_seen_${challenge.id}`);
-                            if (!hasSeenToday) {
-                                setShowChallengeModal(true);
-                                await AsyncStorage.setItem(`challenge_seen_${challenge.id}`, 'true');
-                            }
+                            setShowChallengeModal(true);
                         }
                     } catch (error) {
                         console.error('Error loading user data:', error);
@@ -480,6 +449,10 @@ export const AppProvider = ({ children }) => {
         const user = getCurrentUser();
         if (user) {
             try {
+                // Clear the tour flag so the tour starts for first-time users
+                await AsyncStorage.removeItem('hasSeenTour');
+                console.log('AppContext - Cleared hasSeenTour flag for new user');
+
                 // Persist onboarding completion to Firestore
                 await updateUserProfile(user.uid, {
                     onboardingCompleted: true

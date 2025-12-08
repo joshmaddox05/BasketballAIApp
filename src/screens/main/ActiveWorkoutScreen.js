@@ -81,6 +81,9 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
   const [misses, setMisses] = useState(0);
   const [stepShootingStats, setStepShootingStats] = useState([]); // Track stats for each step
 
+  // Workout summary data (populated on completion)
+  const [summaryData, setSummaryData] = useState(null);
+
   // Animation refs
   const progressAnimation = useRef(new Animated.Value(0)).current;
   const pulseAnimation = useRef(new Animated.Value(1)).current;
@@ -349,47 +352,63 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
 
   const completeWorkout = async () => {
     const totalWorkoutTime = Math.floor((Date.now() - startTime) / 1000);
+
+    // Calculate total reps
+    const totalReps = stepPerformance.reduce((sum, step) => sum + (step.repsCompleted || 0), 0);
+
+    // Calculate overall completion percentage
+    const avgCompletion = stepPerformance.length > 0
+      ? stepPerformance.reduce((sum, step) => sum + step.completionPercentage, 0) / stepPerformance.length
+      : 100;
+
+    // Estimate calories (rough estimate: 5 calories per minute)
+    const caloriesEstimate = Math.round((totalWorkoutTime / 60) * 5);
+
+    // Determine workout category - use workout.category if available (custom workouts), otherwise infer from title
+    let category = workout.category || 'general';
+    if (!workout.category) {
+      const title = (workout.title || workout.name || '').toLowerCase();
+      if (title.includes('shooting')) category = 'Shooting';
+      else if (title.includes('dribbling')) category = 'Dribbling';
+      else if (title.includes('physical') || title.includes('conditioning')) category = 'Physical';
+      else if (title.includes('defense')) category = 'Defense';
+      else if (title.includes('passing')) category = 'Passing';
+    }
+
+    // Calculate shooting stats early so we can include in summary
+    const shootingStatsData = stepShootingStats.length > 0 ? {
+      totalMakes: stepShootingStats.reduce((sum, step) => sum + step.makes, 0),
+      totalMisses: stepShootingStats.reduce((sum, step) => sum + step.misses, 0),
+      totalShots: stepShootingStats.reduce((sum, step) => sum + step.totalShots, 0),
+      overallPercentage: 0,
+      stepBreakdown: stepShootingStats
+    } : null;
+
+    if (shootingStatsData) {
+      shootingStatsData.overallPercentage = shootingStatsData.totalShots > 0
+        ? Math.round((shootingStatsData.totalMakes / shootingStatsData.totalShots) * 100)
+        : 0;
+    }
+
+    // Set summary data before showing completion screen
+    setSummaryData({
+      workoutTitle: workout.title || workout.name,
+      category,
+      difficulty: workout.difficulty || workout.level || 'Intermediate',
+      totalTime: totalWorkoutTime,
+      totalReps,
+      stepsCompleted: stepPerformance.length,
+      totalSteps: workout.steps.length,
+      completionPercentage: Math.round(avgCompletion),
+      caloriesEstimate,
+      shootingStats: shootingStatsData,
+      stepPerformance
+    });
+
     setIsCompleted(true);
 
     try {
-      // Calculate total reps
-      const totalReps = stepPerformance.reduce((sum, step) => sum + (step.repsCompleted || 0), 0);
-
-      // Calculate overall completion percentage
-      const avgCompletion = stepPerformance.length > 0
-        ? stepPerformance.reduce((sum, step) => sum + step.completionPercentage, 0) / stepPerformance.length
-        : 100;
-
-      // Estimate calories (rough estimate: 5 calories per minute)
-      const caloriesEstimate = Math.round((totalWorkoutTime / 60) * 5);
-
-      // Determine workout category - use workout.category if available (custom workouts), otherwise infer from title
-      let category = workout.category || 'general';
-      if (!workout.category) {
-        const title = (workout.title || workout.name || '').toLowerCase();
-        if (title.includes('shooting')) category = 'Shooting';
-        else if (title.includes('dribbling')) category = 'Dribbling';
-        else if (title.includes('physical') || title.includes('conditioning')) category = 'Physical';
-        else if (title.includes('defense')) category = 'Defense';
-        else if (title.includes('passing')) category = 'Passing';
-      }
-
-      // Calculate shooting stats if this was a shooting workout
-      const shootingStats = stepShootingStats.length > 0 ? {
-        totalMakes: stepShootingStats.reduce((sum, step) => sum + step.makes, 0),
-        totalMisses: stepShootingStats.reduce((sum, step) => sum + step.misses, 0),
-        totalShots: stepShootingStats.reduce((sum, step) => sum + step.totalShots, 0),
-        overallPercentage: 0,
-        stepBreakdown: stepShootingStats
-      } : null;
-
-      if (shootingStats) {
-        shootingStats.overallPercentage = shootingStats.totalShots > 0
-          ? Math.round((shootingStats.totalMakes / shootingStats.totalShots) * 100)
-          : 0;
-      }
-
-      // Save detailed workout completion to Firestore
+      // Save detailed workout completion to Firestore (using pre-calculated shootingStatsData)
       await addWorkoutCompletion(userData.uid, {
         workoutId: workout.id,
         title: workout.name || workout.title,
@@ -402,7 +421,7 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
         totalReps: totalReps,
         completionPercentage: Math.round(avgCompletion),
         caloriesEstimate: caloriesEstimate,
-        ...(shootingStats && { shootingStats }), // Add shooting stats if available
+        ...(shootingStatsData && { shootingStats: shootingStatsData }), // Add shooting stats if available
         completedAt: new Date()
       });
 
@@ -534,8 +553,8 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
       if (fromCustomPlan && onWorkoutComplete) {
         const performanceData = {
           score: Math.round(avgCompletion),
-          makes: shootingStats?.totalMakes || 0,
-          misses: shootingStats?.totalMisses || 0,
+          makes: shootingStatsData?.totalMakes || 0,
+          misses: shootingStatsData?.totalMisses || 0,
           completionPercentage: Math.round(avgCompletion),
           totalReps,
           duration: totalWorkoutTime
@@ -704,17 +723,138 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
     );
   }
 
-  if (isCompleted) {
+  if (isCompleted && summaryData) {
+    const formatTime = (seconds) => {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
+
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
         <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} />
-        <View style={styles.completedContainer}>
-          <Ionicons name="checkmark-circle" size={100} color={theme.success} />
-          <Text style={[styles.completedTitle, { color: theme.text }]}>Workout Complete!</Text>
-          <Text style={[styles.completedSubtitle, { color: theme.textSecondary }]}>
-            Great job completing {workout.title}
-          </Text>
-        </View>
+        <ScrollView
+          style={styles.summaryScrollView}
+          contentContainerStyle={styles.summaryScrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Success Header */}
+          <View style={styles.summaryHeader}>
+            <View style={[styles.summaryIconContainer, { backgroundColor: theme.success + '20' }]}>
+              <Ionicons name="checkmark-circle" size={64} color={theme.success} />
+            </View>
+            <Text style={[styles.summaryTitle, { color: theme.text }]}>Workout Complete!</Text>
+            <Text style={[styles.summarySubtitle, { color: theme.textSecondary }]}>
+              {summaryData.workoutTitle}
+            </Text>
+          </View>
+
+          {/* Main Stats Grid */}
+          <View style={[styles.summaryStatsCard, { backgroundColor: theme.card }]}>
+            <Text style={[styles.summaryCardTitle, { color: theme.text }]}>Performance Summary</Text>
+            <View style={styles.summaryStatsGrid}>
+              <View style={styles.summaryStatItem}>
+                <Ionicons name="time-outline" size={28} color={theme.primary} />
+                <Text style={[styles.summaryStatValue, { color: theme.text }]}>
+                  {formatTime(summaryData.totalTime)}
+                </Text>
+                <Text style={[styles.summaryStatLabel, { color: theme.textSecondary }]}>Duration</Text>
+              </View>
+              <View style={styles.summaryStatItem}>
+                <Ionicons name="flame-outline" size={28} color={theme.warning || '#FF9500'} />
+                <Text style={[styles.summaryStatValue, { color: theme.text }]}>
+                  {summaryData.caloriesEstimate}
+                </Text>
+                <Text style={[styles.summaryStatLabel, { color: theme.textSecondary }]}>Calories</Text>
+              </View>
+              <View style={styles.summaryStatItem}>
+                <Ionicons name="checkmark-done-outline" size={28} color={theme.success} />
+                <Text style={[styles.summaryStatValue, { color: theme.text }]}>
+                  {summaryData.stepsCompleted}/{summaryData.totalSteps}
+                </Text>
+                <Text style={[styles.summaryStatLabel, { color: theme.textSecondary }]}>Steps</Text>
+              </View>
+              <View style={styles.summaryStatItem}>
+                <Ionicons name="trending-up-outline" size={28} color={theme.info || '#007AFF'} />
+                <Text style={[styles.summaryStatValue, { color: theme.text }]}>
+                  {summaryData.completionPercentage}%
+                </Text>
+                <Text style={[styles.summaryStatLabel, { color: theme.textSecondary }]}>Completion</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Shooting Stats (if available) */}
+          {summaryData.shootingStats && summaryData.shootingStats.totalShots > 0 && (
+            <View style={[styles.summaryStatsCard, { backgroundColor: theme.card }]}>
+              <Text style={[styles.summaryCardTitle, { color: theme.text }]}>Shooting Performance</Text>
+              <View style={styles.shootingSummaryContainer}>
+                <View style={[styles.shootingPercentageCircle, { borderColor: theme.primary }]}>
+                  <Text style={[styles.shootingPercentageText, { color: theme.primary }]}>
+                    {summaryData.shootingStats.overallPercentage}%
+                  </Text>
+                  <Text style={[styles.shootingPercentageLabel, { color: theme.textSecondary }]}>FG%</Text>
+                </View>
+                <View style={styles.shootingBreakdown}>
+                  <View style={styles.shootingBreakdownRow}>
+                    <View style={[styles.shootingDot, { backgroundColor: theme.success }]} />
+                    <Text style={[styles.shootingBreakdownText, { color: theme.text }]}>
+                      Makes: {summaryData.shootingStats.totalMakes}
+                    </Text>
+                  </View>
+                  <View style={styles.shootingBreakdownRow}>
+                    <View style={[styles.shootingDot, { backgroundColor: theme.error }]} />
+                    <Text style={[styles.shootingBreakdownText, { color: theme.text }]}>
+                      Misses: {summaryData.shootingStats.totalMisses}
+                    </Text>
+                  </View>
+                  <View style={styles.shootingBreakdownRow}>
+                    <View style={[styles.shootingDot, { backgroundColor: theme.textSecondary }]} />
+                    <Text style={[styles.shootingBreakdownText, { color: theme.text }]}>
+                      Total: {summaryData.shootingStats.totalShots} shots
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* Workout Details */}
+          <View style={[styles.summaryStatsCard, { backgroundColor: theme.card }]}>
+            <Text style={[styles.summaryCardTitle, { color: theme.text }]}>Workout Details</Text>
+            <View style={styles.summaryDetailRow}>
+              <Text style={[styles.summaryDetailLabel, { color: theme.textSecondary }]}>Category</Text>
+              <Text style={[styles.summaryDetailValue, { color: theme.text }]}>{summaryData.category}</Text>
+            </View>
+            <View style={styles.summaryDetailRow}>
+              <Text style={[styles.summaryDetailLabel, { color: theme.textSecondary }]}>Difficulty</Text>
+              <Text style={[styles.summaryDetailValue, { color: theme.text }]}>{summaryData.difficulty}</Text>
+            </View>
+            {summaryData.totalReps > 0 && (
+              <View style={styles.summaryDetailRow}>
+                <Text style={[styles.summaryDetailLabel, { color: theme.textSecondary }]}>Total Reps</Text>
+                <Text style={[styles.summaryDetailValue, { color: theme.text }]}>{summaryData.totalReps}</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Action Buttons */}
+          <View style={styles.summaryActions}>
+            <TouchableOpacity
+              style={[styles.summaryPrimaryButton, { backgroundColor: theme.primary }]}
+              onPress={() => navigation.navigate('Progress', { screen: 'ProgressMain' })}
+            >
+              <Ionicons name="stats-chart" size={20} color="#FFF" />
+              <Text style={styles.summaryPrimaryButtonText}>View Progress</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.summarySecondaryButton, { borderColor: theme.border }]}
+              onPress={() => navigation.goBack()}
+            >
+              <Text style={[styles.summarySecondaryButtonText, { color: theme.text }]}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -1395,6 +1535,146 @@ const styles = StyleSheet.create({
   completedSubtitle: {
     fontSize: 16,
     textAlign: 'center',
+  },
+  // Workout Summary Styles
+  summaryScrollView: {
+    flex: 1,
+  },
+  summaryScrollContent: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+  summaryHeader: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  summaryIconContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  summaryTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  summarySubtitle: {
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  summaryStatsCard: {
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+  },
+  summaryCardTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 16,
+  },
+  summaryStatsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  summaryStatItem: {
+    width: '48%',
+    alignItems: 'center',
+    paddingVertical: 16,
+    marginBottom: 8,
+  },
+  summaryStatValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  summaryStatLabel: {
+    fontSize: 14,
+  },
+  shootingSummaryContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  shootingPercentageCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 24,
+  },
+  shootingPercentageText: {
+    fontSize: 28,
+    fontWeight: 'bold',
+  },
+  shootingPercentageLabel: {
+    fontSize: 14,
+    marginTop: 2,
+  },
+  shootingBreakdown: {
+    flex: 1,
+  },
+  shootingBreakdownRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  shootingDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 12,
+  },
+  shootingBreakdownText: {
+    fontSize: 16,
+  },
+  summaryDetailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(0,0,0,0.1)',
+  },
+  summaryDetailLabel: {
+    fontSize: 16,
+  },
+  summaryDetailValue: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  summaryActions: {
+    marginTop: 8,
+  },
+  summaryPrimaryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  summaryPrimaryButtonText: {
+    color: '#FFF',
+    fontSize: 17,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  summarySecondaryButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  summarySecondaryButtonText: {
+    fontSize: 17,
+    fontWeight: '500',
   },
 });
 

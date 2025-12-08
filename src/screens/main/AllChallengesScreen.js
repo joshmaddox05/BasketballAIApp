@@ -197,13 +197,13 @@ const AllChallengesScreen = ({ navigation }) => {
 
                     // Load daily challenge
                     const dailyChallengeResult = await getDailyChallenge();
-                    if (dailyChallengeResult.success && dailyChallengeResult.challenge) {
-                        setDailyChallenge(dailyChallengeResult.challenge);
+                    if (dailyChallengeResult) {
+                        setDailyChallenge(dailyChallengeResult);
 
                         // Load user's progress on daily challenge
                         const progressResult = await getDailyChallengeProgress(user.uid);
-                        if (progressResult.success && progressResult.progress) {
-                            setDailyChallengeProgress(progressResult.progress);
+                        if (progressResult) {
+                            setDailyChallengeProgress(progressResult);
                         }
                     }
 
@@ -735,11 +735,10 @@ const AllChallengesScreen = ({ navigation }) => {
         );
     };
 
-    const renderSectionHeader = (title, count, onViewAll = null) => (
+    const renderSectionHeader = (title, onViewAll = null) => (
         <View style={styles.sectionHeader}>
             <View style={styles.sectionHeaderLeft}>
                 <Text style={[styles.sectionTitle, { color: theme.text }]}>{title}</Text>
-                <Text style={[styles.sectionCount, { color: theme.textSecondary }]}>{count}</Text>
             </View>
             {onViewAll && (
                 <TouchableOpacity onPress={onViewAll}>
@@ -885,7 +884,7 @@ const AllChallengesScreen = ({ navigation }) => {
                 {/* Friend Requests Section */}
                 {friendRequests.length > 0 && (
                     <View style={styles.section}>
-                        {renderSectionHeader('Friend Requests', friendRequests.length)}
+                        {renderSectionHeader('Friend Requests')}
                         <FlatList
                             data={friendRequests}
                             renderItem={renderFriendRequestCard}
@@ -950,7 +949,7 @@ const AllChallengesScreen = ({ navigation }) => {
                 {/* Active Challenges */}
                 {activeChallenges.length > 0 && (
                     <View style={styles.section}>
-                        {renderSectionHeader('Your Active Challenges', activeChallenges.length)}
+                        {renderSectionHeader('Your Active Challenges')}
                         {activeChallenges.map(challenge => (
                             <View key={challenge.id}>
                                 {renderChallengeCard({ item: challenge, isActive: true })}
@@ -961,7 +960,7 @@ const AllChallengesScreen = ({ navigation }) => {
 
                 {/* Available Challenges */}
                 <View style={styles.section}>
-                    {renderSectionHeader('Available Challenges', availableChallenges.length)}
+                    {renderSectionHeader('Available Challenges')}
                     {availableChallenges.length > 0 ? (
                         availableChallenges.map(challenge => (
                             <View key={challenge.id}>
@@ -981,7 +980,7 @@ const AllChallengesScreen = ({ navigation }) => {
                 {/* Completed Challenges */}
                 {completedChallenges.length > 0 && (
                     <View style={styles.section}>
-                        {renderSectionHeader('Completed', completedChallenges.length)}
+                        {renderSectionHeader('Completed')}
                         {completedChallenges.map(challenge => (
                             <View key={challenge.id}>
                                 {renderChallengeCard({ item: challenge, isCompleted: true })}

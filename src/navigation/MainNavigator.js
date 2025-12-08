@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { View, Text } from 'react-native';
 import { useAppContext } from '../context/AppContext';
 import FriendRequestModal from '../components/shared/FriendRequestModal';
+import DailyChallengeModal from '../components/shared/DailyChallengeModal';
 import { listenToFriendRequests } from '../services/firestoreService';
 import { TourProvider, TourOverlay, useTour } from '../components/tour';
 import { navigationRef } from './AppNavigator';
@@ -26,6 +27,7 @@ import AllActivitiesScreen from "../screens/main/AllActivitiesScreen";
 import ChallengeDetailScreen from "../screens/main/ChallengeDetailScreen";
 import ActivityDetailScreen from "../screens/main/ActivityDetailScreen";
 import AllChallengesScreen from "../screens/main/AllChallengesScreen";
+import DailyChallengeDetailScreen from "../screens/main/DailyChallengeDetailScreen";
 
 // For nested navigation within tabs
 const HomeStack = createStackNavigator();
@@ -90,6 +92,7 @@ function ChallengesStackNavigator() {
         <ChallengesStack.Navigator screenOptions={{ headerShown: false }}>
             <ChallengesStack.Screen name="ChallengesMain" component={AllChallengesScreen} />
             <ChallengesStack.Screen name="ChallengeDetail" component={ChallengeDetailScreen} options={{ headerShown: false }} />
+            <ChallengesStack.Screen name="DailyChallengeDetail" component={DailyChallengeDetailScreen} options={{ headerShown: false }} />
 
             {/* Add shared screens to Challenges stack */}
             {addSharedScreensToStack(ChallengesStack)}
@@ -183,14 +186,16 @@ const TabBarIcon = ({ route, focused, color, size }) => {
 
 // Inner component that uses tour context
 function MainNavigatorContent() {
-    const { theme, user } = useAppContext();
+    const { theme, user, dailyChallenge, showChallengeModal, dismissChallengeModal } = useAppContext();
     const { hasSeenTour, isLoading: isTourLoading, startTour, handleTabChange } = useTour();
     const [showFriendRequestModal, setShowFriendRequestModal] = useState(false);
     const [hasShownModal, setHasShownModal] = useState(false);
 
     // Auto-start tour for new users who haven't seen it yet
     useEffect(() => {
+        console.log('MainNavigator - Tour check:', { isTourLoading, hasSeenTour, hasUser: !!user?.uid });
         if (!isTourLoading && !hasSeenTour && user?.uid) {
+            console.log('MainNavigator - Starting tour for new user');
             // Delay slightly to ensure UI is fully rendered
             const timer = setTimeout(() => {
                 startTour();
@@ -256,6 +261,14 @@ function MainNavigatorContent() {
         <FriendRequestModal
             visible={showFriendRequestModal}
             onClose={() => setShowFriendRequestModal(false)}
+        />
+
+        {/* Daily Challenge Modal - shows on login if there's a daily challenge */}
+        <DailyChallengeModal
+            visible={showChallengeModal}
+            challenge={dailyChallenge}
+            onDismiss={dismissChallengeModal}
+            theme={theme}
         />
 
         {/* Tour Overlay - renders above everything when tour is active */}

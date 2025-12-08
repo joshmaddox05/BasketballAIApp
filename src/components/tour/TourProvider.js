@@ -25,7 +25,10 @@ export const TourProvider = ({ children, navigationRef }) => {
         const loadTourPreference = async () => {
             try {
                 const storedValue = await AsyncStorage.getItem(TOUR_STORAGE_KEY);
-                setHasSeenTour(storedValue === 'true');
+                console.log('TourProvider - Loaded hasSeenTour from storage:', storedValue);
+                const hasSeen = storedValue === 'true';
+                console.log('TourProvider - Setting hasSeenTour to:', hasSeen);
+                setHasSeenTour(hasSeen);
             } catch (error) {
                 console.error('Error loading tour preference:', error);
                 setHasSeenTour(false);
