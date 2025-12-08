@@ -27,7 +27,7 @@ const workoutThumbnails = {
 
 const TrainingCategoryScreen = ({ route, navigation }) => {
     const { category } = route.params;
-    const { workouts, loading, userData } = useAppContext();
+    const { workouts, loading, userData, theme, isDarkMode } = useAppContext();
     const [filteredWorkouts, setFilteredWorkouts] = useState([]);
 
     const userSubscription = userData?.subscription || SUBSCRIPTION_TIERS.FREE;
@@ -140,7 +140,7 @@ const TrainingCategoryScreen = ({ route, navigation }) => {
 
         return (
             <TouchableOpacity
-                style={[styles.workoutCard, isLocked && styles.lockedWorkoutCard]}
+                style={[styles.workoutCard, { backgroundColor: theme.card }, isLocked && styles.lockedWorkoutCard]}
                 onPress={() => isLocked
                     ? navigation.navigate('Profile', { screen: 'Settings', params: { openSubscription: true }, initial: false })
                     : navigation.navigate('WorkoutDetail', { workoutId: item.id })
@@ -164,8 +164,8 @@ const TrainingCategoryScreen = ({ route, navigation }) => {
                             resizeMode="cover"
                         />
                     ) : (
-                        <View style={[styles.workoutImage, styles.workoutImagePlaceholder]}>
-                            <Ionicons name={getCategoryIcon()} size={48} color="#CCC" />
+                        <View style={[styles.workoutImage, styles.workoutImagePlaceholder, { backgroundColor: theme.backgroundSecondary }]}>
+                            <Ionicons name={getCategoryIcon()} size={48} color={theme.textTertiary} />
                         </View>
                     )}
                     {/* Level badge overlay */}
@@ -183,9 +183,9 @@ const TrainingCategoryScreen = ({ route, navigation }) => {
 
                 {/* Content section */}
                 <View style={styles.workoutContent}>
-                    <Text style={styles.workoutTitle}>{item.title}</Text>
+                    <Text style={[styles.workoutTitle, { color: theme.text }]}>{item.title}</Text>
                     {item.description && (
-                        <Text style={styles.workoutDescription} numberOfLines={2}>
+                        <Text style={[styles.workoutDescription, { color: theme.textSecondary }]} numberOfLines={2}>
                             {item.description}
                         </Text>
                     )}
@@ -193,8 +193,8 @@ const TrainingCategoryScreen = ({ route, navigation }) => {
                     {/* Footer with duration and action button */}
                     <View style={styles.workoutFooter}>
                         <View style={styles.workoutDuration}>
-                            <Ionicons name="time-outline" size={16} color="#666" />
-                            <Text style={styles.workoutDurationText}>{item.duration}</Text>
+                            <Ionicons name="time-outline" size={16} color={theme.textSecondary} />
+                            <Text style={[styles.workoutDurationText, { color: theme.textSecondary }]}>{item.duration}</Text>
                         </View>
                         {isLocked ? (
                             <TouchableOpacity
@@ -221,39 +221,39 @@ const TrainingCategoryScreen = ({ route, navigation }) => {
 
     if (loading) {
         return (
-            <View style={styles.loadingContainer}>
+            <View style={[styles.loadingContainer, { backgroundColor: theme.background }]}>
                 <ActivityIndicator size="large" color={getCategoryColor()} />
             </View>
         );
     }
 
     return (
-        <SafeAreaView style={styles.safeArea}>
-            <StatusBar barStyle="dark-content" backgroundColor="#F8F9FA" />
-            
-            <View style={styles.header}>
+        <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+            <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={theme.background} />
+
+            <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
                 <TouchableOpacity
                     style={styles.backButton}
                     onPress={() => navigation.goBack()}
                 >
-                    <Ionicons name="arrow-back" size={24} color="#333" />
+                    <Ionicons name="arrow-back" size={24} color={theme.text} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>{category} Training</Text>
+                <Text style={[styles.headerTitle, { color: theme.text }]}>{category} Training</Text>
                 <TouchableOpacity
-                    style={styles.filterButton}
+                    style={[styles.filterButton, { backgroundColor: theme.backgroundTertiary }]}
                     onPress={() => navigation.navigate('TrainingFilters', { category })}
                 >
-                    <Ionicons name="options-outline" size={22} color="#666" />
+                    <Ionicons name="options-outline" size={22} color={theme.textSecondary} />
                 </TouchableOpacity>
             </View>
 
-            <View style={styles.categoryHeader}>
+            <View style={[styles.categoryHeader, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
                 <View style={[styles.categoryIcon, { backgroundColor: `${getCategoryColor()}20` }]}>
                     <Ionicons name={getCategoryIcon()} size={32} color={getCategoryColor()} />
                 </View>
                 <View style={styles.categoryInfo}>
-                    <Text style={styles.categoryTitle}>{category} Training</Text>
-                    <Text style={styles.workoutCount}>
+                    <Text style={[styles.categoryTitle, { color: theme.text }]}>{category} Training</Text>
+                    <Text style={[styles.workoutCount, { color: theme.textSecondary }]}>
                         {filteredWorkouts.length} {filteredWorkouts.length === 1 ? 'workout' : 'workouts'} available
                     </Text>
                 </View>
@@ -268,14 +268,14 @@ const TrainingCategoryScreen = ({ route, navigation }) => {
                 />
             ) : (
                 <View style={styles.emptyState}>
-                    <Ionicons name={getCategoryIcon()} size={60} color="#CCC" />
-                    <Text style={styles.emptyStateTitle}>No Workouts Available</Text>
-                    <Text style={styles.emptyStateDescription}>
-                        There are currently no {category.toLowerCase()} workouts available. 
+                    <Ionicons name={getCategoryIcon()} size={60} color={theme.textTertiary} />
+                    <Text style={[styles.emptyStateTitle, { color: theme.text }]}>No Workouts Available</Text>
+                    <Text style={[styles.emptyStateDescription, { color: theme.textSecondary }]}>
+                        There are currently no {category.toLowerCase()} workouts available.
                         Check back later or explore other categories.
                     </Text>
                     <TouchableOpacity
-                        style={styles.exploreButton}
+                        style={[styles.exploreButton, { backgroundColor: theme.primary }]}
                         onPress={() => navigation.goBack()}
                     >
                         <Text style={styles.exploreButtonText}>Explore Categories</Text>
@@ -289,13 +289,11 @@ const TrainingCategoryScreen = ({ route, navigation }) => {
 const styles = StyleSheet.create({
     safeArea: {
         flex: 1,
-        backgroundColor: '#F8F9FA',
     },
     loadingContainer: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#F8F9FA',
     },
     header: {
         flexDirection: 'row',
@@ -303,9 +301,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: 16,
         paddingVertical: 12,
-        backgroundColor: '#FFF',
         borderBottomWidth: 1,
-        borderBottomColor: '#EEE',
     },
     backButton: {
         width: 40,
@@ -317,13 +313,11 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: '#333',
     },
     filterButton: {
         width: 40,
         height: 40,
         borderRadius: 20,
-        backgroundColor: '#F0F0F0',
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -331,9 +325,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         padding: 16,
-        backgroundColor: '#FFF',
         borderBottomWidth: 1,
-        borderBottomColor: '#EEE',
     },
     categoryIcon: {
         width: 60,
@@ -349,18 +341,15 @@ const styles = StyleSheet.create({
     categoryTitle: {
         fontSize: 20,
         fontWeight: 'bold',
-        color: '#333',
         marginBottom: 4,
     },
     workoutCount: {
         fontSize: 14,
-        color: '#666',
     },
     workoutsList: {
         padding: 16,
     },
     workoutCard: {
-        backgroundColor: '#FFF',
         borderRadius: 16,
         marginBottom: 16,
         overflow: 'hidden',
@@ -413,7 +402,6 @@ const styles = StyleSheet.create({
         width: '100%',
         height: 160,
         position: 'relative',
-        backgroundColor: '#F5F5F5',
     },
     workoutImage: {
         width: '100%',
@@ -422,7 +410,6 @@ const styles = StyleSheet.create({
     workoutImagePlaceholder: {
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#F0F0F0',
     },
     levelBadge: {
         position: 'absolute',
@@ -460,12 +447,10 @@ const styles = StyleSheet.create({
     workoutTitle: {
         fontSize: 18,
         fontWeight: '700',
-        color: '#333',
         marginBottom: 8,
     },
     workoutDescription: {
         fontSize: 14,
-        color: '#666',
         lineHeight: 20,
         marginBottom: 16,
     },
@@ -481,7 +466,6 @@ const styles = StyleSheet.create({
     workoutDurationText: {
         marginLeft: 6,
         fontSize: 14,
-        color: '#666',
     },
     startButton: {
         flexDirection: 'row',
@@ -505,18 +489,15 @@ const styles = StyleSheet.create({
     emptyStateTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: '#333',
         marginTop: 16,
         marginBottom: 8,
     },
     emptyStateDescription: {
         fontSize: 14,
-        color: '#666',
         textAlign: 'center',
         marginBottom: 24,
     },
     exploreButton: {
-        backgroundColor: '#FF6B00',
         paddingHorizontal: 24,
         paddingVertical: 12,
         borderRadius: 8,

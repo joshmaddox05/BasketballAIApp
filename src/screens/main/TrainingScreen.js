@@ -23,6 +23,7 @@ import SubscriptionModal from '../../components/shared/SubscriptionModal';
 import { getActiveCustomPlan, getCustomPlans } from '../../services/firestoreService';
 import { auth } from '../../config/firebaseConfig';
 import { LinearGradient } from 'expo-linear-gradient';
+import { TourStep } from '../../components/tour';
 
 // Import thumbnail images for workouts
 const shootingThumbnail = require('../../../assets/shooting-thumbnail.jpg');
@@ -162,7 +163,6 @@ const TrainingScreen = ({ navigation }) => {
 
         const handleWorkoutPress = () => {
             if (isLocked) {
-                // Show subscription modal
                 setShowSubscriptionModal(true);
             } else {
                 navigation.navigate('WorkoutDetail', { workoutId: item.id });
@@ -298,34 +298,36 @@ const TrainingScreen = ({ navigation }) => {
 
                 <ScrollView showsVerticalScrollIndicator={false}>
                     {/* Build Your Workout Card */}
-                    <TouchableOpacity
-                        style={styles.buildWorkoutCard}
-                        onPress={() => navigation.navigate('BuildWorkout')}
-                        activeOpacity={0.9}
-                    >
-                        <LinearGradient
-                            colors={['#FF6B00', '#FF8C33']}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                            style={styles.buildWorkoutGradient}
+                    <TourStep stepId="build-workout-card">
+                        <TouchableOpacity
+                            style={styles.buildWorkoutCard}
+                            onPress={() => navigation.navigate('BuildWorkout')}
+                            activeOpacity={0.9}
                         >
-                            <View style={styles.buildWorkoutContent}>
-                                <View style={styles.buildWorkoutLeft}>
-                                    <Text style={styles.buildWorkoutTitle}>Build Your Workout</Text>
-                                    <Text style={styles.buildWorkoutSubtitle}>
-                                        Create a personalized training plan for today, this week, or this month
-                                    </Text>
-                                    <View style={styles.buildWorkoutButton}>
-                                        <Text style={styles.buildWorkoutButtonText}>Get Started</Text>
-                                        <Ionicons name="arrow-forward" size={16} color="#FF6B00" />
+                            <LinearGradient
+                                colors={['#FF6B00', '#FF8C33']}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={styles.buildWorkoutGradient}
+                            >
+                                <View style={styles.buildWorkoutContent}>
+                                    <View style={styles.buildWorkoutLeft}>
+                                        <Text style={styles.buildWorkoutTitle}>Build Your Workout</Text>
+                                        <Text style={styles.buildWorkoutSubtitle}>
+                                            Create a personalized training plan for today, this week, or this month
+                                        </Text>
+                                        <View style={styles.buildWorkoutButton}>
+                                            <Text style={styles.buildWorkoutButtonText}>Get Started</Text>
+                                            <Ionicons name="arrow-forward" size={16} color="#FF6B00" />
+                                        </View>
+                                    </View>
+                                    <View style={styles.buildWorkoutIcon}>
+                                        <Ionicons name="create-outline" size={48} color="rgba(255,255,255,0.9)" />
                                     </View>
                                 </View>
-                                <View style={styles.buildWorkoutIcon}>
-                                    <Ionicons name="create-outline" size={48} color="rgba(255,255,255,0.9)" />
-                                </View>
-                            </View>
-                        </LinearGradient>
-                    </TouchableOpacity>
+                            </LinearGradient>
+                        </TouchableOpacity>
+                    </TourStep>
 
                     {/* Active Plan Card */}
                     {activePlan && (
@@ -372,27 +374,29 @@ const TrainingScreen = ({ navigation }) => {
                     </View>
 
                     {/* AI-Powered Analysis Feature */}
-                    <View style={styles.analysisSection}>
-                        <View style={[styles.analysisCard, { backgroundColor: theme.primary }]}>
-                            <View style={styles.analysisContent}>
-                                <Text style={styles.analysisTitle}>AI Shooting Analysis</Text>
-                                <Text style={styles.analysisDescription}>
-                                    Get personalized feedback on your shooting form with our AI-powered analysis
-                                </Text>
-                                <TouchableOpacity
-                                    style={styles.analysisButton}
-                                    onPress={() => navigation.navigate('ShootingAnalysis')}
-                                >
-                                    <Text style={[styles.analysisButtonText, { color: theme.primary }]}>Analyze Your Shot</Text>
-                                </TouchableOpacity>
-                            </View>
-                            <View style={styles.analysisImageContainer}>
-                                <View style={styles.analysisImage}>
-                                    <Ionicons name="analytics" size={40} color="#FFF" />
+                    <TourStep stepId="ai-analysis-card">
+                        <View style={styles.analysisSection}>
+                            <View style={[styles.analysisCard, { backgroundColor: theme.primary }]}>
+                                <View style={styles.analysisContent}>
+                                    <Text style={styles.analysisTitle}>AI Shooting Analysis</Text>
+                                    <Text style={styles.analysisDescription}>
+                                        Get personalized feedback on your shooting form with our AI-powered analysis
+                                    </Text>
+                                    <TouchableOpacity
+                                        style={styles.analysisButton}
+                                        onPress={() => navigation.navigate('ShootingAnalysis')}
+                                    >
+                                        <Text style={[styles.analysisButtonText, { color: theme.primary }]}>Analyze Your Shot</Text>
+                                    </TouchableOpacity>
+                                </View>
+                                <View style={styles.analysisImageContainer}>
+                                    <View style={styles.analysisImage}>
+                                        <Ionicons name="analytics" size={40} color="#FFF" />
+                                    </View>
                                 </View>
                             </View>
                         </View>
-                    </View>
+                    </TourStep>
 
                     {/* Recommended for You */}
                     <View style={styles.recommendedSection}>
@@ -534,17 +538,14 @@ const TrainingScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
     safeArea: {
         flex: 1,
-        backgroundColor: '#F8F9FA',
     },
     loadingContainer: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#F8F9FA',
     },
     container: {
         flex: 1,
-        backgroundColor: '#F8F9FA',
         padding: 16,
     },
     header: {
@@ -556,7 +557,6 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 24,
         fontWeight: 'bold',
-        color: '#333',
         flex: 1,
     },
     headerActions: {
@@ -567,7 +567,6 @@ const styles = StyleSheet.create({
         width: 40,
         height: 40,
         borderRadius: 20,
-        backgroundColor: '#FF6B0015',
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -575,17 +574,16 @@ const styles = StyleSheet.create({
         width: 40,
         height: 40,
         borderRadius: 20,
-        backgroundColor: '#F0F0F0',
         justifyContent: 'center',
         alignItems: 'center',
     },
     searchContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#F0F0F0',
         borderRadius: 12,
         paddingHorizontal: 12,
         marginBottom: 24,
+        borderWidth: 1,
     },
     searchIcon: {
         marginRight: 8,
@@ -594,7 +592,6 @@ const styles = StyleSheet.create({
         flex: 1,
         height: 44,
         fontSize: 16,
-        color: '#333',
     },
     categoriesSection: {
         marginBottom: 24,
@@ -602,7 +599,6 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: '#333',
         marginBottom: 16,
     },
     sectionTitleRow: {
@@ -613,7 +609,6 @@ const styles = StyleSheet.create({
     },
     seeAllText: {
         fontSize: 14,
-        color: '#FF6B00',
         fontWeight: '500',
     },
     categoriesList: {
@@ -659,7 +654,6 @@ const styles = StyleSheet.create({
         marginBottom: 24,
     },
     analysisCard: {
-        backgroundColor: '#FF6B00',
         borderRadius: 12,
         padding: 16,
         flexDirection: 'row',
@@ -693,7 +687,6 @@ const styles = StyleSheet.create({
         alignSelf: 'flex-start',
     },
     analysisButtonText: {
-        color: '#FF6B00',
         fontWeight: 'bold',
     },
     analysisImageContainer: {
@@ -713,7 +706,6 @@ const styles = StyleSheet.create({
         marginBottom: 24,
     },
     workoutItem: {
-        backgroundColor: '#FFF',
         borderRadius: 12,
         padding: 12,
         marginBottom: 12,
@@ -744,7 +736,6 @@ const styles = StyleSheet.create({
     workoutTitle: {
         fontSize: 16,
         fontWeight: '600',
-        color: '#333',
         marginBottom: 6,
     },
     workoutMeta: {
@@ -753,7 +744,6 @@ const styles = StyleSheet.create({
     },
     workoutLevel: {
         fontSize: 14,
-        color: '#FF6B00',
         marginRight: 12,
     },
     workoutDuration: {
@@ -762,7 +752,6 @@ const styles = StyleSheet.create({
     },
     workoutDurationText: {
         fontSize: 14,
-        color: '#666',
         marginLeft: 4,
     },
     startButton: {
@@ -811,7 +800,6 @@ const styles = StyleSheet.create({
         backgroundColor: '#9C27B0',
     },
     emptyStateContainer: {
-        backgroundColor: '#FFF',
         borderRadius: 12,
         padding: 20,
         alignItems: 'center',
@@ -819,14 +807,12 @@ const styles = StyleSheet.create({
     },
     emptyStateText: {
         fontSize: 14,
-        color: '#666',
         textAlign: 'center',
     },
     challengeSection: {
         marginBottom: 24,
     },
     challengeCard: {
-        backgroundColor: '#FFF',
         borderRadius: 12,
         padding: 16,
         shadowColor: '#000',
@@ -838,12 +824,10 @@ const styles = StyleSheet.create({
     challengeTitle: {
         fontSize: 16,
         fontWeight: 'bold',
-        color: '#333',
         marginBottom: 8,
     },
     challengeDescription: {
         fontSize: 14,
-        color: '#666',
         marginBottom: 16,
         lineHeight: 20,
     },
@@ -855,25 +839,21 @@ const styles = StyleSheet.create({
     },
     challengeWorkoutBorder: {
         borderBottomWidth: 1,
-        borderBottomColor: '#F0F0F0',
     },
     challengeWorkoutTitle: {
         fontSize: 15,
-        color: '#333',
         fontWeight: '500',
     },
     trainingProgramsSection: {
         marginBottom: 24,
     },
     viewMoreButton: {
-        backgroundColor: '#F0F0F0',
         borderRadius: 8,
         padding: 12,
         alignItems: 'center',
         marginTop: 8,
     },
     viewMoreText: {
-        color: '#666',
         fontWeight: '600',
     },
     
@@ -896,11 +876,9 @@ const styles = StyleSheet.create({
     },
     loadingVideoText: {
         marginLeft: 8,
-        color: '#666',
         fontSize: 14,
     },
     retryButton: {
-        backgroundColor: '#FF6B00',
         paddingHorizontal: 16,
         paddingVertical: 8,
         borderRadius: 6,
@@ -971,12 +949,10 @@ const styles = StyleSheet.create({
     },
     // Active Plan Card Styles
     activePlanCard: {
-        backgroundColor: '#1A1A1A',
         borderRadius: 14,
         padding: 16,
         marginBottom: 20,
         borderWidth: 1,
-        borderColor: '#2A2A2A',
     },
     activePlanHeader: {
         flexDirection: 'row',
@@ -987,13 +963,11 @@ const styles = StyleSheet.create({
     activePlanBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(255,215,0,0.15)',
         paddingHorizontal: 10,
         paddingVertical: 4,
         borderRadius: 12,
     },
     activePlanBadgeText: {
-        color: '#FFD700',
         fontSize: 12,
         fontWeight: '600',
         marginLeft: 4,
@@ -1010,18 +984,15 @@ const styles = StyleSheet.create({
     activePlanProgressBar: {
         flex: 1,
         height: 6,
-        backgroundColor: '#2A2A2A',
         borderRadius: 3,
         marginRight: 12,
         overflow: 'hidden',
     },
     activePlanProgressFill: {
         height: '100%',
-        backgroundColor: '#FF6B00',
         borderRadius: 3,
     },
     activePlanProgressText: {
-        color: '#888888',
         fontSize: 13,
         fontWeight: '500',
     },

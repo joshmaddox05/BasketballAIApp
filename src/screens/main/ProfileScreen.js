@@ -16,6 +16,7 @@ import { useAppContext } from '../../context/AppContext';
 import SubscriptionModal from '../../components/shared/SubscriptionModal';
 import { getTheme } from '../../utils/theme';
 import i18n from '../../i18n/i18n';
+import { useTour } from '../../components/tour';
 
 const ProfileScreen = ({ navigation }) => {
     const {
@@ -28,6 +29,8 @@ const ProfileScreen = ({ navigation }) => {
         theme: contextTheme,
         upgradeSubscription
     } = useAppContext();
+
+    const { startTour, resetTour } = useTour();
 
     // Fallback theme
     const theme = contextTheme || getTheme(isDarkMode || false);
@@ -224,6 +227,35 @@ const ProfileScreen = ({ navigation }) => {
                         <View style={styles.settingLeft}>
                             <Ionicons name="help-circle-outline" size={24} color={theme.textSecondary} />
                             <Text style={[styles.settingLabel, { color: theme.text }]}>Help & Support</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[styles.settingItem, { borderBottomColor: theme.border }]}
+                        onPress={() => {
+                            Alert.alert(
+                                'Take a Tour',
+                                'Would you like to take the app tour again?',
+                                [
+                                    { text: 'Cancel', style: 'cancel' },
+                                    {
+                                        text: 'Start Tour',
+                                        onPress: async () => {
+                                            await resetTour();
+                                            navigation.navigate('Home');
+                                            setTimeout(() => {
+                                                startTour();
+                                            }, 500);
+                                        }
+                                    }
+                                ]
+                            );
+                        }}
+                    >
+                        <View style={styles.settingLeft}>
+                            <Ionicons name="compass-outline" size={24} color={theme.textSecondary} />
+                            <Text style={[styles.settingLabel, { color: theme.text }]}>Take a Tour</Text>
                         </View>
                         <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
                     </TouchableOpacity>
