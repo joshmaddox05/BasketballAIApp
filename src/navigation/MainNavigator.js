@@ -7,6 +7,8 @@ import { View, Text } from 'react-native';
 import { useAppContext } from '../context/AppContext';
 import FriendRequestModal from '../components/shared/FriendRequestModal';
 import { listenToFriendRequests } from '../services/firestoreService';
+import { TourProvider, TourOverlay, useTour } from '../components/tour';
+import { navigationRef } from './AppNavigator';
 
 // Import your main app screens
 import HomeScreen from '../screens/main/HomeScreen';
@@ -119,10 +121,93 @@ function ProfileStackNavigator() {
 // Create the tab navigator
 const Tab = createBottomTabNavigator();
 
-export default function MainNavigator() {
+// Map route names to tour step IDs for tab icons
+const TAB_TO_TOUR_STEP = {
+    'Training': 'training-tab',
+    'Challenges': 'challenges-tab',
+    'Progress': 'progress-tab',
+};
+
+// Tab bar icon component with TourStep registration for tour-highlighted tabs
+const TabBarIcon = ({ route, focused, color, size }) => {
+    const { registerTarget, unregisterTarget, isTourActive, currentStep, measureTarget } = useTour();
+    const ref = React.useRef(null);
+    const stepId = TAB_TO_TOUR_STEP[route.name];
+
+    // Register this tab as a tour target if it has a step ID
+    React.useEffect(() => {
+        if (stepId) {
+            registerTarget(stepId, ref);
+        }
+        return () => {
+            if (stepId) {
+                unregisterTarget(stepId);
+            }
+        };
+    }, [stepId, registerTarget, unregisterTarget]);
+
+    // Re-measure when this step becomes active
+    React.useEffect(() => {
+        if (isTourActive && currentStep?.id === stepId) {
+            const timer = setTimeout(() => {
+                measureTarget(stepId);
+            }, 100);
+            return () => clearTimeout(timer);
+        }
+    }, [isTourActive, currentStep, stepId, measureTarget]);
+
+    let iconName;
+    if (route.name === 'Home') {
+        iconName = focused ? 'home' : 'home-outline';
+    } else if (route.name === 'Training') {
+        iconName = focused ? 'basketball' : 'basketball-outline';
+    } else if (route.name === 'Challenges') {
+        iconName = focused ? 'trophy' : 'trophy-outline';
+    } else if (route.name === 'Progress') {
+        iconName = focused ? 'stats-chart' : 'stats-chart-outline';
+    } else if (route.name === 'Profile') {
+        iconName = focused ? 'person' : 'person-outline';
+    }
+
+    // Wrap tabs that are part of the tour
+    if (stepId) {
+        return (
+            <View ref={ref} collapsable={false}>
+                <Ionicons name={iconName} size={size} color={color} />
+            </View>
+        );
+    }
+
+    return <Ionicons name={iconName} size={size} color={color} />;
+};
+
+// Inner component that uses tour context
+function MainNavigatorContent() {
     const { theme, user } = useAppContext();
+    const { hasSeenTour, isLoading: isTourLoading, startTour, handleTabChange } = useTour();
     const [showFriendRequestModal, setShowFriendRequestModal] = useState(false);
     const [hasShownModal, setHasShownModal] = useState(false);
+
+    // Auto-start tour for new users who haven't seen it yet
+    useEffect(() => {
+        if (!isTourLoading && !hasSeenTour && user?.uid) {
+            // Delay slightly to ensure UI is fully rendered
+            const timer = setTimeout(() => {
+                startTour();
+            }, 1000);
+            return () => clearTimeout(timer);
+        }
+    }, [isTourLoading, hasSeenTour, user?.uid, startTour]);
+
+    // Handle tab change events to notify tour
+    const onTabChange = (state) => {
+        if (state?.routes && state.index !== undefined) {
+            const currentRoute = state.routes[state.index];
+            if (currentRoute?.name) {
+                handleTabChange(currentRoute.name);
+            }
+        }
+    };
 
     // Listen for friend requests and show modal on login
     useEffect(() => {
@@ -143,23 +228,9 @@ export default function MainNavigator() {
         <>
         <Tab.Navigator
             screenOptions={({ route }) => ({
-                tabBarIcon: ({ focused, color, size }) => {
-                    let iconName;
-
-                    if (route.name === 'Home') {
-                        iconName = focused ? 'home' : 'home-outline';
-                    } else if (route.name === 'Training') {
-                        iconName = focused ? 'basketball' : 'basketball-outline';
-                    } else if (route.name === 'Challenges') {
-                        iconName = focused ? 'trophy' : 'trophy-outline';
-                    } else if (route.name === 'Progress') {
-                        iconName = focused ? 'stats-chart' : 'stats-chart-outline';
-                    } else if (route.name === 'Profile') {
-                        iconName = focused ? 'person' : 'person-outline';
-                    }
-
-                    return <Ionicons name={iconName} size={size} color={color} />;
-                },
+                tabBarIcon: ({ focused, color, size }) => (
+                    <TabBarIcon route={route} focused={focused} color={color} size={size} />
+                ),
                 tabBarActiveTintColor: theme.tabActive,
                 tabBarInactiveTintColor: theme.tabInactive,
                 headerShown: false,
@@ -170,6 +241,9 @@ export default function MainNavigator() {
                     paddingTop: 5
                 }
             })}
+            screenListeners={{
+                state: (e) => onTabChange(e.data.state),
+            }}
         >
             <Tab.Screen name="Home" component={HomeStackNavigator} />
             <Tab.Screen name="Training" component={TrainingStackNavigator} />
@@ -183,7 +257,18 @@ export default function MainNavigator() {
             visible={showFriendRequestModal}
             onClose={() => setShowFriendRequestModal(false)}
         />
+
+        {/* Tour Overlay - renders above everything when tour is active */}
+        <TourOverlay theme={theme} />
         </>
+    );
+}
+
+export default function MainNavigator() {
+    return (
+        <TourProvider navigationRef={navigationRef}>
+            <MainNavigatorContent />
+        </TourProvider>
     );
 }
 

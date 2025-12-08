@@ -131,15 +131,15 @@ const SignupScreen = ({ navigation }) => {
 
     return (
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-            <SafeAreaView style={styles.container}>
-                <StatusBar barStyle="dark-content" backgroundColor="#FFF" />
+            <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+                <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={theme.background} />
 
                 <View style={styles.header}>
                     <TouchableOpacity
                         style={styles.backButton}
                         onPress={() => navigation.goBack()}
                     >
-                        <Ionicons name="arrow-back" size={24} color="#333" />
+                        <Ionicons name="arrow-back" size={24} color={theme.text} />
                     </TouchableOpacity>
                 </View>
 
@@ -149,26 +149,28 @@ const SignupScreen = ({ navigation }) => {
                 >
                     <ScrollView style={styles.content}>
                         <View style={styles.titleContainer}>
-                            <Text style={styles.title}>Create an account</Text>
-                            <Text style={styles.subtitle}>Start your basketball journey today</Text>
+                            <Text style={[styles.title, { color: theme.text }]}>Create an account</Text>
+                            <Text style={[styles.subtitle, { color: theme.textSecondary }]}>Start your basketball journey today</Text>
                         </View>
 
                         <View style={styles.form}>
-                            <View style={styles.inputContainer}>
-                                <Ionicons name="person-outline" size={20} color="#999" style={styles.inputIcon} />
+                            <View style={[styles.inputContainer, { backgroundColor: theme.input }]}>
+                                <Ionicons name="person-outline" size={20} color={theme.textSecondary} style={styles.inputIcon} />
                                 <TextInput
-                                    style={styles.input}
+                                    style={[styles.input, { color: theme.text }]}
                                     placeholder="Full Name"
+                                    placeholderTextColor={theme.inputPlaceholder}
                                     value={name}
                                     onChangeText={setName}
                                 />
                             </View>
 
-                            <View style={styles.inputContainer}>
-                                <Ionicons name="mail-outline" size={20} color="#999" style={styles.inputIcon} />
+                            <View style={[styles.inputContainer, { backgroundColor: theme.input }]}>
+                                <Ionicons name="mail-outline" size={20} color={theme.textSecondary} style={styles.inputIcon} />
                                 <TextInput
-                                    style={styles.input}
+                                    style={[styles.input, { color: theme.text }]}
                                     placeholder="Email"
+                                    placeholderTextColor={theme.inputPlaceholder}
                                     value={email}
                                     onChangeText={setEmail}
                                     autoCapitalize="none"
@@ -176,11 +178,12 @@ const SignupScreen = ({ navigation }) => {
                                 />
                             </View>
 
-                            <View style={styles.inputContainer}>
-                                <Ionicons name="lock-closed-outline" size={20} color="#999" style={styles.inputIcon} />
+                            <View style={[styles.inputContainer, { backgroundColor: theme.input }]}>
+                                <Ionicons name="lock-closed-outline" size={20} color={theme.textSecondary} style={styles.inputIcon} />
                                 <TextInput
-                                    style={styles.input}
+                                    style={[styles.input, { color: theme.text }]}
                                     placeholder="Password"
+                                    placeholderTextColor={theme.inputPlaceholder}
                                     value={password}
                                     onChangeText={setPassword}
                                     secureTextEntry={!isPasswordVisible}
@@ -192,16 +195,17 @@ const SignupScreen = ({ navigation }) => {
                                     <Ionicons
                                         name={isPasswordVisible ? "eye-off-outline" : "eye-outline"}
                                         size={20}
-                                        color="#999"
+                                        color={theme.textSecondary}
                                     />
                                 </TouchableOpacity>
                             </View>
 
-                            <View style={styles.inputContainer}>
-                                <Ionicons name="lock-closed-outline" size={20} color="#999" style={styles.inputIcon} />
+                            <View style={[styles.inputContainer, { backgroundColor: theme.input }]}>
+                                <Ionicons name="lock-closed-outline" size={20} color={theme.textSecondary} style={styles.inputIcon} />
                                 <TextInput
-                                    style={styles.input}
+                                    style={[styles.input, { color: theme.text }]}
                                     placeholder="Confirm Password"
+                                    placeholderTextColor={theme.inputPlaceholder}
                                     value={confirmPassword}
                                     onChangeText={setConfirmPassword}
                                     secureTextEntry={!isConfirmPasswordVisible}
@@ -213,23 +217,23 @@ const SignupScreen = ({ navigation }) => {
                                     <Ionicons
                                         name={isConfirmPasswordVisible ? "eye-off-outline" : "eye-outline"}
                                         size={20}
-                                        color="#999"
+                                        color={theme.textSecondary}
                                     />
                                 </TouchableOpacity>
                             </View>
 
                             <View style={styles.passwordRequirements}>
-                                <Text style={styles.passwordRequirementsTitle}>Password must:</Text>
+                                <Text style={[styles.passwordRequirementsTitle, { color: theme.textSecondary }]}>Password must:</Text>
                                 <View style={styles.passwordRequirementItem}>
                                     <Ionicons
                                         name={password.length >= 8 ? "checkmark-circle" : "checkmark-circle-outline"}
                                         size={16}
-                                        color={password.length >= 8 ? "#4CAF50" : "#CCC"}
+                                        color={password.length >= 8 ? theme.success : theme.border}
                                     />
                                     <Text
                                         style={[
                                             styles.passwordRequirementText,
-                                            password.length >= 8 && styles.passwordRequirementMet
+                                            { color: password.length >= 8 ? theme.success : theme.textTertiary }
                                         ]}
                                     >
                                         Be at least 8 characters
@@ -239,12 +243,12 @@ const SignupScreen = ({ navigation }) => {
                                     <Ionicons
                                         name={/[A-Z]/.test(password) ? "checkmark-circle" : "checkmark-circle-outline"}
                                         size={16}
-                                        color={/[A-Z]/.test(password) ? "#4CAF50" : "#CCC"}
+                                        color={/[A-Z]/.test(password) ? theme.success : theme.border}
                                     />
                                     <Text
                                         style={[
                                             styles.passwordRequirementText,
-                                            /[A-Z]/.test(password) && styles.passwordRequirementMet
+                                            { color: /[A-Z]/.test(password) ? theme.success : theme.textTertiary }
                                         ]}
                                     >
                                         Include an uppercase letter
@@ -254,12 +258,12 @@ const SignupScreen = ({ navigation }) => {
                                     <Ionicons
                                         name={/[a-z]/.test(password) ? "checkmark-circle" : "checkmark-circle-outline"}
                                         size={16}
-                                        color={/[a-z]/.test(password) ? "#4CAF50" : "#CCC"}
+                                        color={/[a-z]/.test(password) ? theme.success : theme.border}
                                     />
                                     <Text
                                         style={[
                                             styles.passwordRequirementText,
-                                            /[a-z]/.test(password) && styles.passwordRequirementMet
+                                            { color: /[a-z]/.test(password) ? theme.success : theme.textTertiary }
                                         ]}
                                     >
                                         Include a lowercase letter
@@ -269,12 +273,12 @@ const SignupScreen = ({ navigation }) => {
                                     <Ionicons
                                         name={/\d/.test(password) ? "checkmark-circle" : "checkmark-circle-outline"}
                                         size={16}
-                                        color={/\d/.test(password) ? "#4CAF50" : "#CCC"}
+                                        color={/\d/.test(password) ? theme.success : theme.border}
                                     />
                                     <Text
                                         style={[
                                             styles.passwordRequirementText,
-                                            /\d/.test(password) && styles.passwordRequirementMet
+                                            { color: /\d/.test(password) ? theme.success : theme.textTertiary }
                                         ]}
                                     >
                                         Include a number
@@ -289,28 +293,28 @@ const SignupScreen = ({ navigation }) => {
                                 <View style={[
                                     styles.checkboxContainer,
                                     {
-                                        borderColor: agreeToTerms ? '#FF6B00' : '#CCC',
-                                        backgroundColor: agreeToTerms ? '#FF6B00' : 'transparent'
+                                        borderColor: agreeToTerms ? theme.primary : theme.border,
+                                        backgroundColor: agreeToTerms ? theme.primary : 'transparent'
                                     }
                                 ]}>
                                     {agreeToTerms ? (
                                         <Ionicons name="checkmark" size={16} color="#FFF" />
                                     ) : null}
                                 </View>
-                                <Text style={styles.termsText}>
+                                <Text style={[styles.termsText, { color: theme.textSecondary }]}>
                                     I agree to the{' '}
-                                    <Text style={styles.termsLink}>
+                                    <Text style={[styles.termsLink, { color: theme.primary }]}>
                                         Terms of Service
                                     </Text>
                                     {' '}and{' '}
-                                    <Text style={styles.termsLink}>
+                                    <Text style={[styles.termsLink, { color: theme.primary }]}>
                                         Privacy Policy
                                     </Text>
                                 </Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity
-                                style={styles.signupButton}
+                                style={[styles.signupButton, { backgroundColor: theme.primary }]}
                                 onPress={handleSignup}
                                 disabled={isLoading}
                             >
@@ -323,30 +327,30 @@ const SignupScreen = ({ navigation }) => {
                         </View>
 
                         <View style={styles.socialSignupContainer}>
-                            <Text style={styles.orText}>Or sign up with</Text>
+                            <Text style={[styles.orText, { color: theme.textSecondary }]}>Or sign up with</Text>
 
                             <View style={styles.socialButtonsRow}>
-                                <TouchableOpacity 
-                                    style={styles.socialButton}
+                                <TouchableOpacity
+                                    style={[styles.socialButton, { borderColor: theme.border, backgroundColor: theme.card }]}
                                     onPress={handleGoogleSignIn}
                                 >
                                     <Ionicons name="logo-google" size={20} color="#DB4437" />
                                 </TouchableOpacity>
 
-                                <TouchableOpacity style={styles.socialButton}>
+                                <TouchableOpacity style={[styles.socialButton, { borderColor: theme.border, backgroundColor: theme.card }]}>
                                     <Ionicons name="logo-facebook" size={20} color="#4267B2" />
                                 </TouchableOpacity>
 
-                                <TouchableOpacity style={styles.socialButton}>
-                                    <Ionicons name="logo-apple" size={20} color="#000" />
+                                <TouchableOpacity style={[styles.socialButton, { borderColor: theme.border, backgroundColor: theme.card }]}>
+                                    <Ionicons name="logo-apple" size={20} color={isDarkMode ? '#FFF' : '#000'} />
                                 </TouchableOpacity>
                             </View>
                         </View>
 
                         <View style={styles.loginPromptContainer}>
-                            <Text style={styles.loginPromptText}>Already have an account? </Text>
+                            <Text style={[styles.loginPromptText, { color: theme.textSecondary }]}>Already have an account? </Text>
                             <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-                                <Text style={styles.loginPromptLink}>Sign In</Text>
+                                <Text style={[styles.loginPromptLink, { color: theme.primary }]}>Sign In</Text>
                             </TouchableOpacity>
                         </View>
                     </ScrollView>

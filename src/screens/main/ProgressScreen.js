@@ -33,6 +33,7 @@ import { ACHIEVEMENT_CATEGORIES } from '../../data/achievements';
 import UpgradePrompt from '../../components/shared/UpgradePrompt';
 import LockedFeatureCard from '../../components/features/LockedFeatureCard';
 import { canAccessFeature } from '../../utils/subscription';
+import { TourStep } from '../../components/tour';
 
 const { width } = Dimensions.get('window');
 
@@ -387,55 +388,57 @@ const ProgressScreen = ({ navigation }) => {
 
         return (
             <View style={styles.tabContent}>
-                {/* Training Summary Card */}
-                <View style={[styles.summaryContainer, { backgroundColor: theme.card }]}>
-                    <View style={styles.summaryHeader}>
-                        <View style={styles.sectionTitleRow}>
-                            <Ionicons name="stats-chart" size={20} color={theme.primary} />
-                            <Text style={[styles.summaryTitle, { color: theme.text }]}>Training Summary</Text>
+                {/* Training Summary Card - wrapped with TourStep for onboarding */}
+                <TourStep stepId="training-summary-card">
+                    <View style={[styles.summaryContainer, { backgroundColor: theme.card }]}>
+                        <View style={styles.summaryHeader}>
+                            <View style={styles.sectionTitleRow}>
+                                <Ionicons name="stats-chart" size={20} color={theme.primary} />
+                                <Text style={[styles.summaryTitle, { color: theme.text }]}>Training Summary</Text>
+                            </View>
+                            <TouchableOpacity
+                                style={[styles.timeframeSelector, { backgroundColor: theme.backgroundSecondary }]}
+                                onPress={() => {
+                                    const timeframes = ['week', 'month', 'year'];
+                                    const currentIndex = timeframes.indexOf(selectedTimeframe);
+                                    const nextIndex = (currentIndex + 1) % timeframes.length;
+                                    setSelectedTimeframe(timeframes[nextIndex]);
+                                }}
+                            >
+                                <Text style={[styles.timeframeText, { color: theme.textSecondary }]}>
+                                    {selectedTimeframe === 'week' ? 'This Week' : selectedTimeframe === 'month' ? 'This Month' : 'This Year'}
+                                </Text>
+                                <Ionicons name="chevron-down" size={16} color={theme.textSecondary} />
+                            </TouchableOpacity>
                         </View>
-                        <TouchableOpacity
-                            style={[styles.timeframeSelector, { backgroundColor: theme.backgroundSecondary }]}
-                            onPress={() => {
-                                const timeframes = ['week', 'month', 'year'];
-                                const currentIndex = timeframes.indexOf(selectedTimeframe);
-                                const nextIndex = (currentIndex + 1) % timeframes.length;
-                                setSelectedTimeframe(timeframes[nextIndex]);
-                            }}
-                        >
-                            <Text style={[styles.timeframeText, { color: theme.textSecondary }]}>
-                                {selectedTimeframe === 'week' ? 'This Week' : selectedTimeframe === 'month' ? 'This Month' : 'This Year'}
-                            </Text>
-                            <Ionicons name="chevron-down" size={16} color={theme.textSecondary} />
-                        </TouchableOpacity>
-                    </View>
 
-                    <View style={styles.metricsRow}>
-                        <View style={[styles.metricCard, { backgroundColor: theme.backgroundSecondary }]}>
-                            <Ionicons name="fitness" size={24} color={theme.primary} style={styles.metricIcon} />
-                            <Text style={[styles.metricValue, { color: theme.primary }]}>{totalWorkouts}</Text>
-                            <Text style={[styles.metricLabel, { color: theme.textSecondary }]}>Total Workouts</Text>
+                        <View style={styles.metricsRow}>
+                            <View style={[styles.metricCard, { backgroundColor: theme.backgroundSecondary }]}>
+                                <Ionicons name="fitness" size={24} color={theme.primary} style={styles.metricIcon} />
+                                <Text style={[styles.metricValue, { color: theme.primary }]}>{totalWorkouts}</Text>
+                                <Text style={[styles.metricLabel, { color: theme.textSecondary }]}>Total Workouts</Text>
+                            </View>
+                            <View style={[styles.metricCard, { backgroundColor: theme.backgroundSecondary }]}>
+                                <Ionicons name="flame" size={24} color={theme.primary} style={styles.metricIcon} />
+                                <Text style={[styles.metricValue, { color: theme.primary }]}>{calculateStreak()}</Text>
+                                <Text style={[styles.metricLabel, { color: theme.textSecondary }]}>Day Streak</Text>
+                            </View>
                         </View>
-                        <View style={[styles.metricCard, { backgroundColor: theme.backgroundSecondary }]}>
-                            <Ionicons name="flame" size={24} color="#FF6B00" style={styles.metricIcon} />
-                            <Text style={[styles.metricValue, { color: '#FF6B00' }]}>{calculateStreak()}</Text>
-                            <Text style={[styles.metricLabel, { color: theme.textSecondary }]}>Day Streak</Text>
-                        </View>
-                    </View>
 
-                    <View style={[styles.metricsRow, { marginTop: 8 }]}>
-                        <View style={[styles.metricCard, { backgroundColor: theme.backgroundSecondary }]}>
-                            <Ionicons name="calendar" size={24} color="#4CAF50" style={styles.metricIcon} />
-                            <Text style={[styles.metricValue, { color: '#4CAF50' }]}>{thisWeekWorkouts}</Text>
-                            <Text style={[styles.metricLabel, { color: theme.textSecondary }]}>This Week</Text>
-                        </View>
-                        <View style={[styles.metricCard, { backgroundColor: theme.backgroundSecondary }]}>
-                            <Ionicons name="time" size={24} color="#2196F3" style={styles.metricIcon} />
-                            <Text style={[styles.metricValue, { color: '#2196F3' }]}>{avgDuration}</Text>
-                            <Text style={[styles.metricLabel, { color: theme.textSecondary }]}>Avg Minutes</Text>
+                        <View style={[styles.metricsRow, { marginTop: 8 }]}>
+                            <View style={[styles.metricCard, { backgroundColor: theme.backgroundSecondary }]}>
+                                <Ionicons name="calendar" size={24} color={theme.success} style={styles.metricIcon} />
+                                <Text style={[styles.metricValue, { color: theme.success }]}>{thisWeekWorkouts}</Text>
+                                <Text style={[styles.metricLabel, { color: theme.textSecondary }]}>This Week</Text>
+                            </View>
+                            <View style={[styles.metricCard, { backgroundColor: theme.backgroundSecondary }]}>
+                                <Ionicons name="time" size={24} color={theme.info} style={styles.metricIcon} />
+                                <Text style={[styles.metricValue, { color: theme.info }]}>{avgDuration}</Text>
+                                <Text style={[styles.metricLabel, { color: theme.textSecondary }]}>Avg Minutes</Text>
+                            </View>
                         </View>
                     </View>
-                </View>
+                </TourStep>
 
                 {/* Shooting Accuracy Card */}
                 <View style={[styles.shootingAccuracyCard, { backgroundColor: theme.card }]}>
@@ -445,16 +448,16 @@ const ProgressScreen = ({ navigation }) => {
                         {shootingStats?.trend !== 0 && shootingStats?.totalShots > 0 && (
                             <View style={[
                                 styles.trendBadge,
-                                { backgroundColor: shootingStats.trend > 0 ? '#4CAF5020' : '#F4433620' }
+                                { backgroundColor: shootingStats.trend > 0 ? theme.success + '20' : theme.error + '20' }
                             ]}>
                                 <Ionicons
                                     name={shootingStats.trend > 0 ? 'trending-up' : 'trending-down'}
                                     size={14}
-                                    color={shootingStats.trend > 0 ? '#4CAF50' : '#F44336'}
+                                    color={shootingStats.trend > 0 ? theme.success : theme.error}
                                 />
                                 <Text style={[
                                     styles.trendText,
-                                    { color: shootingStats.trend > 0 ? '#4CAF50' : '#F44336' }
+                                    { color: shootingStats.trend > 0 ? theme.success : theme.error }
                                 ]}>
                                     {shootingStats.trend > 0 ? '+' : ''}{shootingStats.trend}%
                                 </Text>
@@ -484,13 +487,13 @@ const ProgressScreen = ({ navigation }) => {
 
                         <View style={styles.accuracyStats}>
                             <View style={styles.accuracyStat}>
-                                <View style={[styles.accuracyDot, { backgroundColor: '#4CAF50' }]} />
+                                <View style={[styles.accuracyDot, { backgroundColor: theme.success }]} />
                                 <Text style={[styles.accuracyStatText, { color: theme.text }]}>
                                     Makes: {shootingStats?.makes || 0}
                                 </Text>
                             </View>
                             <View style={styles.accuracyStat}>
-                                <View style={[styles.accuracyDot, { backgroundColor: '#F44336' }]} />
+                                <View style={[styles.accuracyDot, { backgroundColor: theme.error }]} />
                                 <Text style={[styles.accuracyStatText, { color: theme.text }]}>
                                     Misses: {shootingStats?.misses || 0}
                                 </Text>
@@ -685,7 +688,7 @@ const ProgressScreen = ({ navigation }) => {
                 {recommendations && (
                     <View style={[styles.recommendationsContainer, { backgroundColor: theme.card }]}>
                         <View style={styles.sectionTitleRow}>
-                            <Ionicons name="bulb" size={20} color="#FFD700" />
+                            <Ionicons name="bulb" size={20} color={theme.warning} />
                             <Text style={[styles.sectionTitle, { color: theme.text }]}>Recommended For You</Text>
                         </View>
 
@@ -730,7 +733,7 @@ const ProgressScreen = ({ navigation }) => {
         if (!gamificationStats || !achievementProgress) {
             return (
                 <View style={styles.tabContent}>
-                    <ActivityIndicator size="large" color="#FF6B00" />
+                    <ActivityIndicator size="large" color={theme.primary} />
                 </View>
             );
         }
@@ -745,18 +748,18 @@ const ProgressScreen = ({ navigation }) => {
         return (
             <View style={styles.tabContent}>
                 {/* XP and Level Header */}
-                <View style={styles.xpLevelCard}>
+                <View style={[styles.xpLevelCard, { backgroundColor: theme.card }]}>
                     <View style={styles.xpLevelHeader}>
-                        <View style={styles.levelBadge}>
+                        <View style={[styles.levelBadge, { backgroundColor: theme.primary }]}>
                             <Text style={styles.levelNumber}>{levelInfo.level}</Text>
                         </View>
                         <View style={styles.xpLevelInfo}>
-                            <Text style={styles.levelTitle}>{levelInfo.title}</Text>
-                            <Text style={styles.xpText}>{gamificationStats.totalXP} XP</Text>
+                            <Text style={[styles.levelTitle, { color: theme.text }]}>{levelInfo.title}</Text>
+                            <Text style={[styles.xpText, { color: theme.textSecondary }]}>{gamificationStats.totalXP} XP</Text>
                         </View>
                         <TouchableOpacity style={styles.achievementsTrophyIcon}>
                             <Ionicons name="trophy" size={28} color="#FFD700" />
-                            <Text style={styles.achievementCount}>
+                            <Text style={[styles.achievementCount, { color: theme.textSecondary }]}>
                                 {unlockedAchievements.length}/{achievementProgress.length}
                             </Text>
                         </TouchableOpacity>
@@ -765,15 +768,15 @@ const ProgressScreen = ({ navigation }) => {
                     {/* XP Progress Bar */}
                     {levelInfo.xpForNextLevel && (
                         <View style={styles.xpProgressSection}>
-                            <View style={styles.xpProgressBar}>
+                            <View style={[styles.xpProgressBar, { backgroundColor: theme.backgroundTertiary }]}>
                                 <View
                                     style={[
                                         styles.xpProgressFill,
-                                        { width: `${levelInfo.progressToNextLevel}%` }
+                                        { width: `${levelInfo.progressToNextLevel}%`, backgroundColor: theme.primary }
                                     ]}
                                 />
                             </View>
-                            <Text style={styles.xpProgressText}>
+                            <Text style={[styles.xpProgressText, { color: theme.textSecondary }]}>
                                 {levelInfo.currentXP - levelInfo.xpForCurrentLevel} / {levelInfo.xpForNextLevel - levelInfo.xpForCurrentLevel} XP to Level {levelInfo.level + 1}
                             </Text>
                         </View>
@@ -790,18 +793,20 @@ const ProgressScreen = ({ navigation }) => {
                     <TouchableOpacity
                         style={[
                             styles.achievementCategoryChip,
-                            selectedAchievementCategory === 'all' && styles.achievementCategoryChipActive
+                            { backgroundColor: theme.backgroundTertiary },
+                            selectedAchievementCategory === 'all' && [styles.achievementCategoryChipActive, { borderColor: theme.primary }]
                         ]}
                         onPress={() => setSelectedAchievementCategory('all')}
                     >
                         <Ionicons
                             name="apps"
                             size={16}
-                            color={selectedAchievementCategory === 'all' ? '#FF6B00' : '#666'}
+                            color={selectedAchievementCategory === 'all' ? theme.primary : theme.textSecondary}
                         />
                         <Text style={[
                             styles.achievementCategoryChipText,
-                            selectedAchievementCategory === 'all' && styles.achievementCategoryChipTextActive
+                            { color: theme.textSecondary },
+                            selectedAchievementCategory === 'all' && [styles.achievementCategoryChipTextActive, { color: theme.primary }]
                         ]}>
                             All
                         </Text>
@@ -822,18 +827,20 @@ const ProgressScreen = ({ navigation }) => {
                                 key={category}
                                 style={[
                                     styles.achievementCategoryChip,
-                                    isSelected && styles.achievementCategoryChipActive
+                                    { backgroundColor: theme.backgroundTertiary },
+                                    isSelected && [styles.achievementCategoryChipActive, { borderColor: theme.primary }]
                                 ]}
                                 onPress={() => setSelectedAchievementCategory(category)}
                             >
                                 <Ionicons
                                     name={categoryIcons[category]}
                                     size={16}
-                                    color={isSelected ? '#FF6B00' : '#666'}
+                                    color={isSelected ? theme.primary : theme.textSecondary}
                                 />
                                 <Text style={[
                                     styles.achievementCategoryChipText,
-                                    isSelected && styles.achievementCategoryChipTextActive
+                                    { color: theme.textSecondary },
+                                    isSelected && [styles.achievementCategoryChipTextActive, { color: theme.primary }]
                                 ]}>
                                     {category.charAt(0).toUpperCase() + category.slice(1)}
                                 </Text>
@@ -846,8 +853,8 @@ const ProgressScreen = ({ navigation }) => {
                 <View style={styles.achievementsList}>
                     {filteredAchievements.length === 0 ? (
                         <View style={styles.emptyAchievements}>
-                            <Ionicons name="trophy-outline" size={64} color="#CCC" />
-                            <Text style={styles.emptyAchievementsText}>No achievements in this category</Text>
+                            <Ionicons name="trophy-outline" size={64} color={theme.textTertiary} />
+                            <Text style={[styles.emptyAchievementsText, { color: theme.textSecondary }]}>No achievements in this category</Text>
                         </View>
                     ) : (
                         filteredAchievements.map((achievement, index) => (
@@ -855,13 +862,15 @@ const ProgressScreen = ({ navigation }) => {
                                 key={achievement.id}
                                 style={[
                                     styles.achievementCard,
-                                    achievement.unlocked && styles.achievementCardUnlocked
+                                    { backgroundColor: theme.backgroundSecondary, borderColor: theme.border },
+                                    achievement.unlocked && [styles.achievementCardUnlocked, { backgroundColor: theme.card }]
                                 ]}
                             >
                                 <View style={styles.achievementIconContainer}>
                                     <View
                                         style={[
                                             styles.achievementIcon,
+                                            { borderColor: theme.border },
                                             achievement.unlocked && styles.achievementIconUnlocked,
                                             { backgroundColor: achievement.tier.color + '20' }
                                         ]}
@@ -869,7 +878,7 @@ const ProgressScreen = ({ navigation }) => {
                                         <Ionicons
                                             name={achievement.icon}
                                             size={28}
-                                            color={achievement.unlocked ? achievement.tier.color : '#CCC'}
+                                            color={achievement.unlocked ? achievement.tier.color : theme.textTertiary}
                                         />
                                     </View>
                                     {achievement.unlocked && (
@@ -882,17 +891,18 @@ const ProgressScreen = ({ navigation }) => {
                                 <View style={styles.achievementInfo}>
                                     <Text style={[
                                         styles.achievementTitle,
-                                        !achievement.unlocked && styles.achievementTitleLocked
+                                        { color: theme.text },
+                                        !achievement.unlocked && [styles.achievementTitleLocked, { color: theme.textTertiary }]
                                     ]}>
                                         {achievement.title}
                                     </Text>
-                                    <Text style={styles.achievementDescription}>
+                                    <Text style={[styles.achievementDescription, { color: theme.textSecondary }]}>
                                         {achievement.description}
                                     </Text>
 
                                     {!achievement.unlocked && achievement.progress > 0 && (
                                         <View style={styles.achievementProgressSection}>
-                                            <View style={styles.achievementProgressBar}>
+                                            <View style={[styles.achievementProgressBar, { backgroundColor: theme.backgroundTertiary }]}>
                                                 <View
                                                     style={[
                                                         styles.achievementProgressFill,
@@ -900,7 +910,7 @@ const ProgressScreen = ({ navigation }) => {
                                                     ]}
                                                 />
                                             </View>
-                                            <Text style={styles.achievementProgressText}>
+                                            <Text style={[styles.achievementProgressText, { color: theme.textSecondary }]}>
                                                 {achievement.current} / {achievement.target}
                                             </Text>
                                         </View>
@@ -914,7 +924,7 @@ const ProgressScreen = ({ navigation }) => {
                                     ]}>
                                         {achievement.tier.name}
                                     </Text>
-                                    <Text style={styles.achievementXPText}>
+                                    <Text style={[styles.achievementXPText, { color: theme.textSecondary }]}>
                                         +{achievement.tier.xp} XP
                                     </Text>
                                 </View>
@@ -1044,8 +1054,8 @@ const ProgressScreen = ({ navigation }) => {
 
         return (
             <View style={styles.tabContent}>
-                <View style={styles.historyHeader}>
-                    <Text style={styles.historyTitle}>Training History</Text>
+                <View style={[styles.historyHeader, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+                    <Text style={[styles.historyTitle, { color: theme.text }]}>Training History</Text>
                 </View>
 
                 {/* Category Filter */}
@@ -1072,6 +1082,7 @@ const ProgressScreen = ({ navigation }) => {
                                 key={category}
                                 style={[
                                     styles.categoryFilterChip,
+                                    { backgroundColor: theme.backgroundTertiary },
                                     isSelected && { backgroundColor: config.color + '20', borderColor: config.color }
                                 ]}
                                 onPress={() => setSelectedCategory(category)}
@@ -1079,10 +1090,11 @@ const ProgressScreen = ({ navigation }) => {
                                 <Ionicons
                                     name={config.icon}
                                     size={16}
-                                    color={isSelected ? config.color : '#666'}
+                                    color={isSelected ? config.color : theme.textSecondary}
                                 />
                                 <Text style={[
                                     styles.categoryFilterText,
+                                    { color: theme.textSecondary },
                                     isSelected && { color: config.color, fontWeight: '600' }
                                 ]}>
                                     {config.label}
@@ -1094,28 +1106,28 @@ const ProgressScreen = ({ navigation }) => {
 
                 {loading ? (
                     <View style={styles.loadingContainer}>
-                        <ActivityIndicator size="large" color="#FF6B00" />
-                        <Text style={styles.loadingText}>Loading workout history...</Text>
+                        <ActivityIndicator size="large" color={theme.primary} />
+                        <Text style={[styles.loadingText, { color: theme.textSecondary }]}>Loading workout history...</Text>
                     </View>
                 ) : workoutHistory.length === 0 ? (
-                    <View style={styles.emptyState}>
-                        <Ionicons name="fitness-outline" size={48} color="#CCC" style={{ marginBottom: 12 }} />
-                        <Text style={styles.emptyStateText}>No workout history found.</Text>
-                        <Text style={styles.emptyStateSubtext}>
+                    <View style={[styles.emptyState, { backgroundColor: theme.card }]}>
+                        <Ionicons name="fitness-outline" size={48} color={theme.textTertiary} style={{ marginBottom: 12 }} />
+                        <Text style={[styles.emptyStateText, { color: theme.textSecondary }]}>No workout history found.</Text>
+                        <Text style={[styles.emptyStateSubtext, { color: theme.textTertiary }]}>
                             Complete your first workout to start tracking your progress!
                         </Text>
                     </View>
                 ) : (
                     <>
-                        <View style={styles.calendarContainer}>
-                            <Text style={styles.calendarTitle}>Activity Calendar</Text>
+                        <View style={[styles.calendarContainer, { backgroundColor: theme.card }]}>
+                            <Text style={[styles.calendarTitle, { color: theme.text }]}>Activity Calendar</Text>
                             <View style={styles.monthSelector}>
                                 <TouchableOpacity>
-                                    <Ionicons name="chevron-back" size={20} color="#666" />
+                                    <Ionicons name="chevron-back" size={20} color={theme.textSecondary} />
                                 </TouchableOpacity>
-                                <Text style={styles.monthText}>{currentMonth}</Text>
+                                <Text style={[styles.monthText, { color: theme.text }]}>{currentMonth}</Text>
                                 <TouchableOpacity>
-                                    <Ionicons name="chevron-forward" size={20} color="#666" />
+                                    <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
                                 </TouchableOpacity>
                             </View>
 
@@ -1123,7 +1135,7 @@ const ProgressScreen = ({ navigation }) => {
                             <View style={styles.calendarGrid}>
                                 <View style={styles.calendarRow}>
                                     {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, index) => (
-                                        <Text key={index} style={styles.calendarDayHeader}>{day}</Text>
+                                        <Text key={index} style={[styles.calendarDayHeader, { color: theme.textSecondary }]}>{day}</Text>
                                     ))}
                                 </View>
 
@@ -1134,8 +1146,8 @@ const ProgressScreen = ({ navigation }) => {
                                         const hasWorkout = workoutDates.has(checkDate.toDateString());
                                         return (
                                             <View key={day} style={styles.calendarDay}>
-                                                <Text style={styles.calendarDayText}>{day}</Text>
-                                                {hasWorkout && <View style={styles.workoutDot} />}
+                                                <Text style={[styles.calendarDayText, { color: theme.text }]}>{day}</Text>
+                                                {hasWorkout && <View style={[styles.workoutDot, { backgroundColor: theme.primary }]} />}
                                             </View>
                                         );
                                     })}
@@ -1143,19 +1155,19 @@ const ProgressScreen = ({ navigation }) => {
                             </View>
                         </View>
 
-                        <View style={styles.workoutHistoryContainer}>
-                            <Text style={styles.workoutHistoryTitle}>
+                        <View style={[styles.workoutHistoryContainer, { backgroundColor: theme.card }]}>
+                            <Text style={[styles.workoutHistoryTitle, { color: theme.text }]}>
                                 {selectedCategory === 'all' ? 'Recent Workouts' : `${selectedCategory} Workouts`}
                             </Text>
 
                             {filteredWorkouts.length === 0 ? (
                                 <View style={styles.emptyFilterState}>
-                                    <Ionicons name="search-outline" size={40} color="#CCC" />
-                                    <Text style={styles.emptyFilterText}>
+                                    <Ionicons name="search-outline" size={40} color={theme.textTertiary} />
+                                    <Text style={[styles.emptyFilterText, { color: theme.textSecondary }]}>
                                         No {selectedCategory === 'all' ? '' : selectedCategory.toLowerCase()} workouts found
                                     </Text>
                                     <TouchableOpacity
-                                        style={styles.clearFilterButton}
+                                        style={[styles.clearFilterButton, { backgroundColor: theme.primary }]}
                                         onPress={() => setSelectedCategory('all')}
                                     >
                                         <Text style={styles.clearFilterText}>Clear Filter</Text>
@@ -1182,7 +1194,7 @@ const ProgressScreen = ({ navigation }) => {
                                 return (
                                     <TouchableOpacity
                                         key={workout.id}
-                                        style={styles.historyItem}
+                                        style={[styles.historyItem, { borderBottomColor: theme.border }]}
                                         onPress={() => {
                                             // Navigate to workout details
                                             navigation.navigate('WorkoutDetail', { workoutId: workout.workoutId });
@@ -1195,37 +1207,29 @@ const ProgressScreen = ({ navigation }) => {
                                         </View>
 
                                         <View style={styles.historyItemContent}>
-                                            <Text style={styles.historyItemTitle}>{workout.title}</Text>
+                                            <Text style={[styles.historyItemTitle, { color: theme.text }]}>{workout.title}</Text>
                                             <View style={styles.historyItemMeta}>
                                                 <View style={styles.historyItemMetaItem}>
-                                                    <Ionicons name="calendar-outline" size={14} color="#666" />
-                                                    <Text style={styles.historyItemMetaText}>
+                                                    <Ionicons name="calendar-outline" size={14} color={theme.textSecondary} />
+                                                    <Text style={[styles.historyItemMetaText, { color: theme.textSecondary }]}>
                                                         {workoutDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                                     </Text>
                                                 </View>
                                                 <View style={styles.historyItemMetaItem}>
-                                                    <Ionicons name="time-outline" size={14} color="#666" />
-                                                    <Text style={styles.historyItemMetaText}>{durationMinutes} min</Text>
+                                                    <Ionicons name="time-outline" size={14} color={theme.textSecondary} />
+                                                    <Text style={[styles.historyItemMetaText, { color: theme.textSecondary }]}>{durationMinutes} min</Text>
                                                 </View>
-                                                {completionScore > 0 && (
-                                                    <View style={styles.historyItemMetaItem}>
-                                                        <Ionicons name="checkmark-circle" size={14} color={config.color} />
-                                                        <Text style={[styles.historyItemMetaText, { color: config.color }]}>
-                                                            {completionScore}%
-                                                        </Text>
-                                                    </View>
-                                                )}
                                             </View>
                                         </View>
 
-                                        <Ionicons name="chevron-forward" size={20} color="#666" />
+                                        <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
                                     </TouchableOpacity>
                                 );
                                     })}
 
                                     {workoutHistory.length > 10 && (
-                                        <TouchableOpacity style={styles.viewMoreButton}>
-                                            <Text style={styles.viewMoreText}>View All History ({workoutHistory.length} total)</Text>
+                                        <TouchableOpacity style={[styles.viewMoreButton, { backgroundColor: theme.backgroundTertiary }]}>
+                                            <Text style={[styles.viewMoreText, { color: theme.textSecondary }]}>View All History ({workoutHistory.length} total)</Text>
                                         </TouchableOpacity>
                                     )}
                                 </>
@@ -1246,38 +1250,40 @@ const ProgressScreen = ({ navigation }) => {
                 <Text style={[styles.headerTitle, { color: theme.text }]}>Your Progress</Text>
             </View>
 
-            {/* Tabs */}
-            <View style={[styles.tabsContainer, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
-                {TABS.map((tab) => (
-                    <TouchableOpacity
-                        key={tab.id}
-                        style={[styles.tab, activeTab === tab.id && styles.activeTab]}
-                        onPress={() => handleTabChange(tab.id)}
-                    >
-                        <Text
-                            style={[
-                                styles.tabText,
-                                { color: theme.textSecondary },
-                                activeTab === tab.id && [styles.activeTabText, { color: theme.primary }]
-                            ]}
-                            numberOfLines={1}
-                            adjustsFontSizeToFit
+            {/* Tabs - wrapped with TourStep for onboarding */}
+            <TourStep stepId="progress-tabs">
+                <View style={[styles.tabsContainer, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+                    {TABS.map((tab) => (
+                        <TouchableOpacity
+                            key={tab.id}
+                            style={[styles.tab, activeTab === tab.id && styles.activeTab]}
+                            onPress={() => handleTabChange(tab.id)}
                         >
-                            {tab.label}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
-                <Animated.View
-                    style={[
-                        styles.tabIndicator,
-                        { backgroundColor: theme.primary },
-                        {
-                            left: tabIndicatorPosition,
-                            width: width / TABS.length,
-                        }
-                    ]}
-                />
-            </View>
+                            <Text
+                                style={[
+                                    styles.tabText,
+                                    { color: theme.textSecondary },
+                                    activeTab === tab.id && [styles.activeTabText, { color: theme.primary }]
+                                ]}
+                                numberOfLines={1}
+                                adjustsFontSizeToFit
+                            >
+                                {tab.label}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                    <Animated.View
+                        style={[
+                            styles.tabIndicator,
+                            { backgroundColor: theme.primary },
+                            {
+                                left: tabIndicatorPosition,
+                                width: width / TABS.length,
+                            }
+                        ]}
+                    />
+                </View>
+            </TourStep>
 
             {/* Tab Content */}
             <ScrollView style={[styles.contentContainer, { backgroundColor: theme.background }]} showsVerticalScrollIndicator={false}>
@@ -1297,20 +1303,15 @@ const styles = StyleSheet.create({
     header: {
         paddingHorizontal: 16,
         paddingVertical: 12,
-        backgroundColor: '#FFF',
         borderBottomWidth: 1,
-        borderBottomColor: '#EEE',
     },
     headerTitle: {
         fontSize: 24,
         fontWeight: 'bold',
-        color: '#333',
     },
     tabsContainer: {
         flexDirection: 'row',
-        backgroundColor: '#FFF',
         borderBottomWidth: 1,
-        borderBottomColor: '#EEE',
         position: 'relative',
     },
     tab: {
@@ -1319,23 +1320,19 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     activeTab: {
-        backgroundColor: '#FFF',
     },
     tabText: {
         fontSize: 12,
-        color: '#666',
         fontWeight: '500',
         textAlign: 'center',
     },
     activeTabText: {
-        color: '#FF6B00',
         fontWeight: 'bold',
     },
     tabIndicator: {
         position: 'absolute',
         bottom: 0,
         height: 3,
-        backgroundColor: '#FF6B00',
     },
     contentContainer: {
         flex: 1,
@@ -1346,10 +1343,8 @@ const styles = StyleSheet.create({
 
     // Overview Tab Styles
     summaryContainer: {
-        backgroundColor: '#FFF',
         padding: 16,
         borderBottomWidth: 1,
-        borderBottomColor: '#EEE',
     },
     summaryHeader: {
         flexDirection: 'row',
@@ -1360,19 +1355,16 @@ const styles = StyleSheet.create({
     summaryTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: '#333',
     },
     timeframeSelector: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#F5F5F5',
         paddingHorizontal: 10,
         paddingVertical: 6,
         borderRadius: 16,
     },
     timeframeText: {
         fontSize: 12,
-        color: '#666',
         marginRight: 4,
     },
     metricsRow: {
@@ -1381,7 +1373,6 @@ const styles = StyleSheet.create({
     },
     metricCard: {
         flex: 1,
-        backgroundColor: '#F5F5F5',
         borderRadius: 12,
         padding: 12,
         alignItems: 'center',
@@ -1390,12 +1381,10 @@ const styles = StyleSheet.create({
     metricValue: {
         fontSize: 24,
         fontWeight: 'bold',
-        color: '#FF6B00',
         marginBottom: 4,
     },
     metricLabel: {
         fontSize: 12,
-        color: '#666',
     },
     metricIcon: {
         marginBottom: 8,
@@ -1423,17 +1412,14 @@ const styles = StyleSheet.create({
     loadingText: {
         marginTop: 12,
         fontSize: 16,
-        color: '#666',
     },
     chartContainer: {
-        backgroundColor: '#FFF',
         padding: 16,
         marginTop: 8,
     },
     chartTitle: {
         fontSize: 16,
         fontWeight: 'bold',
-        color: '#333',
         marginBottom: 16,
     },
     chart: {
@@ -1522,7 +1508,6 @@ const styles = StyleSheet.create({
         marginTop: 8,
     },
     skillsSnapshotContainer: {
-        backgroundColor: '#FFF',
         padding: 16,
         marginTop: 8,
     },
@@ -1535,11 +1520,9 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 16,
         fontWeight: 'bold',
-        color: '#333',
     },
     seeAllText: {
         fontSize: 14,
-        color: '#FF6B00',
         fontWeight: '500',
     },
     skillProgressRow: {
@@ -1556,17 +1539,14 @@ const styles = StyleSheet.create({
     },
     skillName: {
         fontSize: 14,
-        color: '#333',
         fontWeight: '500',
     },
     skillValue: {
         fontSize: 14,
-        color: '#333',
         fontWeight: 'bold',
     },
     progressBar: {
         height: 6,
-        backgroundColor: '#F0F0F0',
         borderRadius: 3,
         overflow: 'hidden',
     },
@@ -1575,7 +1555,6 @@ const styles = StyleSheet.create({
         borderRadius: 3,
     },
     goalsSnapshotContainer: {
-        backgroundColor: '#FFF',
         padding: 16,
         marginTop: 8,
     },
@@ -1591,12 +1570,10 @@ const styles = StyleSheet.create({
     },
     goalName: {
         fontSize: 14,
-        color: '#333',
         marginBottom: 8,
     },
     goalProgress: {
         height: 6,
-        backgroundColor: '#F0F0F0',
         borderRadius: 3,
         overflow: 'hidden',
     },
@@ -1610,21 +1587,17 @@ const styles = StyleSheet.create({
     goalPercentage: {
         fontSize: 14,
         fontWeight: 'bold',
-        color: '#333',
         marginBottom: 2,
     },
     goalDeadline: {
         fontSize: 12,
-        color: '#666',
     },
     moreIndicator: {
         fontSize: 12,
-        color: '#666',
         textAlign: 'center',
         marginTop: 8,
     },
     achievementsContainer: {
-        backgroundColor: '#FFF',
         padding: 16,
         marginTop: 8,
     },
@@ -1641,14 +1614,12 @@ const styles = StyleSheet.create({
         width: 60,
         height: 60,
         borderRadius: 30,
-        backgroundColor: '#FFF0E6',
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 8,
     },
     badgeName: {
         fontSize: 12,
-        color: '#333',
         textAlign: 'center',
     },
     lockedAchievement: {
@@ -1669,7 +1640,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     emptyState: {
-        backgroundColor: '#FFF',
         borderRadius: 12,
         padding: 24,
         alignItems: 'center',
@@ -1677,13 +1647,11 @@ const styles = StyleSheet.create({
     },
     emptyStateText: {
         fontSize: 14,
-        color: '#666',
         textAlign: 'center',
         marginBottom: 16,
     },
     emptyStateSubtext: {
         fontSize: 13,
-        color: '#999',
         textAlign: 'center',
     },
     emptyStateButton: {
@@ -1700,11 +1668,9 @@ const styles = StyleSheet.create({
     // Skills Tab Styles
     skillSelector: {
         flexDirection: 'row',
-        backgroundColor: '#FFF',
         paddingVertical: 12,
         paddingHorizontal: 16,
         borderBottomWidth: 1,
-        borderBottomColor: '#EEE',
     },
     skillTab: {
         flexDirection: 'row',
@@ -1715,19 +1681,15 @@ const styles = StyleSheet.create({
         marginRight: 10,
     },
     selectedSkillTab: {
-        backgroundColor: '#FFF0E6',
     },
     skillTabText: {
         fontSize: 14,
-        color: '#666',
         marginLeft: 6,
     },
     selectedSkillTabText: {
-        color: '#FF6B00',
         fontWeight: '600',
     },
     skillDetailContainer: {
-        backgroundColor: '#FFF',
         padding: 16,
         marginTop: 8,
     },
@@ -1740,22 +1702,18 @@ const styles = StyleSheet.create({
     skillDetailName: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: '#333',
         marginBottom: 4,
     },
     skillDetailRating: {
         fontSize: 14,
-        color: '#666',
     },
     skillBreakdownContainer: {
-        backgroundColor: '#FFF',
         padding: 16,
         marginTop: 8,
     },
     skillBreakdownTitle: {
         fontSize: 16,
         fontWeight: 'bold',
-        color: '#333',
         marginBottom: 16,
     },
     skillBreakdownItem: {
@@ -1781,7 +1739,6 @@ const styles = StyleSheet.create({
     },
     skillBreakdownName: {
         fontSize: 14,
-        color: '#333',
         fontWeight: '500',
     },
     skillBreakdownValue: {
@@ -1790,7 +1747,6 @@ const styles = StyleSheet.create({
     },
     skillBreakdownBar: {
         height: 6,
-        backgroundColor: '#F0F0F0',
         borderRadius: 3,
         overflow: 'hidden',
     },
@@ -1799,13 +1755,11 @@ const styles = StyleSheet.create({
         borderRadius: 3,
     },
     categoryDistributionContainer: {
-        backgroundColor: '#FFF',
         padding: 16,
         marginTop: 8,
     },
     categorySubtitle: {
         fontSize: 13,
-        color: '#666',
         marginBottom: 16,
     },
     categoryItem: {
@@ -1832,11 +1786,9 @@ const styles = StyleSheet.create({
     categoryName: {
         fontSize: 15,
         fontWeight: '600',
-        color: '#333',
     },
     categoryCount: {
         fontSize: 12,
-        color: '#666',
         marginTop: 2,
     },
     categoryPercentage: {
@@ -1845,7 +1797,6 @@ const styles = StyleSheet.create({
     },
     categoryBar: {
         height: 8,
-        backgroundColor: '#F0F0F0',
         borderRadius: 4,
         overflow: 'hidden',
     },
@@ -1854,7 +1805,6 @@ const styles = StyleSheet.create({
         borderRadius: 4,
     },
     suggestedTrainingContainer: {
-        backgroundColor: '#FFF',
         padding: 16,
         marginTop: 8,
     },
@@ -1886,12 +1836,10 @@ const styles = StyleSheet.create({
     trainingItemTitle: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#333',
         marginBottom: 4,
     },
     trainingItemDescription: {
         fontSize: 12,
-        color: '#666',
     },
 
     // Goals Tab Styles
@@ -1899,16 +1847,13 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        backgroundColor: '#FFF',
         paddingHorizontal: 16,
         paddingVertical: 12,
         borderBottomWidth: 1,
-        borderBottomColor: '#EEE',
     },
     goalsTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: '#333',
     },
     addGoalButton: {
         flexDirection: 'row',
@@ -1928,7 +1873,6 @@ const styles = StyleSheet.create({
         padding: 16,
     },
     goalCard: {
-        backgroundColor: '#FFF',
         borderRadius: 12,
         marginBottom: 16,
         shadowColor: '#000',
@@ -1959,7 +1903,6 @@ const styles = StyleSheet.create({
     goalCardTitle: {
         fontSize: 16,
         fontWeight: '600',
-        color: '#333',
     },
     goalCardProgress: {
         padding: 16,
@@ -1971,16 +1914,13 @@ const styles = StyleSheet.create({
     },
     goalCardProgressText: {
         fontSize: 14,
-        color: '#666',
     },
     goalCardProgressPercentage: {
         fontSize: 14,
         fontWeight: 'bold',
-        color: '#333',
     },
     goalCardProgressBar: {
         height: 8,
-        backgroundColor: '#F0F0F0',
         borderRadius: 4,
         overflow: 'hidden',
     },
@@ -1999,7 +1939,6 @@ const styles = StyleSheet.create({
     },
     goalCardDetailText: {
         fontSize: 14,
-        color: '#666',
         marginLeft: 8,
     },
     updateProgressContainer: {
@@ -2011,7 +1950,6 @@ const styles = StyleSheet.create({
     updateProgressTitle: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#333',
         marginBottom: 8,
     },
     updateProgressControls: {
@@ -2023,16 +1961,13 @@ const styles = StyleSheet.create({
         width: 36,
         height: 36,
         borderRadius: 18,
-        backgroundColor: '#FFF',
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: '#E0E0E0',
     },
     currentProgressValue: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: '#333',
         paddingHorizontal: 16,
     },
     goalCardActions: {
@@ -2042,7 +1977,6 @@ const styles = StyleSheet.create({
     goalCardActionButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#FFF',
         paddingHorizontal: 12,
         paddingVertical: 8,
         borderRadius: 4,
@@ -2050,7 +1984,6 @@ const styles = StyleSheet.create({
     },
     goalCardActionText: {
         fontSize: 14,
-        color: '#666',
         marginLeft: 4,
     },
     goalCardActionDelete: {
@@ -2262,16 +2195,13 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        backgroundColor: '#FFF',
         paddingHorizontal: 16,
         paddingVertical: 12,
         borderBottomWidth: 1,
-        borderBottomColor: '#EEE',
     },
     historyTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: '#333',
     },
     historyFilterButton: {
         flexDirection: 'row',
@@ -2283,7 +2213,6 @@ const styles = StyleSheet.create({
     },
     historyFilterText: {
         fontSize: 14,
-        color: '#666',
         marginLeft: 4,
     },
     categoryFilterContainer: {
@@ -2307,7 +2236,6 @@ const styles = StyleSheet.create({
     },
     categoryFilterText: {
         fontSize: 14,
-        color: '#666',
     },
     emptyFilterState: {
         alignItems: 'center',
@@ -2316,7 +2244,6 @@ const styles = StyleSheet.create({
     },
     emptyFilterText: {
         fontSize: 15,
-        color: '#666',
         marginTop: 12,
         marginBottom: 16,
         textAlign: 'center',
@@ -2333,14 +2260,12 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     calendarContainer: {
-        backgroundColor: '#FFF',
         padding: 16,
         marginTop: 8,
     },
     calendarTitle: {
         fontSize: 16,
         fontWeight: 'bold',
-        color: '#333',
         marginBottom: 16,
     },
     monthSelector: {
@@ -2352,7 +2277,6 @@ const styles = StyleSheet.create({
     monthText: {
         fontSize: 16,
         fontWeight: '500',
-        color: '#333',
     },
     calendarGrid: {},
     calendarRow: {
@@ -2364,7 +2288,6 @@ const styles = StyleSheet.create({
         width: 30,
         textAlign: 'center',
         fontSize: 12,
-        color: '#666',
         fontWeight: '500',
     },
     calendarDays: {
@@ -2382,7 +2305,6 @@ const styles = StyleSheet.create({
     },
     calendarDayText: {
         fontSize: 14,
-        color: '#333',
     },
     workoutDot: {
         position: 'absolute',
@@ -2393,14 +2315,12 @@ const styles = StyleSheet.create({
         backgroundColor: '#FF6B00',
     },
     workoutHistoryContainer: {
-        backgroundColor: '#FFF',
         padding: 16,
         marginTop: 8,
     },
     workoutHistoryTitle: {
         fontSize: 16,
         fontWeight: 'bold',
-        color: '#333',
         marginBottom: 16,
     },
     historyItem: {
@@ -2423,7 +2343,6 @@ const styles = StyleSheet.create({
     },
     historyItemDate: {
         fontSize: 12,
-        color: '#666',
         textAlign: 'center',
     },
     historyItemContent: {
@@ -2433,7 +2352,6 @@ const styles = StyleSheet.create({
     historyItemTitle: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#333',
         marginBottom: 4,
     },
     historyItemMeta: {
@@ -2446,7 +2364,6 @@ const styles = StyleSheet.create({
     },
     historyItemMetaText: {
         fontSize: 12,
-        color: '#666',
         marginLeft: 4,
     },
     viewMoreButton: {
@@ -2458,13 +2375,11 @@ const styles = StyleSheet.create({
     },
     viewMoreText: {
         fontSize: 14,
-        color: '#666',
         fontWeight: '500',
     },
 
     // Recommendations Styles
     recommendationsContainer: {
-        backgroundColor: '#FFF',
         padding: 16,
         marginTop: 8,
         marginBottom: 20,
@@ -2502,12 +2417,10 @@ const styles = StyleSheet.create({
     recommendationTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: '#333',
         marginBottom: 6,
     },
     recommendationReason: {
         fontSize: 14,
-        color: '#666',
         lineHeight: 20,
     },
     recommendationButton: {
@@ -2538,7 +2451,6 @@ const styles = StyleSheet.create({
     },
     alternativesLabel: {
         fontSize: 13,
-        color: '#666',
         marginBottom: 10,
     },
     alternativesChips: {
@@ -2561,7 +2473,6 @@ const styles = StyleSheet.create({
 
     // ==================== ACHIEVEMENTS TAB STYLES ====================
     xpLevelCard: {
-        backgroundColor: '#FFF',
         padding: 16,
         borderRadius: 16,
         marginBottom: 16,
@@ -2601,12 +2512,10 @@ const styles = StyleSheet.create({
     levelTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: '#333',
         marginBottom: 4,
     },
     xpText: {
         fontSize: 14,
-        color: '#666',
         fontWeight: '500',
     },
     achievementsTrophyIcon: {
@@ -2616,14 +2525,12 @@ const styles = StyleSheet.create({
     achievementCount: {
         fontSize: 12,
         fontWeight: '600',
-        color: '#666',
     },
     xpProgressSection: {
         gap: 8,
     },
     xpProgressBar: {
         height: 8,
-        backgroundColor: '#F0F0F0',
         borderRadius: 4,
         overflow: 'hidden',
     },
@@ -2634,7 +2541,6 @@ const styles = StyleSheet.create({
     },
     xpProgressText: {
         fontSize: 12,
-        color: '#666',
         textAlign: 'center',
     },
     achievementCategoryFilter: {
@@ -2662,11 +2568,9 @@ const styles = StyleSheet.create({
     },
     achievementCategoryChipText: {
         fontSize: 13,
-        color: '#666',
         fontWeight: '500',
     },
     achievementCategoryChipTextActive: {
-        color: '#FF6B00',
         fontWeight: '600',
     },
     achievementsList: {
@@ -2679,7 +2583,6 @@ const styles = StyleSheet.create({
     },
     emptyAchievementsText: {
         fontSize: 14,
-        color: '#999',
         textAlign: 'center',
     },
     achievementCard: {
@@ -2725,14 +2628,11 @@ const styles = StyleSheet.create({
     achievementTitle: {
         fontSize: 15,
         fontWeight: '600',
-        color: '#333',
     },
     achievementTitleLocked: {
-        color: '#999',
     },
     achievementDescription: {
         fontSize: 13,
-        color: '#666',
         lineHeight: 18,
     },
     achievementProgressSection: {
@@ -2751,7 +2651,6 @@ const styles = StyleSheet.create({
     },
     achievementProgressText: {
         fontSize: 11,
-        color: '#666',
         fontWeight: '500',
     },
     achievementTierBadge: {
@@ -2766,7 +2665,6 @@ const styles = StyleSheet.create({
     },
     achievementXPText: {
         fontSize: 11,
-        color: '#666',
         fontWeight: '600',
     },
 });

@@ -95,15 +95,15 @@ const LoginScreen = ({ navigation }) => {
 
     return (
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-            <SafeAreaView style={styles.container}>
-                <StatusBar barStyle="dark-content" backgroundColor="#FFF" />
+            <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+                <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={theme.background} />
 
                 <View style={styles.header}>
                     <TouchableOpacity
                         style={styles.backButton}
                         onPress={() => navigation.goBack()}
                     >
-                        <Ionicons name="arrow-back" size={24} color="#333" />
+                        <Ionicons name="arrow-back" size={24} color={theme.text} />
                     </TouchableOpacity>
                 </View>
 
@@ -112,16 +112,17 @@ const LoginScreen = ({ navigation }) => {
                     style={styles.content}
                 >
                     <View style={styles.titleContainer}>
-                        <Text style={styles.title}>Welcome back!</Text>
-                        <Text style={styles.subtitle}>Sign in to continue your training journey</Text>
+                        <Text style={[styles.title, { color: theme.text }]}>Welcome back!</Text>
+                        <Text style={[styles.subtitle, { color: theme.textSecondary }]}>Sign in to continue your training journey</Text>
                     </View>
 
                     <View style={styles.form}>
-                        <View style={styles.inputContainer}>
-                            <Ionicons name="mail-outline" size={20} color="#999" style={styles.inputIcon} />
+                        <View style={[styles.inputContainer, { backgroundColor: theme.input }]}>
+                            <Ionicons name="mail-outline" size={20} color={theme.textSecondary} style={styles.inputIcon} />
                             <TextInput
-                                style={styles.input}
+                                style={[styles.input, { color: theme.text }]}
                                 placeholder="Email"
+                                placeholderTextColor={theme.inputPlaceholder}
                                 value={email}
                                 onChangeText={setEmail}
                                 autoCapitalize="none"
@@ -129,11 +130,12 @@ const LoginScreen = ({ navigation }) => {
                             />
                         </View>
 
-                        <View style={styles.inputContainer}>
-                            <Ionicons name="lock-closed-outline" size={20} color="#999" style={styles.inputIcon} />
+                        <View style={[styles.inputContainer, { backgroundColor: theme.input }]}>
+                            <Ionicons name="lock-closed-outline" size={20} color={theme.textSecondary} style={styles.inputIcon} />
                             <TextInput
-                                style={styles.input}
+                                style={[styles.input, { color: theme.text }]}
                                 placeholder="Password"
+                                placeholderTextColor={theme.inputPlaceholder}
                                 value={password}
                                 onChangeText={setPassword}
                                 secureTextEntry={!isPasswordVisible}
@@ -145,7 +147,7 @@ const LoginScreen = ({ navigation }) => {
                                 <Ionicons
                                     name={isPasswordVisible ? "eye-off-outline" : "eye-outline"}
                                     size={20}
-                                    color="#999"
+                                    color={theme.textSecondary}
                                 />
                             </TouchableOpacity>
                         </View>
@@ -158,24 +160,24 @@ const LoginScreen = ({ navigation }) => {
                                 <View style={[
                                     styles.checkboxContainer,
                                     {
-                                        borderColor: rememberMe ? '#FF6B00' : '#CCC',
-                                        backgroundColor: rememberMe ? '#FF6B00' : 'transparent'
+                                        borderColor: rememberMe ? theme.primary : theme.border,
+                                        backgroundColor: rememberMe ? theme.primary : 'transparent'
                                     }
                                 ]}>
                                     {rememberMe ? (
                                         <Ionicons name="checkmark" size={16} color="#FFF" />
                                     ) : null}
                                 </View>
-                                <Text style={styles.rememberMeText}>Remember me</Text>
+                                <Text style={[styles.rememberMeText, { color: theme.textSecondary }]}>Remember me</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity onPress={handleForgotPassword}>
-                                <Text style={styles.forgotPasswordText}>Forgot password?</Text>
+                                <Text style={[styles.forgotPasswordText, { color: theme.primary }]}>Forgot password?</Text>
                             </TouchableOpacity>
                         </View>
 
                         <TouchableOpacity
-                            style={styles.loginButton}
+                            style={[styles.loginButton, { backgroundColor: theme.primary }]}
                             onPress={handleLogin}
                             disabled={isLoading}
                         >
@@ -188,30 +190,30 @@ const LoginScreen = ({ navigation }) => {
                     </View>
 
                     <View style={styles.socialLoginContainer}>
-                        <Text style={styles.orText}>Or sign in with</Text>
+                        <Text style={[styles.orText, { color: theme.textSecondary }]}>Or sign in with</Text>
 
                         <View style={styles.socialButtonsRow}>
-                            <TouchableOpacity 
-                                style={styles.socialButton}
+                            <TouchableOpacity
+                                style={[styles.socialButton, { borderColor: theme.border, backgroundColor: theme.card }]}
                                 onPress={handleGoogleSignIn}
                             >
                                 <Ionicons name="logo-google" size={20} color="#DB4437" />
                             </TouchableOpacity>
 
-                            <TouchableOpacity style={styles.socialButton}>
+                            <TouchableOpacity style={[styles.socialButton, { borderColor: theme.border, backgroundColor: theme.card }]}>
                                 <Ionicons name="logo-facebook" size={20} color="#4267B2" />
                             </TouchableOpacity>
 
-                            <TouchableOpacity style={styles.socialButton}>
-                                <Ionicons name="logo-apple" size={20} color="#000" />
+                            <TouchableOpacity style={[styles.socialButton, { borderColor: theme.border, backgroundColor: theme.card }]}>
+                                <Ionicons name="logo-apple" size={20} color={isDarkMode ? '#FFF' : '#000'} />
                             </TouchableOpacity>
                         </View>
                     </View>
 
                     <View style={styles.signupPromptContainer}>
-                        <Text style={styles.signupPromptText}>Don't have an account? </Text>
+                        <Text style={[styles.signupPromptText, { color: theme.textSecondary }]}>Don't have an account? </Text>
                         <TouchableOpacity onPress={() => navigation.navigate('Signup')}>
-                            <Text style={styles.signupPromptLink}>Sign Up</Text>
+                            <Text style={[styles.signupPromptLink, { color: theme.primary }]}>Sign Up</Text>
                         </TouchableOpacity>
                     </View>
                 </KeyboardAvoidingView>

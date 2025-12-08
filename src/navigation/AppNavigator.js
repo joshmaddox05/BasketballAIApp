@@ -1,9 +1,12 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { useAppContext } from '../context/AppContext';
 import OnboardingNavigator from './OnboardingNavigator';
 import MainNavigator from "./MainNavigator";
 import AuthNavigator from './AuthNavigator';
+
+// Export navigation ref for programmatic navigation
+export const navigationRef = React.createRef();
 
 export default function AppNavigator() {
     const { isAuthenticated, userData } = useAppContext();
@@ -17,7 +20,7 @@ export default function AppNavigator() {
     }, [isAuthenticated, userData?.onboardingCompleted]);
 
     return (
-        <NavigationContainer>
+        <NavigationContainer ref={navigationRef}>
             {isAuthenticated ? (
                 userData?.onboardingCompleted ? (
                     <MainNavigator />

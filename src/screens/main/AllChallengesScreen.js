@@ -32,6 +32,7 @@ import {
 } from '../../services/firestoreService';
 import { OpponentSelector, ChallengeInviteModal } from '../../components/challenges';
 import { LinearGradient } from 'expo-linear-gradient';
+import { TourStep } from '../../components/tour';
 
 // Challenge type tabs
 const CHALLENGE_TYPES = [
@@ -765,7 +766,7 @@ const AllChallengesScreen = ({ navigation }) => {
                 <Text style={[styles.headerTitle, { color: theme.text }]}>Challenges</Text>
                 <View style={styles.headerActions}>
                     {/* Invites button with badge */}
-                    <TouchableOpacity 
+                    <TouchableOpacity
                         style={styles.headerButton}
                         onPress={() => setShowInvitesModal(true)}
                     >
@@ -777,17 +778,19 @@ const AllChallengesScreen = ({ navigation }) => {
                 </View>
             </View>
 
-            {/* Type tabs */}
-            <View style={styles.typeTabs}>
-                <FlatList
-                    data={CHALLENGE_TYPES}
-                    renderItem={renderTypeTab}
-                    keyExtractor={item => item.id}
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.typeTabsContent}
-                />
-            </View>
+            {/* Type tabs - wrapped with TourStep for onboarding */}
+            <TourStep stepId="challenge-type-tabs">
+                <View style={styles.typeTabs}>
+                    <FlatList
+                        data={CHALLENGE_TYPES}
+                        renderItem={renderTypeTab}
+                        keyExtractor={item => item.id}
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.typeTabsContent}
+                    />
+                </View>
+            </TourStep>
 
             <ScrollView
                 style={styles.content}
@@ -800,49 +803,50 @@ const AllChallengesScreen = ({ navigation }) => {
                     />
                 }
             >
-                {/* Daily Challenge Card */}
+                {/* Daily Challenge Card - wrapped with TourStep for onboarding */}
                 {dailyChallenge && (
-                    <TouchableOpacity
-                        style={styles.dailyChallengeCard}
-                        onPress={() => navigation.navigate('DailyChallengeDetail', { challenge: dailyChallenge, progress: dailyChallengeProgress })}
-                        activeOpacity={0.9}
-                    >
-                        <LinearGradient
-                            colors={['#9C27B0', '#E040FB']}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                            style={styles.dailyChallengeGradient}
+                    <TourStep stepId="daily-challenge-card">
+                        <TouchableOpacity
+                            style={styles.dailyChallengeCard}
+                            onPress={() => navigation.navigate('DailyChallengeDetail', { challenge: dailyChallenge, progress: dailyChallengeProgress })}
+                            activeOpacity={0.9}
                         >
-                            <View style={styles.dailyChallengeHeader}>
-                                <View style={styles.dailyChallengeBadge}>
-                                    <Ionicons name="flash" size={14} color="#FFD700" />
-                                    <Text style={styles.dailyChallengeBadgeText}>Daily Challenge</Text>
+                            <LinearGradient
+                                colors={['#9C27B0', '#E040FB']}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={styles.dailyChallengeGradient}
+                            >
+                                <View style={styles.dailyChallengeHeader}>
+                                    <View style={styles.dailyChallengeBadge}>
+                                        <Ionicons name="flash" size={14} color="#FFD700" />
+                                        <Text style={styles.dailyChallengeBadgeText}>Daily Challenge</Text>
+                                    </View>
+                                    <Text style={styles.dailyChallengeReward}>
+                                        +{dailyChallenge.rewards?.xp || 75} XP
+                                    </Text>
                                 </View>
-                                <Text style={styles.dailyChallengeReward}>
-                                    +{dailyChallenge.rewards?.xp || 75} XP
+
+                                <Text style={styles.dailyChallengeTitle}>{dailyChallenge.title}</Text>
+                                <Text style={styles.dailyChallengeDescription} numberOfLines={2}>
+                                    {dailyChallenge.description}
                                 </Text>
-                            </View>
 
-                            <Text style={styles.dailyChallengeTitle}>{dailyChallenge.title}</Text>
-                            <Text style={styles.dailyChallengeDescription} numberOfLines={2}>
-                                {dailyChallenge.description}
-                            </Text>
-
-                            <View style={styles.dailyChallengeFooter}>
-                                <View style={styles.dailyChallengeStats}>
-                                    <View style={styles.dailyChallengeStat}>
-                                        <Ionicons name="trophy-outline" size={14} color="rgba(255,255,255,0.8)" />
-                                        <Text style={styles.dailyChallengeStatText}>
-                                            {dailyChallenge.targetValue} {dailyChallenge.targetMetric}
-                                        </Text>
+                                <View style={styles.dailyChallengeFooter}>
+                                    <View style={styles.dailyChallengeStats}>
+                                        <View style={styles.dailyChallengeStat}>
+                                            <Ionicons name="trophy-outline" size={14} color="rgba(255,255,255,0.8)" />
+                                            <Text style={styles.dailyChallengeStatText}>
+                                                {dailyChallenge.targetValue} {dailyChallenge.targetMetric}
+                                            </Text>
+                                        </View>
+                                        <View style={styles.dailyChallengeStat}>
+                                            <Ionicons name="time-outline" size={14} color="rgba(255,255,255,0.8)" />
+                                            <Text style={styles.dailyChallengeStatText}>
+                                                ~{dailyChallenge.estimatedTime || 15} min
+                                            </Text>
+                                        </View>
                                     </View>
-                                    <View style={styles.dailyChallengeStat}>
-                                        <Ionicons name="time-outline" size={14} color="rgba(255,255,255,0.8)" />
-                                        <Text style={styles.dailyChallengeStatText}>
-                                            ~{dailyChallenge.estimatedTime || 15} min
-                                        </Text>
-                                    </View>
-                                </View>
 
                                 {dailyChallengeProgress?.completed ? (
                                     <View style={styles.dailyChallengeCompletedBadge}>
@@ -875,6 +879,7 @@ const AllChallengesScreen = ({ navigation }) => {
                             )}
                         </LinearGradient>
                     </TouchableOpacity>
+                    </TourStep>
                 )}
 
                 {/* Friend Requests Section */}
