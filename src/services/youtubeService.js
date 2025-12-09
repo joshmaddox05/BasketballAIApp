@@ -1,7 +1,7 @@
 // youtubeService.js - Service for YouTube Data API integration
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { YOUTUBE_API_KEY } from '../config/env';
 
-const YOUTUBE_API_KEY = 'AIzaSyCOhPnUz793R1XZE_Uf73ORINAiWWJ-f4M';
 const YOUTUBE_API_BASE_URL = 'https://www.googleapis.com/youtube/v3';
 
 // Basketball training related search terms

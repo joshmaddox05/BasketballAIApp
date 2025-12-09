@@ -339,15 +339,46 @@ export const AppProvider = ({ children }) => {
         setDailyTip(randomTip);
     };
 
-    // Refresh user data (would connect to backend in real app)
+    // Refresh user profile data from Firestore
     const refreshUserData = async () => {
-        // Simulate API call delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        const authUser = getCurrentUser();
+        if (!authUser) {
+            console.log('refreshUserData: No authenticated user');
+            return false;
+        }
 
-        // For demo purposes, just refresh the daily tip
-        await fetchDailyTip();
+        try {
+            const profile = await getUserProfile(authUser.uid);
+            if (profile) {
+                // Normalize field names: ensure both 'displayName' and 'name' are available
+                const normalizedProfile = {
+                    ...profile,
+                    name: profile.displayName || profile.name,
+                    displayName: profile.displayName || profile.name
+                };
+                setUserData(normalizedProfile);
+                console.log('refreshUserData: Profile refreshed successfully');
+            }
 
-        return true;
+            // Also refresh the daily tip
+            await fetchDailyTip();
+
+            return true;
+        } catch (error) {
+            console.error('refreshUserData: Error refreshing profile:', error);
+            return false;
+        }
+    };
+
+    // Update user data locally (for immediate UI updates after profile edits)
+    const updateUserDataLocally = (updates) => {
+        setUserData(prev => ({
+            ...prev,
+            ...updates,
+            // Ensure both name fields are synced
+            name: updates.displayName || updates.name || prev.name,
+            displayName: updates.displayName || updates.name || prev.displayName
+        }));
     };
 
     // Authentication functions (now handled by Firebase auth state listener)
@@ -711,7 +742,8 @@ export const AppProvider = ({ children }) => {
             acceptChallenge,
             triggerMilestone,
             dismissMilestone,
-            refreshAIStats
+            refreshAIStats,
+            updateUserDataLocally
         }}>
             {children}
         </AppContext.Provider>

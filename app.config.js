@@ -61,7 +61,13 @@ export default {
     extra: {
       eas: {
         projectId: "129b22c3-c3ef-4d4a-b37c-e8bed0c7df7f"
-      }
+      },
+      // Environment variables - set via EAS secrets for production builds
+      // See: https://docs.expo.dev/build-reference/variables/
+      stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY,
+      youtubeApiKey: process.env.YOUTUBE_API_KEY,
+      apiBaseUrl: process.env.API_BASE_URL,
+      isProduction: process.env.NODE_ENV === 'production',
     },
     owner: "jmaddox0503"
   }

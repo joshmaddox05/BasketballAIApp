@@ -647,29 +647,10 @@ const AICameraCapture = ({
             ]} />
           </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={styles.settingsButton}
-            onPress={() => {
-              // Debug: Force trigger analysis with fake data
-              console.log('🧪 Debug: Simulating video capture...');
-              const testData = {
-                videoUri: 'test://fake-video.mp4',
-                duration: 3.5,
-                timestamp: Date.now(),
-                analysisMode: analysisMode,
-                pose: detectedPose,
-                cameraType: cameraType,
-                isDebugMode: true
-              };
-              
-              setAnalysisPhase('processing');
-              setTimeout(() => {
-                onCapture(testData);
-              }, 1000);
-            }}
-          >
-            <Ionicons name="bug" size={24} color="#FFF" />
-          </TouchableOpacity>
+          <View style={styles.settingsButton}>
+            {/* Placeholder for symmetry with flip button */}
+            <Ionicons name="options" size={24} color="rgba(255,255,255,0.3)" />
+          </View>
         </View>
       </View>
     </View>

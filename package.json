@@ -25,6 +25,7 @@
     "expo-dev-client": "~6.0.15",
     "expo-device": "~8.0.9",
     "expo-file-system": "~19.0.16",
+    "expo-image-picker": "~17.0.9",
     "expo-linear-gradient": "^15.0.7",
     "expo-localization": "^17.0.7",
     "expo-media-library": "~18.2.0",
@@ -43,7 +44,8 @@
     "react-native-webview": "13.15.0"
   },
   "devDependencies": {
-    "@babel/core": "^7.20.0"
+    "@babel/core": "^7.20.0",
+    "baseline-browser-mapping": "^2.9.5"
   },
   "private": true
 }

@@ -28,6 +28,10 @@ import ChallengeDetailScreen from "../screens/main/ChallengeDetailScreen";
 import ActivityDetailScreen from "../screens/main/ActivityDetailScreen";
 import AllChallengesScreen from "../screens/main/AllChallengesScreen";
 import DailyChallengeDetailScreen from "../screens/main/DailyChallengeDetailScreen";
+import EditProfileScreen from "../screens/main/EditProfileScreen";
+import NotificationsScreen from "../screens/main/NotificationsScreen";
+import AchievementsScreen from "../screens/main/AchievementsScreen";
+import AllGoalsScreen from "../screens/main/AllGoalsScreen";
 
 // For nested navigation within tabs
 const HomeStack = createStackNavigator();
@@ -288,11 +292,7 @@ export default function MainNavigator() {
 // Placeholder components for screens that might not exist yet
 // You can replace these with real screen imports when they're ready
 const ShootingHistoryScreen = () => <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><Text>Shooting History Screen</Text></View>;
-const AchievementsScreen = () => <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><Text>Achievements Screen</Text></View>;
-const AllGoalsScreen = () => <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><Text>All Goals Screen</Text></View>;
 const CreatePostScreen = () => <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><Text>Create Post Screen</Text></View>;
-const EditProfileScreen = () => <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><Text>Edit Profile Screen</Text></View>;
-const NotificationsScreen = () => <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><Text>Notifications Screen</Text></View>;
 const AccountPrivacyScreen = () => <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><Text>Account Privacy Screen</Text></View>;
 const HelpCenterScreen = () => <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><Text>Help Center Screen</Text></View>;
 const ContactUsScreen = () => <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><Text>Contact Us Screen</Text></View>;

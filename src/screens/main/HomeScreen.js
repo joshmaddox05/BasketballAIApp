@@ -224,8 +224,8 @@ const HomeScreen = ({ navigation }) => {
                         style={styles.profileButton}
                         onPress={() => navigation.navigate('Profile', { screen: 'ProfileMain' })}
                     >
-                        {userData.profileImage ? (
-                            <Image source={userData.profileImage} style={styles.profileImage} />
+                        {userData?.photoURL ? (
+                            <Image source={{ uri: userData.photoURL }} style={styles.profileImage} />
                         ) : (
                             <View style={[styles.profileImage, styles.profileImagePlaceholder]}>
                                 <Text style={styles.profileImageText}>

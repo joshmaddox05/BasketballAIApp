@@ -153,7 +153,7 @@ const SettingsScreen = ({ navigation }) => {
                     icon="person-outline"
                     title={i18n.t('editProfile')}
                     subtitle="Update your personal information"
-                    onPress={() => Alert.alert('Edit Profile', 'Coming soon!')}
+                    onPress={() => navigation.navigate('EditProfile')}
                     rightComponent={<Ionicons name="chevron-forward" size={20} color={theme.textTertiary} />}
                 />
 
@@ -216,7 +216,7 @@ const SettingsScreen = ({ navigation }) => {
                     icon="notifications-outline"
                     title={i18n.t('notifications')}
                     subtitle="Push notifications and alerts"
-                    onPress={() => Alert.alert('Notifications', 'Coming soon!')}
+                    onPress={() => navigation.navigate('Notifications')}
                     rightComponent={<Ionicons name="chevron-forward" size={20} color={theme.textTertiary} />}
                 />
 
