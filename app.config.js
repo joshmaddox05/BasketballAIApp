@@ -85,6 +85,10 @@ export default {
       youtubeApiKey: process.env.YOUTUBE_API_KEY,
       apiBaseUrl: process.env.API_BASE_URL,
     },
-    owner: "jmaddox0503"
+    owner: "jmaddox0503",
+    updates: {
+      url: "https://u.expo.dev/129b22c3-c3ef-4d4a-b37c-e8bed0c7df7f"
+    },
+    runtimeVersion: "1.0.0"
   }
 };
