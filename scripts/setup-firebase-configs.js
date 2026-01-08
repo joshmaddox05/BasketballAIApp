@@ -7,7 +7,7 @@ console.log('🔥 Firebase Configuration Setup');
 console.log('===============================');
 
 // Check iOS GoogleService-Info.plist
-const iosConfigPath = './ios/GoogleService-Info.plist';
+const iosConfigPath = './GoogleService-Info.plist';
 if (fs.existsSync(iosConfigPath)) {
   console.log('✅ iOS GoogleService-Info.plist found');
   
@@ -25,7 +25,7 @@ if (fs.existsSync(iosConfigPath)) {
 }
 
 // Check Android google-services.json
-const androidConfigPath = './android/app/google-services.json';
+const androidConfigPath = './google-services.json';
 if (fs.existsSync(androidConfigPath)) {
   console.log('✅ Android google-services.json found');
   

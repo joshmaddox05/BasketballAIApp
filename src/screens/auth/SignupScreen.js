@@ -1,5 +1,5 @@
 // SignupScreen.js
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     StyleSheet,
     Text,
@@ -18,7 +18,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
-import { registerWithEmail, signInWithGoogle } from '../../services/authService';
+import { registerWithEmail } from '../../services/authService';
+import { signInWithGoogle } from '../../services/googleAuthService';
+import { signInWithApple, isAppleSignInAvailable } from '../../services/appleAuthService';
 import { getTheme } from '../../utils/theme';
 
 const SignupScreen = ({ navigation }) => {
@@ -30,9 +32,19 @@ const SignupScreen = ({ navigation }) => {
     const [isConfirmPasswordVisible, setIsConfirmPasswordVisible] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [agreeToTerms, setAgreeToTerms] = useState(false); // Remove pre-check for production
+    const [appleSignInAvailable, setAppleSignInAvailable] = useState(false);
 
     const { theme: contextTheme, isDarkMode } = useAppContext();
     const theme = contextTheme || getTheme(isDarkMode || false);
+
+    // Check if Apple Sign-In is available on mount
+    useEffect(() => {
+        const checkAppleSignIn = async () => {
+            const available = await isAppleSignInAvailable();
+            setAppleSignInAvailable(available);
+        };
+        checkAppleSignIn();
+    }, []);
 
     const validateEmail = (email) => {
         const re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
@@ -115,15 +127,45 @@ const SignupScreen = ({ navigation }) => {
     const handleGoogleSignIn = async () => {
         setIsLoading(true);
         try {
-            // For now, show a message that Google Sign-In is coming soon
-            Alert.alert(
-                'Coming Soon',
-                'Google Sign-In will be available in the next update. Please use email/password for now.',
-                [{ text: 'OK' }]
-            );
+            const result = await signInWithGoogle();
+
+            if (result.user && result.profile) {
+                console.log('Google Sign-In successful!', result.user.email);
+                // AppContext will handle the auth state change automatically
+                // AppNavigator will navigate to the appropriate screen (onboarding for new users)
+            }
         } catch (error) {
             console.error('Google sign-in error:', error);
-            Alert.alert('Error', 'Google Sign-In is not available yet');
+            // Don't show alert for cancelled sign-in
+            if (!error.message?.includes('cancelled')) {
+                Alert.alert('Sign-In Failed', error.message || 'Google Sign-In failed. Please try again.');
+            }
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleAppleSignIn = async () => {
+        if (!appleSignInAvailable) {
+            Alert.alert('Not Available', 'Apple Sign-In is not available on this device.');
+            return;
+        }
+
+        setIsLoading(true);
+        try {
+            const result = await signInWithApple();
+
+            if (result.user && result.profile) {
+                console.log('Apple Sign-In successful!', result.user.email);
+                // AppContext will handle the auth state change automatically
+                // AppNavigator will navigate to the appropriate screen (onboarding for new users)
+            }
+        } catch (error) {
+            console.error('Apple sign-in error:', error);
+            // Don't show alert for cancelled sign-in
+            if (!error.message?.includes('cancelled')) {
+                Alert.alert('Sign-In Failed', error.message || 'Apple Sign-In failed. Please try again.');
+            }
         } finally {
             setIsLoading(false);
         }
@@ -341,9 +383,14 @@ const SignupScreen = ({ navigation }) => {
                                     <Ionicons name="logo-facebook" size={20} color="#4267B2" />
                                 </TouchableOpacity>
 
-                                <TouchableOpacity style={[styles.socialButton, { borderColor: theme.border, backgroundColor: theme.card }]}>
-                                    <Ionicons name="logo-apple" size={20} color={isDarkMode ? '#FFF' : '#000'} />
-                                </TouchableOpacity>
+                                {appleSignInAvailable && (
+                                    <TouchableOpacity
+                                        style={[styles.socialButton, { borderColor: theme.border, backgroundColor: theme.card }]}
+                                        onPress={handleAppleSignIn}
+                                    >
+                                        <Ionicons name="logo-apple" size={20} color={isDarkMode ? '#FFF' : '#000'} />
+                                    </TouchableOpacity>
+                                )}
                             </View>
                         </View>
 

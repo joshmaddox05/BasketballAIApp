@@ -7,8 +7,8 @@ console.log('🔥 Uploading Firebase Config Files to EAS');
 console.log('=========================================');
 
 // Check if files exist
-const iosConfigPath = './ios/GoogleService-Info.plist';
-const androidConfigPath = './android/app/google-services.json';
+const iosConfigPath = './GoogleService-Info.plist';
+const androidConfigPath = './google-services.json';
 
 if (!fs.existsSync(iosConfigPath)) {
   console.error('❌ iOS GoogleService-Info.plist not found at:', iosConfigPath);

@@ -58,9 +58,18 @@ service cloud.firestore {
         allow read, write: if isOwner(uid);
       }
 
-      // Challenge progress - only owner can read/write
+      // Challenge progress - owner can read/write, friends can read/write (for head-to-head)
       match /challengeProgress/{challengeId} {
-        allow read, write: if isOwner(uid);
+        // Owner can read, or friends can read (for opponent progress in H2H)
+        // Check if the requesting user exists in the owner's friends subcollection
+        allow read: if isOwner(uid) ||
+          (isSignedIn() && exists(/databases/$(database)/documents/users/$(uid)/friends/$(request.auth.uid)));
+        // Owner can create/update their own progress
+        // Friends can also create/update (for setting up H2H challenge when accepting invites)
+        allow create: if isOwner(uid) ||
+          (isSignedIn() && exists(/databases/$(database)/documents/users/$(uid)/friends/$(request.auth.uid)));
+        allow update: if isOwner(uid) ||
+          (isSignedIn() && exists(/databases/$(database)/documents/users/$(uid)/friends/$(request.auth.uid)));
       }
 
       // Daily challenge progress - only owner can access
@@ -68,24 +77,38 @@ service cloud.firestore {
         allow read, write: if isOwner(uid);
       }
 
-      // Challenge invites - owner can read/write, any authenticated user can create
+      // Challenge invites - owner can read/write, friends can create invites
       match /challengeInvites/{inviteId} {
         allow read: if isOwner(uid);
-        allow create: if isSignedIn();
+        // Only friends can send challenge invites to each other
+        allow create: if isSignedIn() &&
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)/friends/$(uid));
         allow update, delete: if isOwner(uid);
       }
 
-      // Friends list - only owner can manage
+      // Friends list - owner can manage, friend can add themselves when accepting request
       match /friends/{friendUid} {
         allow read: if isOwner(uid) || isOwner(friendUid);
-        allow write: if isOwner(uid);
+        // Owner can write to their own friends list
+        // OR the friend being added can write (for accepting friend requests)
+        allow write: if isOwner(uid) || isOwner(friendUid);
       }
 
       // Friend requests - owner can read/manage, any authenticated user can create
       match /friendRequests/{requestId} {
         allow read: if isOwner(uid);
-        allow create: if isSignedIn() && request.resource.data.fromUserId == request.auth.uid;
+        allow create: if isSignedIn() && request.resource.data.fromUid == request.auth.uid;
         allow update, delete: if isOwner(uid);
+      }
+
+      // AI analyses - only owner can access
+      match /ai_analyses/{analysisId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      // Notifications - only owner can read/write
+      match /notifications/{notificationId} {
+        allow read, write: if isOwner(uid);
       }
     }
 
@@ -113,10 +136,12 @@ service cloud.firestore {
       allow write: if false; // Admin only
     }
 
-    // Challenges collection - public read, admin write only
+    // Challenges collection - public read, authenticated users can create/update participant count
     match /challenges/{challengeId} {
       allow read: if true;
-      allow write: if false; // Admin only - seeded via scripts
+      allow delete: if false; // Admin only
+      // Allow create/update for authenticated users (setDoc with merge needs both)
+      allow create, update: if isSignedIn();
     }
 
     // Daily challenges - public read, admin write only
@@ -137,7 +162,9 @@ service cloud.firestore {
 
       match /entries/{entryId} {
         allow read: if true;
-        allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+        // Allow create if signed in - needed for challenge invite acceptance where
+        // the accepting user creates entries for both themselves and the inviter
+        allow create: if isSignedIn();
         allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
         allow delete: if false;
       }

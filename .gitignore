@@ -65,3 +65,7 @@ backend/.env
 
 /ios
 /android
+# Firebase
+firebase-debug.log
+firebase-debug.*.log
+.firebase/

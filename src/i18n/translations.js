@@ -85,17 +85,23 @@ export const translations = {
     maybeLater: 'Maybe Later',
 
     // Features
-    basicWorkouts: 'Basic workouts',
-    communityAccess: 'Community access',
-    progressTracking: 'Progress tracking',
-    unlimitedWorkouts: 'Unlimited workouts',
-    noAds: 'No ads',
-    basicAiAnalysis: 'Basic AI analysis',
-    advancedAiAnalysis: 'Advanced AI analysis',
-    personalizedTraining: 'Personalized training plans',
-    mentorSessions: 'Mentor sessions',
-    exclusiveChallenges: 'Exclusive challenges',
-    prioritySupport: 'Priority support',
+    basicWorkouts: 'Access to 3 starter workouts',
+    communityAccess: 'Community feed & leaderboards',
+    progressTracking: 'Basic stats & workout history',
+    unlimitedWorkouts: 'Full workout library (50+ drills)',
+    noAds: 'Ad-free experience',
+    basicAiAnalysis: 'AI shot form tips',
+    advancedAiAnalysis: 'Detailed AI shot breakdown & comparisons',
+    personalizedTraining: 'Custom AI-generated training plans',
+    mentorSessions: 'Live 1-on-1 coach video sessions',
+    exclusiveChallenges: 'Premium weekly challenges & rewards',
+    prioritySupport: '24/7 priority support',
+
+    // Plan descriptions
+    freePlanDesc: 'Get started with basketball training basics',
+    basicPlanDesc: 'Unlock the full workout library and remove ads',
+    premiumPlanDesc: 'Advanced AI analysis plus coaching support',
+    proPlanDesc: 'Everything included with unlimited coaching access',
 
     // Auth
     login: 'Login',
@@ -203,17 +209,23 @@ export const translations = {
     maybeLater: 'Peut-être plus tard',
 
     // Features
-    basicWorkouts: 'Entraînements de base',
-    communityAccess: 'Accès à la communauté',
-    progressTracking: 'Suivi des progrès',
-    unlimitedWorkouts: 'Entraînements illimités',
-    noAds: 'Sans publicité',
-    basicAiAnalysis: 'Analyse IA de base',
-    advancedAiAnalysis: 'Analyse IA avancée',
-    personalizedTraining: 'Plans d\'entraînement personnalisés',
-    mentorSessions: 'Sessions de mentorat',
-    exclusiveChallenges: 'Défis exclusifs',
-    prioritySupport: 'Support prioritaire',
+    basicWorkouts: 'Accès à 3 entraînements de départ',
+    communityAccess: 'Fil communautaire et classements',
+    progressTracking: 'Statistiques de base et historique',
+    unlimitedWorkouts: 'Bibliothèque complète (50+ exercices)',
+    noAds: 'Expérience sans publicité',
+    basicAiAnalysis: 'Conseils IA sur la forme de tir',
+    advancedAiAnalysis: 'Analyse détaillée IA et comparaisons',
+    personalizedTraining: 'Plans d\'entraînement personnalisés par IA',
+    mentorSessions: 'Sessions vidéo 1-à-1 avec coach',
+    exclusiveChallenges: 'Défis premium hebdomadaires et récompenses',
+    prioritySupport: 'Support prioritaire 24/7',
+
+    // Plan descriptions
+    freePlanDesc: 'Commencez avec les bases de l\'entraînement',
+    basicPlanDesc: 'Débloquez toute la bibliothèque sans publicité',
+    premiumPlanDesc: 'Analyse IA avancée plus support coaching',
+    proPlanDesc: 'Tout inclus avec coaching illimité',
 
     // Auth
     login: 'Connexion',

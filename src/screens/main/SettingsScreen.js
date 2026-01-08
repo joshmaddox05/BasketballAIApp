@@ -1,5 +1,5 @@
 // SettingsScreen.js - Settings with dark mode and language options
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     StyleSheet,
     Text,
@@ -9,7 +9,8 @@ import {
     Switch,
     SafeAreaView,
     Alert,
-    ActivityIndicator
+    ActivityIndicator,
+    Linking
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
@@ -19,10 +20,16 @@ import SubscriptionModal from '../../components/shared/SubscriptionModal';
 import { getTheme } from '../../utils/theme';
 import { seedChallenges, checkChallengesExist } from '../../scripts/seedChallenges';
 import { seedDailyChallenges } from '../../scripts/seedDailyChallenges';
+import {
+    updateNotificationPreference,
+    getNotificationPermissionStatus
+} from '../../services/notificationService';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
 const SettingsScreen = ({ navigation }) => {
     const {
         userData,
+        user,
         isDarkMode,
         toggleDarkMode,
         language,
@@ -38,6 +45,50 @@ const SettingsScreen = ({ navigation }) => {
 
     const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
     const [seedingChallenges, setSeedingChallenges] = useState(false);
+    const [sendingTestNotification, setSendingTestNotification] = useState(false);
+
+    // Notification state
+    const [notificationsEnabled, setNotificationsEnabled] = useState(
+        userData?.notificationSettings?.enabled ?? true
+    );
+    const [permissionStatus, setPermissionStatus] = useState(null);
+
+    // Check notification permission status on mount
+    useEffect(() => {
+        const checkPermission = async () => {
+            const status = await getNotificationPermissionStatus();
+            setPermissionStatus(status);
+        };
+        checkPermission();
+    }, []);
+
+    // Update local state when userData changes
+    useEffect(() => {
+        if (userData?.notificationSettings?.enabled !== undefined) {
+            setNotificationsEnabled(userData.notificationSettings.enabled);
+        }
+    }, [userData?.notificationSettings?.enabled]);
+
+    // Handle notification toggle
+    const handleNotificationToggle = async (value) => {
+        // If trying to enable but no permission, prompt to open settings
+        if (permissionStatus !== 'granted' && value) {
+            Alert.alert(
+                'Notifications Disabled',
+                'Please enable notifications in your device settings to receive daily reminders.',
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Open Settings', onPress: () => Linking.openSettings() }
+                ]
+            );
+            return;
+        }
+
+        setNotificationsEnabled(value);
+        if (user?.uid) {
+            await updateNotificationPreference(user.uid, value);
+        }
+    };
 
     const handleStartTour = async () => {
         // Navigate back to Home first, then start the tour
@@ -47,6 +98,32 @@ const SettingsScreen = ({ navigation }) => {
             await resetTour();
             startTour();
         }, 500);
+    };
+
+    const handleTestNotification = async () => {
+        setSendingTestNotification(true);
+        try {
+            const functions = getFunctions();
+            const sendTestNotification = httpsCallable(functions, 'sendTestNotification');
+            const result = await sendTestNotification({
+                title: 'Test Notification',
+                body: 'Push notifications are working! You should see this on your device.',
+                type: 'test'
+            });
+
+            if (result.data.success) {
+                Alert.alert(
+                    'Success',
+                    `Notification sent! Check your device.\n\nToken: ${result.data.pushToken}`
+                );
+            } else {
+                Alert.alert('Error', result.data.error || 'Failed to send notification');
+            }
+        } catch (error) {
+            Alert.alert('Error', `Failed to send test notification: ${error.message}`);
+        } finally {
+            setSendingTestNotification(false);
+        }
     };
 
     const handleSeedChallenges = async () => {
@@ -214,8 +291,22 @@ const SettingsScreen = ({ navigation }) => {
 
                 <SettingRow
                     icon="notifications-outline"
-                    title={i18n.t('notifications')}
-                    subtitle="Push notifications and alerts"
+                    title="Push Notifications"
+                    subtitle={notificationsEnabled ? 'Daily reminders enabled' : 'Reminders disabled'}
+                    rightComponent={
+                        <Switch
+                            value={notificationsEnabled}
+                            onValueChange={handleNotificationToggle}
+                            trackColor={{ false: theme.border, true: theme.primaryLight }}
+                            thumbColor={notificationsEnabled ? theme.primary : theme.backgroundTertiary}
+                        />
+                    }
+                />
+
+                <SettingRow
+                    icon="list-outline"
+                    title="Notification History"
+                    subtitle="View past notifications"
                     onPress={() => navigation.navigate('Notifications')}
                     rightComponent={<Ionicons name="chevron-forward" size={20} color={theme.textTertiary} />}
                 />
@@ -256,6 +347,20 @@ const SettingsScreen = ({ navigation }) => {
 
                 {/* Developer Tools Section - Remove in production */}
                 <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>DEVELOPER TOOLS</Text>
+
+                <SettingRow
+                    icon="notifications-outline"
+                    title="Send Test Notification"
+                    subtitle={sendingTestNotification ? "Sending..." : "Test push notifications"}
+                    onPress={sendingTestNotification ? null : handleTestNotification}
+                    rightComponent={
+                        sendingTestNotification ? (
+                            <ActivityIndicator size="small" color={theme.primary} />
+                        ) : (
+                            <Ionicons name="chevron-forward" size={20} color={theme.textTertiary} />
+                        )
+                    }
+                />
 
                 <SettingRow
                     icon="flask-outline"

@@ -1,5 +1,5 @@
 // DailyChallengeModal.js
-import React from 'react';
+import { useState, useEffect } from 'react';
 import {
     StyleSheet,
     Text,
@@ -15,6 +15,20 @@ const { width } = Dimensions.get('window');
 
 const DailyChallengeModal = ({ visible, challenge, onDismiss, theme }) => {
     const navigation = useNavigation();
+    const [isNavigationReady, setIsNavigationReady] = useState(false);
+
+    // Track when navigation is ready to prevent crashes
+    useEffect(() => {
+        if (visible) {
+            // Small delay to ensure navigation context is fully available
+            const timer = setTimeout(() => {
+                setIsNavigationReady(true);
+            }, 300);
+            return () => clearTimeout(timer);
+        } else {
+            setIsNavigationReady(false);
+        }
+    }, [visible]);
 
     if (!challenge) return null;
 
@@ -39,11 +53,20 @@ const DailyChallengeModal = ({ visible, challenge, onDismiss, theme }) => {
     };
 
     const handleStartChallenge = () => {
+        if (!isNavigationReady) {
+            // If navigation isn't ready, just dismiss and let user navigate manually
+            onDismiss();
+            return;
+        }
         onDismiss();
-        navigation.navigate('Challenges', {
-            screen: 'DailyChallengeDetail',
-            params: { challenge, progress: null }
-        });
+        try {
+            navigation.navigate('Challenges', {
+                screen: 'DailyChallengeDetail',
+                params: { challenge, progress: null }
+            });
+        } catch (error) {
+            console.error('Error navigating to daily challenge:', error);
+        }
     };
 
     return (

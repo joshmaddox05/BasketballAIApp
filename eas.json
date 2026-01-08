@@ -9,7 +9,8 @@
       "distribution": "internal",
       "env": {
         "GOOGLE_SERVICES_INFO_PLIST": "secret:GOOGLE_SERVICES_INFO_PLIST",
-        "GOOGLE_SERVICES_JSON": "secret:GOOGLE_SERVICES_JSON"
+        "GOOGLE_SERVICES_JSON": "secret:GOOGLE_SERVICES_JSON",
+        "APP_ENV": "development"
       },
       "ios": {
         "simulator": false,
@@ -27,10 +28,29 @@
       }
     },
     "preview": {
+      "distribution": "store",
+      "autoIncrement": true,
+      "channel": "preview",
+      "env": {
+        "GOOGLE_SERVICES_INFO_PLIST": "secret:GOOGLE_SERVICES_INFO_PLIST",
+        "GOOGLE_SERVICES_JSON": "secret:GOOGLE_SERVICES_JSON",
+        "YOUTUBE_API_KEY": "secret:YOUTUBE_API_KEY",
+        "APP_ENV": "preview"
+      },
+      "ios": {
+        "simulator": false
+      },
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "preview-internal": {
       "distribution": "internal",
       "env": {
         "GOOGLE_SERVICES_INFO_PLIST": "secret:GOOGLE_SERVICES_INFO_PLIST",
-        "GOOGLE_SERVICES_JSON": "secret:GOOGLE_SERVICES_JSON"
+        "GOOGLE_SERVICES_JSON": "secret:GOOGLE_SERVICES_JSON",
+        "YOUTUBE_API_KEY": "secret:YOUTUBE_API_KEY",
+        "APP_ENV": "preview"
       },
       "ios": {
         "simulator": false
@@ -44,7 +64,8 @@
       "distribution": "internal",
       "env": {
         "GOOGLE_SERVICES_INFO_PLIST": "secret:GOOGLE_SERVICES_INFO_PLIST",
-        "GOOGLE_SERVICES_JSON": "secret:GOOGLE_SERVICES_JSON"
+        "GOOGLE_SERVICES_JSON": "secret:GOOGLE_SERVICES_JSON",
+        "APP_ENV": "preview"
       },
       "ios": {
         "simulator": true
@@ -54,10 +75,16 @@
       }
     },
     "production": {
+      "distribution": "store",
       "autoIncrement": true,
+      "channel": "production",
       "env": {
         "GOOGLE_SERVICES_INFO_PLIST": "secret:GOOGLE_SERVICES_INFO_PLIST",
-        "GOOGLE_SERVICES_JSON": "secret:GOOGLE_SERVICES_JSON"
+        "GOOGLE_SERVICES_JSON": "secret:GOOGLE_SERVICES_JSON",
+        "STRIPE_PUBLISHABLE_KEY": "secret:STRIPE_PUBLISHABLE_KEY",
+        "YOUTUBE_API_KEY": "secret:YOUTUBE_API_KEY",
+        "API_BASE_URL": "secret:API_BASE_URL",
+        "APP_ENV": "production"
       }
     }
   },

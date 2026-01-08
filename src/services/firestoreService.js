@@ -1790,18 +1790,18 @@ export const joinChallenge = async (uid, challengeId, challengeData = {}) => {
       lastActivityAt: serverTimestamp()
     });
 
-    // Increment participant count on the challenge
-    await updateDoc(doc(db, 'challenges', challengeId), {
+    // Increment participant count on the challenge (use setDoc with merge in case doc doesn't exist)
+    await setDoc(doc(db, 'challenges', challengeId), {
       participantCount: increment(1),
       updatedAt: serverTimestamp()
-    });
+    }, { merge: true });
 
     // Add initial leaderboard entry
     const userDoc = await getDoc(doc(db, 'users', uid));
     const userData = userDoc.exists() ? userDoc.data() : {};
 
     await setDoc(doc(db, 'challengeLeaderboards', challengeId, 'entries', uid), {
-      odas: uid,
+      userId: uid,
       displayName: userData.displayName || 'Anonymous',
       profileImage: userData.profileImage || null,
       totalScore: 0,
@@ -2280,9 +2280,11 @@ export const getUserChallengeRank = async (uid, challengeId) => {
  */
 export const sendChallengeInvite = async (challengeId, inviterUid, inviteeUid, challengeData = {}) => {
   try {
-    // Get inviter's display name
+    // Get inviter's display name and profile image
     const inviterDoc = await getDoc(doc(db, 'users', inviterUid));
-    const inviterName = inviterDoc.exists() ? inviterDoc.data().displayName : 'Someone';
+    const inviterData = inviterDoc.exists() ? inviterDoc.data() : {};
+    const inviterName = inviterData.displayName || 'Someone';
+    const inviterProfileImage = inviterData.photoURL || null;
 
     // Create invite document for invitee
     const inviteRef = await addDoc(collection(db, 'users', inviteeUid, 'challengeInvites'), {
@@ -2291,6 +2293,7 @@ export const sendChallengeInvite = async (challengeId, inviterUid, inviteeUid, c
       challengeType: 'head_to_head',
       fromUid: inviterUid,
       fromDisplayName: inviterName,
+      fromProfileImage: inviterProfileImage,
       status: 'pending',
       createdAt: serverTimestamp(),
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days expiry
@@ -2395,15 +2398,16 @@ export const acceptChallengeInvite = async (uid, inviteId) => {
       }
     });
 
-    // Update inviter's progress with opponent info
-    await updateDoc(doc(db, 'users', fromUid, 'challengeProgress', challengeId), {
+    // Create/update inviter's progress with opponent info
+    // Use setDoc with merge to handle case where inviter doesn't have progress doc yet
+    await setDoc(doc(db, 'users', fromUid, 'challengeProgress', challengeId), {
+      ...progressData,
       opponent: {
         uid: uid,
         displayName: inviteeName
       },
-      status: 'active',
       updatedAt: serverTimestamp()
-    });
+    }, { merge: true });
 
     // Update invite status
     await updateDoc(doc(db, 'users', uid, 'challengeInvites', inviteId), {
@@ -2420,7 +2424,7 @@ export const acceptChallengeInvite = async (uid, inviteId) => {
     // Create leaderboard entries for both users
     await Promise.all([
       setDoc(doc(db, 'challengeLeaderboards', challengeId, 'entries', uid), {
-        odas: uid,
+        userId: uid,
         displayName: inviteeName,
         totalScore: 0,
         completedDays: 0,
@@ -2428,7 +2432,7 @@ export const acceptChallengeInvite = async (uid, inviteId) => {
         lastUpdated: serverTimestamp()
       }),
       setDoc(doc(db, 'challengeLeaderboards', challengeId, 'entries', fromUid), {
-        odas: fromUid,
+        userId: fromUid,
         displayName: inviterName,
         totalScore: 0,
         completedDays: 0,
@@ -2513,7 +2517,7 @@ export const searchUsers = async (searchQuery, limitCount = 20) => {
     return snapshot.docs.map(doc => ({
       uid: doc.id,
       displayName: doc.data().displayName,
-      profileImage: doc.data().profileImage || null,
+      profileImage: doc.data().photoURL || null,
       level: doc.data().gamification?.level || 1
     }));
   } catch (error) {
@@ -2544,7 +2548,7 @@ export const sendFriendRequest = async (fromUid, toUid) => {
     const requestRef = await addDoc(collection(db, 'users', toUid, 'friendRequests'), {
       fromUid,
       fromDisplayName: fromUser?.displayName || 'Anonymous',
-      fromProfileImage: fromUser?.profileImage || null,
+      fromProfileImage: fromUser?.photoURL || null,
       status: 'pending',
       createdAt: serverTimestamp()
     });
@@ -2628,7 +2632,7 @@ export const acceptFriendRequest = async (uid, requestId) => {
       // Add to sender's friends
       setDoc(doc(db, 'users', fromUid, 'friends', uid), {
         displayName: toUser?.displayName || 'Anonymous',
-        profileImage: toUser?.profileImage || null,
+        profileImage: toUser?.photoURL || null,
         addedAt: serverTimestamp(),
         status: 'accepted'
       }),

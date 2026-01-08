@@ -32,6 +32,8 @@ import EditProfileScreen from "../screens/main/EditProfileScreen";
 import NotificationsScreen from "../screens/main/NotificationsScreen";
 import AchievementsScreen from "../screens/main/AchievementsScreen";
 import AllGoalsScreen from "../screens/main/AllGoalsScreen";
+import ShootingHistoryScreen from "../screens/main/ShootingHistoryScreen";
+import AccountPrivacyScreen from "../screens/main/AccountPrivacyScreen";
 
 // For nested navigation within tabs
 const HomeStack = createStackNavigator();
@@ -194,6 +196,17 @@ function MainNavigatorContent() {
     const { hasSeenTour, isLoading: isTourLoading, startTour, handleTabChange } = useTour();
     const [showFriendRequestModal, setShowFriendRequestModal] = useState(false);
     const [hasShownModal, setHasShownModal] = useState(false);
+    const [pendingFriendRequests, setPendingFriendRequests] = useState([]);
+    const [isNavigationReady, setIsNavigationReady] = useState(false);
+
+    // Track navigation readiness to prevent issues with modal navigation
+    useEffect(() => {
+        // Delay to ensure navigation is fully mounted and ready
+        const timer = setTimeout(() => {
+            setIsNavigationReady(true);
+        }, 500);
+        return () => clearTimeout(timer);
+    }, []);
 
     // Auto-start tour for new users who haven't seen it yet
     useEffect(() => {
@@ -218,20 +231,30 @@ function MainNavigatorContent() {
         }
     };
 
-    // Listen for friend requests and show modal on login
+    // Listen for friend requests
     useEffect(() => {
         if (!user?.uid) return;
 
         const unsubscribe = listenToFriendRequests(user.uid, (requests) => {
-            // Show modal automatically if there are pending requests and we haven't shown it yet
-            if (requests.length > 0 && !hasShownModal) {
-                setShowFriendRequestModal(true);
-                setHasShownModal(true);
-            }
+            setPendingFriendRequests(requests);
         });
 
         return () => unsubscribe();
-    }, [user?.uid, hasShownModal]);
+    }, [user?.uid]);
+
+    // Show friend request modal only when navigation is ready and no daily challenge modal is showing
+    useEffect(() => {
+        if (!isNavigationReady || !user?.uid) return;
+
+        // Only show friend request modal if:
+        // 1. There are pending requests
+        // 2. We haven't shown the modal yet this session
+        // 3. The daily challenge modal is NOT showing (to prevent race condition)
+        if (pendingFriendRequests.length > 0 && !hasShownModal && !showChallengeModal) {
+            setShowFriendRequestModal(true);
+            setHasShownModal(true);
+        }
+    }, [pendingFriendRequests, hasShownModal, isNavigationReady, user?.uid, showChallengeModal]);
 
     return (
         <>
@@ -291,9 +314,7 @@ export default function MainNavigator() {
 
 // Placeholder components for screens that might not exist yet
 // You can replace these with real screen imports when they're ready
-const ShootingHistoryScreen = () => <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><Text>Shooting History Screen</Text></View>;
 const CreatePostScreen = () => <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><Text>Create Post Screen</Text></View>;
-const AccountPrivacyScreen = () => <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><Text>Account Privacy Screen</Text></View>;
 const HelpCenterScreen = () => <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><Text>Help Center Screen</Text></View>;
 const ContactUsScreen = () => <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><Text>Contact Us Screen</Text></View>;
 const PrivacyPolicyScreen = () => <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><Text>Privacy Policy Screen</Text></View>;

@@ -1,8 +1,17 @@
 // AppContext.js - Enhanced with Firebase integration
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useColorScheme } from 'react-native';
+import { useColorScheme, AppState } from 'react-native';
 import { getTheme } from '../utils/theme';
+
+// Push notification imports
+import {
+  registerForPushNotificationsAsync,
+  savePushToken,
+  updateLastAppOpen,
+  addNotificationReceivedListener,
+  addNotificationResponseListener,
+} from '../services/notificationService';
 
 // Firebase imports
 import { onAuthStateChange, signOutUser, getCurrentUser } from '../services/authService';
@@ -187,8 +196,11 @@ export const AppProvider = ({ children }) => {
                         setAIAnalysisStats(aiStats);
 
                         // Show the challenge modal on every login unless already completed
+                        // Delay slightly to ensure navigation is ready
                         if (challenge && !challenge.completed) {
-                            setShowChallengeModal(true);
+                            setTimeout(() => {
+                                setShowChallengeModal(true);
+                            }, 800);
                         }
                     } catch (error) {
                         console.error('Error loading user data:', error);
@@ -198,6 +210,8 @@ export const AppProvider = ({ children }) => {
                         setAchievements([]);
                         setDailyChallenge(null);
                         setAIAnalysisStats(null);
+                        // Ensure modal is not shown on error
+                        setShowChallengeModal(false);
                     }
                 } else {
                     // User is authenticated but doesn't have a profile yet (during registration)
@@ -228,6 +242,70 @@ export const AppProvider = ({ children }) => {
 
         return unsubscribe;
     }, []);
+
+    // Push notification setup when user is authenticated
+    useEffect(() => {
+        if (!isAuthenticated || !user?.uid) return;
+
+        // Register for push notifications and save token
+        const setupPushNotifications = async () => {
+            try {
+                const token = await registerForPushNotificationsAsync();
+                if (token) {
+                    await savePushToken(user.uid, token);
+                }
+            } catch (error) {
+                console.error('Error setting up push notifications:', error);
+            }
+        };
+
+        setupPushNotifications();
+
+        // Update last app open timestamp
+        updateLastAppOpen(user.uid);
+
+        // Set up notification listeners
+        const notificationReceivedSub = addNotificationReceivedListener((notification) => {
+            console.log('Notification received in foreground:', notification);
+            // Could trigger in-app notification display here
+        });
+
+        const notificationResponseSub = addNotificationResponseListener((response) => {
+            console.log('Notification tapped:', response);
+            const data = response.notification.request.content.data;
+
+            // Handle navigation based on notification type
+            // Navigation will be handled by the component that consumes this context
+            if (data?.type === 'daily_challenge') {
+                console.log('User tapped daily challenge notification');
+                // Navigation handled in MainNavigator or App.js
+            } else if (data?.type === 'workout_reminder') {
+                console.log('User tapped workout reminder notification');
+            }
+        });
+
+        return () => {
+            notificationReceivedSub.remove();
+            notificationResponseSub.remove();
+        };
+    }, [isAuthenticated, user?.uid]);
+
+    // Track app state changes to update lastAppOpen when app comes to foreground
+    useEffect(() => {
+        if (!user?.uid) return;
+
+        const appStateRef = { current: AppState.currentState };
+
+        const subscription = AppState.addEventListener('change', (nextAppState) => {
+            // When app comes to foreground from background
+            if (appStateRef.current.match(/inactive|background/) && nextAppState === 'active') {
+                updateLastAppOpen(user.uid);
+            }
+            appStateRef.current = nextAppState;
+        });
+
+        return () => subscription?.remove();
+    }, [user?.uid]);
 
     // Load global data (workouts, videos) when user is authenticated
     useEffect(() => {

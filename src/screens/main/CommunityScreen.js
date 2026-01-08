@@ -516,8 +516,8 @@ const CommunityScreen = ({ navigation }) => {
                 <View style={[styles.createPostContainer, { backgroundColor: theme.card }]}>
                     <View style={styles.createPostHeader}>
                         <View style={styles.userAvatarContainer}>
-                            {userData.profileImage ? (
-                                <Image source={userData.profileImage} style={styles.userAvatar} />
+                            {userData.photoURL ? (
+                                <Image source={{ uri: userData.photoURL }} style={styles.userAvatar} />
                             ) : (
                                 <View style={styles.userAvatarPlaceholder}>
                                     <Text style={styles.userInitials}>{getInitials(userData.name)}</Text>
