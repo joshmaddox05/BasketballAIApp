@@ -34,6 +34,8 @@ import AchievementsScreen from "../screens/main/AchievementsScreen";
 import AllGoalsScreen from "../screens/main/AllGoalsScreen";
 import ShootingHistoryScreen from "../screens/main/ShootingHistoryScreen";
 import AccountPrivacyScreen from "../screens/main/AccountPrivacyScreen";
+import BrowseWorkoutsScreen from "../screens/main/BrowseWorkoutsScreen";
+import CategoryWorkoutsScreen from "../screens/main/CategoryWorkoutsScreen";
 
 // For nested navigation within tabs
 const HomeStack = createStackNavigator();
@@ -69,6 +71,8 @@ function TrainingStackNavigator() {
             <TrainingStack.Screen name="TrainingCategory" component={TrainingCategoryScreen} options={{ headerShown: false }} />
             <TrainingStack.Screen name="TrainingFilters" component={TrainingFiltersScreen} options={{ headerShown: false }} />
             <TrainingStack.Screen name="AllWorkouts" component={AllWorkoutsScreen} options={{ headerShown: false }} />
+            <TrainingStack.Screen name="BrowseWorkouts" component={BrowseWorkoutsScreen} options={{ headerShown: false }} />
+            <TrainingStack.Screen name="CategoryWorkouts" component={CategoryWorkoutsScreen} options={{ headerShown: false }} />
 
             {/* Add shared screens to Training stack */}
             {addSharedScreensToStack(TrainingStack)}

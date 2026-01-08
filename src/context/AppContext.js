@@ -35,6 +35,7 @@ import {
 // Import workout templates
 import { getAllWorkoutTemplates } from '../data/workoutTemplates';
 import { hasAccess } from '../utils/subscription';
+import { mapLegacyCategoryToId, DEFAULT_CATEGORY_ID } from '../data/taxonomy';
 // Initial empty user data - will be populated from Firestore
 const initialUserData = {
     displayName: null,
@@ -52,6 +53,9 @@ const initialUserData = {
 
 // Convert workout templates to app format
 const convertTemplateToWorkout = (template) => {
+    // Map legacy category to taxonomy categoryId
+    const categoryId = mapLegacyCategoryToId(template.category) || DEFAULT_CATEGORY_ID;
+
     return {
         id: template.id,
         title: template.name,
@@ -60,6 +64,10 @@ const convertTemplateToWorkout = (template) => {
         duration: `${template.estimatedDuration} min`,
         featured: template.requiredTier === 'free', // Feature free workouts
         category: template.category.toLowerCase(),
+        // Taxonomy fields
+        categoryId: categoryId,
+        subCategoryId: null, // Can be set manually or via admin later
+        tags: [], // Can be populated later
         requiredTier: template.requiredTier, // Add subscription tier
         steps: template.steps.map(step => ({
             title: step.name,
@@ -72,6 +80,19 @@ const convertTemplateToWorkout = (template) => {
         })),
         equipment: ['Basketball', 'Court space', 'Water bottle'],
         coachNotes: `This ${template.difficulty.toLowerCase()} workout focuses on ${template.category.toLowerCase()} and takes approximately ${template.estimatedDuration} minutes to complete.`
+    };
+};
+
+/**
+ * Backfill taxonomy fields for workouts that are missing them
+ * Ensures UI never crashes due to missing taxonomy data
+ */
+const backfillTaxonomy = (workout) => {
+    return {
+        ...workout,
+        categoryId: workout.categoryId || mapLegacyCategoryToId(workout.category) || DEFAULT_CATEGORY_ID,
+        subCategoryId: workout.subCategoryId || null,
+        tags: workout.tags || [],
     };
 };
 
@@ -714,6 +735,57 @@ export const AppProvider = ({ children }) => {
         );
     };
 
+    // Get all workouts with taxonomy fields backfilled
+    const getWorkoutsWithTaxonomy = () => {
+        return workouts.map(backfillTaxonomy);
+    };
+
+    // Get workouts filtered by category ID
+    const getWorkoutsByCategory = (categoryId) => {
+        return workouts
+            .map(backfillTaxonomy)
+            .filter(workout => workout.categoryId === categoryId);
+    };
+
+    // Get workouts filtered by category and optionally subcategory
+    const getWorkoutsByTaxonomy = (categoryId, subCategoryId = null) => {
+        return workouts
+            .map(backfillTaxonomy)
+            .filter(workout => {
+                if (workout.categoryId !== categoryId) return false;
+                if (subCategoryId && workout.subCategoryId !== subCategoryId) return false;
+                return true;
+            });
+    };
+
+    // Get workouts filtered by tag
+    const getWorkoutsByTag = (tagId) => {
+        return workouts
+            .map(backfillTaxonomy)
+            .filter(workout => workout.tags && workout.tags.includes(tagId));
+    };
+
+    // Search workouts by title with taxonomy filter
+    const searchWorkouts = (query, categoryId = null, subCategoryId = null) => {
+        const lowerQuery = query.toLowerCase().trim();
+        return workouts
+            .map(backfillTaxonomy)
+            .filter(workout => {
+                // Title match
+                const matchesQuery = !lowerQuery ||
+                    workout.title.toLowerCase().includes(lowerQuery) ||
+                    (workout.description && workout.description.toLowerCase().includes(lowerQuery));
+
+                // Category match
+                const matchesCategory = !categoryId || workout.categoryId === categoryId;
+
+                // Subcategory match
+                const matchesSubCategory = !subCategoryId || workout.subCategoryId === subCategoryId;
+
+                return matchesQuery && matchesCategory && matchesSubCategory;
+            });
+    };
+
     // Challenge management functions
     const refreshDailyChallenge = async () => {
         if (!userData?.uid) return;
@@ -807,6 +879,12 @@ export const AppProvider = ({ children }) => {
             setTrainingVideosData,
             getAccessibleWorkouts,
             getLockedWorkouts,
+            // Taxonomy functions
+            getWorkoutsWithTaxonomy,
+            getWorkoutsByCategory,
+            getWorkoutsByTaxonomy,
+            getWorkoutsByTag,
+            searchWorkouts,
             // Challenge and milestone state
             dailyChallenge,
             showChallengeModal,
