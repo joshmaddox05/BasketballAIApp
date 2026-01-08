@@ -3,10 +3,12 @@
  */
 const { onCall } = require('firebase-functions/v2/https');
 const { onRequest } = require('firebase-functions/v2/https');
+const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { setGlobalOptions } = require('firebase-functions/v2');
 const { defineSecret } = require('firebase-functions/params');
 const admin = require('firebase-admin');
 const Stripe = require('stripe');
+const { Expo } = require('expo-server-sdk');
 
 // Define secrets
 const stripeSecretKey = defineSecret('STRIPE_SECRET_KEY');
@@ -429,5 +431,390 @@ async function handlePaymentSucceeded(invoice) {
 
 async function handlePaymentFailed(invoice) {
   console.log('Payment failed for invoice:', invoice.id);
-  // TODO: Notify the user about failed payment
+
+  const stripe = getStripe();
+  const subscriptionId = invoice.subscription;
+
+  if (!subscriptionId) {
+    console.log('No subscription ID on failed invoice, skipping');
+    return;
+  }
+
+  try {
+    // Get the subscription to find the user
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    const userId = subscription.metadata.firebaseUID;
+
+    if (!userId) {
+      console.error('No Firebase UID in subscription metadata for failed payment');
+      return;
+    }
+
+    // Get user data for push notification
+    const userDoc = await admin.firestore().collection('users').doc(userId).get();
+    const userData = userDoc.data();
+
+    // Update subscription status to past_due in Firestore
+    await admin.firestore().collection('users').doc(userId).update({
+      'subscriptionDetails.status': 'past_due',
+      'subscriptionDetails.paymentFailed': true,
+      'subscriptionDetails.lastPaymentFailure': new Date().toISOString(),
+      'subscriptionDetails.updatedAt': new Date().toISOString(),
+    });
+
+    console.log(`Updated subscription status to past_due for user ${userId}`);
+
+    // Send push notification if user has a valid push token
+    if (userData?.pushToken && Expo.isExpoPushToken(userData.pushToken)) {
+      const message = {
+        to: userData.pushToken,
+        sound: 'default',
+        title: 'Payment Failed',
+        body: 'Your subscription payment failed. Please update your payment method to continue your premium access.',
+        data: {
+          type: 'payment_failed',
+          userId: userId,
+          subscriptionId: subscriptionId,
+        },
+        channelId: 'reminders',
+      };
+
+      try {
+        const tickets = await expo.sendPushNotificationsAsync([message]);
+        console.log('Payment failed notification sent:', tickets[0]);
+      } catch (notifError) {
+        console.error('Failed to send payment failed notification:', notifError);
+      }
+
+      // Save notification to history
+      await admin.firestore()
+        .collection('users')
+        .doc(userId)
+        .collection('notifications')
+        .add({
+          type: 'payment_failed',
+          title: 'Payment Failed',
+          body: 'Your subscription payment failed. Please update your payment method to continue your premium access.',
+          sentAt: admin.firestore.FieldValue.serverTimestamp(),
+          readAt: null,
+        });
+    } else {
+      console.log(`No valid push token for user ${userId}, skipping notification`);
+    }
+
+  } catch (error) {
+    console.error('Error handling payment failed:', error);
+  }
 }
+
+// Initialize Expo SDK for push notifications
+const expo = new Expo();
+
+/**
+ * Test Push Notification - Callable function to send a test notification
+ * Call this from the app to test push notifications work correctly
+ */
+exports.sendTestNotification = onCall(async (request) => {
+  // Verify user is authenticated
+  if (!request.auth) {
+    throw new Error('User must be authenticated');
+  }
+
+  const userId = request.auth.uid;
+  const { title, body, type } = request.data;
+
+  console.log(`Sending test notification to user: ${userId}`);
+
+  try {
+    // Get user's push token from Firestore
+    const userDoc = await admin.firestore().collection('users').doc(userId).get();
+    const userData = userDoc.data();
+
+    if (!userData?.pushToken) {
+      return {
+        success: false,
+        error: 'No push token found. Make sure you are using a physical device and have granted notification permissions.',
+      };
+    }
+
+    // Validate push token format
+    if (!Expo.isExpoPushToken(userData.pushToken)) {
+      return {
+        success: false,
+        error: `Invalid push token format: ${userData.pushToken}`,
+      };
+    }
+
+    // Create and send the notification
+    const message = {
+      to: userData.pushToken,
+      sound: 'default',
+      title: title || 'Test Notification',
+      body: body || 'This is a test push notification from Basketball AI!',
+      data: {
+        type: type || 'test',
+        userId: userId,
+        sentAt: new Date().toISOString(),
+      },
+      channelId: 'reminders',
+    };
+
+    const tickets = await expo.sendPushNotificationsAsync([message]);
+    console.log('Notification ticket:', tickets[0]);
+
+    // Save to notification history
+    await admin.firestore()
+      .collection('users')
+      .doc(userId)
+      .collection('notifications')
+      .add({
+        type: type || 'test',
+        title: message.title,
+        body: message.body,
+        sentAt: admin.firestore.FieldValue.serverTimestamp(),
+        readAt: null,
+      });
+
+    return {
+      success: true,
+      message: 'Test notification sent successfully!',
+      ticket: tickets[0],
+      pushToken: userData.pushToken.substring(0, 30) + '...', // Partial token for debugging
+    };
+
+  } catch (error) {
+    console.error('Error sending test notification:', error);
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+});
+
+/**
+ * Scheduled function: Daily Challenge Reminder at 5 PM ET
+ * Sends push notification to users who haven't opened the app today
+ */
+exports.sendDailyChallengeReminder = onSchedule({
+  schedule: '0 17 * * *', // 5 PM ET
+  timeZone: 'America/New_York',
+  memory: '256MiB',
+}, async (event) => {
+  console.log('Starting daily challenge reminder job...');
+
+  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+
+  try {
+    // Query users with notifications enabled and valid push token
+    const usersSnapshot = await admin.firestore()
+      .collection('users')
+      .where('notificationSettings.enabled', '==', true)
+      .get();
+
+    const messages = [];
+    const notificationRecords = [];
+
+    for (const userDoc of usersSnapshot.docs) {
+      const userData = userDoc.data();
+
+      // Skip if no push token
+      if (!userData.pushToken) {
+        continue;
+      }
+
+      // Skip if user already opened app today
+      if (userData.lastAppOpenDate === today) {
+        console.log(`User ${userDoc.id} already opened app today, skipping`);
+        continue;
+      }
+
+      // Validate push token format
+      if (!Expo.isExpoPushToken(userData.pushToken)) {
+        console.log(`Invalid push token for user ${userDoc.id}`);
+        continue;
+      }
+
+      // Create the notification message
+      messages.push({
+        to: userData.pushToken,
+        sound: 'default',
+        title: "Daily Challenge Waiting!",
+        body: "You haven't completed today's challenge yet. Jump in and keep your streak alive!",
+        data: {
+          type: 'daily_challenge',
+          userId: userDoc.id,
+        },
+        channelId: 'reminders',
+      });
+
+      // Record for notification history
+      notificationRecords.push({
+        userId: userDoc.id,
+        type: 'daily_challenge',
+        title: "Daily Challenge Waiting!",
+        body: "You haven't completed today's challenge yet. Jump in and keep your streak alive!",
+        sentAt: admin.firestore.FieldValue.serverTimestamp(),
+        readAt: null,
+      });
+    }
+
+    if (messages.length === 0) {
+      console.log('No users to notify for daily challenge');
+      return { success: true, count: 0 };
+    }
+
+    // Send notifications in chunks (Expo recommends max 100 per batch)
+    const chunks = expo.chunkPushNotifications(messages);
+
+    for (const chunk of chunks) {
+      try {
+        const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
+        console.log('Sent notification chunk:', ticketChunk.length);
+      } catch (error) {
+        console.error('Error sending notification chunk:', error);
+      }
+    }
+
+    // Save notification records to Firestore
+    const batch = admin.firestore().batch();
+    for (const record of notificationRecords) {
+      const notifRef = admin.firestore()
+        .collection('users')
+        .doc(record.userId)
+        .collection('notifications')
+        .doc();
+      const { userId, ...recordData } = record;
+      batch.set(notifRef, recordData);
+    }
+    await batch.commit();
+
+    console.log(`Daily challenge reminders sent to ${messages.length} users`);
+    return { success: true, count: messages.length };
+
+  } catch (error) {
+    console.error('Error in sendDailyChallengeReminder:', error);
+    throw error;
+  }
+});
+
+/**
+ * Scheduled function: No Workout Today Reminder at 7 PM ET
+ * Sends push notification to users who haven't opened the app today AND haven't done a workout
+ */
+exports.sendWorkoutReminder = onSchedule({
+  schedule: '0 19 * * *', // 7 PM ET
+  timeZone: 'America/New_York',
+  memory: '256MiB',
+}, async (event) => {
+  console.log('Starting workout reminder job...');
+
+  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  const todayStart = new Date(today);
+  todayStart.setHours(0, 0, 0, 0);
+
+  try {
+    // Query users with notifications enabled
+    const usersSnapshot = await admin.firestore()
+      .collection('users')
+      .where('notificationSettings.enabled', '==', true)
+      .get();
+
+    const messages = [];
+    const notificationRecords = [];
+
+    for (const userDoc of usersSnapshot.docs) {
+      const userData = userDoc.data();
+
+      // Skip if no push token
+      if (!userData.pushToken) {
+        continue;
+      }
+
+      // Skip if user already opened app today
+      if (userData.lastAppOpenDate === today) {
+        console.log(`User ${userDoc.id} already opened app today, skipping`);
+        continue;
+      }
+
+      // Validate push token format
+      if (!Expo.isExpoPushToken(userData.pushToken)) {
+        console.log(`Invalid push token for user ${userDoc.id}`);
+        continue;
+      }
+
+      // Check if user has done a workout today
+      const workoutsSnapshot = await admin.firestore()
+        .collection('users')
+        .doc(userDoc.id)
+        .collection('activities')
+        .where('type', '==', 'workout')
+        .where('createdAt', '>=', todayStart)
+        .limit(1)
+        .get();
+
+      if (!workoutsSnapshot.empty) {
+        console.log(`User ${userDoc.id} completed workout today, skipping`);
+        continue;
+      }
+
+      // User hasn't opened app AND hasn't done workout - send notification
+      messages.push({
+        to: userData.pushToken,
+        sound: 'default',
+        title: "Don't Break Your Streak!",
+        body: "You haven't trained today. Even 10 minutes can make a difference!",
+        data: {
+          type: 'workout_reminder',
+          userId: userDoc.id,
+        },
+        channelId: 'reminders',
+      });
+
+      notificationRecords.push({
+        userId: userDoc.id,
+        type: 'workout_reminder',
+        title: "Don't Break Your Streak!",
+        body: "You haven't trained today. Even 10 minutes can make a difference!",
+        sentAt: admin.firestore.FieldValue.serverTimestamp(),
+        readAt: null,
+      });
+    }
+
+    if (messages.length === 0) {
+      console.log('No users to notify for workout reminder');
+      return { success: true, count: 0 };
+    }
+
+    // Send notifications in chunks
+    const chunks = expo.chunkPushNotifications(messages);
+
+    for (const chunk of chunks) {
+      try {
+        const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
+        console.log('Sent notification chunk:', ticketChunk.length);
+      } catch (error) {
+        console.error('Error sending notification chunk:', error);
+      }
+    }
+
+    // Save notification records to Firestore
+    const batch = admin.firestore().batch();
+    for (const record of notificationRecords) {
+      const notifRef = admin.firestore()
+        .collection('users')
+        .doc(record.userId)
+        .collection('notifications')
+        .doc();
+      const { userId, ...recordData } = record;
+      batch.set(notifRef, recordData);
+    }
+    await batch.commit();
+
+    console.log(`Workout reminders sent to ${messages.length} users`);
+    return { success: true, count: messages.length };
+
+  } catch (error) {
+    console.error('Error in sendWorkoutReminder:', error);
+    throw error;
+  }
+});

@@ -940,90 +940,202 @@ const ProgressScreen = ({ navigation }) => {
         );
     };
 
-    // Renders the Goals tab content - Coming Soon
+    // Renders the Goals tab content
     const renderGoalsTab = () => {
-        const plannedFeatures = [
-            {
-                icon: 'flag',
-                title: 'Custom Goals',
-                description: 'Set personalized targets for shooting accuracy, workouts, and more'
-            },
-            {
-                icon: 'analytics',
-                title: 'Progress Tracking',
-                description: 'Track your progress with visual charts and milestone notifications'
-            },
-            {
-                icon: 'trophy',
-                title: 'Achievement Goals',
-                description: 'Earn badges and rewards for hitting your training milestones'
-            },
-            {
-                icon: 'calendar',
-                title: 'Deadline Reminders',
-                description: 'Stay on track with smart reminders as deadlines approach'
-            }
-        ];
+        // Filter goals
+        const activeGoals = goals?.filter(g => !g.completed && g.isActive !== false) || [];
+        const completedGoals = goals?.filter(g => g.completed || (g.current >= g.target)) || [];
+
+        // Calculate stats
+        const totalProgress = activeGoals.length > 0
+            ? activeGoals.reduce((sum, g) => sum + Math.min((g.current / g.target) * 100, 100), 0) / activeGoals.length
+            : 0;
+
+        const getProgressColor = (progress) => {
+            if (progress >= 100) return '#4CAF50';
+            if (progress >= 75) return '#8BC34A';
+            if (progress >= 50) return '#FFC107';
+            if (progress >= 25) return '#FF9800';
+            return theme.primary;
+        };
+
+        const getCategoryIcon = (category) => {
+            const categoryIcons = {
+                shooting: 'basketball',
+                dribbling: 'hand-left',
+                physical: 'fitness',
+                defense: 'shield',
+                passing: 'swap-horizontal',
+            };
+            return categoryIcons[category?.toLowerCase()] || 'flag';
+        };
+
+        const displayedGoals = showCompletedGoals ? completedGoals : activeGoals;
 
         return (
             <View style={styles.tabContent}>
-                {/* Coming Soon Hero */}
-                <View style={[styles.goalsSoonHero, { backgroundColor: theme.card }]}>
-                    <View style={[styles.goalsSoonIconContainer, { backgroundColor: theme.primary + '20' }]}>
-                        <Ionicons name="flag" size={48} color={theme.primary} />
-                    </View>
-                    <Text style={[styles.goalsSoonTitle, { color: theme.text }]}>Goals Coming Soon</Text>
-                    <Text style={[styles.goalsSoonSubtitle, { color: theme.textSecondary }]}>
-                        We're building powerful goal-setting tools to help you reach your full potential.
-                    </Text>
-                    <View style={[styles.goalsSoonBadge, { backgroundColor: theme.primary + '20' }]}>
-                        <Ionicons name="construct" size={14} color={theme.primary} />
-                        <Text style={[styles.goalsSoonBadgeText, { color: theme.primary }]}>In Development</Text>
-                    </View>
-                </View>
-
-                {/* Planned Features */}
-                <Text style={[styles.goalsSoonSectionTitle, { color: theme.text }]}>What's Coming</Text>
-                <View style={styles.goalsSoonFeatures}>
-                    {plannedFeatures.map((feature, index) => (
-                        <View
-                            key={index}
-                            style={[styles.goalsSoonFeatureCard, { backgroundColor: theme.card }]}
-                        >
-                            <View style={[styles.goalsSoonFeatureIcon, { backgroundColor: theme.primary + '15' }]}>
-                                <Ionicons name={feature.icon} size={24} color={theme.primary} />
-                            </View>
-                            <View style={styles.goalsSoonFeatureContent}>
-                                <Text style={[styles.goalsSoonFeatureTitle, { color: theme.text }]}>
-                                    {feature.title}
-                                </Text>
-                                <Text style={[styles.goalsSoonFeatureDesc, { color: theme.textSecondary }]}>
-                                    {feature.description}
-                                </Text>
-                            </View>
+                {/* Goals Summary */}
+                <View style={[styles.goalsSummaryCard, { backgroundColor: theme.card }]}>
+                    <View style={styles.goalsSummaryRow}>
+                        <View style={styles.goalsSummaryItem}>
+                            <Text style={[styles.goalsSummaryValue, { color: theme.primary }]}>{activeGoals.length}</Text>
+                            <Text style={[styles.goalsSummaryLabel, { color: theme.textSecondary }]}>Active</Text>
                         </View>
-                    ))}
+                        <View style={[styles.goalsSummaryDivider, { backgroundColor: theme.border }]} />
+                        <View style={styles.goalsSummaryItem}>
+                            <Text style={[styles.goalsSummaryValue, { color: '#4CAF50' }]}>{completedGoals.length}</Text>
+                            <Text style={[styles.goalsSummaryLabel, { color: theme.textSecondary }]}>Completed</Text>
+                        </View>
+                        <View style={[styles.goalsSummaryDivider, { backgroundColor: theme.border }]} />
+                        <View style={styles.goalsSummaryItem}>
+                            <Text style={[styles.goalsSummaryValue, { color: theme.text }]}>{Math.round(totalProgress)}%</Text>
+                            <Text style={[styles.goalsSummaryLabel, { color: theme.textSecondary }]}>Avg Progress</Text>
+                        </View>
+                    </View>
                 </View>
 
-                {/* Get Notified CTA */}
-                <View style={[styles.goalsSoonCta, { backgroundColor: theme.card }]}>
-                    <Text style={[styles.goalsSoonCtaTitle, { color: theme.text }]}>
-                        Want to be notified?
-                    </Text>
-                    <Text style={[styles.goalsSoonCtaText, { color: theme.textSecondary }]}>
-                        Enable notifications in Settings to know when Goals launches!
-                    </Text>
+                {/* Toggle Active/Completed */}
+                <View style={styles.goalsToggleRow}>
                     <TouchableOpacity
-                        style={[styles.goalsSoonCtaButton, { backgroundColor: theme.primary }]}
-                        onPress={() => navigation.navigate('Profile', {
-                            screen: 'Settings',
-                            initial: false
-                        })}
+                        style={[
+                            styles.goalsToggleButton,
+                            !showCompletedGoals && { backgroundColor: theme.primary },
+                            showCompletedGoals && { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border }
+                        ]}
+                        onPress={() => setShowCompletedGoals(false)}
                     >
-                        <Ionicons name="notifications" size={18} color="#FFF" />
-                        <Text style={styles.goalsSoonCtaButtonText}>Go to Settings</Text>
+                        <Text style={[styles.goalsToggleText, { color: showCompletedGoals ? theme.text : '#FFF' }]}>
+                            Active ({activeGoals.length})
+                        </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[
+                            styles.goalsToggleButton,
+                            showCompletedGoals && { backgroundColor: '#4CAF50' },
+                            !showCompletedGoals && { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border }
+                        ]}
+                        onPress={() => setShowCompletedGoals(true)}
+                    >
+                        <Text style={[styles.goalsToggleText, { color: !showCompletedGoals ? theme.text : '#FFF' }]}>
+                            Completed ({completedGoals.length})
+                        </Text>
                     </TouchableOpacity>
                 </View>
+
+                {/* Goals List */}
+                {displayedGoals.length === 0 ? (
+                    <View style={[styles.goalsEmptyState, { backgroundColor: theme.card }]}>
+                        <Ionicons
+                            name={showCompletedGoals ? "checkmark-circle-outline" : "flag-outline"}
+                            size={48}
+                            color={theme.textSecondary}
+                        />
+                        <Text style={[styles.goalsEmptyTitle, { color: theme.text }]}>
+                            {showCompletedGoals ? 'No Completed Goals Yet' : 'No Active Goals'}
+                        </Text>
+                        <Text style={[styles.goalsEmptyText, { color: theme.textSecondary }]}>
+                            {showCompletedGoals
+                                ? 'Complete your active goals to see them here.'
+                                : 'Set goals to track your basketball progress and stay motivated!'}
+                        </Text>
+                        {!showCompletedGoals && (
+                            <TouchableOpacity
+                                style={[styles.goalsAddButton, { backgroundColor: theme.primary }]}
+                                onPress={() => navigation.navigate('AllGoals')}
+                            >
+                                <Ionicons name="add" size={20} color="#FFF" />
+                                <Text style={styles.goalsAddButtonText}>Add Your First Goal</Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                ) : (
+                    <>
+                        {displayedGoals.slice(0, 5).map((goal, index) => {
+                            const progress = Math.min((goal.current / goal.target) * 100, 100);
+                            const progressColor = getProgressColor(progress);
+                            const isCompleted = goal.completed || progress >= 100;
+
+                            return (
+                                <TouchableOpacity
+                                    key={goal.id || index}
+                                    style={[styles.goalCard, { backgroundColor: theme.card }]}
+                                    onPress={() => toggleGoalExpansion(goal.id)}
+                                    activeOpacity={0.7}
+                                >
+                                    <View style={styles.goalCardHeader}>
+                                        <View style={[styles.goalCategoryIcon, { backgroundColor: progressColor + '20' }]}>
+                                            <Ionicons
+                                                name={getCategoryIcon(goal.category || goal.type)}
+                                                size={20}
+                                                color={progressColor}
+                                            />
+                                        </View>
+                                        <View style={styles.goalCardInfo}>
+                                            <Text style={[styles.goalCardTitle, { color: theme.text }]} numberOfLines={1}>
+                                                {goal.title || goal.name}
+                                            </Text>
+                                            <Text style={[styles.goalCardCategory, { color: theme.textSecondary }]}>
+                                                {goal.category || goal.type || 'General'}
+                                            </Text>
+                                        </View>
+                                        {isCompleted && (
+                                            <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
+                                        )}
+                                    </View>
+
+                                    <View style={styles.goalCardProgress}>
+                                        <View style={styles.goalProgressHeader}>
+                                            <Text style={[styles.goalProgressValues, { color: theme.text }]}>
+                                                {goal.current || 0} / {goal.target}
+                                            </Text>
+                                            <Text style={[styles.goalProgressPercent, { color: progressColor }]}>
+                                                {Math.round(progress)}%
+                                            </Text>
+                                        </View>
+                                        <View style={[styles.goalProgressBar, { backgroundColor: theme.backgroundSecondary }]}>
+                                            <View
+                                                style={[
+                                                    styles.goalProgressFill,
+                                                    { backgroundColor: progressColor, width: `${progress}%` }
+                                                ]}
+                                            />
+                                        </View>
+                                    </View>
+
+                                    {expandedGoalId === goal.id && goal.description && (
+                                        <Text style={[styles.goalCardDescription, { color: theme.textSecondary }]}>
+                                            {goal.description}
+                                        </Text>
+                                    )}
+                                </TouchableOpacity>
+                            );
+                        })}
+
+                        {/* View All Goals Button */}
+                        {(activeGoals.length > 5 || completedGoals.length > 5) && (
+                            <TouchableOpacity
+                                style={[styles.viewAllGoalsButton, { borderColor: theme.primary }]}
+                                onPress={() => navigation.navigate('AllGoals')}
+                            >
+                                <Text style={[styles.viewAllGoalsText, { color: theme.primary }]}>
+                                    View All Goals
+                                </Text>
+                                <Ionicons name="arrow-forward" size={18} color={theme.primary} />
+                            </TouchableOpacity>
+                        )}
+                    </>
+                )}
+
+                {/* Add New Goal Button */}
+                {displayedGoals.length > 0 && (
+                    <TouchableOpacity
+                        style={[styles.floatingAddGoalButton, { backgroundColor: theme.primary }]}
+                        onPress={() => navigation.navigate('AllGoals')}
+                    >
+                        <Ionicons name="add" size={20} color="#FFF" />
+                        <Text style={styles.floatingAddGoalText}>Manage Goals</Text>
+                    </TouchableOpacity>
+                )}
             </View>
         );
     };
@@ -2087,100 +2199,67 @@ const styles = StyleSheet.create({
     completedGoalValue: {
         fontSize: 13,
     },
-    // Goals Coming Soon Styles
-    goalsSoonHero: {
+    // Goals Tab Styles
+    goalsSummaryCard: {
         borderRadius: 16,
-        padding: 24,
+        padding: 16,
         margin: 16,
+    },
+    goalsSummaryRow: {
+        flexDirection: 'row',
         alignItems: 'center',
     },
-    goalsSoonIconContainer: {
-        width: 96,
-        height: 96,
-        borderRadius: 48,
-        justifyContent: 'center',
+    goalsSummaryItem: {
+        flex: 1,
         alignItems: 'center',
-        marginBottom: 16,
     },
-    goalsSoonTitle: {
-        fontSize: 22,
+    goalsSummaryValue: {
+        fontSize: 24,
         fontWeight: 'bold',
-        marginBottom: 8,
-        textAlign: 'center',
     },
-    goalsSoonSubtitle: {
+    goalsSummaryLabel: {
+        fontSize: 12,
+        marginTop: 4,
+    },
+    goalsSummaryDivider: {
+        width: 1,
+        height: 40,
+    },
+    goalsToggleRow: {
+        flexDirection: 'row',
+        marginHorizontal: 16,
+        marginBottom: 16,
+        gap: 12,
+    },
+    goalsToggleButton: {
+        flex: 1,
+        paddingVertical: 10,
+        borderRadius: 20,
+        alignItems: 'center',
+    },
+    goalsToggleText: {
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    goalsEmptyState: {
+        borderRadius: 16,
+        padding: 32,
+        marginHorizontal: 16,
+        alignItems: 'center',
+    },
+    goalsEmptyTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        marginTop: 16,
+        marginBottom: 8,
+    },
+    goalsEmptyText: {
         fontSize: 14,
         textAlign: 'center',
         lineHeight: 20,
-        marginBottom: 16,
-        paddingHorizontal: 20,
-    },
-    goalsSoonBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 20,
-        gap: 6,
-    },
-    goalsSoonBadgeText: {
-        fontSize: 12,
-        fontWeight: '600',
-    },
-    goalsSoonSectionTitle: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        marginHorizontal: 16,
-        marginBottom: 12,
-    },
-    goalsSoonFeatures: {
-        paddingHorizontal: 16,
         marginBottom: 20,
     },
-    goalsSoonFeatureCard: {
-        flexDirection: 'row',
-        borderRadius: 12,
-        padding: 16,
-        marginBottom: 12,
-        alignItems: 'center',
-    },
-    goalsSoonFeatureIcon: {
-        width: 48,
-        height: 48,
-        borderRadius: 12,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 14,
-    },
-    goalsSoonFeatureContent: {
-        flex: 1,
-    },
-    goalsSoonFeatureTitle: {
-        fontSize: 15,
-        fontWeight: '600',
-        marginBottom: 4,
-    },
-    goalsSoonFeatureDesc: {
-        fontSize: 13,
-        lineHeight: 18,
-    },
-    goalsSoonCta: {
-        borderRadius: 16,
-        padding: 20,
-        margin: 16,
-        alignItems: 'center',
-    },
-    goalsSoonCtaTitle: {
-        fontSize: 16,
-        fontWeight: '600',
-        marginBottom: 6,
-    },
-    goalsSoonCtaText: {
-        fontSize: 13,
-        textAlign: 'center',
-        marginBottom: 16,
-    },
-    goalsSoonCtaButton: {
+    goalsAddButton: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 20,
@@ -2188,7 +2267,99 @@ const styles = StyleSheet.create({
         borderRadius: 24,
         gap: 8,
     },
-    goalsSoonCtaButtonText: {
+    goalsAddButtonText: {
+        color: '#FFF',
+        fontSize: 15,
+        fontWeight: '600',
+    },
+    goalCard: {
+        borderRadius: 12,
+        padding: 16,
+        marginHorizontal: 16,
+        marginBottom: 12,
+    },
+    goalCardHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    goalCategoryIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    goalCardInfo: {
+        flex: 1,
+    },
+    goalCardTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    goalCardCategory: {
+        fontSize: 12,
+        marginTop: 2,
+        textTransform: 'capitalize',
+    },
+    goalCardProgress: {
+        marginBottom: 8,
+    },
+    goalProgressHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 6,
+    },
+    goalProgressValues: {
+        fontSize: 14,
+        fontWeight: '500',
+    },
+    goalProgressPercent: {
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    goalProgressBar: {
+        height: 8,
+        borderRadius: 4,
+        overflow: 'hidden',
+    },
+    goalProgressFill: {
+        height: '100%',
+        borderRadius: 4,
+    },
+    goalCardDescription: {
+        fontSize: 13,
+        lineHeight: 18,
+        marginTop: 8,
+    },
+    viewAllGoalsButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+        marginHorizontal: 16,
+        marginTop: 4,
+        borderRadius: 12,
+        borderWidth: 1,
+        gap: 8,
+    },
+    viewAllGoalsText: {
+        fontSize: 15,
+        fontWeight: '600',
+    },
+    floatingAddGoalButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 14,
+        marginHorizontal: 16,
+        marginTop: 16,
+        marginBottom: 8,
+        borderRadius: 24,
+        gap: 8,
+    },
+    floatingAddGoalText: {
         color: '#FFF',
         fontSize: 15,
         fontWeight: '600',

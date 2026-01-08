@@ -12,6 +12,7 @@ export const SUBSCRIPTION_PLANS = [
     id: SUBSCRIPTION_TIERS.FREE,
     name: 'Free',
     nameKey: 'freePlan',
+    descriptionKey: 'freePlanDesc',
     price: '$0',
     priceValue: 0,
     billingCycle: 'month',
@@ -25,54 +26,57 @@ export const SUBSCRIPTION_PLANS = [
     id: SUBSCRIPTION_TIERS.BASIC,
     name: 'Basic',
     nameKey: 'basicPlan',
+    descriptionKey: 'basicPlanDesc',
     price: '$4.99',
     priceValue: 4.99,
     billingCycle: 'month',
     popular: false,
     features: [
       { key: 'unlimitedWorkouts', enabled: true },
-      { key: 'communityAccess', enabled: true },
-      { key: 'progressTracking', enabled: true },
       { key: 'noAds', enabled: true },
-      { key: 'basicAiAnalysis', enabled: true, limit: 5 }
+      { key: 'basicAiAnalysis', enabled: true, limit: 5 },
+      { key: 'communityAccess', enabled: true },
+      { key: 'progressTracking', enabled: true }
     ]
   },
   {
     id: SUBSCRIPTION_TIERS.PREMIUM,
     name: 'Premium',
     nameKey: 'premiumPlan',
+    descriptionKey: 'premiumPlanDesc',
     price: '$9.99',
     priceValue: 9.99,
     billingCycle: 'month',
     popular: true,
     features: [
       { key: 'unlimitedWorkouts', enabled: true },
-      { key: 'communityAccess', enabled: true },
-      { key: 'progressTracking', enabled: true },
       { key: 'noAds', enabled: true },
       { key: 'advancedAiAnalysis', enabled: true },
       { key: 'mentorSessions', enabled: true, limit: 1 },
-      { key: 'exclusiveChallenges', enabled: true }
+      { key: 'exclusiveChallenges', enabled: true },
+      { key: 'communityAccess', enabled: true },
+      { key: 'progressTracking', enabled: true }
     ]
   },
   {
     id: SUBSCRIPTION_TIERS.PRO,
     name: 'Pro',
     nameKey: 'proPlan',
+    descriptionKey: 'proPlanDesc',
     price: '$19.99',
     priceValue: 19.99,
     billingCycle: 'month',
     popular: false,
     features: [
       { key: 'unlimitedWorkouts', enabled: true },
-      { key: 'communityAccess', enabled: true },
-      { key: 'progressTracking', enabled: true },
       { key: 'noAds', enabled: true },
       { key: 'advancedAiAnalysis', enabled: true },
       { key: 'personalizedTraining', enabled: true },
       { key: 'mentorSessions', enabled: true, limit: -1 },
       { key: 'exclusiveChallenges', enabled: true },
-      { key: 'prioritySupport', enabled: true }
+      { key: 'prioritySupport', enabled: true },
+      { key: 'communityAccess', enabled: true },
+      { key: 'progressTracking', enabled: true }
     ]
   }
 ];

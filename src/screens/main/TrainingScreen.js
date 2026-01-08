@@ -371,6 +371,25 @@ const TrainingScreen = ({ navigation }) => {
                             showsHorizontalScrollIndicator={false}
                             contentContainerStyle={styles.categoriesList}
                         />
+                        {/* Browse by Type Button */}
+                        <TouchableOpacity
+                            style={[styles.browseByTypeButton, { backgroundColor: theme.card, borderColor: theme.border }]}
+                            onPress={() => navigation.navigate('BrowseWorkouts')}
+                            activeOpacity={0.7}
+                        >
+                            <View style={styles.browseByTypeContent}>
+                                <View style={[styles.browseByTypeIcon, { backgroundColor: theme.primary + '20' }]}>
+                                    <Ionicons name="grid-outline" size={20} color={theme.primary} />
+                                </View>
+                                <View style={styles.browseByTypeText}>
+                                    <Text style={[styles.browseByTypeTitle, { color: theme.text }]}>Browse by Type</Text>
+                                    <Text style={[styles.browseByTypeSubtitle, { color: theme.textSecondary }]}>
+                                        Find workouts with categories and filters
+                                    </Text>
+                                </View>
+                            </View>
+                            <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
+                        </TouchableOpacity>
                     </View>
 
                     {/* AI-Powered Analysis Feature */}
@@ -649,6 +668,39 @@ const styles = StyleSheet.create({
     },
     categoryArrow: {
         opacity: 0.8,
+    },
+    browseByTypeButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: 14,
+        borderRadius: 12,
+        borderWidth: 1,
+        marginTop: 16,
+    },
+    browseByTypeContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+    },
+    browseByTypeIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    browseByTypeText: {
+        marginLeft: 12,
+        flex: 1,
+    },
+    browseByTypeTitle: {
+        fontSize: 15,
+        fontWeight: '600',
+        marginBottom: 2,
+    },
+    browseByTypeSubtitle: {
+        fontSize: 13,
     },
     analysisSection: {
         marginBottom: 24,

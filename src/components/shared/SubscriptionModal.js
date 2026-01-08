@@ -266,20 +266,41 @@ const SubscriptionModal = ({ visible, onClose, onUpgrade }) => {
                                         </View>
                                     </View>
 
+                                    {plan.descriptionKey && (
+                                        <Text style={[styles.planDescription, { color: theme.textSecondary }]}>
+                                            {i18n.t(plan.descriptionKey)}
+                                        </Text>
+                                    )}
+
                                     <View style={styles.featuresContainer}>
-                                        {plan.features.map((feature, index) => (
-                                            <View key={index} style={styles.featureRow}>
-                                                <Ionicons
-                                                    name="checkmark-circle"
-                                                    size={20}
-                                                    color={theme.success}
-                                                />
-                                                <Text style={[styles.featureText, { color: theme.textSecondary }]}>
-                                                    {i18n.t(feature.key)}
-                                                    {feature.limit && feature.limit > 0 && ` (${feature.limit}x)`}
-                                                </Text>
-                                            </View>
-                                        ))}
+                                        {plan.features.map((feature, index) => {
+                                            // Format limit display
+                                            let limitText = '';
+                                            if (feature.limit && feature.limit > 0) {
+                                                if (feature.key === 'mentorSessions') {
+                                                    limitText = ` (${feature.limit}/mo)`;
+                                                } else if (feature.key === 'basicAiAnalysis') {
+                                                    limitText = ` (${feature.limit}/mo)`;
+                                                } else {
+                                                    limitText = ` (${feature.limit}x)`;
+                                                }
+                                            } else if (feature.limit === -1) {
+                                                limitText = ' (unlimited)';
+                                            }
+
+                                            return (
+                                                <View key={index} style={styles.featureRow}>
+                                                    <Ionicons
+                                                        name="checkmark-circle"
+                                                        size={20}
+                                                        color={theme.success}
+                                                    />
+                                                    <Text style={[styles.featureText, { color: theme.textSecondary }]}>
+                                                        {i18n.t(feature.key)}{limitText}
+                                                    </Text>
+                                                </View>
+                                            );
+                                        })}
                                     </View>
 
                                     {isCurrentPlan && (
@@ -394,6 +415,12 @@ const styles = StyleSheet.create({
     planName: {
         fontSize: 22,
         fontWeight: 'bold',
+    },
+    planDescription: {
+        fontSize: 14,
+        fontStyle: 'italic',
+        marginBottom: 10,
+        lineHeight: 20,
     },
     priceContainer: {
         alignItems: 'flex-end',

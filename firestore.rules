@@ -7,101 +7,194 @@ service cloud.firestore {
     }
 
     function isOwner(userId) {
-      return request.auth.uid == userId;
+      return request.auth != null && request.auth.uid == userId;
     }
 
-    // DEVELOPMENT MODE: Temporarily open for testing
-    // TODO: Tighten these rules before production!
-    // Users collection - temporarily open for development
+    function isValidUser() {
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    // Users collection - users can only read/write their own data
     match /users/{uid} {
-      allow read, write: if true; // DEVELOPMENT ONLY - CHANGE BEFORE PRODUCTION!
-      
-      // User's subcollections - temporarily open for development
+      // Users can read their own profile, and basic info of other users
+      allow read: if isSignedIn();
+      // Users can only create/update their own profile
+      allow create: if isOwner(uid);
+      allow update: if isOwner(uid);
+      allow delete: if false; // Prevent accidental deletion
+
+      // User's activities - only owner can access
       match /activities/{activityId} {
-        allow read, write: if true; // DEVELOPMENT ONLY
+        allow read, write: if isOwner(uid);
       }
 
+      // User's training plans - only owner can access
       match /plans/{planId} {
-        allow read, write: if true; // DEVELOPMENT ONLY
+        allow read, write: if isOwner(uid);
       }
 
+      // User's training sessions - only owner can access
       match /sessions/{sessionId} {
-        allow read, write: if true; // DEVELOPMENT ONLY
+        allow read, write: if isOwner(uid);
       }
 
+      // User's goals - only owner can access
       match /goals/{goalId} {
-        allow read, write: if true; // DEVELOPMENT ONLY
+        allow read, write: if isOwner(uid);
       }
 
+      // User's achievements - only owner can access
       match /achievements/{achievementId} {
-        allow read, write: if true; // DEVELOPMENT ONLY
+        allow read, write: if isOwner(uid);
       }
 
-      // Challenge progress - only owner can read/write
+      // User's custom workouts - only owner can access
+      match /customWorkouts/{workoutId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      // User's custom plans - only owner can access
+      match /customPlans/{planId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      // Challenge progress - owner can read/write, friends can read/write (for head-to-head)
       match /challengeProgress/{challengeId} {
-        allow read, write: if true; // DEVELOPMENT ONLY
+        // Owner can read, or friends can read (for opponent progress in H2H)
+        // Check if the requesting user exists in the owner's friends subcollection
+        allow read: if isOwner(uid) ||
+          (isSignedIn() && exists(/databases/$(database)/documents/users/$(uid)/friends/$(request.auth.uid)));
+        // Owner can create/update their own progress
+        // Friends can also create/update (for setting up H2H challenge when accepting invites)
+        allow create: if isOwner(uid) ||
+          (isSignedIn() && exists(/databases/$(database)/documents/users/$(uid)/friends/$(request.auth.uid)));
+        allow update: if isOwner(uid) ||
+          (isSignedIn() && exists(/databases/$(database)/documents/users/$(uid)/friends/$(request.auth.uid)));
       }
 
-      // Challenge invites - owner can read/write, any authenticated user can create
+      // Daily challenge progress - only owner can access
+      match /dailyChallengeProgress/{progressId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      // Challenge invites - owner can read/write, friends can create invites
       match /challengeInvites/{inviteId} {
-        allow read, write: if true; // DEVELOPMENT ONLY
+        allow read: if isOwner(uid);
+        // Only friends can send challenge invites to each other
+        allow create: if isSignedIn() &&
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)/friends/$(uid));
+        allow update, delete: if isOwner(uid);
       }
 
-      // Friends - only owner can manage
+      // Friends list - owner can manage, friend can add themselves when accepting request
       match /friends/{friendUid} {
-        allow read, write: if true; // DEVELOPMENT ONLY
+        allow read: if isOwner(uid) || isOwner(friendUid);
+        // Owner can write to their own friends list
+        // OR the friend being added can write (for accepting friend requests)
+        allow write: if isOwner(uid) || isOwner(friendUid);
       }
 
-      // Friend requests - owner can read/manage, anyone can create
+      // Friend requests - owner can read/manage, any authenticated user can create
       match /friendRequests/{requestId} {
-        allow read, write: if true; // D                                                                                                                            EVELOPMENT ONLY
+        allow read: if isOwner(uid);
+        allow create: if isSignedIn() && request.resource.data.fromUid == request.auth.uid;
+        allow update, delete: if isOwner(uid);
+      }
+
+      // AI analyses - only owner can access
+      match /ai_analyses/{analysisId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      // Notifications - only owner can read/write
+      match /notifications/{notificationId} {
+        allow read, write: if isOwner(uid);
       }
     }
-    
+
     // Workout templates - public read, admin write only
     match /workoutTemplates/{templateId} {
-      allow read: if true; // Public templates
-      allow write: if false; // Lock down for now - admin only
+      allow read: if true;
+      allow write: if false; // Admin only via Firebase Console or Cloud Functions
     }
-    
+
     // Exercise definitions - public read, admin write only
     match /exercises/{exerciseId} {
-      allow read: if true; // Public exercises
-      allow write: if false; // Lock down for now - admin only
-    }
-    
-    // Global content collections - DEVELOPMENT MODE
-    match /workouts/{workoutId} {
-      allow read, write: if true; // DEVELOPMENT ONLY - CHANGE BEFORE PRODUCTION!
-    }
-
-    match /videos/{videoId} {
-      allow read, write: if true; // DEVELOPMENT ONLY - CHANGE BEFORE PRODUCTION!
-    }
-    
-    // Community features
-    match /community/{postId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update, delete: if isSignedIn() && isOwner(resource.data.userId);
-      
-      match /comments/{commentId} {
-        allow read: if isSignedIn();
-        allow create: if isSignedIn();
-        allow update, delete: if isSignedIn() && isOwner(resource.data.userId);
-      }
-    }
-
-    // Challenges collection - readable by all authenticated users
-    match /challenges/{challengeId} {
-      allow read: if true; // Public challenges
+      allow read: if true;
       allow write: if false; // Admin only
     }
 
-    // Challenge leaderboards - readable by all, writable by participant
-    match /challengeLeaderboards/{challengeId}/entries/{odas} {
+    // Global workouts - public read, admin write only
+    match /workouts/{workoutId} {
       allow read: if true;
-      allow write: if true; // DEVELOPMENT ONLY
+      allow write: if false; // Admin only
+    }
+
+    // Videos - public read, admin write only
+    match /videos/{videoId} {
+      allow read: if true;
+      allow write: if false; // Admin only
+    }
+
+    // Challenges collection - public read, authenticated users can create/update participant count
+    match /challenges/{challengeId} {
+      allow read: if true;
+      allow delete: if false; // Admin only
+      // Allow create/update for authenticated users (setDoc with merge needs both)
+      allow create, update: if isSignedIn();
+    }
+
+    // Daily challenges - public read, admin write only
+    match /dailyChallenges/{challengeId} {
+      allow read: if true;
+      allow write: if false; // Admin only
+    }
+
+    // Daily challenge templates - public read, admin write only
+    match /dailyChallengeTemplates/{templateId} {
+      allow read: if true;
+      allow write: if false; // Admin only
+    }
+
+    // Challenge leaderboards - readable by all, writable by authenticated participants
+    match /challengeLeaderboards/{challengeId} {
+      allow read: if true;
+
+      match /entries/{entryId} {
+        allow read: if true;
+        // Allow create if signed in - needed for challenge invite acceptance where
+        // the accepting user creates entries for both themselves and the inviter
+        allow create: if isSignedIn();
+        allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
+        allow delete: if false;
+      }
+    }
+
+    // Community posts - authenticated users only
+    match /community/{postId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+
+      match /comments/{commentId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+        allow update, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      }
+
+      match /likes/{likeId} {
+        allow read: if isSignedIn();
+        allow create, delete: if isSignedIn() && likeId == request.auth.uid;
+      }
+    }
+
+    // User challenges (joined challenges) - users can read their own and update progress
+    match /userChallenges/{challengeInstanceId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow delete: if false; // Keep history
     }
   }
 }

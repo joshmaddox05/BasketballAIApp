@@ -17,6 +17,10 @@ export default {
       bundleIdentifier: "com.jmaddox0503.BasketballAIApp",
       deploymentTarget: "15.1",
       googleServicesFile: "./GoogleService-Info.plist",
+      usesAppleSignIn: true,
+      entitlements: {
+        "aps-environment": "development"
+      },
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
         NSCameraUsageDescription: "This app needs access to camera to record basketball shots for AI analysis.",
@@ -30,12 +34,14 @@ export default {
         backgroundColor: "#ffffff"
       },
       package: "com.jmaddox0503.BasketballAIApp",
-      googleServicesFile: "./android/app/google-services.json",
+      googleServicesFile: "./google-services.json",
       permissions: [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
         "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.WRITE_EXTERNAL_STORAGE"
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE"
       ]
     },
     web: {
@@ -56,12 +62,28 @@ export default {
           isAccessMediaLocationEnabled: true
         }
       ],
-      "expo-video"
+      "expo-video",
+      [
+        "expo-notifications",
+        {
+          color: "#FF6B35"
+        }
+      ],
+      "expo-apple-authentication",
+      "@react-native-google-signin/google-signin"
     ],
     extra: {
       eas: {
         projectId: "129b22c3-c3ef-4d4a-b37c-e8bed0c7df7f"
-      }
+      },
+      // App environment - set via eas.json build profiles
+      // Values: 'development', 'preview', 'production'
+      appEnv: process.env.APP_ENV || 'development',
+      // Environment variables - set via EAS secrets for production builds
+      // See: https://docs.expo.dev/build-reference/variables/
+      stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY,
+      youtubeApiKey: process.env.YOUTUBE_API_KEY,
+      apiBaseUrl: process.env.API_BASE_URL,
     },
     owner: "jmaddox0503"
   }

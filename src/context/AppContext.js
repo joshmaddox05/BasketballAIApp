@@ -1,8 +1,17 @@
 // AppContext.js - Enhanced with Firebase integration
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useColorScheme } from 'react-native';
+import { useColorScheme, AppState } from 'react-native';
 import { getTheme } from '../utils/theme';
+
+// Push notification imports
+import {
+  registerForPushNotificationsAsync,
+  savePushToken,
+  updateLastAppOpen,
+  addNotificationReceivedListener,
+  addNotificationResponseListener,
+} from '../services/notificationService';
 
 // Firebase imports
 import { onAuthStateChange, signOutUser, getCurrentUser } from '../services/authService';
@@ -26,6 +35,7 @@ import {
 // Import workout templates
 import { getAllWorkoutTemplates } from '../data/workoutTemplates';
 import { hasAccess } from '../utils/subscription';
+import { mapLegacyCategoryToId, DEFAULT_CATEGORY_ID } from '../data/taxonomy';
 // Initial empty user data - will be populated from Firestore
 const initialUserData = {
     displayName: null,
@@ -43,6 +53,9 @@ const initialUserData = {
 
 // Convert workout templates to app format
 const convertTemplateToWorkout = (template) => {
+    // Map legacy category to taxonomy categoryId
+    const categoryId = mapLegacyCategoryToId(template.category) || DEFAULT_CATEGORY_ID;
+
     return {
         id: template.id,
         title: template.name,
@@ -51,6 +64,10 @@ const convertTemplateToWorkout = (template) => {
         duration: `${template.estimatedDuration} min`,
         featured: template.requiredTier === 'free', // Feature free workouts
         category: template.category.toLowerCase(),
+        // Taxonomy fields
+        categoryId: categoryId,
+        subCategoryId: null, // Can be set manually or via admin later
+        tags: [], // Can be populated later
         requiredTier: template.requiredTier, // Add subscription tier
         steps: template.steps.map(step => ({
             title: step.name,
@@ -63,6 +80,19 @@ const convertTemplateToWorkout = (template) => {
         })),
         equipment: ['Basketball', 'Court space', 'Water bottle'],
         coachNotes: `This ${template.difficulty.toLowerCase()} workout focuses on ${template.category.toLowerCase()} and takes approximately ${template.estimatedDuration} minutes to complete.`
+    };
+};
+
+/**
+ * Backfill taxonomy fields for workouts that are missing them
+ * Ensures UI never crashes due to missing taxonomy data
+ */
+const backfillTaxonomy = (workout) => {
+    return {
+        ...workout,
+        categoryId: workout.categoryId || mapLegacyCategoryToId(workout.category) || DEFAULT_CATEGORY_ID,
+        subCategoryId: workout.subCategoryId || null,
+        tags: workout.tags || [],
     };
 };
 
@@ -187,8 +217,11 @@ export const AppProvider = ({ children }) => {
                         setAIAnalysisStats(aiStats);
 
                         // Show the challenge modal on every login unless already completed
+                        // Delay slightly to ensure navigation is ready
                         if (challenge && !challenge.completed) {
-                            setShowChallengeModal(true);
+                            setTimeout(() => {
+                                setShowChallengeModal(true);
+                            }, 800);
                         }
                     } catch (error) {
                         console.error('Error loading user data:', error);
@@ -198,6 +231,8 @@ export const AppProvider = ({ children }) => {
                         setAchievements([]);
                         setDailyChallenge(null);
                         setAIAnalysisStats(null);
+                        // Ensure modal is not shown on error
+                        setShowChallengeModal(false);
                     }
                 } else {
                     // User is authenticated but doesn't have a profile yet (during registration)
@@ -228,6 +263,70 @@ export const AppProvider = ({ children }) => {
 
         return unsubscribe;
     }, []);
+
+    // Push notification setup when user is authenticated
+    useEffect(() => {
+        if (!isAuthenticated || !user?.uid) return;
+
+        // Register for push notifications and save token
+        const setupPushNotifications = async () => {
+            try {
+                const token = await registerForPushNotificationsAsync();
+                if (token) {
+                    await savePushToken(user.uid, token);
+                }
+            } catch (error) {
+                console.error('Error setting up push notifications:', error);
+            }
+        };
+
+        setupPushNotifications();
+
+        // Update last app open timestamp
+        updateLastAppOpen(user.uid);
+
+        // Set up notification listeners
+        const notificationReceivedSub = addNotificationReceivedListener((notification) => {
+            console.log('Notification received in foreground:', notification);
+            // Could trigger in-app notification display here
+        });
+
+        const notificationResponseSub = addNotificationResponseListener((response) => {
+            console.log('Notification tapped:', response);
+            const data = response.notification.request.content.data;
+
+            // Handle navigation based on notification type
+            // Navigation will be handled by the component that consumes this context
+            if (data?.type === 'daily_challenge') {
+                console.log('User tapped daily challenge notification');
+                // Navigation handled in MainNavigator or App.js
+            } else if (data?.type === 'workout_reminder') {
+                console.log('User tapped workout reminder notification');
+            }
+        });
+
+        return () => {
+            notificationReceivedSub.remove();
+            notificationResponseSub.remove();
+        };
+    }, [isAuthenticated, user?.uid]);
+
+    // Track app state changes to update lastAppOpen when app comes to foreground
+    useEffect(() => {
+        if (!user?.uid) return;
+
+        const appStateRef = { current: AppState.currentState };
+
+        const subscription = AppState.addEventListener('change', (nextAppState) => {
+            // When app comes to foreground from background
+            if (appStateRef.current.match(/inactive|background/) && nextAppState === 'active') {
+                updateLastAppOpen(user.uid);
+            }
+            appStateRef.current = nextAppState;
+        });
+
+        return () => subscription?.remove();
+    }, [user?.uid]);
 
     // Load global data (workouts, videos) when user is authenticated
     useEffect(() => {
@@ -339,15 +438,46 @@ export const AppProvider = ({ children }) => {
         setDailyTip(randomTip);
     };
 
-    // Refresh user data (would connect to backend in real app)
+    // Refresh user profile data from Firestore
     const refreshUserData = async () => {
-        // Simulate API call delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        const authUser = getCurrentUser();
+        if (!authUser) {
+            console.log('refreshUserData: No authenticated user');
+            return false;
+        }
 
-        // For demo purposes, just refresh the daily tip
-        await fetchDailyTip();
+        try {
+            const profile = await getUserProfile(authUser.uid);
+            if (profile) {
+                // Normalize field names: ensure both 'displayName' and 'name' are available
+                const normalizedProfile = {
+                    ...profile,
+                    name: profile.displayName || profile.name,
+                    displayName: profile.displayName || profile.name
+                };
+                setUserData(normalizedProfile);
+                console.log('refreshUserData: Profile refreshed successfully');
+            }
 
-        return true;
+            // Also refresh the daily tip
+            await fetchDailyTip();
+
+            return true;
+        } catch (error) {
+            console.error('refreshUserData: Error refreshing profile:', error);
+            return false;
+        }
+    };
+
+    // Update user data locally (for immediate UI updates after profile edits)
+    const updateUserDataLocally = (updates) => {
+        setUserData(prev => ({
+            ...prev,
+            ...updates,
+            // Ensure both name fields are synced
+            name: updates.displayName || updates.name || prev.name,
+            displayName: updates.displayName || updates.name || prev.displayName
+        }));
     };
 
     // Authentication functions (now handled by Firebase auth state listener)
@@ -605,6 +735,57 @@ export const AppProvider = ({ children }) => {
         );
     };
 
+    // Get all workouts with taxonomy fields backfilled
+    const getWorkoutsWithTaxonomy = () => {
+        return workouts.map(backfillTaxonomy);
+    };
+
+    // Get workouts filtered by category ID
+    const getWorkoutsByCategory = (categoryId) => {
+        return workouts
+            .map(backfillTaxonomy)
+            .filter(workout => workout.categoryId === categoryId);
+    };
+
+    // Get workouts filtered by category and optionally subcategory
+    const getWorkoutsByTaxonomy = (categoryId, subCategoryId = null) => {
+        return workouts
+            .map(backfillTaxonomy)
+            .filter(workout => {
+                if (workout.categoryId !== categoryId) return false;
+                if (subCategoryId && workout.subCategoryId !== subCategoryId) return false;
+                return true;
+            });
+    };
+
+    // Get workouts filtered by tag
+    const getWorkoutsByTag = (tagId) => {
+        return workouts
+            .map(backfillTaxonomy)
+            .filter(workout => workout.tags && workout.tags.includes(tagId));
+    };
+
+    // Search workouts by title with taxonomy filter
+    const searchWorkouts = (query, categoryId = null, subCategoryId = null) => {
+        const lowerQuery = query.toLowerCase().trim();
+        return workouts
+            .map(backfillTaxonomy)
+            .filter(workout => {
+                // Title match
+                const matchesQuery = !lowerQuery ||
+                    workout.title.toLowerCase().includes(lowerQuery) ||
+                    (workout.description && workout.description.toLowerCase().includes(lowerQuery));
+
+                // Category match
+                const matchesCategory = !categoryId || workout.categoryId === categoryId;
+
+                // Subcategory match
+                const matchesSubCategory = !subCategoryId || workout.subCategoryId === subCategoryId;
+
+                return matchesQuery && matchesCategory && matchesSubCategory;
+            });
+    };
+
     // Challenge management functions
     const refreshDailyChallenge = async () => {
         if (!userData?.uid) return;
@@ -698,6 +879,12 @@ export const AppProvider = ({ children }) => {
             setTrainingVideosData,
             getAccessibleWorkouts,
             getLockedWorkouts,
+            // Taxonomy functions
+            getWorkoutsWithTaxonomy,
+            getWorkoutsByCategory,
+            getWorkoutsByTaxonomy,
+            getWorkoutsByTag,
+            searchWorkouts,
             // Challenge and milestone state
             dailyChallenge,
             showChallengeModal,
@@ -711,7 +898,8 @@ export const AppProvider = ({ children }) => {
             acceptChallenge,
             triggerMilestone,
             dismissMilestone,
-            refreshAIStats
+            refreshAIStats,
+            updateUserDataLocally
         }}>
             {children}
         </AppContext.Provider>

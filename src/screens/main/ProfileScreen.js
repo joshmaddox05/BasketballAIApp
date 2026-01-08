@@ -8,8 +8,10 @@ import {
     TouchableOpacity,
     Switch,
     SafeAreaView,
-    Alert
+    Alert,
+    Image
 } from 'react-native';
+// Note: Switch is still used for Dark Mode toggle
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
@@ -36,7 +38,6 @@ const ProfileScreen = ({ navigation }) => {
     const theme = contextTheme || getTheme(isDarkMode || false);
 
     const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
-    const [notifications, setNotifications] = useState(true);
 
     const currentPlan = (userData.subscription || 'free').charAt(0).toUpperCase() + (userData.subscription || 'free').slice(1);
 
@@ -74,11 +75,18 @@ const ProfileScreen = ({ navigation }) => {
             <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
                 {/* Profile Header */}
                 <View style={[styles.profileHeader, { backgroundColor: theme.card }]}>
-                    <View style={[styles.profileImagePlaceholder, { backgroundColor: theme.primary }]}>
-                        <Text style={styles.profileInitials}>
-                            {getInitials(userData?.displayName || userData?.name || 'User')}
-                        </Text>
-                    </View>
+                    {userData?.photoURL ? (
+                        <Image
+                            source={{ uri: userData.photoURL }}
+                            style={styles.profileImage}
+                        />
+                    ) : (
+                        <View style={[styles.profileImagePlaceholder, { backgroundColor: theme.primary }]}>
+                            <Text style={styles.profileInitials}>
+                                {getInitials(userData?.displayName || userData?.name || 'User')}
+                            </Text>
+                        </View>
+                    )}
 
                     <Text style={[styles.profileName, { color: theme.text }]}>
                         {userData?.displayName || userData?.name || 'User'}
@@ -118,7 +126,7 @@ const ProfileScreen = ({ navigation }) => {
 
                     <TouchableOpacity
                         style={[styles.editProfileButton, { backgroundColor: theme.primary }]}
-                        onPress={() => Alert.alert('Edit Profile', 'Coming soon!')}
+                        onPress={() => navigation.navigate('EditProfile')}
                     >
                         <Text style={styles.editProfileButtonText}>Edit Profile</Text>
                     </TouchableOpacity>
@@ -158,18 +166,16 @@ const ProfileScreen = ({ navigation }) => {
                 <View style={[styles.sectionContainer, { backgroundColor: theme.card }]}>
                     <Text style={[styles.sectionTitle, { color: theme.text }]}>Settings</Text>
 
-                    <View style={[styles.settingItem, { borderBottomColor: theme.border }]}>
+                    <TouchableOpacity
+                        style={[styles.settingItem, { borderBottomColor: theme.border }]}
+                        onPress={() => navigation.navigate('Notifications')}
+                    >
                         <View style={styles.settingLeft}>
                             <Ionicons name="notifications-outline" size={24} color={theme.textSecondary} />
                             <Text style={[styles.settingLabel, { color: theme.text }]}>Notifications</Text>
                         </View>
-                        <Switch
-                            value={notifications}
-                            onValueChange={setNotifications}
-                            trackColor={{ false: theme.border, true: theme.primaryLight }}
-                            thumbColor={notifications ? theme.primary : theme.backgroundTertiary}
-                        />
-                    </View>
+                        <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
+                    </TouchableOpacity>
 
                     <View style={[styles.settingItem, { borderBottomColor: theme.border }]}>
                         <View style={styles.settingLeft}>
@@ -295,6 +301,12 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingVertical: 30,
         paddingHorizontal: 20,
+        marginBottom: 15,
+    },
+    profileImage: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
         marginBottom: 15,
     },
     profileImagePlaceholder: {
