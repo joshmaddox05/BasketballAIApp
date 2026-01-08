@@ -17,6 +17,10 @@ export default {
       bundleIdentifier: "com.jmaddox0503.BasketballAIApp",
       deploymentTarget: "15.1",
       googleServicesFile: "./GoogleService-Info.plist",
+      usesAppleSignIn: true,
+      entitlements: {
+        "aps-environment": "development"
+      },
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
         NSCameraUsageDescription: "This app needs access to camera to record basketball shots for AI analysis.",
@@ -65,6 +69,7 @@ export default {
           color: "#FF6B35"
         }
       ],
+      "expo-apple-authentication",
       "@react-native-google-signin/google-signin"
     ],
     extra: {
