@@ -35,7 +35,12 @@ import {
 // Import workout templates
 import { getAllWorkoutTemplates } from '../data/workoutTemplates';
 import { hasAccess } from '../utils/subscription';
-import { mapLegacyCategoryToId, DEFAULT_CATEGORY_ID } from '../data/taxonomy';
+import {
+    mapLegacyCategoryToId,
+    DEFAULT_CATEGORY_ID,
+    getSubcategoryForWorkout,
+    inferSubcategoryFromWorkout
+} from '../data/taxonomy';
 // Initial empty user data - will be populated from Firestore
 const initialUserData = {
     displayName: null,
@@ -55,6 +60,8 @@ const initialUserData = {
 const convertTemplateToWorkout = (template) => {
     // Map legacy category to taxonomy categoryId
     const categoryId = mapLegacyCategoryToId(template.category) || DEFAULT_CATEGORY_ID;
+    // Get subcategory from the mapping
+    const subCategoryId = getSubcategoryForWorkout(template.id);
 
     return {
         id: template.id,
@@ -66,7 +73,7 @@ const convertTemplateToWorkout = (template) => {
         category: template.category.toLowerCase(),
         // Taxonomy fields
         categoryId: categoryId,
-        subCategoryId: null, // Can be set manually or via admin later
+        subCategoryId: subCategoryId,
         tags: [], // Can be populated later
         requiredTier: template.requiredTier, // Add subscription tier
         steps: template.steps.map(step => ({
@@ -88,10 +95,17 @@ const convertTemplateToWorkout = (template) => {
  * Ensures UI never crashes due to missing taxonomy data
  */
 const backfillTaxonomy = (workout) => {
+    const categoryId = workout.categoryId || mapLegacyCategoryToId(workout.category) || DEFAULT_CATEGORY_ID;
+    // Try to get subcategory from map first, then infer from content
+    let subCategoryId = workout.subCategoryId;
+    if (!subCategoryId) {
+        subCategoryId = getSubcategoryForWorkout(workout.id) ||
+                        inferSubcategoryFromWorkout({ ...workout, categoryId });
+    }
     return {
         ...workout,
-        categoryId: workout.categoryId || mapLegacyCategoryToId(workout.category) || DEFAULT_CATEGORY_ID,
-        subCategoryId: workout.subCategoryId || null,
+        categoryId,
+        subCategoryId,
         tags: workout.tags || [],
     };
 };

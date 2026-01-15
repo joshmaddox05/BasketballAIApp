@@ -182,3 +182,126 @@ export const UNCATEGORIZED_CATEGORY = {
   icon: 'help-circle-outline',
   color: '#888888',
 };
+
+/**
+ * Workout ID to subcategory mapping
+ * Maps specific workout template IDs to their most relevant subcategory
+ */
+export const WORKOUT_SUBCATEGORY_MAP = {
+  // Shooting workouts
+  'shooting_1': 'form',           // Beginner Shooting Basics - focuses on form
+  'shooting_2': 'free-throws',    // Free Throw Master
+  'shooting_3': 'mid-range',      // Mid-Range Specialist
+  'shooting_4': 'three-point',    // Three-Point Shooter
+  'shooting_5': 'catch-shoot',    // Advanced Shooting - emphasizes catch and shoot
+  'shooting_6': 'off-dribble',    // Elite Scorer - off the dribble shooting
+
+  // Dribbling workouts
+  'dribbling_1': 'basics',        // Ball Handling Fundamentals
+  'dribbling_2': 'basics',        // Quick Hands
+  'dribbling_3': 'combo-moves',   // Combo Moves
+  'dribbling_4': 'speed',         // Speed Handler
+  'dribbling_5': 'combo-moves',   // Elite Ball Handling
+  'dribbling_6': 'two-ball',      // Pro Ball Handler - includes two-ball drills
+
+  // Physical workouts
+  'physical_1': 'conditioning',   // Basic Conditioning
+  'physical_2': 'conditioning',   // Cardio Blast
+  'physical_3': 'conditioning',   // Basketball Conditioning
+  'physical_4': 'vertical',       // Vertical Jump Trainer
+  'physical_5': 'agility',        // Athletic Development
+  'physical_6': 'conditioning',   // Pro Athlete Conditioning
+
+  // Defense workouts
+  'defense_1': 'footwork',        // Defensive Fundamentals
+  'defense_2': 'stance',          // Defense 101
+  'defense_3': 'on-ball',         // Perimeter Defense
+  'defense_4': 'rebounding',      // Post Defender (includes rebounding)
+  'defense_5': 'on-ball',         // Lockdown Defender
+  'defense_6': 'help-defense',    // Elite Defense System
+
+  // Passing workouts
+  'passing_1': 'chest-pass',      // Passing Fundamentals
+  'passing_2': 'chest-pass',      // Basic Passing Skills
+  'passing_3': 'entry',           // Complete Passer - includes entry passes
+  'passing_4': 'outlet',          // Playmaker Training
+  'passing_5': 'no-look',         // Elite Playmaker - flashy passes
+
+  // Custom/Mixed workouts
+  'custom_1': null,               // Complete Skills - mixed, no specific subcategory
+};
+
+/**
+ * Helper: Get subcategory ID for a workout by its ID
+ */
+export const getSubcategoryForWorkout = (workoutId) => {
+  return WORKOUT_SUBCATEGORY_MAP[workoutId] || null;
+};
+
+/**
+ * Helper: Infer subcategory from workout name/description
+ * Used as fallback when workout ID isn't in the map
+ */
+export const inferSubcategoryFromWorkout = (workout) => {
+  if (!workout) return null;
+
+  const titleLower = (workout.title || workout.name || '').toLowerCase();
+  const descLower = (workout.description || '').toLowerCase();
+  const combined = titleLower + ' ' + descLower;
+
+  // Shooting subcategories
+  if (workout.categoryId === 'shooting' || workout.category?.toLowerCase() === 'shooting') {
+    if (combined.includes('free throw')) return 'free-throws';
+    if (combined.includes('three') || combined.includes('3-point') || combined.includes('3 point')) return 'three-point';
+    if (combined.includes('mid-range') || combined.includes('mid range') || combined.includes('elbow')) return 'mid-range';
+    if (combined.includes('off the dribble') || combined.includes('off-dribble') || combined.includes('pull-up')) return 'off-dribble';
+    if (combined.includes('catch and shoot') || combined.includes('catch-and-shoot')) return 'catch-shoot';
+    if (combined.includes('post') || combined.includes('low block')) return 'post';
+    if (combined.includes('form') || combined.includes('fundamental') || combined.includes('basic')) return 'form';
+  }
+
+  // Dribbling subcategories
+  if (workout.categoryId === 'dribbling' || workout.category?.toLowerCase() === 'dribbling') {
+    if (combined.includes('crossover')) return 'crossovers';
+    if (combined.includes('between the legs') || combined.includes('between-legs')) return 'between-legs';
+    if (combined.includes('behind the back') || combined.includes('behind-back')) return 'behind-back';
+    if (combined.includes('speed') || combined.includes('fast break')) return 'speed';
+    if (combined.includes('combo') || combined.includes('combination')) return 'combo-moves';
+    if (combined.includes('two ball') || combined.includes('two-ball') || combined.includes('2 ball')) return 'two-ball';
+    if (combined.includes('basic') || combined.includes('fundamental')) return 'basics';
+  }
+
+  // Physical subcategories
+  if (workout.categoryId === 'physical' || workout.category?.toLowerCase() === 'physical') {
+    if (combined.includes('vertical') || combined.includes('jump')) return 'vertical';
+    if (combined.includes('agility') || combined.includes('ladder') || combined.includes('footwork')) return 'agility';
+    if (combined.includes('strength') || combined.includes('weight')) return 'strength';
+    if (combined.includes('flexibility') || combined.includes('stretch') || combined.includes('mobility')) return 'flexibility';
+    if (combined.includes('core') || combined.includes('abs')) return 'core';
+    if (combined.includes('recovery') || combined.includes('rest')) return 'recovery';
+    return 'conditioning'; // Default for physical
+  }
+
+  // Defense subcategories
+  if (workout.categoryId === 'defense' || workout.category?.toLowerCase() === 'defense') {
+    if (combined.includes('stance') || combined.includes('position')) return 'stance';
+    if (combined.includes('footwork') || combined.includes('slide')) return 'footwork';
+    if (combined.includes('on-ball') || combined.includes('on ball') || combined.includes('perimeter')) return 'on-ball';
+    if (combined.includes('off-ball') || combined.includes('off ball') || combined.includes('help')) return 'off-ball';
+    if (combined.includes('rebound')) return 'rebounding';
+    if (combined.includes('closeout') || combined.includes('close out') || combined.includes('close-out')) return 'closeouts';
+  }
+
+  // Passing subcategories
+  if (workout.categoryId === 'passing' || workout.category?.toLowerCase() === 'passing') {
+    if (combined.includes('chest pass')) return 'chest-pass';
+    if (combined.includes('bounce pass')) return 'bounce-pass';
+    if (combined.includes('overhead')) return 'overhead';
+    if (combined.includes('no-look') || combined.includes('no look') || combined.includes('flashy')) return 'no-look';
+    if (combined.includes('outlet')) return 'outlet';
+    if (combined.includes('entry') || combined.includes('post entry')) return 'entry';
+    if (combined.includes('vision') || combined.includes('playmaker')) return 'vision';
+  }
+
+  return null;
+};
