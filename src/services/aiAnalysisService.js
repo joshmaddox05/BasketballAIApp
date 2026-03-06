@@ -1,5 +1,6 @@
 // aiAnalysisService.js - Service for AI-powered shooting analysis
-import * as FileSystem from 'expo-file-system';
+// Expo SDK 54 moves uploadAsync and FileSystemUploadType to the legacy export path.
+import * as FileSystem from 'expo-file-system/legacy';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CONFIG } from '../config/api';
 
@@ -643,52 +644,68 @@ class AIAnalysisService {
       }
 
       console.log('📁 Video file URI validated:', videoData.videoUri);
-      console.log('📤 Uploading video to backend for form analysis...');
 
-      const formData = new FormData();
-      formData.append('video', {
-        uri: videoData.videoUri,
-        type: 'video/mp4',
-        name: 'shooting_video.mp4',
+      // Step 1: Create analysis session
+      console.log('🔵 Step 1: Creating analysis session...');
+      const sessionResp = await fetch(`${this.API_BASE_URL}/analysis-sessions`, {
+        method: 'POST',
       });
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 minutes for long-running model processing
-
-      try {
-        // Call the shot analysis endpoint that returns JSON analysis
-        // Note: Do NOT set Content-Type header manually for FormData -
-        // React Native/fetch will set it automatically with the correct boundary
-        const response = await fetch(`${this.API_BASE_URL}/analyze/shot`, {
-          method: 'POST',
-          body: formData,
-          signal: controller.signal,
-        });
-
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('❌ API error response:', errorText);
-          throw new Error(`Form analysis API error: ${response.status}`);
-        }
-
-        const results = await response.json();
-        console.log('✅ Received form analysis results from backend');
-        console.log('📊 Result keys:', Object.keys(results));
-
-        // Cache results
-        await this.cacheAnalysisResults(videoData.timestamp, results);
-        
-        return this.formatFormAnalysisResults(results);
-      } catch (fetchError) {
-        clearTimeout(timeoutId);
-        if (fetchError.name === 'AbortError') {
-          console.error('❌ Request timeout - backend took too long');
-          throw new Error('Analysis timed out after 10 minutes. The model may be processing a very complex video. Please try again with a shorter video.');
-        }
-        throw fetchError;
+      if (!sessionResp.ok) {
+        const errorText = await sessionResp.text();
+        throw new Error(`Session creation failed: ${sessionResp.status} - ${errorText}`);
       }
+      const { session_id } = await sessionResp.json();
+      console.log('✅ Session created:', session_id);
+
+      // Step 2: Get presigned upload URL
+      console.log('🔵 Step 2: Getting presigned upload URL...');
+      const urlResp = await fetch(`${this.API_BASE_URL}/analysis-sessions/${session_id}/upload-url`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: 'shooting_video.mp4', content_type: 'video/mp4' }),
+      });
+      if (!urlResp.ok) {
+        const errorText = await urlResp.text();
+        throw new Error(`Failed to get upload URL: ${urlResp.status} - ${errorText}`);
+      }
+      const { upload_url } = await urlResp.json();
+      console.log('✅ Got presigned upload URL');
+
+      // Step 3: Upload video directly to presigned URL
+      console.log('🔵 Step 3: Uploading video to storage...');
+      const uploadResult = await FileSystem.uploadAsync(upload_url, videoData.videoUri, {
+        httpMethod: 'PUT',
+        headers: { 'Content-Type': 'video/mp4' },
+        uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+      });
+      if (uploadResult.status < 200 || uploadResult.status >= 300) {
+        throw new Error(`Video upload failed with status: ${uploadResult.status}`);
+      }
+      console.log('✅ Video uploaded to storage');
+
+      // Step 4: Start analysis
+      console.log('🔵 Step 4: Starting analysis...');
+      const startResp = await fetch(`${this.API_BASE_URL}/analysis-sessions/${session_id}/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ analysis_mode: 'shot', frame_skip: 1 }),
+      });
+      if (!startResp.ok) {
+        const errorText = await startResp.text();
+        throw new Error(`Failed to start analysis: ${startResp.status} - ${errorText}`);
+      }
+      console.log('✅ Analysis queued');
+
+      // Step 5: Poll for results
+      console.log('🔵 Step 5: Polling for results...');
+      const results = await this._pollSessionResults(session_id);
+      console.log('✅ Received form analysis results from backend');
+      console.log('📊 Result keys:', Object.keys(results));
+
+      // Cache results
+      await this.cacheAnalysisResults(videoData.timestamp, results);
+
+      return this.formatFormAnalysisResults(results);
     } catch (error) {
       console.error('❌ Comprehensive analysis error:', error);
 
@@ -710,6 +727,39 @@ class AIAnalysisService {
   }
 
   /**
+   * Poll analysis session until DONE or FAILED
+   * @param {string} session_id - The session UUID
+   * @param {number} maxAttempts - Max number of poll attempts (default 120 = 10 min at 5s interval)
+   * @param {number} intervalMs - Polling interval in ms
+   */
+  async _pollSessionResults(session_id, maxAttempts = 120, intervalMs = 5000) {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, intervalMs));
+
+      const resp = await fetch(`${this.API_BASE_URL}/analysis-sessions/${session_id}`);
+      if (!resp.ok) {
+        throw new Error(`Polling failed: ${resp.status}`);
+      }
+
+      const { session } = await resp.json();
+      console.log(`🔄 Poll attempt ${attempt + 1}: status = ${session.status}`);
+
+      if (session.status === 'DONE') {
+        return session;
+      }
+
+      if (session.status === 'FAILED') {
+        const error = new Error(session.error || 'Analysis failed on the server');
+        error.apiError = true;
+        error.tips = session.tips || [];
+        throw error;
+      }
+    }
+
+    throw new Error('Analysis timed out after 10 minutes. Please try again with a shorter video.');
+  }
+
+  /**
    * Format form analysis results from backend API
    * Maps backend response to app's expected format
    */
@@ -717,35 +767,39 @@ class AIAnalysisService {
     console.log('📝 Formatting form analysis results...');
     console.log('🌐 API Response:', JSON.stringify(apiResults, null, 2));
 
+    const normalizedResults = this._normalizeAnalysisResults(apiResults);
+
     // Check if API returned an error
-    if (apiResults.success === false) {
-      console.warn('⚠️ API returned failure:', apiResults.error);
+    if (normalizedResults.success === false) {
+      console.warn('⚠️ API returned failure:', normalizedResults.error);
 
       // Create a custom error object with tips if available
-      const error = new Error(apiResults.error || 'Analysis failed');
+      const error = new Error(normalizedResults.error || 'Analysis failed');
       error.apiError = true;
-      error.tips = apiResults.tips || [];
-      error.confidence = apiResults.confidence;
+      error.tips = normalizedResults.tips || [];
+      error.confidence = normalizedResults.confidence;
       throw error;
     }
 
     // Map the metrics from the API response to the UI format
-    const metricsArray = this._mapMetricsToArray(apiResults.metrics || {});
+    const metricsArray = this._mapMetricsToArray(normalizedResults.metrics || {});
 
     // Extract improvement areas from coaching cues and improvement summary
-    const improvements = this._extractImprovements(apiResults);
+    const improvements = this._extractImprovements(normalizedResults, metricsArray);
+    const overallScore = this._deriveOverallScore(normalizedResults, metricsArray);
+    const overlayVideoUrl = this._extractOverlayVideoUrl(normalizedResults);
 
     const formattedResults = {
-      videoId: apiResults.video_id,
-      overallScore: Math.round(apiResults.overall_score || 0),
-      grade: apiResults.overall_grade || this.getGradeFromScore(apiResults.overall_score),
-      confidence: apiResults.confidence || 0.90,
+      videoId: normalizedResults.video_id || normalizedResults.session_id || normalizedResults.id,
+      overallScore,
+      grade: normalizedResults.overall_grade || this.getGradeFromScore(overallScore),
+      confidence: normalizedResults.confidence || normalizedResults.quality?.confidence || 0.90,
 
       // Metrics as array for FlatList rendering
       metrics: metricsArray,
 
       // Coaching cues for the top fixes
-      coachingCues: (apiResults.coaching_cues || []).map((cueData, idx) => ({
+      coachingCues: (normalizedResults.coaching_cues || []).map((cueData, idx) => ({
         priority: idx + 1,
         cue: typeof cueData === 'string' ? cueData : cueData.cue || '',
         title: typeof cueData === 'string' ? cueData : cueData.cue || '',
@@ -761,20 +815,23 @@ class AIAnalysisService {
 
       // Improvement suggestions
       improvements: improvements,
+      strengths: normalizedResults.improvement_summary?.strengths || [],
+      summary: this._buildCoachingSummary(normalizedResults, metricsArray, overallScore),
 
-      // Visualization video URL from API (new field)
-      visualizationVideoUrl: apiResults.visualization_video_url || apiResults.annotated_video_url || null,
+      // Overlay / visualization video URLs from API
+      overlayVideoUrl,
+      visualizationVideoUrl: overlayVideoUrl || normalizedResults.visualization_video_url || normalizedResults.annotated_video_url || null,
 
       // Phases data if available
-      phases: apiResults.phases || {},
+      phases: normalizedResults.phases || {},
 
       // Quality/visibility data
-      quality: apiResults.quality || {},
+      quality: normalizedResults.quality || {},
 
       // Metadata
-      metadata: apiResults.metadata || {},
+      metadata: normalizedResults.metadata || {},
 
-      analyzedAt: apiResults.analyzed_at
+      analyzedAt: normalizedResults.analyzed_at || new Date().toISOString()
     };
 
     console.log('✅ Formatted results:', JSON.stringify(formattedResults, null, 2));
@@ -793,32 +850,40 @@ class AIAnalysisService {
       elbow_flare: { name: 'Elbow Alignment', ideal: '<10° flare', unit: '°', valueField: 'angle_deg' },
       knee_load: { name: 'Knee Bend', ideal: '45-65°', unit: '°', valueField: 'angle_deg' },
       hip_shoulder_alignment: { name: 'Body Alignment', ideal: 'Aligned', unit: '°', valueField: 'angle_deg' },
-      base_width: { name: 'Stance Width', ideal: 'Shoulder width', unit: '', valueField: 'value' },
+      base_width: { name: 'Stance Width', ideal: 'Shoulder-width base', unit: '', valueField: 'ratio' },
       lateral_sway: { name: 'Balance & Stability', ideal: '<3cm sway', unit: 'cm', valueField: 'sway_cm' },
-      arc_trajectory: { name: 'Shot Arc', ideal: '45-52°', unit: '°', valueField: 'angle_deg' }
+      arc_trajectory: { name: 'Shot Arc', ideal: '45-52°', unit: '°', valueField: 'angle_deg' },
+      time_load_to_release: { name: 'Release Timing', ideal: '240-320ms', unit: 'ms', valueField: 'ms' },
+      release_timing: { name: 'Release Timing', ideal: '240-320ms', unit: 'ms', valueField: 'ms' }
     };
 
-    for (const [key, data] of Object.entries(metrics)) {
+    const metricEntries = Array.isArray(metrics)
+      ? metrics.map((m, idx) => [m.id || m.metric || `metric_${idx}`, m])
+      : Object.entries(metrics);
+
+    for (const [rawKey, data] of metricEntries) {
+      const key = this._normalizeMetricKey(rawKey);
       if (data && metricConfig[key]) {
         const config = metricConfig[key];
-        const qualityScore = data.quality_score || 0.5;
+        const rawQuality = data.quality_score ?? data.score ?? data.metric_score;
+        const qualityScore = typeof rawQuality === 'number'
+          ? (rawQuality > 1 ? rawQuality / 100 : rawQuality)
+          : 0.5;
 
-        // API returns 'in_range' not 'in_optimal_range'
+        // API may return 'in_range' or 'in_optimal_range'
         const inOptimalRange = data.in_range !== undefined ? data.in_range : data.in_optimal_range;
-        const status = inOptimalRange ? 'good' : (qualityScore >= 0.6 ? 'improve' : 'poor');
-
-        // Get the value from the appropriate field (angle_deg, sway_cm, etc.)
-        const valueField = config.valueField || 'value';
-        const rawValue = data[valueField] !== undefined ? data[valueField] : data.value;
+        const status = inOptimalRange === true ? 'good' : (qualityScore >= 0.7 ? 'improve' : 'poor');
+        const metricValue = this._extractMetricValue(data, config.valueField);
+        const idealText = this._formatIdealRange(data, config.ideal, config.unit);
 
         metricsArray.push({
           id: key,
           name: config.name,
-          score: Math.round(qualityScore * 10),
-          value: `${typeof rawValue === 'number' ? rawValue.toFixed(1) : rawValue}${config.unit}`,
-          ideal: data.optimal_range ? `${data.optimal_range[0]}-${data.optimal_range[1]}${config.unit}` : config.ideal,
-          feedback: data.description || data.status || (inOptimalRange ? 'Good form!' : 'Room for improvement'),
-          status: status
+          score: Math.max(1, Math.min(10, Math.round(qualityScore * 10))),
+          value: this._formatMetricValue(key, metricValue, config.unit),
+          ideal: idealText,
+          feedback: this._buildMetricFeedback(key, data, metricValue, idealText, inOptimalRange, qualityScore),
+          status
         });
       }
     }
@@ -829,7 +894,7 @@ class AIAnalysisService {
   /**
    * Extract improvement suggestions from API response
    */
-  _extractImprovements(apiResults) {
+  _extractImprovements(apiResults, metricsArray = []) {
     const improvements = [];
 
     // Add from improvement_summary if available
@@ -841,8 +906,18 @@ class AIAnalysisService {
     if (improvements.length < 3 && apiResults.coaching_cues) {
       const additionalCues = apiResults.coaching_cues
         .slice(0, 3 - improvements.length)
-        .map(cue => typeof cue === 'string' ? cue : cue.cue || '');
+        .map(cue => typeof cue === 'string' ? cue : cue.cue || cue.description || '');
       improvements.push(...additionalCues.filter(c => c)); // Filter out empty strings
+    }
+
+    if (improvements.length < 3 && metricsArray.length > 0) {
+      const derivedImprovements = metricsArray
+        .filter(metric => metric.status !== 'good')
+        .sort((a, b) => a.score - b.score)
+        .map(metric => this._metricToImprovementCue(metric))
+        .filter(Boolean);
+
+      improvements.push(...derivedImprovements.slice(0, 3 - improvements.length));
     }
 
     // Fallback if no improvements found
@@ -854,7 +929,285 @@ class AIAnalysisService {
       );
     }
 
-    return improvements;
+    return [...new Set(improvements.map(text => this._cleanCoachingText(text)).filter(Boolean))].slice(0, 5);
+  }
+
+  _normalizeMetricKey(key) {
+    const aliases = {
+      release_angle_deg: 'release_angle',
+      elbow_flare_deg: 'elbow_flare',
+      knee_flexion: 'knee_load',
+      knee_load_deg: 'knee_load',
+      stance_width: 'base_width',
+      base_width_ratio: 'base_width',
+      body_alignment: 'hip_shoulder_alignment',
+      hip_shoulder_alignment_deg: 'hip_shoulder_alignment',
+      lateral_sway_cm: 'lateral_sway',
+      sway: 'lateral_sway',
+      shot_arc: 'arc_trajectory',
+      release_timing_ms: 'time_load_to_release',
+      release_speed: 'time_load_to_release'
+    };
+
+    return aliases[key] || key;
+  }
+
+  _extractMetricValue(data, preferredField) {
+    const fields = [
+      preferredField,
+      'angle_deg',
+      'sway_cm',
+      'ms',
+      'ratio',
+      'value',
+      'measured_value',
+      'current_value'
+    ].filter(Boolean);
+
+    for (const field of fields) {
+      if (data[field] !== undefined && data[field] !== null) {
+        return data[field];
+      }
+    }
+
+    return null;
+  }
+
+  _formatMetricValue(metricKey, rawValue, unit) {
+    if (rawValue === undefined || rawValue === null || rawValue === '') {
+      return 'Not available';
+    }
+
+    if (typeof rawValue === 'number') {
+      if (metricKey === 'base_width') {
+        return rawValue <= 1 ? `${Math.round(rawValue * 100)}% shoulder width` : `${rawValue.toFixed(1)}`;
+      }
+      return `${rawValue.toFixed(1)}${unit}`;
+    }
+
+    return `${rawValue}${unit}`;
+  }
+
+  _formatIdealRange(data, fallbackIdeal, unit) {
+    const range = data.optimal_range || data.target_range || data.recommended_range;
+    if (Array.isArray(range) && range.length >= 2) {
+      return `${range[0]}-${range[1]}${unit}`;
+    }
+    if (typeof range === 'string') {
+      return range;
+    }
+    return fallbackIdeal;
+  }
+
+  _buildMetricFeedback(metricKey, data, rawValue, idealText, inOptimalRange, qualityScore) {
+    const backendText = (data.coaching_feedback || data.coaching_tip || data.description || data.status || '').trim();
+    if (backendText) {
+      return this._humanizeBackendFeedback(backendText, idealText, inOptimalRange);
+    }
+
+    const coachText = {
+      release_angle: {
+        good: 'Good release arc. Keep finishing high for a soft entry into the rim.',
+        improve: 'Arc is close. Finish a little higher and hold your follow-through.',
+        poor: 'Arc needs work. Practice a higher finish so the ball gets a softer entry angle.'
+      },
+      elbow_flare: {
+        good: 'Elbow alignment looks solid. Keep the elbow under the ball through release.',
+        improve: 'Elbow is drifting some. Focus on stacking elbow under the ball before lift-off.',
+        poor: 'Elbow flare is affecting your shot path. Start tucked and finish straight up.'
+      },
+      knee_load: {
+        good: 'Good leg load. You are getting power from your base.',
+        improve: 'Knee bend is a little inconsistent. Try to load the same amount each rep.',
+        poor: 'Build a stronger base first. Sit into your legs before starting the shot.'
+      },
+      hip_shoulder_alignment: {
+        good: 'Body alignment looks clean. Keep your line organized to the basket.',
+        improve: 'Alignment is slightly off. Set your base and shoulders earlier before release.',
+        poor: 'Body alignment is hurting consistency. Reset your stance and line up before lifting.'
+      },
+      base_width: {
+        good: 'Your stance width supports balance. Keep that base throughout the shot.',
+        improve: 'Base is a little inconsistent. Aim for a comfortable shoulder-width stance.',
+        poor: 'Your base needs work. Start every rep from a stable shoulder-width stance.'
+      },
+      lateral_sway: {
+        good: 'Balance looks strong with minimal sway. Great job staying centered.',
+        improve: 'There is extra sway. Focus on going straight up and landing in the same spot.',
+        poor: 'Too much side-to-side movement. Prioritize balance and vertical lift first.'
+      },
+      arc_trajectory: {
+        good: 'Shot arc looks good. Keep that soft, repeatable trajectory.',
+        improve: 'Arc is close. A slightly higher release finish should help consistency.',
+        poor: 'Shot arc needs work. Focus on a higher finish and full follow-through.'
+      },
+      time_load_to_release: {
+        good: 'Release timing looks efficient. Keep the shot smooth and connected.',
+        improve: 'Timing is close. Smooth out the move from load to release.',
+        poor: 'Release timing needs work. Practice one-motion rhythm to connect legs and release.'
+      }
+    };
+
+    const bandHint = typeof rawValue === 'number' && Array.isArray(data.optimal_range) && data.optimal_range.length >= 2
+      ? (rawValue < data.optimal_range[0]
+        ? ` You are a little below the target (${idealText}).`
+        : rawValue > data.optimal_range[1]
+          ? ` You are a little above the target (${idealText}).`
+          : '')
+      : '';
+
+    const level = inOptimalRange === true ? 'good' : (qualityScore >= 0.7 ? 'improve' : 'poor');
+    return (coachText[metricKey]?.[level] || (level === 'good' ? 'This part of your shot looks solid.' : 'This area needs more work for consistency.')) + bandHint;
+  }
+
+  _humanizeBackendFeedback(text, idealText, inOptimalRange) {
+    const cleaned = text.replace(/\s+/g, ' ').trim();
+    if (inOptimalRange === true && !/good|great|solid|nice|strong/i.test(cleaned)) {
+      return `Looks good here. ${cleaned}`;
+    }
+    if (inOptimalRange === false && idealText && !/target|aim/i.test(cleaned)) {
+      return `${cleaned} Target: ${idealText}.`;
+    }
+    return cleaned;
+  }
+
+  _deriveOverallScore(apiResults, metricsArray) {
+    if (typeof apiResults.overall_score === 'number') {
+      return Math.round(apiResults.overall_score);
+    }
+
+    const metricScores = metricsArray.map(m => m.score).filter(s => typeof s === 'number');
+    if (!metricScores.length) return 0;
+    return Math.round((metricScores.reduce((sum, score) => sum + score, 0) / metricScores.length) * 10);
+  }
+
+  _buildCoachingSummary(apiResults, metricsArray, overallScore) {
+    const strengths = apiResults.improvement_summary?.strengths || [];
+    const topFocus = apiResults.improvement_summary?.areas_to_improve?.[0];
+
+    if (strengths[0] && topFocus) {
+      return `Strongest area: ${strengths[0]}. Next focus: ${topFocus}.`;
+    }
+
+    const goodCount = metricsArray.filter(m => m.status === 'good').length;
+    if (metricsArray.length && overallScore >= 80) {
+      return `${goodCount}/${metricsArray.length} key areas are in a good range. Focus on one small adjustment and retest.`;
+    }
+    if (metricsArray.length) {
+      return 'You have a good foundation. Fix one or two priorities first, then re-record to track progress.';
+    }
+    return 'Analysis complete. Use the coaching notes below for your next reps.';
+  }
+
+  _normalizeAnalysisResults(raw) {
+    if (!raw || typeof raw !== 'object') return raw;
+
+    const nestedCandidates = [
+      raw.result,
+      raw.results,
+      raw.output,
+      raw.outputs,
+      raw.analysis_result,
+      raw.analysis_results,
+      raw.payload,
+      raw.data,
+      raw.final_result
+    ];
+
+    for (const candidate of nestedCandidates) {
+      if (candidate && typeof candidate === 'object' && (candidate.metrics || candidate.overall_score || candidate.coaching_cues)) {
+        return {
+          ...candidate,
+          session_id: raw.session_id || raw.id || candidate.session_id,
+          analyzed_at: candidate.analyzed_at || raw.completed_at || raw.updated_at || raw.created_at,
+          metadata: {
+            ...(candidate.metadata || {}),
+            session_status: raw.status || candidate.metadata?.session_status
+          }
+        };
+      }
+    }
+
+    for (const key of ['result_json', 'results_json', 'output_json', 'analysis_json']) {
+      const jsonPayload = raw[key];
+      if (typeof jsonPayload === 'string') {
+        try {
+          const parsed = JSON.parse(jsonPayload);
+          if (parsed && typeof parsed === 'object') {
+            return {
+              ...parsed,
+              session_id: raw.session_id || raw.id || parsed.session_id,
+              analyzed_at: parsed.analyzed_at || raw.completed_at || raw.updated_at || raw.created_at
+            };
+          }
+        } catch (error) {
+          console.warn('⚠️ Could not parse nested JSON analysis payload:', error?.message);
+        }
+      }
+    }
+
+    return raw;
+  }
+
+  _extractOverlayVideoUrl(results) {
+    if (!results || typeof results !== 'object') return null;
+
+    const directCandidates = [
+      results.overlay_video_url,
+      results.overlayVideoUrl,
+      results.annotated_video_url,
+      results.annotatedVideoUrl,
+      results.visualization_video_url,
+      results.visualizationVideoUrl,
+      results.analysis_video_url,
+      results.analysisVideoUrl,
+      results.rendered_video_url,
+      results.renderedVideoUrl,
+      results.output_video_url,
+      results.outputVideoUrl,
+      results.video_overlay_url,
+      results.videoOverlayUrl
+    ];
+
+    const objectCandidates = [
+      results.overlay,
+      results.visualization,
+      results.render,
+      results.artifacts,
+      results.output
+    ].filter(Boolean);
+
+    const nestedCandidates = objectCandidates.flatMap((obj) => [
+      obj.url,
+      obj.video_url,
+      obj.videoUrl,
+      obj.overlay_video_url,
+      obj.overlayVideoUrl,
+      obj.annotated_video_url,
+      obj.annotatedVideoUrl
+    ]);
+
+    const allCandidates = [...directCandidates, ...nestedCandidates];
+    return allCandidates.find((value) => typeof value === 'string' && value.startsWith('http')) || null;
+  }
+
+  _metricToImprovementCue(metric) {
+    const suggestions = {
+      'Release Angle': 'Work on a higher, more consistent release finish for a softer arc.',
+      'Elbow Alignment': 'Keep your elbow under the ball to create a straighter shot path.',
+      'Knee Bend': 'Load your legs the same way each rep for better power and rhythm.',
+      'Body Alignment': 'Set your hips and shoulders earlier so your shot line stays consistent.',
+      'Stance Width': 'Start from a stable shoulder-width base to improve balance.',
+      'Balance & Stability': 'Focus on going straight up and landing in the same spot.',
+      'Shot Arc': 'Practice finishing high to improve entry angle and consistency.',
+      'Release Timing': 'Smooth out the load-to-release motion for a cleaner rhythm.'
+    };
+    return suggestions[metric.name] || null;
+  }
+
+  _cleanCoachingText(text) {
+    if (typeof text !== 'string') return '';
+    return text.replace(/\s+/g, ' ').replace(/^[-•]\s*/, '').trim();
   }
 
   /**

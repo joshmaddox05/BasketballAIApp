@@ -15,6 +15,13 @@ const API_CONFIG = {
     isOfflineMode: false,
     timeout: 600000, // 10 minutes for long-running model processing (increased from 30s)
   },
+
+  // Staging (Render deployment for backend testing)
+  staging: {
+    API_BASE_URL: 'https://basketballaiappapi-1.onrender.com',
+    isOfflineMode: false,
+    timeout: 600000,
+  },
   
   // Offline mode (for testing without backend)
   offline: {
@@ -26,7 +33,7 @@ const API_CONFIG = {
 
 // Set current environment
 // Change this to switch between environments
-const CURRENT_ENV = 'production'; // 'development' | 'production' | 'offline'
+const CURRENT_ENV = 'staging'; // 'development' | 'staging' | 'production' | 'offline'
 
 // Export current configuration
 export const CONFIG = API_CONFIG[CURRENT_ENV];

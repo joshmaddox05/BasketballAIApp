@@ -471,15 +471,56 @@ const ShootingAnalysisScreen = ({ navigation }) => {
                     />
 
                     {/* Visualization Video Section */}
-                    {analysisResults.visualizationVideoUrl && (
+                    {(analysisResults.overlayVideoUrl || analysisResults.visualizationVideoUrl) && (
                         <View style={styles.visualizationContainer}>
                             <View style={styles.visualizationHeader}>
-                                <Ionicons name="eye" size={20} color="#FF6B00" />
-                                <Text style={styles.visualizationTitle}>Shot Breakdown Video</Text>
+                                <Ionicons name="sparkles" size={20} color="#FF6B00" />
+                                <Text style={styles.visualizationTitle}>
+                                    {analysisResults.overlayVideoUrl ? 'AI Overlay Replay' : 'AI Replay: Shot Breakdown'}
+                                </Text>
                             </View>
                             <Text style={styles.visualizationDescription}>
-                                Watch your shot with AI overlays showing form analysis
+                                {analysisResults.summary || 'Watch your shot with AI overlays and use the replay to focus on one fix at a time.'}
                             </Text>
+
+                            <View style={styles.replayTipsRow}>
+                                <View style={styles.replayTipChip}>
+                                    <Ionicons name="play-circle-outline" size={14} color="#FF6B00" />
+                                    <Text style={styles.replayTipChipText}>Watch full speed first</Text>
+                                </View>
+                                <View style={styles.replayTipChip}>
+                                    <Ionicons name="pause-circle-outline" size={14} color="#FF6B00" />
+                                    <Text style={styles.replayTipChipText}>Pause on release</Text>
+                                </View>
+                                <View style={styles.replayTipChip}>
+                                    <Ionicons name="refresh-circle-outline" size={14} color="#FF6B00" />
+                                    <Text style={styles.replayTipChipText}>Replay after each cue</Text>
+                                </View>
+                            </View>
+
+                            {!!analysisResults.quality?.warning && (
+                                <View style={styles.replayWarningBox}>
+                                    <Ionicons name="warning-outline" size={16} color="#B26A00" />
+                                    <Text style={styles.replayWarningText}>
+                                        Video quality note: {analysisResults.quality.warning}
+                                    </Text>
+                                </View>
+                            )}
+
+                            {analysisResults.phases && Object.keys(analysisResults.phases).length > 0 && (
+                                <View style={styles.replayPhasesSection}>
+                                    <Text style={styles.replayPhasesTitle}>What to look for in the replay</Text>
+                                    <View style={styles.replayPhaseChips}>
+                                        {Object.keys(analysisResults.phases).slice(0, 4).map((phaseKey) => (
+                                            <View key={phaseKey} style={styles.replayPhaseChip}>
+                                                <Text style={styles.replayPhaseChipText}>
+                                                    {phaseKey.replace(/_/g, ' ')}
+                                                </Text>
+                                            </View>
+                                        ))}
+                                    </View>
+                                </View>
+                            )}
 
                             <View style={styles.videoPlayerContainer}>
                                 {videoLoading && (
@@ -490,7 +531,7 @@ const ShootingAnalysisScreen = ({ navigation }) => {
                                 )}
                                 <Video
                                     ref={videoRef}
-                                    source={{ uri: analysisResults.visualizationVideoUrl }}
+                                    source={{ uri: analysisResults.overlayVideoUrl || analysisResults.visualizationVideoUrl }}
                                     style={styles.videoPlayer}
                                     useNativeControls
                                     resizeMode="contain"
@@ -549,6 +590,10 @@ const ShootingAnalysisScreen = ({ navigation }) => {
                                     <Text style={styles.videoControlText}>Replay</Text>
                                 </TouchableOpacity>
                             </View>
+
+                            <Text style={styles.replayCoachNote}>
+                                Coaching tip: pick one focus area from your feedback, watch this replay twice, then re-record.
+                            </Text>
                         </View>
                     )}
 
@@ -1653,6 +1698,70 @@ const styles = StyleSheet.create({
         marginBottom: 16,
         lineHeight: 20,
     },
+    replayTipsRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+        marginBottom: 12,
+    },
+    replayTipChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255,107,0,0.08)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,107,0,0.16)',
+        borderRadius: 999,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+    },
+    replayTipChipText: {
+        fontSize: 12,
+        color: '#A24D00',
+        marginLeft: 6,
+        fontWeight: '500',
+    },
+    replayWarningBox: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        backgroundColor: '#FFF7E6',
+        borderRadius: 8,
+        padding: 10,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#F5D08A',
+    },
+    replayWarningText: {
+        flex: 1,
+        marginLeft: 8,
+        fontSize: 12,
+        color: '#8A5A00',
+        lineHeight: 17,
+    },
+    replayPhasesSection: {
+        marginBottom: 12,
+    },
+    replayPhasesTitle: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#333',
+        marginBottom: 8,
+    },
+    replayPhaseChips: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    replayPhaseChip: {
+        backgroundColor: '#F3F4F6',
+        borderRadius: 999,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+    },
+    replayPhaseChipText: {
+        fontSize: 12,
+        color: '#4B5563',
+        textTransform: 'capitalize',
+    },
     videoPlayerContainer: {
         width: '100%',
         height: 300,
@@ -1696,6 +1805,13 @@ const styles = StyleSheet.create({
         color: '#FFF',
         fontSize: 14,
         fontWeight: '600',
+    },
+    replayCoachNote: {
+        fontSize: 13,
+        color: '#666',
+        marginTop: 12,
+        lineHeight: 18,
+        fontStyle: 'italic',
     },
 });
 

@@ -391,16 +391,14 @@ const AICameraCapture = ({
   };
 
   const renderPoseOverlay = () => {
-    if (!showPoseOverlay) return null;
-
     const overlayWidth = width;
     const overlayHeight = height * 0.7; // Adjust based on camera view height
 
     return (
-      <Animated.View 
+      <Animated.View
         style={[
           styles.poseOverlay,
-          { opacity: poseAnimation }
+          { opacity: poseAnimation, display: showPoseOverlay ? 'flex' : 'none' }
         ]}
         pointerEvents="none"
       >
@@ -502,10 +500,8 @@ const AICameraCapture = ({
   };
 
   const renderRecordingStats = () => {
-    if (!isRecording) return null;
-
     return (
-      <View style={styles.recordingStats}>
+      <View style={[styles.recordingStats, { display: isRecording ? 'flex' : 'none' }]}>
         <View style={styles.recordingIndicator}>
           <View style={styles.recordingDot} />
           <Text style={styles.recordingText}>REC</Text>
@@ -551,51 +547,49 @@ const AICameraCapture = ({
 
   return (
     <View style={styles.container}>
-      {/* Camera View */}
-      <CameraView
-        ref={cameraRef}
-        style={styles.camera}
-        facing={cameraType}
-        mode="video"
-      >
-        {/* Pose Overlay */}
-        {renderPoseOverlay()}
-        
-        {/* Analysis Guide */}
-        {analysisPhase === 'setup' && (
-          <View style={styles.setupOverlay}>
+      <View style={styles.cameraContainer}>
+        {/* Camera View: keep childless to avoid Fabric child unmount ordering crashes */}
+        <CameraView
+          ref={cameraRef}
+          style={styles.camera}
+          facing={cameraType}
+          mode="video"
+        />
+
+        <View style={styles.cameraOverlayLayer} pointerEvents="box-none">
+          {/* Pose Overlay */}
+          {renderPoseOverlay()}
+          
+          {/* Analysis Guide */}
+          <View style={[styles.setupOverlay, { display: analysisPhase === 'setup' ? 'flex' : 'none' }]}>
             {renderAnalysisGuide()}
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.readyButton}
               onPress={() => setAnalysisPhase('ready')}
             >
               <Text style={styles.readyButtonText}>I'm Ready</Text>
             </TouchableOpacity>
           </View>
-        )}
 
-        {/* Recording Stats */}
-        {renderRecordingStats()}
+          {/* Recording Stats */}
+          {renderRecordingStats()}
 
-        {/* Countdown Overlay */}
-        {analysisPhase === 'countdown' && (
-          <View style={styles.countdownOverlay}>
+          {/* Countdown Overlay */}
+          <View style={[styles.countdownOverlay, { display: analysisPhase === 'countdown' ? 'flex' : 'none' }]}>
             <View style={styles.countdownCircle}>
               <Text style={styles.countdownNumber}>{countdown}</Text>
             </View>
             <Text style={styles.countdownText}>Get Ready!</Text>
             <Text style={styles.countdownSubtext}>Recording starts in {countdown}...</Text>
           </View>
-        )}
 
-        {/* Processing Overlay */}
-        {analysisPhase === 'processing' && (
-          <View style={styles.processingOverlay}>
+          {/* Processing Overlay */}
+          <View style={[styles.processingOverlay, { display: analysisPhase === 'processing' ? 'flex' : 'none' }]}>
             <ActivityIndicator size="large" color="#FF6B35" />
             <Text style={styles.processingText}>Processing video...</Text>
           </View>
-        )}
-      </CameraView>
+        </View>
+      </View>
 
       {/* Controls */}
       <View style={styles.controls}>
@@ -662,8 +656,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000',
   },
+  cameraContainer: {
+    flex: 1,
+    position: 'relative',
+  },
   camera: {
     flex: 1,
+  },
+  cameraOverlayLayer: {
+    ...StyleSheet.absoluteFillObject,
   },
   permissionContainer: {
     flex: 1,
