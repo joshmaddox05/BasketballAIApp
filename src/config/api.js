@@ -1,50 +1,49 @@
-// Config for Basketball AI App API endpoints
-// Update these values based on your deployment
+// api.js - AI backend endpoint configuration
+// Environment is driven by env.js (APP_ENV from EAS / build config).
+// To switch environments, set APP_ENV in eas.json or your .env, not here.
+
+import { IS_DEVELOPMENT, IS_PRODUCTION } from './env';
 
 const API_CONFIG = {
-  // Development (local FastAPI server)
   development: {
     API_BASE_URL: 'http://localhost:8000',
     isOfflineMode: false,
-    timeout: 600000, // 10 minutes for long-running model processing
+    timeout: 120000, // 2 minutes — fast failure detection for local dev
   },
-  
-  // Production (Render deployment - separate backend repository)
-  production: {
-    API_BASE_URL: 'https://basketballaiappapi.onrender.com',
-    isOfflineMode: false,
-    timeout: 600000, // 10 minutes for long-running model processing (increased from 30s)
-  },
-
-  // Staging (Render deployment for backend testing)
   staging: {
     API_BASE_URL: 'https://basketballaiappapi-1.onrender.com',
     isOfflineMode: false,
-    timeout: 600000,
+    timeout: 120000,
   },
-  
-  // Offline mode (for testing without backend)
+  production: {
+    API_BASE_URL: 'https://basketballaiappapi.onrender.com',
+    isOfflineMode: false,
+    timeout: 120000,
+  },
   offline: {
     API_BASE_URL: null,
     isOfflineMode: true,
     timeout: 0,
-  }
+  },
 };
 
-// Set current environment
-// Change this to switch between environments
-const CURRENT_ENV = 'staging'; // 'development' | 'staging' | 'production' | 'offline'
+// Resolve environment from build config — never hard-code this here.
+const resolveEnv = () => {
+  if (IS_PRODUCTION) return 'production';
+  if (IS_DEVELOPMENT) return 'development';
+  return 'staging'; // preview / TestFlight builds use staging backend
+};
 
-// Export current configuration
+const CURRENT_ENV = resolveEnv();
+
 export const CONFIG = API_CONFIG[CURRENT_ENV];
 
-// Helper function to get config for specific environment
 export const getConfig = (env) => API_CONFIG[env] || API_CONFIG.development;
 
-// Helper to check if using production
 export const isProduction = () => CURRENT_ENV === 'production';
 
-// Helper to check if offline
 export const isOffline = () => CURRENT_ENV === 'offline';
+
+export const currentEnv = CURRENT_ENV;
 
 export default CONFIG;

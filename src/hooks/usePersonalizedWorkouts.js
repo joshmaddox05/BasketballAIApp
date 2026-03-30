@@ -16,16 +16,18 @@ import {
 export const usePersonalizedWorkouts = () => {
   const { userData, userProfile } = useAppContext();
 
-  // Build user profile for personalization
+  // Build user profile for personalization.
+  // Preferences are stored nested under userData.preferences in Firestore.
   const personalizedProfile = useMemo(() => {
+    const prefs = userData?.preferences || {};
     return {
       level: userData?.level || 'beginner',
       goals: userData?.goals || [],
       preferences: {
-        trainingDays: userData?.trainingDays || ['Mon', 'Wed', 'Fri'],
-        preferredDuration: userData?.preferredDuration || 30,
-        preferredTime: userData?.preferredTime || 'evening',
-        focusAreas: userData?.focusAreas || ['shooting', 'dribbling'],
+        trainingDays: prefs.trainingDays || ['Mon', 'Wed', 'Fri'],
+        preferredDuration: prefs.preferredDuration || 30,
+        preferredTime: prefs.preferredTime || 'evening',
+        focusAreas: prefs.focusAreas || [],
       },
     };
   }, [userData]);

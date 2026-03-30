@@ -10,13 +10,12 @@ import {
     StatusBar,
     Dimensions,
     Animated,
-    Alert,
     ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
 import { useFocusEffect } from '@react-navigation/native';
-import { LineChart, BarChart } from 'react-native-chart-kit';
+import { LineChart } from 'react-native-chart-kit';
 import {
     getWorkoutHistory,
     getWorkoutStats,
@@ -27,22 +26,17 @@ import {
     getAchievementProgress,
     getUserShootingStats,
     listenToUserActivities,
-    listenToUserProfile
 } from '../../services/firestoreService';
 import { ACHIEVEMENT_CATEGORIES } from '../../data/achievements';
-import UpgradePrompt from '../../components/shared/UpgradePrompt';
-import LockedFeatureCard from '../../components/features/LockedFeatureCard';
-import { canAccessFeature } from '../../utils/subscription';
 import { TourStep } from '../../components/tour';
 
 const { width } = Dimensions.get('window');
 
-// Tab options for progress screen (consolidated Overview + Skills into Stats)
+// Tab options for progress screen
 const TABS = [
     { id: 'stats', label: 'Stats' },
     { id: 'achievements', label: 'Achievements' },
     { id: 'goals', label: 'Goals' },
-    { id: 'history', label: 'History' },
 ];
 
 const ProgressScreen = ({ navigation }) => {
@@ -60,7 +54,6 @@ const ProgressScreen = ({ navigation }) => {
     const [expandedGoalId, setExpandedGoalId] = useState(null);
     const [selectedTimeframe, setSelectedTimeframe] = useState('month'); // week, month, year
     const [selectedSkill, setSelectedSkill] = useState('shooting'); // shooting, dribbling, etc.
-    const [selectedCategory, setSelectedCategory] = useState('all'); // all, shooting, dribbling, physical, etc.
     const [showCompletedGoals, setShowCompletedGoals] = useState(false); // For goals tab
 
     // Real analytics data
@@ -1140,223 +1133,6 @@ const ProgressScreen = ({ navigation }) => {
         );
     };
 
-    // Renders the History tab content
-    const renderHistoryTab = () => {
-        // Group workouts by date for calendar
-        const getWorkoutDates = () => {
-            const dates = new Set();
-            workoutHistory.forEach(workout => {
-                if (workout.createdAt && workout.createdAt.toDate) {
-                    const date = workout.createdAt.toDate();
-                    dates.add(date.toDateString());
-                }
-            });
-            return dates;
-        };
-
-        const workoutDates = getWorkoutDates();
-        const currentMonth = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-
-        // Get the most recent workouts (limit to 10 for display)
-        const recentWorkouts = workoutHistory.slice(0, 10);
-
-        // Filter workouts by category
-        const filteredWorkouts = selectedCategory === 'all'
-            ? recentWorkouts
-            : recentWorkouts.filter(w => w.category === selectedCategory);
-
-        // Get unique categories from workout history
-        const availableCategories = ['all', ...new Set(workoutHistory.map(w => w.category).filter(Boolean))];
-
-        return (
-            <View style={styles.tabContent}>
-                <View style={[styles.historyHeader, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
-                    <Text style={[styles.historyTitle, { color: theme.text }]}>Training History</Text>
-                </View>
-
-                {/* Category Filter */}
-                <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    style={styles.categoryFilterContainer}
-                    contentContainerStyle={styles.categoryFilterContent}
-                >
-                    {availableCategories.map((category) => {
-                        const isSelected = selectedCategory === category;
-                        const categoryConfig = {
-                            'all': { icon: 'apps', color: '#666', label: 'All' },
-                            'Shooting': { icon: 'basketball', color: '#FF6B00', label: 'Shooting' },
-                            'Dribbling': { icon: 'hand-left', color: '#4CAF50', label: 'Dribbling' },
-                            'Physical': { icon: 'fitness', color: '#2196F3', label: 'Physical' },
-                            'Defense': { icon: 'shield', color: '#9C27B0', label: 'Defense' },
-                            'Passing': { icon: 'swap-horizontal', color: '#FF9800', label: 'Passing' },
-                        };
-                        const config = categoryConfig[category] || { icon: 'fitness', color: '#666', label: category };
-
-                        return (
-                            <TouchableOpacity
-                                key={category}
-                                style={[
-                                    styles.categoryFilterChip,
-                                    { backgroundColor: theme.backgroundTertiary },
-                                    isSelected && { backgroundColor: config.color + '20', borderColor: config.color }
-                                ]}
-                                onPress={() => setSelectedCategory(category)}
-                            >
-                                <Ionicons
-                                    name={config.icon}
-                                    size={16}
-                                    color={isSelected ? config.color : theme.textSecondary}
-                                />
-                                <Text style={[
-                                    styles.categoryFilterText,
-                                    { color: theme.textSecondary },
-                                    isSelected && { color: config.color, fontWeight: '600' }
-                                ]}>
-                                    {config.label}
-                                </Text>
-                            </TouchableOpacity>
-                        );
-                    })}
-                </ScrollView>
-
-                {loading ? (
-                    <View style={styles.loadingContainer}>
-                        <ActivityIndicator size="large" color={theme.primary} />
-                        <Text style={[styles.loadingText, { color: theme.textSecondary }]}>Loading workout history...</Text>
-                    </View>
-                ) : workoutHistory.length === 0 ? (
-                    <View style={[styles.emptyState, { backgroundColor: theme.card }]}>
-                        <Ionicons name="fitness-outline" size={48} color={theme.textTertiary} style={{ marginBottom: 12 }} />
-                        <Text style={[styles.emptyStateText, { color: theme.textSecondary }]}>No workout history found.</Text>
-                        <Text style={[styles.emptyStateSubtext, { color: theme.textTertiary }]}>
-                            Complete your first workout to start tracking your progress!
-                        </Text>
-                    </View>
-                ) : (
-                    <>
-                        <View style={[styles.calendarContainer, { backgroundColor: theme.card }]}>
-                            <Text style={[styles.calendarTitle, { color: theme.text }]}>Activity Calendar</Text>
-                            <View style={styles.monthSelector}>
-                                <TouchableOpacity>
-                                    <Ionicons name="chevron-back" size={20} color={theme.textSecondary} />
-                                </TouchableOpacity>
-                                <Text style={[styles.monthText, { color: theme.text }]}>{currentMonth}</Text>
-                                <TouchableOpacity>
-                                    <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
-                                </TouchableOpacity>
-                            </View>
-
-                            {/* Simple calendar UI - simplified activity indicator */}
-                            <View style={styles.calendarGrid}>
-                                <View style={styles.calendarRow}>
-                                    {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, index) => (
-                                        <Text key={index} style={[styles.calendarDayHeader, { color: theme.textSecondary }]}>{day}</Text>
-                                    ))}
-                                </View>
-
-                                <View style={styles.calendarDays}>
-                                    {Array.from({ length: 30 }, (_, i) => i + 1).map(day => {
-                                        const currentDate = new Date();
-                                        const checkDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
-                                        const hasWorkout = workoutDates.has(checkDate.toDateString());
-                                        return (
-                                            <View key={day} style={styles.calendarDay}>
-                                                <Text style={[styles.calendarDayText, { color: theme.text }]}>{day}</Text>
-                                                {hasWorkout && <View style={[styles.workoutDot, { backgroundColor: theme.primary }]} />}
-                                            </View>
-                                        );
-                                    })}
-                                </View>
-                            </View>
-                        </View>
-
-                        <View style={[styles.workoutHistoryContainer, { backgroundColor: theme.card }]}>
-                            <Text style={[styles.workoutHistoryTitle, { color: theme.text }]}>
-                                {selectedCategory === 'all' ? 'Recent Workouts' : `${selectedCategory} Workouts`}
-                            </Text>
-
-                            {filteredWorkouts.length === 0 ? (
-                                <View style={styles.emptyFilterState}>
-                                    <Ionicons name="search-outline" size={40} color={theme.textTertiary} />
-                                    <Text style={[styles.emptyFilterText, { color: theme.textSecondary }]}>
-                                        No {selectedCategory === 'all' ? '' : selectedCategory.toLowerCase()} workouts found
-                                    </Text>
-                                    <TouchableOpacity
-                                        style={[styles.clearFilterButton, { backgroundColor: theme.primary }]}
-                                        onPress={() => setSelectedCategory('all')}
-                                    >
-                                        <Text style={styles.clearFilterText}>Clear Filter</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            ) : (
-                                <>
-                                    {filteredWorkouts.map(workout => {
-                                const workoutDate = workout.createdAt && workout.createdAt.toDate ? workout.createdAt.toDate() : new Date();
-                                const durationMinutes = workout.durationMinutes || Math.floor((workout.duration || 0) / 60);
-                                const completionScore = workout.completionPercentage || 0;
-
-                                // Map category to icon and color
-                                const categoryConfig = {
-                                    'Shooting': { icon: 'basketball', color: '#FF6B00' },
-                                    'Dribbling': { icon: 'hand-left', color: '#4CAF50' },
-                                    'Physical': { icon: 'fitness', color: '#2196F3' },
-                                    'Defense': { icon: 'shield', color: '#9C27B0' },
-                                    'Passing': { icon: 'swap-horizontal', color: '#FF9800' },
-                                };
-
-                                const config = categoryConfig[workout.category] || { icon: 'fitness', color: '#666' };
-
-                                return (
-                                    <TouchableOpacity
-                                        key={workout.id}
-                                        style={[styles.historyItem, { borderBottomColor: theme.border }]}
-                                        onPress={() => {
-                                            // Navigate to workout details
-                                            navigation.navigate('WorkoutDetail', { workoutId: workout.workoutId });
-                                        }}
-                                    >
-                                        <View style={styles.historyItemLeft}>
-                                            <View style={[styles.historyItemIcon, { backgroundColor: `${config.color}15` }]}>
-                                                <Ionicons name={config.icon} size={20} color={config.color} />
-                                            </View>
-                                        </View>
-
-                                        <View style={styles.historyItemContent}>
-                                            <Text style={[styles.historyItemTitle, { color: theme.text }]}>{workout.title}</Text>
-                                            <View style={styles.historyItemMeta}>
-                                                <View style={styles.historyItemMetaItem}>
-                                                    <Ionicons name="calendar-outline" size={14} color={theme.textSecondary} />
-                                                    <Text style={[styles.historyItemMetaText, { color: theme.textSecondary }]}>
-                                                        {workoutDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                                    </Text>
-                                                </View>
-                                                <View style={styles.historyItemMetaItem}>
-                                                    <Ionicons name="time-outline" size={14} color={theme.textSecondary} />
-                                                    <Text style={[styles.historyItemMetaText, { color: theme.textSecondary }]}>{durationMinutes} min</Text>
-                                                </View>
-                                            </View>
-                                        </View>
-
-                                        <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
-                                    </TouchableOpacity>
-                                );
-                                    })}
-
-                                    {workoutHistory.length > 10 && (
-                                        <TouchableOpacity style={[styles.viewMoreButton, { backgroundColor: theme.backgroundTertiary }]}>
-                                            <Text style={[styles.viewMoreText, { color: theme.textSecondary }]}>View All History ({workoutHistory.length} total)</Text>
-                                        </TouchableOpacity>
-                                    )}
-                                </>
-                            )}
-                        </View>
-                    </>
-                )}
-            </View>
-        );
-    };
-
     return (
         <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
             <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={theme.background} />
@@ -1406,7 +1182,6 @@ const ProgressScreen = ({ navigation }) => {
                 {activeTab === 'stats' && renderStatsTab()}
                 {activeTab === 'achievements' && renderAchievementsTab()}
                 {activeTab === 'goals' && renderGoalsTab()}
-                {activeTab === 'history' && renderHistoryTab()}
             </ScrollView>
         </SafeAreaView>
     );
@@ -2363,194 +2138,6 @@ const styles = StyleSheet.create({
         color: '#FFF',
         fontSize: 15,
         fontWeight: '600',
-    },
-
-    // History Tab Styles
-    historyHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-    },
-    historyTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-    },
-    historyFilterButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#F5F5F5',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 16,
-    },
-    historyFilterText: {
-        fontSize: 14,
-        marginLeft: 4,
-    },
-    categoryFilterContainer: {
-        marginTop: 12,
-        marginBottom: 8,
-    },
-    categoryFilterContent: {
-        paddingHorizontal: 16,
-        gap: 10,
-    },
-    categoryFilterChip: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-        borderRadius: 20,
-        backgroundColor: '#F5F5F5',
-        borderWidth: 2,
-        borderColor: 'transparent',
-        gap: 6,
-    },
-    categoryFilterText: {
-        fontSize: 14,
-    },
-    emptyFilterState: {
-        alignItems: 'center',
-        paddingVertical: 40,
-        paddingHorizontal: 20,
-    },
-    emptyFilterText: {
-        fontSize: 15,
-        marginTop: 12,
-        marginBottom: 16,
-        textAlign: 'center',
-    },
-    clearFilterButton: {
-        backgroundColor: '#FF6B00',
-        paddingHorizontal: 20,
-        paddingVertical: 10,
-        borderRadius: 20,
-    },
-    clearFilterText: {
-        color: '#FFF',
-        fontSize: 14,
-        fontWeight: '600',
-    },
-    calendarContainer: {
-        padding: 16,
-        marginTop: 8,
-    },
-    calendarTitle: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        marginBottom: 16,
-    },
-    monthSelector: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 16,
-    },
-    monthText: {
-        fontSize: 16,
-        fontWeight: '500',
-    },
-    calendarGrid: {},
-    calendarRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-        marginBottom: 8,
-    },
-    calendarDayHeader: {
-        width: 30,
-        textAlign: 'center',
-        fontSize: 12,
-        fontWeight: '500',
-    },
-    calendarDays: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'flex-start',
-    },
-    calendarDay: {
-        width: width / 7 - 10,
-        height: 30,
-        justifyContent: 'center',
-        alignItems: 'center',
-        margin: 5,
-        position: 'relative',
-    },
-    calendarDayText: {
-        fontSize: 14,
-    },
-    workoutDot: {
-        position: 'absolute',
-        bottom: 2,
-        width: 4,
-        height: 4,
-        borderRadius: 2,
-        backgroundColor: '#FF6B00',
-    },
-    workoutHistoryContainer: {
-        padding: 16,
-        marginTop: 8,
-    },
-    workoutHistoryTitle: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        marginBottom: 16,
-    },
-    historyItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: '#F0F0F0',
-    },
-    historyItemLeft: {
-        width: 50,
-        alignItems: 'center',
-    },
-    historyItemIcon: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    historyItemDate: {
-        fontSize: 12,
-        textAlign: 'center',
-    },
-    historyItemContent: {
-        flex: 1,
-        marginLeft: 10,
-    },
-    historyItemTitle: {
-        fontSize: 14,
-        fontWeight: '600',
-        marginBottom: 4,
-    },
-    historyItemMeta: {
-        flexDirection: 'row',
-    },
-    historyItemMetaItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginRight: 12,
-    },
-    historyItemMetaText: {
-        fontSize: 12,
-        marginLeft: 4,
-    },
-    viewMoreButton: {
-        backgroundColor: '#F5F5F5',
-        paddingVertical: 12,
-        borderRadius: 8,
-        alignItems: 'center',
-        marginTop: 16,
-    },
-    viewMoreText: {
-        fontSize: 14,
-        fontWeight: '500',
     },
 
     // Recommendations Styles

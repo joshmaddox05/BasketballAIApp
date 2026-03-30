@@ -66,32 +66,19 @@ const ENV = {
     USE_TEST_MODE: useTestMode,
 };
 
-// Log environment info (helpful for debugging)
-if (__DEV__) {
-    console.log(`🔧 App Environment: ${APP_ENV}`);
-    console.log(`🔧 Using Test Mode: ${useTestMode}`);
-    console.log(`🔧 Stripe Key: ${ENV.STRIPE_PUBLISHABLE_KEY?.substring(0, 20)}...`);
-}
-
 // Validate required keys in production only
 if (isProduction) {
     const requiredKeys = ['STRIPE_PUBLISHABLE_KEY', 'YOUTUBE_API_KEY'];
     const missingKeys = requiredKeys.filter(key => !ENV[key]);
-
     if (missingKeys.length > 0) {
         console.error(
-            `CRITICAL: Missing production environment variables: ${missingKeys.join(', ')}\n` +
-            'Please set these via EAS secrets. See docs/PRODUCTION_SETUP.md for instructions.'
+            `[ERROR] Missing production environment variables: ${missingKeys.join(', ')}. ` +
+            'Set these via EAS secrets (see docs/PRODUCTION_SETUP.md).'
         );
     }
-
-    // Error if using test keys in production
     if (ENV.STRIPE_PUBLISHABLE_KEY?.startsWith('pk_test_')) {
-        console.error('ERROR: Using Stripe TEST key in PRODUCTION build! This should not happen.');
+        console.error('[ERROR] Stripe TEST key in use in PRODUCTION build.');
     }
-} else if (isPreview) {
-    // Info message for preview builds
-    console.log('📱 Preview Build: Using Stripe TEST mode for TestFlight testing');
 }
 
 export default ENV;
