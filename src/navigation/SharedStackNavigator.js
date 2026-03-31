@@ -6,6 +6,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import AddGoalScreen from '../screens/shared/AddGoalScreen';
 import ShootingAnalysisScreen from '../screens/shared/ShootingAnalysisScreen';
 import WorkoutDetailScreen from '../screens/shared/WorkoutDetailScreen';
+import SubscriptionScreen from '../screens/shared/SubscriptionScreen';
 import ActiveWorkoutScreen from '../screens/main/ActiveWorkoutScreen';
 
 // Import video screens
@@ -23,6 +24,11 @@ const SharedStack = createStackNavigator();
 
 // This stack won't be used directly but its screen definitions will be referenced in other navigators
 export const sharedScreens = [
+    {
+        name: 'Subscription',
+        component: SubscriptionScreen,
+        options: { headerShown: false }
+    },
     {
         name: 'AddGoal',
         component: AddGoalScreen,

@@ -6,12 +6,12 @@ import { IS_DEVELOPMENT, IS_PRODUCTION } from './env';
 
 const API_CONFIG = {
   development: {
-    API_BASE_URL: 'http://localhost:8000',
+    API_BASE_URL: 'https://basketballaiappapi.onrender.com',
     isOfflineMode: false,
-    timeout: 120000, // 2 minutes — fast failure detection for local dev
+    timeout: 120000,
   },
   staging: {
-    API_BASE_URL: 'https://basketballaiappapi-1.onrender.com',
+    API_BASE_URL: 'https://basketballaiappapi.onrender.com',
     isOfflineMode: false,
     timeout: 120000,
   },

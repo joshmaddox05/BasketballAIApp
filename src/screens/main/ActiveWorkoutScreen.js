@@ -205,16 +205,19 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
         setMisses(0);
 
         if (currentStepData.duration) {
-          // Parse duration - handle both number and string formats (e.g., "5 min", "10", 10)
-          let durationInMinutes = 0;
+          // Parse duration — templates store seconds (e.g. 300), legacy data stores minutes (e.g. 5).
+          // Heuristic: values > 60 are already in seconds; values <= 60 are in minutes and need * 60.
+          let durationInSeconds = 0;
           if (typeof currentStepData.duration === 'number') {
-            durationInMinutes = currentStepData.duration;
+            durationInSeconds = currentStepData.duration > 60
+              ? currentStepData.duration
+              : currentStepData.duration * 60;
           } else if (typeof currentStepData.duration === 'string') {
-            // Extract number from strings like "5 min", "10 minutes", etc.
             const match = currentStepData.duration.match(/(\d+)/);
-            durationInMinutes = match ? parseInt(match[1]) : 5; // Default to 5 min if can't parse
+            const val = match ? parseInt(match[1]) : 300;
+            durationInSeconds = val > 60 ? val : val * 60;
           }
-          setTimeRemaining(durationInMinutes * 60);
+          setTimeRemaining(durationInSeconds);
           setTimerType('duration');
           setTimerActive(true);
         } else {

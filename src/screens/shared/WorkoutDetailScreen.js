@@ -21,6 +21,17 @@ import { getCustomWorkout } from '../../services/firestoreService';
 
 const { width } = Dimensions.get('window');
 
+const formatDuration = (workout) => {
+    if (workout.estimatedDuration) return `${workout.estimatedDuration} min`;
+    if (workout.duration) return `${Math.round(workout.duration / 60)} min`;
+    return '—';
+};
+
+const formatStepDuration = (seconds) => {
+    const mins = Math.round(seconds / 60);
+    return mins < 1 ? `${seconds}s` : `${mins} min`;
+};
+
 const WorkoutDetailScreen = ({ route, navigation }) => {
     const { workoutId, workout: passedWorkout, isCustom } = route.params;
     const { workouts, theme, userData, addActivity } = useAppContext();
@@ -51,7 +62,7 @@ const WorkoutDetailScreen = ({ route, navigation }) => {
     // Determine which workout to use
     const workout = isCustom
         ? customWorkout
-        : workouts.find(w => w.id === workoutId);
+        : (passedWorkout || workouts.find(w => w.id === workoutId));
 
     if (loading) {
         return (
@@ -124,7 +135,7 @@ const WorkoutDetailScreen = ({ route, navigation }) => {
                         <Ionicons name="time-outline" size={24} color={theme.primary} />
                         <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>Duration</Text>
                         <Text style={[styles.metaValue, { color: theme.text }]}>
-                            {workout.duration}
+                            {formatDuration(workout)}
                         </Text>
                     </View>
                     <View style={[styles.metaCard, { backgroundColor: theme.card }]}>
@@ -156,10 +167,10 @@ const WorkoutDetailScreen = ({ route, navigation }) => {
             <View style={styles.stepsSection}>
                 <View style={styles.sectionHeaderContainer}>
                     <Ionicons name="list-outline" size={24} color={theme.primary} />
-                    <Text style={[styles.sectionTitle, { color: theme.text }]}>Workout Steps</Text>
+                    <Text style={[styles.sectionTitle, { color: theme.text }]}>{workout.name || workout.title}</Text>
                 </View>
                 <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
-                    Follow these {workout.steps.length} steps to complete your workout
+                    {workout.steps.length} steps · {formatDuration(workout)}
                 </Text>
 
                 {workout.steps.map((step, index) => (
@@ -169,28 +180,46 @@ const WorkoutDetailScreen = ({ route, navigation }) => {
                                 <Text style={styles.stepNumberText}>{index + 1}</Text>
                             </View>
                             <View style={styles.stepTitleContainer}>
-                                <Text style={[styles.stepTitle, { color: theme.text }]}>{step.title}</Text>
-                                {step.duration && (
-                                    <View style={styles.stepDuration}>
-                                        <Ionicons name="timer-outline" size={14} color={theme.textSecondary} />
-                                        <Text style={[styles.stepDurationText, { color: theme.textSecondary }]}>
-                                            {step.duration} min
-                                        </Text>
-                                    </View>
-                                )}
-                                {step.reps && (
-                                    <View style={styles.stepDuration}>
-                                        <Ionicons name="repeat-outline" size={14} color={theme.textSecondary} />
-                                        <Text style={[styles.stepDurationText, { color: theme.textSecondary }]}>
-                                            {step.reps} reps
-                                        </Text>
-                                    </View>
-                                )}
+                                <Text style={[styles.stepTitle, { color: theme.text }]}>{step.name || step.title}</Text>
+                                <View style={styles.stepMeta}>
+                                    {step.duration && (
+                                        <View style={styles.stepDuration}>
+                                            <Ionicons name="timer-outline" size={14} color={theme.textSecondary} />
+                                            <Text style={[styles.stepDurationText, { color: theme.textSecondary }]}>
+                                                {formatStepDuration(step.duration)}
+                                            </Text>
+                                        </View>
+                                    )}
+                                    {step.reps && (
+                                        <View style={styles.stepDuration}>
+                                            <Ionicons name="repeat-outline" size={14} color={theme.textSecondary} />
+                                            <Text style={[styles.stepDurationText, { color: theme.textSecondary }]}>
+                                                {step.reps} reps
+                                            </Text>
+                                        </View>
+                                    )}
+                                </View>
                             </View>
                         </View>
-                        <Text style={[styles.stepInstructions, { color: theme.textSecondary }]}>
-                            {step.instructions}
-                        </Text>
+
+                        {/* Instructions — array rendered as numbered list, string as paragraph */}
+                        {Array.isArray(step.instructions) ? (
+                            <View style={styles.instructionsList}>
+                                {step.instructions.map((line, i) => (
+                                    <View key={i} style={styles.instructionRow}>
+                                        <View style={[styles.instructionBullet, { backgroundColor: theme.primary }]}>
+                                            <Text style={styles.instructionBulletText}>{i + 1}</Text>
+                                        </View>
+                                        <Text style={[styles.instructionText, { color: theme.textSecondary }]}>{line}</Text>
+                                    </View>
+                                ))}
+                            </View>
+                        ) : (
+                            <Text style={[styles.stepInstructions, { color: theme.textSecondary }]}>
+                                {step.instructions}
+                            </Text>
+                        )}
+
                         {step.tips && (
                             <View style={[styles.tipContainer, { backgroundColor: theme.primary + '08', borderColor: theme.primary + '20' }]}>
                                 <View style={[styles.tipIconBadge, { backgroundColor: theme.primary }]}>
@@ -253,7 +282,7 @@ const WorkoutDetailScreen = ({ route, navigation }) => {
                 </TouchableOpacity>
                 <View style={styles.headerTitleContainer}>
                     <Text style={[styles.headerTitle, { color: theme.text }]} numberOfLines={1}>
-                        {workout.title}
+                        {workout.name || workout.title}
                     </Text>
                     {isLocked && (
                         <View style={styles.lockHeaderBadge}>
@@ -287,7 +316,7 @@ const WorkoutDetailScreen = ({ route, navigation }) => {
                                 {isLocked ? 'Unlock Workout' : 'Start Workout'}
                             </Text>
                             <Text style={styles.startButtonSubtext}>
-                                {workout.steps.length} steps · {workout.duration}
+                                {workout.steps.length} steps · {formatDuration(workout)}
                             </Text>
                         </View>
                     </View>
@@ -441,11 +470,45 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         marginBottom: 4,
     },
+    stepMeta: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 10,
+        marginTop: 4,
+    },
     stepDuration: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 4,
+    },
+    instructionsList: {
         marginTop: 4,
+        marginBottom: 12,
+        gap: 8,
+    },
+    instructionRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 10,
+    },
+    instructionBullet: {
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 1,
+        flexShrink: 0,
+    },
+    instructionBulletText: {
+        color: '#FFF',
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    instructionText: {
+        flex: 1,
+        fontSize: 14,
+        lineHeight: 20,
     },
     stepDurationText: {
         fontSize: 13,
