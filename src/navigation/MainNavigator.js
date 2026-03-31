@@ -214,13 +214,8 @@ function MainNavigatorContent() {
 
     // Auto-start tour for new users who haven't seen it yet
     useEffect(() => {
-        console.log('MainNavigator - Tour check:', { isTourLoading, hasSeenTour, hasUser: !!user?.uid });
         if (!isTourLoading && !hasSeenTour && user?.uid) {
-            console.log('MainNavigator - Starting tour for new user');
-            // Delay slightly to ensure UI is fully rendered
-            const timer = setTimeout(() => {
-                startTour();
-            }, 1000);
+            const timer = setTimeout(() => startTour(), 1000);
             return () => clearTimeout(timer);
         }
     }, [isTourLoading, hasSeenTour, user?.uid, startTour]);

@@ -1,5 +1,5 @@
 // TrainingScreen.js
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
     StyleSheet,
     Text,
@@ -23,7 +23,7 @@ import SubscriptionModal from '../../components/shared/SubscriptionModal';
 import { getActiveCustomPlan, getCustomPlans } from '../../services/firestoreService';
 import { auth } from '../../config/firebaseConfig';
 import { LinearGradient } from 'expo-linear-gradient';
-import { TourStep } from '../../components/tour';
+import { TourStep, useTour } from '../../components/tour';
 
 // Import thumbnail images for workouts
 const shootingThumbnail = require('../../../assets/shooting-thumbnail.jpg');
@@ -37,6 +37,14 @@ const workoutThumbnails = {
 
 const TrainingScreen = ({ navigation }) => {
     const { workouts, loading, userData, trainingVideos, setTrainingVideosData, theme, isDarkMode, getAccessibleWorkouts } = useAppContext();
+    const { registerScrollRef, unregisterScrollRef, updateScrollY } = useTour();
+    const scrollRef = useRef(null);
+
+    useEffect(() => {
+        registerScrollRef('Training', scrollRef);
+        return () => unregisterScrollRef('Training');
+    }, [registerScrollRef, unregisterScrollRef]);
+
     const [searchQuery, setSearchQuery] = useState('');
     const [filteredWorkouts, setFilteredWorkouts] = useState([]);
     const [selectedCategory, setSelectedCategory] = useState('All');
@@ -296,7 +304,12 @@ const TrainingScreen = ({ navigation }) => {
                     />
                 </View>
 
-                <ScrollView showsVerticalScrollIndicator={false}>
+                <ScrollView
+                    ref={scrollRef}
+                    showsVerticalScrollIndicator={false}
+                    onScroll={(e) => updateScrollY('Training', e.nativeEvent.contentOffset.y)}
+                    scrollEventThrottle={16}
+                >
                     {/* Build Your Workout Card */}
                     <TourStep stepId="build-workout-card">
                         <TouchableOpacity

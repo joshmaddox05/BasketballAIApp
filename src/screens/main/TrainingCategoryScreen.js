@@ -14,6 +14,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
 import { hasAccess, SUBSCRIPTION_TIERS } from '../../utils/subscription';
+import SubscriptionModal from '../../components/shared/SubscriptionModal';
 
 // Import thumbnail images for workouts
 const shootingThumbnail = require('../../../assets/shooting-thumbnail.jpg');
@@ -29,6 +30,7 @@ const TrainingCategoryScreen = ({ route, navigation }) => {
     const { category } = route.params;
     const { workouts, loading, userData, theme, isDarkMode } = useAppContext();
     const [filteredWorkouts, setFilteredWorkouts] = useState([]);
+    const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
 
     const userSubscription = userData?.subscription || SUBSCRIPTION_TIERS.FREE;
 
@@ -142,7 +144,7 @@ const TrainingCategoryScreen = ({ route, navigation }) => {
             <TouchableOpacity
                 style={[styles.workoutCard, { backgroundColor: theme.card }, isLocked && styles.lockedWorkoutCard]}
                 onPress={() => isLocked
-                    ? navigation.navigate('Profile', { screen: 'Settings', params: { openSubscription: true }, initial: false })
+                    ? setShowSubscriptionModal(true)
                     : navigation.navigate('WorkoutDetail', { workoutId: item.id })
                 }
                 activeOpacity={isLocked ? 0.8 : 0.9}
@@ -199,7 +201,7 @@ const TrainingCategoryScreen = ({ route, navigation }) => {
                         {isLocked ? (
                             <TouchableOpacity
                                 style={styles.unlockButton}
-                                onPress={() => navigation.navigate('Profile', { screen: 'Settings', params: { openSubscription: true }, initial: false })}
+                                onPress={() => setShowSubscriptionModal(true)}
                             >
                                 <Ionicons name="lock-open-outline" size={14} color="#FFF" />
                                 <Text style={styles.unlockButtonText}>Upgrade</Text>
@@ -228,6 +230,7 @@ const TrainingCategoryScreen = ({ route, navigation }) => {
     }
 
     return (
+        <>
         <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
             <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={theme.background} />
 
@@ -283,7 +286,12 @@ const TrainingCategoryScreen = ({ route, navigation }) => {
                 </View>
             )}
         </SafeAreaView>
-    );
+        <SubscriptionModal
+            visible={showSubscriptionModal}
+            onClose={() => setShowSubscriptionModal(false)}
+            onUpgrade={() => setShowSubscriptionModal(false)}
+        />
+    </> );
 };
 
 const styles = StyleSheet.create({

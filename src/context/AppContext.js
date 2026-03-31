@@ -1,5 +1,6 @@
-// AppContext.js - Enhanced with Firebase integration
+// AppContext.js - Global app state with Firebase integration
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import logger from '../utils/logger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useColorScheme, AppState } from 'react-native';
 import { getTheme } from '../utils/theme';
@@ -26,6 +27,7 @@ import {
   getVideos,
   updateUserProfile,
   getDailyChallenge,
+  getDailyChallengeProgress,
   updateChallengeProgress,
   getAIAnalysisStats,
   getWorkoutHistory,
@@ -138,6 +140,7 @@ export const AppProvider = ({ children }) => {
 
     // Daily challenge and milestone state
     const [dailyChallenge, setDailyChallenge] = useState(null);
+    const [dailyChallengeProgress, setDailyChallengeProgress] = useState(null);
     const [showChallengeModal, setShowChallengeModal] = useState(false);
     const [currentMilestone, setCurrentMilestone] = useState(null);
     const [showMilestoneCelebration, setShowMilestoneCelebration] = useState(false);
@@ -153,7 +156,7 @@ export const AppProvider = ({ children }) => {
     // Firebase auth state listener
     useEffect(() => {
         const unsubscribe = onAuthStateChange(async ({ user: authUser, profile }) => {
-            console.log('AppContext - Auth state changed:', { user: !!authUser, profile: !!profile });
+            logger.info('Auth state changed', { authenticated: !!authUser, hasProfile: !!profile });
             
             // Store the auth user object
             setUser(authUser);
@@ -174,11 +177,12 @@ export const AppProvider = ({ children }) => {
 
                     // Load user-specific data from Firestore
                     try {
-                        const [userActivities, userGoals, userAchievements, challenge, aiStats, workoutHistory] = await Promise.all([
+                        const [userActivities, userGoals, userAchievements, challenge, dailyChallengeProgress, aiStats, workoutHistory] = await Promise.all([
                             getUserActivities(authUser.uid),
                             getUserGoals(authUser.uid),
                             getUserAchievements(authUser.uid),
-                            getDailyChallenge(), // No parameter needed - fetches today's challenge
+                            getDailyChallenge(),
+                            getDailyChallengeProgress(authUser.uid),
                             getAIAnalysisStats(authUser.uid, 'month'),
                             getWorkoutHistory(authUser.uid, { limitCount: 365 })
                         ]);
@@ -211,7 +215,7 @@ export const AppProvider = ({ children }) => {
 
                         // Update streak if it's different from the stored value
                         if (normalizedProfile.stats?.streak !== correctStreak) {
-                            console.log(`Correcting streak from ${normalizedProfile.stats?.streak} to ${correctStreak}`);
+                            logger.info(`Correcting streak: ${normalizedProfile.stats?.streak} → ${correctStreak}`);
                             await setUserStats(authUser.uid, {
                                 ...normalizedProfile.stats,
                                 streak: correctStreak
@@ -228,17 +232,18 @@ export const AppProvider = ({ children }) => {
                         setGoals(userGoals.length > 0 ? userGoals : []);
                         setAchievements(userAchievements.length > 0 ? userAchievements : []);
                         setDailyChallenge(challenge);
+                        setDailyChallengeProgress(dailyChallengeProgress);
                         setAIAnalysisStats(aiStats);
 
-                        // Show the challenge modal on every login unless already completed
+                        // Show the challenge modal on login only if today's challenge isn't completed yet
                         // Delay slightly to ensure navigation is ready
-                        if (challenge && !challenge.completed) {
+                        if (challenge && dailyChallengeProgress?.status !== 'completed') {
                             setTimeout(() => {
                                 setShowChallengeModal(true);
                             }, 800);
                         }
                     } catch (error) {
-                        console.error('Error loading user data:', error);
+                        logger.error('Error loading user data', error);
                         // Use empty arrays as fallback
                         setActivities([]);
                         setGoals([]);
@@ -250,7 +255,7 @@ export const AppProvider = ({ children }) => {
                     }
                 } else {
                     // User is authenticated but doesn't have a profile yet (during registration)
-                    console.log('User authenticated but no profile found - likely during registration');
+                    logger.info('Authenticated but no profile yet — likely during registration');
                     setUserData({
                         ...initialUserData,
                         displayName: authUser.displayName,
@@ -290,7 +295,7 @@ export const AppProvider = ({ children }) => {
                     await savePushToken(user.uid, token);
                 }
             } catch (error) {
-                console.error('Error setting up push notifications:', error);
+                logger.error('Error setting up push notifications', error);
             }
         };
 
@@ -300,23 +305,13 @@ export const AppProvider = ({ children }) => {
         updateLastAppOpen(user.uid);
 
         // Set up notification listeners
-        const notificationReceivedSub = addNotificationReceivedListener((notification) => {
-            console.log('Notification received in foreground:', notification);
-            // Could trigger in-app notification display here
+        const notificationReceivedSub = addNotificationReceivedListener(() => {
+            // Foreground notification received — could trigger in-app display here
         });
 
         const notificationResponseSub = addNotificationResponseListener((response) => {
-            console.log('Notification tapped:', response);
             const data = response.notification.request.content.data;
-
-            // Handle navigation based on notification type
-            // Navigation will be handled by the component that consumes this context
-            if (data?.type === 'daily_challenge') {
-                console.log('User tapped daily challenge notification');
-                // Navigation handled in MainNavigator or App.js
-            } else if (data?.type === 'workout_reminder') {
-                console.log('User tapped workout reminder notification');
-            }
+            logger.debug('Notification tapped', { type: data?.type });
         });
 
         return () => {
@@ -354,15 +349,11 @@ export const AppProvider = ({ children }) => {
         const loadGlobalData = async () => {
             try {
                 const globalVideos = await getVideos();
-
-                // Always use local workout templates as the source of truth
-                // Firestore workouts can be added for user-created custom workouts later
                 setWorkouts(initialWorkouts);
                 setTrainingVideos(globalVideos);
-
-                console.log('Loaded workouts from templates:', initialWorkouts.length);
+                logger.info(`Loaded ${initialWorkouts.length} workouts from templates`);
             } catch (error) {
-                console.error('Error loading global data:', error);
+                logger.error('Error loading global data', error);
                 // Use initial data as fallback
                 setWorkouts(initialWorkouts);
             }
@@ -410,7 +401,7 @@ export const AppProvider = ({ children }) => {
                 if (storedLanguage) setLanguage(storedLanguage);
                 if (storedBookmarkedVideos) setBookmarkedVideos(JSON.parse(storedBookmarkedVideos));
             } catch (error) {
-                console.error('Failed to load preferences:', error);
+                logger.error('Failed to load preferences', error);
             }
         };
 
@@ -425,7 +416,7 @@ export const AppProvider = ({ children }) => {
                 await AsyncStorage.setItem('language', language);
                 await AsyncStorage.setItem('bookmarkedVideos', JSON.stringify(bookmarkedVideos));
             } catch (error) {
-                console.error('Failed to save preferences:', error);
+                logger.error('Failed to save preferences', error);
             }
         };
 
@@ -455,30 +446,22 @@ export const AppProvider = ({ children }) => {
     // Refresh user profile data from Firestore
     const refreshUserData = async () => {
         const authUser = getCurrentUser();
-        if (!authUser) {
-            console.log('refreshUserData: No authenticated user');
-            return false;
-        }
+        if (!authUser) return false;
 
         try {
             const profile = await getUserProfile(authUser.uid);
             if (profile) {
-                // Normalize field names: ensure both 'displayName' and 'name' are available
                 const normalizedProfile = {
                     ...profile,
                     name: profile.displayName || profile.name,
                     displayName: profile.displayName || profile.name
                 };
                 setUserData(normalizedProfile);
-                console.log('refreshUserData: Profile refreshed successfully');
             }
-
-            // Also refresh the daily tip
             await fetchDailyTip();
-
             return true;
         } catch (error) {
-            console.error('refreshUserData: Error refreshing profile:', error);
+            logger.error('refreshUserData failed', error);
             return false;
         }
     };
@@ -495,41 +478,34 @@ export const AppProvider = ({ children }) => {
     };
 
     // Authentication functions (now handled by Firebase auth state listener)
-    const register = (userInfo) => {
-        console.log('AppContext - Register function called (handled by Firebase)');
-        // Registration is now handled by Firebase auth service
+    const register = () => {
+        // Registration is handled by Firebase auth service
     };
 
     const login = () => {
-        console.log('AppContext - Login function called (handled by Firebase)');
-        // Login is now handled by Firebase auth service
+        // Login is handled by Firebase auth service
     };
 
     const logout = async () => {
-        console.log('AppContext - Logging out user');
         try {
             await signOutUser();
             // Auth state change will be handled by the listener
             return true;
         } catch (error) {
-            console.error('Logout failed:', error);
+            logger.error('Logout failed', error);
             return false;
         }
     };
 
     // Onboarding functions - persist to Firestore
     const updateUserSkillLevel = async (level) => {
-        console.log('AppContext - Updating skill level to:', level);
         const user = getCurrentUser();
         if (user) {
             try {
                 await updateUserProfile(user.uid, { level });
-                setUserData(prev => ({
-                    ...prev,
-                    level
-                }));
+                setUserData(prev => ({ ...prev, level }));
             } catch (error) {
-                console.error('Error updating skill level:', error);
+                logger.error('Error updating skill level', error);
                 // Still update local state even if Firestore fails
                 setUserData(prev => ({
                     ...prev,
@@ -546,7 +522,6 @@ export const AppProvider = ({ children }) => {
     };
 
     const setUserGoals = async (selectedGoals) => {
-        console.log('AppContext - Setting user goals');
         const formattedGoals = selectedGoals.map(goal => ({
             ...goal,
             current: 0,
@@ -563,17 +538,13 @@ export const AppProvider = ({ children }) => {
     };
 
     const updateUserPreferences = async (preferences) => {
-        console.log('AppContext - Updating user preferences');
         const user = getCurrentUser();
         if (user) {
             try {
                 await updateUserProfile(user.uid, { preferences });
-                setUserData(prev => ({
-                    ...prev,
-                    preferences
-                }));
+                setUserData(prev => ({ ...prev, preferences }));
             } catch (error) {
-                console.error('Error updating preferences:', error);
+                logger.error('Error updating preferences', error);
                 // Still update local state even if Firestore fails
                 setUserData(prev => ({
                     ...prev,
@@ -589,18 +560,10 @@ export const AppProvider = ({ children }) => {
     };
 
     const completeOnboarding = async () => {
-        console.log('AppContext - Completing onboarding');
         const user = getCurrentUser();
         if (user) {
             try {
-                // Clear the tour flag so the tour starts for first-time users
-                await AsyncStorage.removeItem('hasSeenTour');
-                console.log('AppContext - Cleared hasSeenTour flag for new user');
-
-                // Persist onboarding completion to Firestore
-                await updateUserProfile(user.uid, {
-                    onboardingCompleted: true
-                });
+                await updateUserProfile(user.uid, { onboardingCompleted: true });
 
                 setUserData(prev => ({
                     ...prev,
@@ -609,11 +572,10 @@ export const AppProvider = ({ children }) => {
 
                 return true;
             } catch (error) {
-                console.error('Error completing onboarding:', error);
+                logger.error('Error completing onboarding', error);
                 throw error;
             }
         } else {
-            console.error('No user logged in - cannot complete onboarding');
             throw new Error('No user logged in');
         }
     };
@@ -668,7 +630,6 @@ export const AppProvider = ({ children }) => {
 
     // Subscription management function
     const upgradeSubscription = async (planId) => {
-        console.log('AppContext - Upgrading subscription to:', planId);
         const user = getCurrentUser();
         if (user) {
             try {
@@ -676,18 +637,10 @@ export const AppProvider = ({ children }) => {
                 // This function just updates the local state for immediate UI feedback
                 // The webhook will update Firestore with the authoritative subscription data
 
-                // Optimistically update local state
-                setUserData(prev => ({
-                    ...prev,
-                    subscription: planId
-                }));
-
-                console.log('AppContext - Subscription updated locally to:', planId);
-                console.log('AppContext - Waiting for webhook to confirm in Firestore...');
-
+                setUserData(prev => ({ ...prev, subscription: planId }));
                 return true;
             } catch (error) {
-                console.error('AppContext - Error updating subscription:', error);
+                logger.error('Error updating subscription', error);
                 return false;
             }
         }
@@ -704,7 +657,7 @@ export const AppProvider = ({ children }) => {
             await AsyncStorage.setItem('isDarkMode', JSON.stringify(newValue));
             await AsyncStorage.setItem('useSystemTheme', JSON.stringify(false));
         } catch (error) {
-            console.error('Failed to save dark mode preference:', error);
+            logger.error('Failed to save dark mode preference', error);
         }
     };
 
@@ -807,7 +760,7 @@ export const AppProvider = ({ children }) => {
             const challenge = await getDailyChallenge(userData.uid);
             setDailyChallenge(challenge);
         } catch (error) {
-            console.error('Error refreshing daily challenge:', error);
+            logger.error('Error refreshing daily challenge', error);
         }
     };
 
@@ -817,7 +770,7 @@ export const AppProvider = ({ children }) => {
             await updateChallengeProgress(userData.uid, dailyChallenge.id, current);
             await refreshDailyChallenge();
         } catch (error) {
-            console.error('Error updating challenge:', error);
+            logger.error('Error updating challenge', error);
         }
     };
 
@@ -848,7 +801,7 @@ export const AppProvider = ({ children }) => {
             const stats = await getAIAnalysisStats(userData.uid, 'month');
             setAIAnalysisStats(stats);
         } catch (error) {
-            console.error('Error refreshing AI stats:', error);
+            logger.error('Error refreshing AI stats', error);
         }
     };
 
@@ -901,6 +854,7 @@ export const AppProvider = ({ children }) => {
             searchWorkouts,
             // Challenge and milestone state
             dailyChallenge,
+            dailyChallengeProgress,
             showChallengeModal,
             currentMilestone,
             showMilestoneCelebration,
