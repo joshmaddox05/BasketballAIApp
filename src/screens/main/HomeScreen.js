@@ -222,6 +222,7 @@ export default function HomeScreen({ navigation }) {
     activities,
     goals,
     dailyChallenge,
+    dailyChallengeProgress,
     theme,
     isDarkMode,
     refreshUserData,
@@ -253,13 +254,13 @@ export default function HomeScreen({ navigation }) {
 
   // Computed data for sections
   const nextAction = useMemo(
-    () => getNextAction({ activities, goals, dailyChallenge, topWorkout }),
-    [activities, goals, dailyChallenge, topWorkout]
+    () => getNextAction({ activities, goals, dailyChallenge, dailyChallengeProgress, topWorkout }),
+    [activities, goals, dailyChallenge, dailyChallengeProgress, topWorkout]
   );
 
   const weeklyChips = useMemo(
-    () => getWeeklyFocusChips({ activities, goals, dailyChallenge }),
-    [activities, goals, dailyChallenge]
+    () => getWeeklyFocusChips({ activities, goals, dailyChallenge, dailyChallengeProgress }),
+    [activities, goals, dailyChallenge, dailyChallengeProgress]
   );
 
   const hasAnyActivity = activities.length > 0;

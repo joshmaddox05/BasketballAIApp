@@ -49,11 +49,12 @@ export const getNextAction = ({
   activities = [],
   goals = [],
   dailyChallenge = null,
+  dailyChallengeProgress = null,
   topWorkout = null,
   weeklyGoal = WEEKLY_WORKOUT_GOAL,
 }) => {
-  // 1. Daily challenge
-  if (dailyChallenge && !dailyChallenge.completed) {
+  // 1. Daily challenge (only if not yet completed today)
+  if (dailyChallenge && dailyChallengeProgress?.status !== 'completed') {
     return {
       type: 'challenge',
       title: "Complete today's challenge",
@@ -118,7 +119,7 @@ export const getNextAction = ({
 /**
  * Build up to 3 weekly-focus chips from app state.
  */
-export const getWeeklyFocusChips = ({ activities = [], goals = [], dailyChallenge = null }) => {
+export const getWeeklyFocusChips = ({ activities = [], goals = [], dailyChallenge = null, dailyChallengeProgress = null }) => {
   const done = countWorkoutsThisWeek(activities);
   const activeGoals = goals.filter((g) => !g.completed && g.isActive !== false);
 
@@ -143,13 +144,14 @@ export const getWeeklyFocusChips = ({ activities = [], goals = [], dailyChalleng
   }
 
   if (dailyChallenge) {
+    const isDone = dailyChallengeProgress?.status === 'completed';
     chips.push({
       key: 'challenge',
       label: 'Challenge',
-      value: dailyChallenge.completed ? 'Done' : 'Active',
+      value: isDone ? 'Done' : 'Active',
       subtitle: 'today',
-      icon: dailyChallenge.completed ? 'checkmark-circle' : 'trophy',
-      done: !!dailyChallenge.completed,
+      icon: isDone ? 'checkmark-circle' : 'trophy',
+      done: isDone,
     });
   }
 

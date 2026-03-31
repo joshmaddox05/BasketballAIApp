@@ -1,5 +1,5 @@
 // AllChallengesScreen.js
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     StyleSheet,
     Text,
@@ -27,12 +27,14 @@ import {
     acceptFriendRequest,
     declineFriendRequest,
     listenToFriendRequests,
+    listenToChallengeInvites,
     getDailyChallenge,
-    getDailyChallengeProgress
+    getDailyChallengeProgress,
+    sendChallengeInvite
 } from '../../services/firestoreService';
 import { OpponentSelector, ChallengeInviteModal } from '../../components/challenges';
 import { LinearGradient } from 'expo-linear-gradient';
-import { TourStep } from '../../components/tour';
+import { TourStep, useTour } from '../../components/tour';
 
 // Challenge type tabs
 const CHALLENGE_TYPES = [
@@ -146,6 +148,14 @@ const MOCK_USER_CHALLENGES = [
 
 const AllChallengesScreen = ({ navigation }) => {
     const { theme, isDarkMode, userData, user } = useAppContext();
+    const { registerScrollRef, unregisterScrollRef, updateScrollY } = useTour();
+    const scrollRef = useRef(null);
+
+    useEffect(() => {
+        registerScrollRef('Challenges', scrollRef);
+        return () => unregisterScrollRef('Challenges');
+    }, [registerScrollRef, unregisterScrollRef]);
+
     const [selectedType, setSelectedType] = useState('all');
     const [challenges, setChallenges] = useState([]);
     const [userChallengesData, setUserChallengesData] = useState([]);
@@ -157,9 +167,11 @@ const AllChallengesScreen = ({ navigation }) => {
     const [showFriendsModal, setShowFriendsModal] = useState(false);
     const [showInvitesModal, setShowInvitesModal] = useState(false);
     const [selectedFriendForChallenge, setSelectedFriendForChallenge] = useState(null);
+    const [selectedChallengeForInvite, setSelectedChallengeForInvite] = useState(null);
     const [processingRequest, setProcessingRequest] = useState(null);
     const [dailyChallenge, setDailyChallenge] = useState(null);
     const [dailyChallengeProgress, setDailyChallengeProgress] = useState(null);
+    const [pendingInviteCount, setPendingInviteCount] = useState(0);
 
     const userSubscription = userData?.subscription || 'free';
 
@@ -167,6 +179,7 @@ const AllChallengesScreen = ({ navigation }) => {
     useEffect(() => {
         let unsubscribeUserChallenges = null;
         let unsubscribeFriendRequests = null;
+        let unsubscribeChallengeInvites = null;
 
         const loadData = async () => {
             setLoading(true);
@@ -216,6 +229,11 @@ const AllChallengesScreen = ({ navigation }) => {
                     unsubscribeFriendRequests = listenToFriendRequests(user.uid, (requests) => {
                         setFriendRequests(requests || []);
                     });
+
+                    // Set up real-time listener for challenge invites
+                    unsubscribeChallengeInvites = listenToChallengeInvites(user.uid, (invites) => {
+                        setPendingInviteCount(invites.length);
+                    });
                 } else {
                     // Use mock data for logged out users
                     setUserChallengesData(MOCK_USER_CHALLENGES);
@@ -238,6 +256,9 @@ const AllChallengesScreen = ({ navigation }) => {
             }
             if (unsubscribeFriendRequests) {
                 unsubscribeFriendRequests();
+            }
+            if (unsubscribeChallengeInvites) {
+                unsubscribeChallengeInvites();
             }
         };
     }, [user?.uid]);
@@ -401,17 +422,37 @@ const AllChallengesScreen = ({ navigation }) => {
         }
     };
 
-    const handleSelectOpponent = (opponent) => {
+    const handleInviteFriendToChallenge = (challenge) => {
+        if (!user?.uid) {
+            Alert.alert('Sign In Required', 'Please sign in to invite friends.');
+            return;
+        }
+        setSelectedChallengeForInvite(challenge);
+        setShowFriendsModal(true);
+    };
+
+    const handleSelectOpponent = async (opponent) => {
         setShowFriendsModal(false);
-        // Show H2H challenge selection for this opponent
-        const h2hChallenges = challenges.filter(c => c.type === 'head_to_head');
-        if (h2hChallenges.length > 0) {
-            navigation.navigate('ChallengeDetail', {
-                challengeId: h2hChallenges[0].id,
-                challenge: h2hChallenges[0],
-                showOpponentSelector: true,
-                preselectedOpponent: opponent,
+        if (!selectedChallengeForInvite || !user?.uid) return;
+        const challenge = selectedChallengeForInvite;
+        setSelectedChallengeForInvite(null);
+        try {
+            if (challenge.type === 'head_to_head') {
+                await joinChallenge(user.uid, challenge.id, {
+                    title: challenge.title,
+                    type: 'head_to_head',
+                });
+            }
+            await sendChallengeInvite(challenge.id, user.uid, opponent.uid, {
+                title: challenge.title,
             });
+            Alert.alert(
+                'Invite Sent!',
+                `You've challenged ${opponent.displayName} to "${challenge.title}"!`
+            );
+        } catch (error) {
+            console.error('Error sending challenge invite:', error);
+            Alert.alert('Error', 'Failed to send invite. Please try again.');
         }
     };
 
@@ -646,44 +687,54 @@ const AllChallengesScreen = ({ navigation }) => {
                         </View>
                     </View>
 
-                    {/* Action button */}
-                    {!isActive && !isCompleted && !isLocked && (
-                        <TouchableOpacity
-                            style={[styles.joinButton, { backgroundColor: theme.primary }]}
-                            onPress={() => handleJoinChallenge(challenge)}
-                            disabled={joiningChallenge === challenge.id}
-                        >
-                            {joiningChallenge === challenge.id ? (
-                                <ActivityIndicator size="small" color="#FFF" />
-                            ) : (
-                                <Text style={styles.joinButtonText}>
-                                    {challenge.type === 'head_to_head'
-                                        ? 'Challenge'
-                                        : hasPreviouslyCompleted
-                                            ? 'Rejoin'
-                                            : 'Join'}
-                                </Text>
-                            )}
-                        </TouchableOpacity>
-                    )}
-                    {/* Unlock button for locked premium challenges */}
-                    {isLocked && (
-                        <TouchableOpacity
-                            style={styles.unlockButton}
-                            onPress={() => navigation.navigate('Profile', { screen: 'Settings', params: { openSubscription: true }, initial: false })}
-                        >
-                            <Ionicons name="lock-open-outline" size={14} color="#FFF" />
-                            <Text style={styles.unlockButtonText}>Upgrade</Text>
-                        </TouchableOpacity>
-                    )}
-                    {isActive && (
-                        <TouchableOpacity
-                            style={[styles.continueButton, { backgroundColor: theme.primary }]}
-                            onPress={() => handleChallengePress(challenge, progress)}
-                        >
-                            <Text style={styles.continueButtonText}>Continue</Text>
-                        </TouchableOpacity>
-                    )}
+                    {/* Action buttons */}
+                    <View style={styles.cardActions}>
+                        {!isActive && !isCompleted && !isLocked && (
+                            <TouchableOpacity
+                                style={[styles.joinButton, { backgroundColor: theme.primary }]}
+                                onPress={() => handleJoinChallenge(challenge)}
+                                disabled={joiningChallenge === challenge.id}
+                            >
+                                {joiningChallenge === challenge.id ? (
+                                    <ActivityIndicator size="small" color="#FFF" />
+                                ) : (
+                                    <Text style={styles.joinButtonText}>
+                                        {challenge.type === 'head_to_head'
+                                            ? 'Challenge'
+                                            : hasPreviouslyCompleted
+                                                ? 'Rejoin'
+                                                : 'Join'}
+                                    </Text>
+                                )}
+                            </TouchableOpacity>
+                        )}
+                        {isLocked && (
+                            <TouchableOpacity
+                                style={styles.unlockButton}
+                                onPress={() => navigation.navigate('Profile', { screen: 'Settings', params: { openSubscription: true }, initial: false })}
+                            >
+                                <Ionicons name="lock-open-outline" size={14} color="#FFF" />
+                                <Text style={styles.unlockButtonText}>Upgrade</Text>
+                            </TouchableOpacity>
+                        )}
+                        {isActive && (
+                            <TouchableOpacity
+                                style={[styles.continueButton, { backgroundColor: theme.primary }]}
+                                onPress={() => handleChallengePress(challenge, progress)}
+                            >
+                                <Text style={styles.continueButtonText}>Continue</Text>
+                            </TouchableOpacity>
+                        )}
+                        {!isLocked && user?.uid && (
+                            <TouchableOpacity
+                                style={[styles.inviteButton, { borderColor: theme.primary }]}
+                                onPress={() => handleInviteFriendToChallenge(challenge)}
+                            >
+                                <Ionicons name="person-add-outline" size={14} color={theme.primary} />
+                                <Text style={[styles.inviteButtonText, { color: theme.primary }]}>Invite</Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
                 </View>
             </TouchableOpacity>
         );
@@ -748,6 +799,8 @@ const AllChallengesScreen = ({ navigation }) => {
         </View>
     );
 
+    const totalNotifications = friendRequests.length + pendingInviteCount;
+
     if (loading) {
         return (
             <View style={[styles.loadingContainer, { backgroundColor: theme.background }]}>
@@ -769,7 +822,16 @@ const AllChallengesScreen = ({ navigation }) => {
                         style={styles.headerButton}
                         onPress={() => setShowInvitesModal(true)}
                     >
-                        <Ionicons name="mail-outline" size={24} color={theme.text} />
+                        <View style={styles.iconWrapper}>
+                            <Ionicons name="mail-outline" size={24} color={theme.text} />
+                            {totalNotifications > 0 && (
+                                <View style={[styles.badge, { backgroundColor: theme.primary }]}>
+                                    <Text style={styles.badgeText}>
+                                        {totalNotifications > 9 ? '9+' : totalNotifications}
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.headerButton}>
                         <Ionicons name="filter-outline" size={24} color={theme.text} />
@@ -792,8 +854,11 @@ const AllChallengesScreen = ({ navigation }) => {
             </TourStep>
 
             <ScrollView
+                ref={scrollRef}
                 style={styles.content}
                 showsVerticalScrollIndicator={false}
+                onScroll={(e) => updateScrollY('Challenges', e.nativeEvent.contentOffset.y)}
+                scrollEventThrottle={16}
                 refreshControl={
                     <RefreshControl
                         refreshing={refreshing}
@@ -803,7 +868,7 @@ const AllChallengesScreen = ({ navigation }) => {
                 }
             >
                 {/* Daily Challenge Card - wrapped with TourStep for onboarding */}
-                {dailyChallenge && (
+                {dailyChallenge && dailyChallengeProgress?.status !== 'completed' && (
                     <TourStep stepId="daily-challenge-card">
                         <TouchableOpacity
                             style={styles.dailyChallengeCard}
@@ -847,38 +912,55 @@ const AllChallengesScreen = ({ navigation }) => {
                                         </View>
                                     </View>
 
-                                {dailyChallengeProgress?.completed ? (
-                                    <View style={styles.dailyChallengeCompletedBadge}>
-                                        <Ionicons name="checkmark-circle" size={18} color="#4CAF50" />
-                                        <Text style={styles.dailyChallengeCompletedText}>Done!</Text>
-                                    </View>
-                                ) : (
                                     <View style={styles.dailyChallengeStartButton}>
                                         <Text style={styles.dailyChallengeStartText}>Start</Text>
                                         <Ionicons name="arrow-forward" size={16} color="#9C27B0" />
                                     </View>
-                                )}
-                            </View>
-
-                            {/* Progress bar if in progress */}
-                            {dailyChallengeProgress && !dailyChallengeProgress.completed && dailyChallengeProgress.currentValue > 0 && (
-                                <View style={styles.dailyChallengeProgressContainer}>
-                                    <View style={styles.dailyChallengeProgressBar}>
-                                        <View
-                                            style={[
-                                                styles.dailyChallengeProgressFill,
-                                                { width: `${Math.min((dailyChallengeProgress.currentValue / dailyChallenge.targetValue) * 100, 100)}%` }
-                                            ]}
-                                        />
-                                    </View>
-                                    <Text style={styles.dailyChallengeProgressText}>
-                                        {dailyChallengeProgress.currentValue}/{dailyChallenge.targetValue}
-                                    </Text>
                                 </View>
-                            )}
-                        </LinearGradient>
-                    </TouchableOpacity>
+
+                                {/* Progress bar if in progress */}
+                                {dailyChallengeProgress && dailyChallengeProgress.currentValue > 0 && (
+                                    <View style={styles.dailyChallengeProgressContainer}>
+                                        <View style={styles.dailyChallengeProgressBar}>
+                                            <View
+                                                style={[
+                                                    styles.dailyChallengeProgressFill,
+                                                    { width: `${Math.min((dailyChallengeProgress.currentValue / dailyChallenge.targetValue) * 100, 100)}%` }
+                                                ]}
+                                            />
+                                        </View>
+                                        <Text style={styles.dailyChallengeProgressText}>
+                                            {dailyChallengeProgress.currentValue}/{dailyChallenge.targetValue}
+                                        </Text>
+                                    </View>
+                                )}
+                            </LinearGradient>
+                        </TouchableOpacity>
                     </TourStep>
+                )}
+
+                {/* Daily challenge completed — come back tomorrow */}
+                {dailyChallengeProgress?.status === 'completed' && (
+                    <LinearGradient
+                        colors={['#4A148C', '#6A1B9A']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.dailyChallengeCompletedCard}
+                    >
+                        <View style={styles.dailyChallengeCompletedRow}>
+                            <Ionicons name="checkmark-circle" size={32} color="#4CAF50" />
+                            <View style={styles.dailyChallengeCompletedInfo}>
+                                <Text style={styles.dailyChallengeCompletedTitle}>Today's Challenge Done!</Text>
+                                <Text style={styles.dailyChallengeCompletedSubtitle}>
+                                    Awesome work — check back tomorrow for your next challenge.
+                                </Text>
+                            </View>
+                        </View>
+                        <View style={styles.dailyChallengeCompletedFooter}>
+                            <Ionicons name="calendar-outline" size={14} color="rgba(255,255,255,0.5)" />
+                            <Text style={styles.dailyChallengeCompletedCountdown}>New challenge tomorrow</Text>
+                        </View>
+                    </LinearGradient>
                 )}
 
                 {/* Friend Requests Section */}
@@ -1004,7 +1086,7 @@ const AllChallengesScreen = ({ navigation }) => {
                 visible={showFriendsModal}
                 onClose={() => setShowFriendsModal(false)}
                 onSelectOpponent={handleSelectOpponent}
-                challengeTitle="Head-to-Head Challenge"
+                challengeTitle={selectedChallengeForInvite?.title || 'Challenge'}
             />
 
             {/* Challenge Invites Modal */}
@@ -1047,6 +1129,25 @@ const styles = StyleSheet.create({
     },
     headerButton: {
         padding: 8,
+    },
+    iconWrapper: {
+        position: 'relative',
+    },
+    badge: {
+        position: 'absolute',
+        top: -5,
+        right: -7,
+        minWidth: 16,
+        height: 16,
+        borderRadius: 8,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 3,
+    },
+    badgeText: {
+        color: '#FFFFFF',
+        fontSize: 10,
+        fontWeight: '700',
     },
     filterButton: {
         padding: 8,
@@ -1255,6 +1356,24 @@ const styles = StyleSheet.create({
     continueButtonText: {
         color: '#FFF',
         fontSize: 14,
+        fontWeight: '600',
+    },
+    cardActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    inviteButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 20,
+        borderWidth: 1,
+        gap: 5,
+    },
+    inviteButtonText: {
+        fontSize: 13,
         fontWeight: '600',
     },
     emptyState: {
@@ -1508,6 +1627,45 @@ const styles = StyleSheet.create({
         color: '#4CAF50',
         fontSize: 14,
         fontWeight: '700',
+    },
+    dailyChallengeCompletedCard: {
+        marginBottom: 20,
+        borderRadius: 16,
+        padding: 18,
+        shadowColor: '#4A148C',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 6,
+    },
+    dailyChallengeCompletedRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 14,
+    },
+    dailyChallengeCompletedInfo: {
+        flex: 1,
+    },
+    dailyChallengeCompletedTitle: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '700',
+        marginBottom: 4,
+    },
+    dailyChallengeCompletedSubtitle: {
+        color: 'rgba(255,255,255,0.7)',
+        fontSize: 13,
+        lineHeight: 18,
+    },
+    dailyChallengeCompletedFooter: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginTop: 14,
+    },
+    dailyChallengeCompletedCountdown: {
+        color: 'rgba(255,255,255,0.5)',
+        fontSize: 12,
     },
     dailyChallengeProgressContainer: {
         flexDirection: 'row',

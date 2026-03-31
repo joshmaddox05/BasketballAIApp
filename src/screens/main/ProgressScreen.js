@@ -28,7 +28,7 @@ import {
     listenToUserActivities,
 } from '../../services/firestoreService';
 import { ACHIEVEMENT_CATEGORIES } from '../../data/achievements';
-import { TourStep } from '../../components/tour';
+import { TourStep, useTour } from '../../components/tour';
 
 const { width } = Dimensions.get('window');
 
@@ -69,6 +69,15 @@ const ProgressScreen = ({ navigation }) => {
     const [gamificationStats, setGamificationStats] = useState(null);
     const [achievementProgress, setAchievementProgress] = useState([]);
     const [selectedAchievementCategory, setSelectedAchievementCategory] = useState('all');
+
+    // Scroll ref for tour auto-scroll
+    const { registerScrollRef, unregisterScrollRef, updateScrollY } = useTour();
+    const scrollRef = useRef(null);
+
+    useEffect(() => {
+        registerScrollRef('Progress', scrollRef);
+        return () => unregisterScrollRef('Progress');
+    }, [registerScrollRef, unregisterScrollRef]);
 
     // Animation value for tab indicator
     const tabIndicatorPosition = useRef(new Animated.Value(0)).current;
@@ -1178,7 +1187,13 @@ const ProgressScreen = ({ navigation }) => {
             </TourStep>
 
             {/* Tab Content */}
-            <ScrollView style={[styles.contentContainer, { backgroundColor: theme.background }]} showsVerticalScrollIndicator={false}>
+            <ScrollView
+                ref={scrollRef}
+                style={[styles.contentContainer, { backgroundColor: theme.background }]}
+                showsVerticalScrollIndicator={false}
+                onScroll={(e) => updateScrollY('Progress', e.nativeEvent.contentOffset.y)}
+                scrollEventThrottle={16}
+            >
                 {activeTab === 'stats' && renderStatsTab()}
                 {activeTab === 'achievements' && renderAchievementsTab()}
                 {activeTab === 'goals' && renderGoalsTab()}

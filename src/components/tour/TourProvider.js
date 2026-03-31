@@ -1,8 +1,10 @@
 // TourProvider.js - Context provider for managing onboarding tour state
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { InteractionManager } from 'react-native';
+import { InteractionManager, Dimensions } from 'react-native';
 import { TOUR_STEPS } from './tourConfig';
+
+const SCREEN_HEIGHT = Dimensions.get('window').height;
 
 const TourContext = createContext(null);
 
@@ -20,14 +22,15 @@ export const TourProvider = ({ children, navigationRef }) => {
     // Store refs for all tour step targets
     const targetRefs = useRef({});
 
+    // Scroll ref registry: { [tabName]: { ref: ScrollViewRef, scrollY: number } }
+    const scrollRefs = useRef({});
+
     // Load tour preference on mount
     useEffect(() => {
         const loadTourPreference = async () => {
             try {
                 const storedValue = await AsyncStorage.getItem(TOUR_STORAGE_KEY);
-                console.log('TourProvider - Loaded hasSeenTour from storage:', storedValue);
                 const hasSeen = storedValue === 'true';
-                console.log('TourProvider - Setting hasSeenTour to:', hasSeen);
                 setHasSeenTour(hasSeen);
             } catch (error) {
                 console.error('Error loading tour preference:', error);
@@ -88,10 +91,33 @@ export const TourProvider = ({ children, navigationRef }) => {
         delete targetRefs.current[stepId];
     }, []);
 
-    // Measure a target element with retry logic
+    // Register a scroll ref for a tab
+    const registerScrollRef = useCallback((tabName, ref) => {
+        scrollRefs.current[tabName] = { ref, scrollY: 0 };
+    }, []);
+
+    // Unregister a scroll ref for a tab
+    const unregisterScrollRef = useCallback((tabName) => {
+        delete scrollRefs.current[tabName];
+    }, []);
+
+    // Update the current scroll offset for a tab
+    const updateScrollY = useCallback((tabName, y) => {
+        if (scrollRefs.current[tabName]) {
+            scrollRefs.current[tabName].scrollY = y;
+        }
+    }, []);
+
+    // Measure a target element with retry logic, auto-scrolling if needed
     const measureTarget = useCallback((stepId, maxAttempts = 25) => {
         return new Promise((resolve) => {
             let attempts = 0;
+
+            const doMeasure = (ref, onResult) => {
+                ref.current.measureInWindow((x, y, width, height) => {
+                    onResult(x, y, width, height);
+                });
+            };
 
             const tryMeasure = () => {
                 const ref = targetRefs.current[stepId];
@@ -109,8 +135,35 @@ export const TourProvider = ({ children, navigationRef }) => {
                     return;
                 }
 
-                ref.current.measureInWindow((x, y, width, height) => {
+                doMeasure(ref, (x, y, width, height) => {
                     if (width > 0 && height > 0) {
+                        // Check if element is below the visible fold
+                        const isBelowFold = y + height > SCREEN_HEIGHT - 150;
+                        if (isBelowFold) {
+                            // Find the step's tab to look up its scroll ref
+                            const step = TOUR_STEPS.find(s => s.id === stepId);
+                            const tabEntry = step?.tab ? scrollRefs.current[step.tab] : null;
+                            if (tabEntry?.ref?.current) {
+                                const delta = (y + height) - (SCREEN_HEIGHT - 200);
+                                const newScrollY = tabEntry.scrollY + delta;
+                                tabEntry.ref.current.scrollTo({ y: newScrollY, animated: true });
+                                // Wait for scroll animation then re-measure
+                                setTimeout(() => {
+                                    doMeasure(ref, (x2, y2, w2, h2) => {
+                                        if (w2 > 0 && h2 > 0) {
+                                            const measurement = { x: x2, y: y2, width: w2, height: h2 };
+                                            setTargetMeasurement(measurement);
+                                            resolve(measurement);
+                                        } else {
+                                            const measurement = { x, y, width, height };
+                                            setTargetMeasurement(measurement);
+                                            resolve(measurement);
+                                        }
+                                    });
+                                }, 400);
+                                return;
+                            }
+                        }
                         const measurement = { x, y, width, height };
                         setTargetMeasurement(measurement);
                         resolve(measurement);
@@ -144,6 +197,14 @@ export const TourProvider = ({ children, navigationRef }) => {
     // Start the tour
     const startTour = useCallback(async () => {
         if (isTourActive) return;
+
+        // Mark tour as seen immediately so mid-tour app kills don't re-trigger it
+        try {
+            await AsyncStorage.setItem(TOUR_STORAGE_KEY, 'true');
+            setHasSeenTour(true);
+        } catch (error) {
+            console.error('Error saving tour preference:', error);
+        }
 
         setCurrentStepIndex(0);
         setIsTransitioning(true);
@@ -316,6 +377,9 @@ export const TourProvider = ({ children, navigationRef }) => {
         unregisterTarget,
         measureTarget,
         handleTabChange,
+        registerScrollRef,
+        unregisterScrollRef,
+        updateScrollY,
     };
 
     return (

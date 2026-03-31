@@ -27,6 +27,7 @@ import {
   getVideos,
   updateUserProfile,
   getDailyChallenge,
+  getDailyChallengeProgress,
   updateChallengeProgress,
   getAIAnalysisStats,
   getWorkoutHistory,
@@ -139,6 +140,7 @@ export const AppProvider = ({ children }) => {
 
     // Daily challenge and milestone state
     const [dailyChallenge, setDailyChallenge] = useState(null);
+    const [dailyChallengeProgress, setDailyChallengeProgress] = useState(null);
     const [showChallengeModal, setShowChallengeModal] = useState(false);
     const [currentMilestone, setCurrentMilestone] = useState(null);
     const [showMilestoneCelebration, setShowMilestoneCelebration] = useState(false);
@@ -175,11 +177,12 @@ export const AppProvider = ({ children }) => {
 
                     // Load user-specific data from Firestore
                     try {
-                        const [userActivities, userGoals, userAchievements, challenge, aiStats, workoutHistory] = await Promise.all([
+                        const [userActivities, userGoals, userAchievements, challenge, dailyChallengeProgress, aiStats, workoutHistory] = await Promise.all([
                             getUserActivities(authUser.uid),
                             getUserGoals(authUser.uid),
                             getUserAchievements(authUser.uid),
-                            getDailyChallenge(), // No parameter needed - fetches today's challenge
+                            getDailyChallenge(),
+                            getDailyChallengeProgress(authUser.uid),
                             getAIAnalysisStats(authUser.uid, 'month'),
                             getWorkoutHistory(authUser.uid, { limitCount: 365 })
                         ]);
@@ -229,11 +232,12 @@ export const AppProvider = ({ children }) => {
                         setGoals(userGoals.length > 0 ? userGoals : []);
                         setAchievements(userAchievements.length > 0 ? userAchievements : []);
                         setDailyChallenge(challenge);
+                        setDailyChallengeProgress(dailyChallengeProgress);
                         setAIAnalysisStats(aiStats);
 
-                        // Show the challenge modal on every login unless already completed
+                        // Show the challenge modal on login only if today's challenge isn't completed yet
                         // Delay slightly to ensure navigation is ready
-                        if (challenge && !challenge.completed) {
+                        if (challenge && dailyChallengeProgress?.status !== 'completed') {
                             setTimeout(() => {
                                 setShowChallengeModal(true);
                             }, 800);
@@ -559,7 +563,6 @@ export const AppProvider = ({ children }) => {
         const user = getCurrentUser();
         if (user) {
             try {
-                await AsyncStorage.removeItem('hasSeenTour');
                 await updateUserProfile(user.uid, { onboardingCompleted: true });
 
                 setUserData(prev => ({
@@ -851,6 +854,7 @@ export const AppProvider = ({ children }) => {
             searchWorkouts,
             // Challenge and milestone state
             dailyChallenge,
+            dailyChallengeProgress,
             showChallengeModal,
             currentMilestone,
             showMilestoneCelebration,

@@ -44,10 +44,11 @@ const TourTooltip = ({ step, stepIndex, totalSteps, targetMeasurement, theme }) 
         const spaceAbove = targetY;
         const spaceBelow = SCREEN_HEIGHT - (targetY + targetHeight);
         const estimatedHeight = tooltipHeight || 120;
+        const needed = estimatedHeight + ARROW_SIZE + TOOLTIP_MARGIN;
 
-        if (position === 'top' && spaceAbove < estimatedHeight + ARROW_SIZE + TOOLTIP_MARGIN) {
+        if (position === 'top' && spaceAbove < needed) {
             position = 'bottom';
-        } else if (position === 'bottom' && spaceBelow < estimatedHeight + ARROW_SIZE + TOOLTIP_MARGIN) {
+        } else if (position === 'bottom' && spaceBelow < needed) {
             position = 'top';
         }
 
@@ -64,6 +65,13 @@ const TourTooltip = ({ step, stepIndex, totalSteps, targetMeasurement, theme }) 
         } else {
             tooltipY = targetY + targetHeight + ARROW_SIZE + 8;
         }
+
+        // Clamp Y so tooltip stays within safe screen bounds:
+        // - Top: below the Skip Tour / step counter buttons (~110px from top)
+        // - Bottom: above the tab bar (~90px from bottom)
+        const safeTop = 110;
+        const safeBottom = SCREEN_HEIGHT - estimatedHeight - 90;
+        tooltipY = Math.max(safeTop, Math.min(tooltipY, safeBottom));
 
         // Calculate arrow X position relative to tooltip
         const arrowX = targetX + (targetWidth / 2) - tooltipX - (ARROW_SIZE / 2);
