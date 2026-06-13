@@ -99,19 +99,9 @@ const WelcomeCompleteScreen = ({ navigation }) => {
         return workouts[area] || "Personalized Training";
     };
 
-    const handleStartTraining = async () => {
-        if (isCompleting) return; // Prevent double-tap
-
-        setIsCompleting(true);
-        try {
-            // Complete onboarding and persist to Firestore
-            await completeOnboarding();
-            // AppNavigator will detect the change and navigate to main app
-        } catch (error) {
-            console.error('Error completing onboarding:', error);
-            alert('There was an error saving your profile. Please try again.');
-            setIsCompleting(false);
-        }
+    const handleStartTraining = () => {
+        if (isCompleting) return;
+        navigation.navigate('RoleSelection');
     };
 
     return (

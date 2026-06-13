@@ -1,5 +1,5 @@
-// SimCoachScenarioScreen.js - Interactive scenario player with timer, answer selection, feedback
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+// SimCoachScenarioScreen.js - Athlete views coach game plan on court and responds tactically
+import React, { useState, useCallback } from 'react';
 import {
   SafeAreaView,
   StyleSheet,
@@ -7,285 +7,179 @@ import {
   Text,
   TouchableOpacity,
   ScrollView,
-  ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
-import { canAccessFeature } from '../../utils/subscription';
+import { saveSimCoachResult } from '../../services/firestoreService';
+import { getCurrentUser } from '../../services/authService';
 
-// ─── Mock scenarios per category ─────────────────────────────────────────────
-const SCENARIOS_BY_CATEGORY = {
-  pickroll: [
-    {
-      id: 'pr1',
-      description:
-        'Your point guard has the ball on the wing. The opposing big man steps up to hedge hard after a ball screen. The corner shooter is wide open. What is the correct read?',
-      options: [
-        { label: 'A', text: 'Drive hard into the hedge defender and draw the foul' },
-        { label: 'B', text: 'Kick the ball to the open corner shooter immediately' },
-        { label: 'C', text: 'Pull back and reset the offense' },
-        { label: 'D', text: 'Force the mid-range pull-up over the hedge' },
-      ],
-      correctIndex: 1,
-      explanation:
-        'When the defense over-hedges on the pick & roll, the corner shooter becomes the primary read. Kick immediately before the defense can recover.',
-    },
-    {
-      id: 'pr2',
-      description:
-        'You are the ball handler running a pick & roll at the top of the key. The defending big is playing drop coverage. The screener has position in the paint.',
-      options: [
-        { label: 'A', text: 'Attack the drop coverage with a pull-up mid-range jumper' },
-        { label: 'B', text: 'Skip pass to the weak-side corner' },
-        { label: 'C', text: 'Hit the roller diving to the basket' },
-        { label: 'D', text: 'Reset and run a different play' },
-      ],
-      correctIndex: 2,
-      explanation:
-        'Against drop coverage, the roll man gets a head start on the defender. Hitting the roller diving to the basket is the primary read.',
-    },
-    {
-      id: 'pr3',
-      description:
-        'Ice coverage — defender forces ball handler baseline. The screener pins back. Where should the ball go?',
-      options: [
-        { label: 'A', text: 'Attack baseline aggressively' },
-        { label: 'B', text: 'Reject the screen and go opposite' },
-        { label: 'C', text: 'Look for the short-roll pass' },
-        { label: 'D', text: 'Call timeout' },
-      ],
-      correctIndex: 1,
-      explanation:
-        'Against ice defense, the ball handler should reject the screen and attack the side the defense is giving up, not play into the trap.',
-    },
-    {
-      id: 'pr4',
-      description:
-        'Switch coverage: both defenders switch the screen. The smaller guard is now guarding your big man in the post. What is the correct action?',
-      options: [
-        { label: 'A', text: 'Take a contested three-pointer' },
-        { label: 'B', text: 'Immediately post up the size mismatch' },
-        { label: 'C', text: 'Reset the play' },
-        { label: 'D', text: 'Attack off the dribble and ignore the mismatch' },
-      ],
-      correctIndex: 1,
-      explanation:
-        'Any time a switch creates a size mismatch in the post, you must immediately exploit it by posting the smaller defender.',
-    },
-    {
-      id: 'pr5',
-      description:
-        'Blitz/trap coverage: two defenders trap the ball handler after the screen. Three teammates are spread on the perimeter.',
-      options: [
-        { label: 'A', text: 'Power through the double-team' },
-        { label: 'B', text: 'Throw a lob pass' },
-        { label: 'C', text: 'Find the open player quickly before the trap fully sets' },
-        { label: 'D', text: 'Back up and wait' },
-      ],
-      correctIndex: 2,
-      explanation:
-        'A blitz creates 3-on-2 advantages elsewhere. Find the open teammate quickly — before the trap fully sets and the defense rotates.',
-    },
-  ],
-  endgame: [
-    {
-      id: 'eg1',
-      description:
-        'Down 2, 8 seconds left. You have the ball at half court, no timeouts. The defender is playing you straight up.',
-      options: [
-        { label: 'A', text: 'Push immediately to the rim for a layup' },
-        { label: 'B', text: 'Step back three-pointer to win outright' },
-        { label: 'C', text: 'Find the open teammate in the corner' },
-        { label: 'D', text: 'Draw a foul at the three-point line' },
-      ],
-      correctIndex: 1,
-      explanation:
-        'Down 2 with 8 seconds, a contested three to win is better than a layup attempt that only ties. Take the win when available.',
-    },
-    {
-      id: 'eg2',
-      description:
-        'Up 1, 4 seconds left. Opponent inbounds from half court. Which defensive assignment is most critical?',
-      options: [
-        { label: 'A', text: 'Guard the inbounder' },
-        { label: 'B', text: 'Deny the best three-point shooter' },
-        { label: 'C', text: 'Zone up near the paint' },
-        { label: 'D', text: 'Foul immediately to prevent the shot' },
-      ],
-      correctIndex: 1,
-      explanation:
-        'With 4 seconds, opponent needs a three to win. Denying their best shooter is the priority — prevent the only shot that beats you.',
-    },
-    {
-      id: 'eg3',
-      description:
-        'Tied game, you have the ball and are being fouled. 2 seconds left. Who gets the inbound pass if the free throw intentional foul strategy applies?',
-      options: [
-        { label: 'A', text: 'Your worst free throw shooter' },
-        { label: 'B', text: 'Your best ball handler' },
-        { label: 'C', text: 'Your best free throw shooter' },
-        { label: 'D', text: 'Your center' },
-      ],
-      correctIndex: 2,
-      explanation:
-        'Always put your best free throw shooter in position to take the pressure shots in clutch moments.',
-    },
-    {
-      id: 'eg4',
-      description:
-        'Down 3, 15 seconds left. You get an offensive rebound after a missed three. What is the highest-percentage play?',
-      options: [
-        { label: 'A', text: 'Power slam dunk immediately' },
-        { label: 'B', text: 'Kick out and reset for another three' },
-        { label: 'C', text: 'Take the two-point shot to cut to 1' },
-        { label: 'D', text: 'Call timeout to draw up a play' },
-      ],
-      correctIndex: 1,
-      explanation:
-        'Down 3 you need a three. Kick out, reset, get a clean three-point look — do not take a two that leaves you still needing a basket.',
-    },
-    {
-      id: 'eg5',
-      description:
-        'You are up 1, opponent has the ball with 6 seconds. They are 80% from the free throw line. Should you intentionally foul?',
-      options: [
-        { label: 'A', text: 'Yes — foul immediately to stop the clock' },
-        { label: 'B', text: 'No — play normal defense and contest the shot' },
-        { label: 'C', text: 'Foul only if they get a clean look at a three' },
-        { label: 'D', text: 'Zone defense to force a bad shot' },
-      ],
-      correctIndex: 1,
-      explanation:
-        'Against an 80% free throw shooter, intentional fouling is statistically disadvantageous. Play strong defense and contest the shot.',
-    },
-  ],
-  defensive: [
-    {
-      id: 'dr1',
-      description:
-        'Your help side defender collapses on a drive. The ball is kicked out to the corner. You are one pass away. What is the correct rotation?',
-      options: [
-        { label: 'A', text: 'Sprint close-out immediately toward the corner shooter' },
-        { label: 'B', text: 'Stay on your man and let the help side adjust' },
-        { label: 'C', text: 'Sag toward the paint to prevent a drive' },
-        { label: 'D', text: 'Switch all assignments' },
-      ],
-      correctIndex: 0,
-      explanation:
-        'One pass away, you rotate to the corner shooter. Sprint close-out — high hands, no foul — to contest the open three.',
-    },
-  ],
-  offensive: [
-    {
-      id: 'os1',
-      description:
-        'Your team runs a motion offense. You are the weak-side wing. The ball is on the strong-side wing. Your defender is ball-watching. What is your cut?',
-      options: [
-        { label: 'A', text: 'Spot up at the three-point arc and wait' },
-        { label: 'B', text: 'Back-door cut immediately' },
-        { label: 'C', text: 'Set a cross screen for the post' },
-        { label: 'D', text: 'Drift to the corner' },
-      ],
-      correctIndex: 1,
-      explanation:
-        'When your defender is ball-watching, a back-door cut is the correct punishing read. Attack the space behind the distracted defender.',
-    },
-  ],
+// ─── Mock game plan data ──────────────────────────────────────────────────────
+const MOCK_SCENARIOS = {
+  s1: {
+    title: 'vs Lakers — Pick & Roll Defense',
+    coach: 'Coach Davis',
+    category: 'Defense',
+    playSteps: [
+      'Ball handler initiates pick-and-roll at the top of the key.',
+      'Screen is set by the big man. Help defender drops into the paint.',
+      'Ball handler reads the coverage: ice (force baseline) or drop (mid-range available).',
+    ],
+    question: 'The big man is playing drop coverage. The ball handler can take a mid-range jumper. What is the correct defensive read?',
+    options: [
+      { label: 'A', text: 'Contest the mid-range aggressively — prevent the comfortable pull-up.' },
+      { label: 'B', text: 'Stay in drop and allow the mid-range — protect the paint first.' },
+      { label: 'C', text: 'Switch assignments to confuse the offense.' },
+      { label: 'D', text: 'Double-team the ball handler, leaving the corner open.' },
+    ],
+    correctIndex: 0,
+    explanation: 'Against drop coverage, the ball handler can take an easy mid-range. The correct defensive adjustment is to contest that shot aggressively rather than concede it.',
+  },
+  default: {
+    title: 'Game Plan Scenario',
+    coach: 'Coach Davis',
+    category: 'Offense',
+    playSteps: [
+      'Bring ball up the floor in transition.',
+      'Set up motion offense at the 3-point arc.',
+      'Ball handler reads whether the defense is in zone or man.',
+    ],
+    question: 'The defense rotates into a 2-3 zone as your team sets up. What is the best offensive action?',
+    options: [
+      { label: 'A', text: 'Attack the gaps aggressively off the dribble.' },
+      { label: 'B', text: 'Move the ball quickly around the perimeter to collapse the zone.' },
+      { label: 'C', text: 'Set a back-screen and post up in the lane.' },
+      { label: 'D', text: 'Call timeout and draw up a specific set play.' },
+    ],
+    correctIndex: 1,
+    explanation: 'Against a 2-3 zone, quick ball movement around the perimeter collapses the defense and creates gaps in the short corners and at the high post.',
+  },
 };
 
-const ANSWER_LABELS = ['A', 'B', 'C', 'D'];
-const TIMER_SECONDS = 10;
+// ─── Court Diagram ────────────────────────────────────────────────────────────
+const OFFENSIVE_POSITIONS = [
+  { id: 'o1', label: '1', x: 0.5, y: 0.58 },
+  { id: 'o2', label: '2', x: 0.17, y: 0.35 },
+  { id: 'o3', label: '3', x: 0.83, y: 0.35 },
+  { id: 'o4', label: '4', x: 0.25, y: 0.14 },
+  { id: 'o5', label: '5', x: 0.5, y: 0.18 },
+];
+
+const DEFENSIVE_POSITIONS = [
+  { id: 'd1', label: 'X', x: 0.5, y: 0.7 },
+  { id: 'd2', label: 'X', x: 0.2, y: 0.46 },
+  { id: 'd3', label: 'X', x: 0.8, y: 0.46 },
+  { id: 'd4', label: 'X', x: 0.32, y: 0.22 },
+  { id: 'd5', label: 'X', x: 0.68, y: 0.22 },
+];
+
+function CourtDiagram({ theme }) {
+  const W = 300;
+  const H = 170;
+
+  return (
+    <View style={[styles.courtWrapper, { borderColor: theme.border }]}>
+      <View style={[styles.courtInner, { width: W, height: H }]}>
+        <View style={styles.paint} />
+        <View style={styles.centerLine} />
+
+        {OFFENSIVE_POSITIONS.map((p) => (
+          <View
+            key={p.id}
+            style={[styles.playerToken, styles.offToken, { left: p.x * W - 14, top: p.y * H - 14 }]}
+          >
+            <Text style={styles.tokenLabel}>{p.label}</Text>
+          </View>
+        ))}
+
+        {DEFENSIVE_POSITIONS.map((p) => (
+          <View
+            key={p.id}
+            style={[styles.playerToken, styles.defToken, { left: p.x * W - 14, top: p.y * H - 14 }]}
+          >
+            <Text style={styles.tokenLabelDef}>{p.label}</Text>
+          </View>
+        ))}
+
+        <View style={[styles.ball, { left: 0.5 * W - 9, top: 0.58 * H - 9 }]}>
+          <Ionicons name="basketball" size={16} color="#FF6B00" />
+        </View>
+      </View>
+      <View style={styles.legendRow}>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDot, { backgroundColor: '#3B82F6' }]} />
+          <Text style={[styles.legendText, { color: theme.textSecondary }]}>Offense</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDot, { backgroundColor: '#EF4444' }]} />
+          <Text style={[styles.legendText, { color: theme.textSecondary }]}>Defense</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <Ionicons name="basketball" size={10} color="#FF6B00" />
+          <Text style={[styles.legendText, { color: theme.textSecondary }]}>Ball</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 export default function SimCoachScenarioScreen({ navigation, route }) {
   const { theme, isDarkMode } = useAppContext();
-  const category = route.params?.category || { id: 'pickroll', title: 'Pick & Roll Reads' };
+  const scenario = route.params?.scenario || { id: 'default', title: 'Game Plan Scenario' };
 
-  const scenarios = SCENARIOS_BY_CATEGORY[category.id] || SCENARIOS_BY_CATEGORY.pickroll;
-  const totalQuestions = scenarios.length;
+  const scenarioData = MOCK_SCENARIOS[scenario.id] || MOCK_SCENARIOS.default;
 
-  const [currentIdx, setCurrentIdx] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [submitted, setSubmitted] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(TIMER_SECONDS);
-  const [timedOut, setTimedOut] = useState(false);
-  const [results, setResults] = useState([]);
-  const timerRef = useRef(null);
+  const [saving, setSaving] = useState(false);
 
-  const currentScenario = scenarios[currentIdx];
-
-  // Timer countdown
-  useEffect(() => {
-    if (submitted) return;
-    setTimeLeft(TIMER_SECONDS);
-    setTimedOut(false);
-    timerRef.current = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timerRef.current);
-          setTimedOut(true);
-          setSubmitted(true);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timerRef.current);
-  }, [currentIdx]);
-
-  const handleSelectAnswer = useCallback((idx) => {
-    if (submitted) return;
-    setSelectedAnswer(idx);
-  }, [submitted]);
-
-  const handleSubmit = useCallback(() => {
-    if (submitted) return;
-    clearInterval(timerRef.current);
+  const handleSubmit = useCallback(async () => {
+    if (selectedAnswer === null || submitted) return;
+    setSaving(true);
     setSubmitted(true);
-    const isCorrect =
-      selectedAnswer !== null &&
-      selectedAnswer === currentScenario.correctIndex;
-    setResults((prev) => [
-      ...prev,
-      {
-        questionNum: currentIdx + 1,
-        category: category.title,
+
+    const isCorrect = selectedAnswer === scenarioData.correctIndex;
+    const result = {
+      scenarioId: scenario.id,
+      title: scenarioData.title,
+      category: scenarioData.category,
+      correct: isCorrect,
+      selectedAnswer,
+      correctAnswer: scenarioData.correctIndex,
+      explanation: scenarioData.explanation,
+    };
+
+    try {
+      const user = getCurrentUser();
+      if (user) {
+        await saveSimCoachResult(user.uid, result);
+      }
+    } catch (_) {}
+
+    setSaving(false);
+  }, [selectedAnswer, submitted, scenarioData, scenario.id]);
+
+  const handleFinish = useCallback(() => {
+    const isCorrect = selectedAnswer === scenarioData.correctIndex;
+    navigation.navigate('SimCoachResults', {
+      results: [{
+        questionNum: 1,
+        category: scenarioData.category,
         correct: isCorrect,
         selectedAnswer,
-        correctAnswer: currentScenario.correctIndex,
-        explanation: currentScenario.explanation,
-      },
-    ]);
-  }, [submitted, selectedAnswer, currentScenario, currentIdx, category]);
-
-  const handleNext = useCallback(() => {
-    if (currentIdx < totalQuestions - 1) {
-      setCurrentIdx((prev) => prev + 1);
-      setSelectedAnswer(null);
-      setSubmitted(false);
-    } else {
-      // Navigate to results
-      const finalResults = [
-        ...results,
-        // Include current if already submitted
-      ];
-      navigation.replace('SimCoachResults', {
-        results: finalResults,
-        category: category.title,
-        totalQuestions,
-      });
-    }
-  }, [currentIdx, totalQuestions, results, navigation, category]);
-
-  const timerColor = timeLeft <= 3 ? '#EF4444' : timeLeft <= 6 ? '#F59E0B' : '#22C55E';
-  const isLastQuestion = currentIdx === totalQuestions - 1;
+        correctAnswer: scenarioData.correctIndex,
+        explanation: scenarioData.explanation,
+      }],
+      category: scenarioData.title,
+      totalQuestions: 1,
+    });
+  }, [navigation, selectedAnswer, scenarioData]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <StatusBar style={isDarkMode ? 'light' : 'dark'} />
 
-      {/* Nav Header */}
       <View style={[styles.navHeader, { borderBottomColor: theme.border }]}>
         <TouchableOpacity
           style={[styles.backBtn, { backgroundColor: theme.card }]}
@@ -295,88 +189,74 @@ export default function SimCoachScenarioScreen({ navigation, route }) {
         </TouchableOpacity>
         <View style={styles.navCenter}>
           <Text style={[styles.navCategory, { color: theme.textSecondary }]} numberOfLines={1}>
-            {category.title}
+            {scenarioData.coach}
           </Text>
-          <Text style={[styles.navProgress, { color: theme.text }]}>
-            Q {currentIdx + 1}/{totalQuestions}
+          <Text style={[styles.navTitle, { color: theme.text }]} numberOfLines={1}>
+            {scenarioData.title}
           </Text>
         </View>
-        <View style={[styles.timerBadge, { backgroundColor: timerColor + '20', borderColor: timerColor }]}>
-          <Text style={[styles.timerText, { color: timerColor }]}>{timeLeft}s</Text>
+        <View style={[styles.categoryPill, { backgroundColor: theme.primary + '18' }]}>
+          <Text style={[styles.categoryPillText, { color: theme.primary }]}>{scenarioData.category}</Text>
         </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Court Diagram Placeholder */}
-        <View style={[styles.courtDiagram, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <View style={[styles.courtInner, { borderColor: theme.border }]}>
-            {/* Basketball positions */}
-            <View style={[styles.courtCenter, { borderColor: theme.textSecondary }]} />
-            <View style={[styles.courtBall, { backgroundColor: theme.primary, top: '40%', left: '45%' }]}>
-              <Ionicons name="basketball" size={16} color="#FFF" />
-            </View>
-            <View style={[styles.courtPlayer, { backgroundColor: '#3B82F640', borderColor: '#3B82F6', top: '20%', left: '20%' }]}>
-              <Text style={{ fontSize: 9, color: '#3B82F6', fontWeight: '700' }}>1</Text>
-            </View>
-            <View style={[styles.courtPlayer, { backgroundColor: '#3B82F640', borderColor: '#3B82F6', top: '60%', left: '70%' }]}>
-              <Text style={{ fontSize: 9, color: '#3B82F6', fontWeight: '700' }}>2</Text>
-            </View>
-            <View style={[styles.courtPlayerDef, { backgroundColor: '#EF444440', borderColor: '#EF4444', top: '35%', left: '55%' }]}>
-              <Text style={{ fontSize: 9, color: '#EF4444', fontWeight: '700' }}>X</Text>
-            </View>
+        {/* Court Diagram */}
+        <CourtDiagram theme={theme} />
+
+        {/* Play Steps */}
+        <View style={[styles.stepsCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          <View style={styles.stepsHeader}>
+            <Ionicons name="list-outline" size={16} color={theme.primary} />
+            <Text style={[styles.stepsHeaderText, { color: theme.primary }]}>PLAY BREAKDOWN</Text>
           </View>
-          <Text style={[styles.courtLabel, { color: theme.textSecondary }]}>Play Diagram</Text>
+          {scenarioData.playSteps.map((step, i) => (
+            <View key={i} style={styles.stepRow}>
+              <View style={[styles.stepNum, { backgroundColor: theme.primary + '18' }]}>
+                <Text style={[styles.stepNumText, { color: theme.primary }]}>{i + 1}</Text>
+              </View>
+              <Text style={[styles.stepText, { color: theme.text }]}>{step}</Text>
+            </View>
+          ))}
         </View>
 
-        {/* Scenario Description */}
-        <View style={[styles.scenarioCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <View style={styles.scenarioHeader}>
-            <Ionicons name="help-circle-outline" size={18} color={theme.primary} />
-            <Text style={[styles.scenarioHeaderText, { color: theme.primary }]}>Scenario</Text>
+        {/* Question */}
+        <View style={[styles.questionCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          <View style={styles.questionHeader}>
+            <Ionicons name="help-circle-outline" size={16} color={theme.primary} />
+            <Text style={[styles.questionHeaderText, { color: theme.primary }]}>YOUR RESPONSE</Text>
           </View>
-          <Text style={[styles.scenarioText, { color: theme.text }]}>
-            {currentScenario.description}
-          </Text>
+          <Text style={[styles.questionText, { color: theme.text }]}>{scenarioData.question}</Text>
         </View>
 
-        {/* Answer Options */}
-        <View style={styles.answersSection}>
-          {currentScenario.options.map((option, idx) => {
+        {/* Options */}
+        <View style={styles.optionsSection}>
+          {scenarioData.options.map((option, idx) => {
             const isSelected = selectedAnswer === idx;
-            const isCorrect = idx === currentScenario.correctIndex;
+            const isCorrect = idx === scenarioData.correctIndex;
             const showCorrect = submitted && isCorrect;
             const showWrong = submitted && isSelected && !isCorrect;
 
-            let bgColor = theme.card;
-            let borderColor = theme.border;
+            let bg = theme.card;
+            let border = theme.border;
             let textColor = theme.text;
 
-            if (showCorrect) {
-              bgColor = '#22C55E18';
-              borderColor = '#22C55E';
-              textColor = '#22C55E';
-            } else if (showWrong) {
-              bgColor = '#EF444418';
-              borderColor = '#EF4444';
-              textColor = '#EF4444';
-            } else if (isSelected && !submitted) {
-              bgColor = theme.primary + '18';
-              borderColor = theme.primary;
-              textColor = theme.primary;
-            }
+            if (showCorrect) { bg = '#22C55E18'; border = '#22C55E'; textColor = '#22C55E'; }
+            else if (showWrong) { bg = '#EF444418'; border = '#EF4444'; textColor = '#EF4444'; }
+            else if (isSelected && !submitted) { bg = theme.primary + '18'; border = theme.primary; textColor = theme.primary; }
 
             return (
               <TouchableOpacity
                 key={option.label}
-                style={[styles.answerBtn, { backgroundColor: bgColor, borderColor }]}
-                onPress={() => handleSelectAnswer(idx)}
+                style={[styles.optionBtn, { backgroundColor: bg, borderColor: border }]}
+                onPress={() => !submitted && setSelectedAnswer(idx)}
                 activeOpacity={submitted ? 1 : 0.75}
                 disabled={submitted}
               >
-                <View style={[styles.answerLabelCircle, { borderColor, backgroundColor: borderColor + '30' }]}>
-                  <Text style={[styles.answerLabel, { color: textColor }]}>{option.label}</Text>
+                <View style={[styles.optionLabelCircle, { borderColor: border, backgroundColor: border + '30' }]}>
+                  <Text style={[styles.optionLabel, { color: textColor }]}>{option.label}</Text>
                 </View>
-                <Text style={[styles.answerText, { color: textColor }]}>{option.text}</Text>
+                <Text style={[styles.optionText, { color: textColor }]}>{option.text}</Text>
                 {showCorrect && <Ionicons name="checkmark-circle" size={20} color="#22C55E" />}
                 {showWrong && <Ionicons name="close-circle" size={20} color="#EF4444" />}
               </TouchableOpacity>
@@ -384,91 +264,48 @@ export default function SimCoachScenarioScreen({ navigation, route }) {
           })}
         </View>
 
-        {/* Feedback after submit */}
+        {/* Feedback */}
         {submitted && (
-          <View
-            style={[
-              styles.feedbackCard,
-              {
-                backgroundColor:
-                  (timedOut || selectedAnswer !== currentScenario.correctIndex)
-                    ? '#EF444412'
-                    : '#22C55E12',
-                borderColor:
-                  (timedOut || selectedAnswer !== currentScenario.correctIndex)
-                    ? '#EF4444'
-                    : '#22C55E',
-              },
-            ]}
-          >
+          <View style={[styles.feedbackCard, {
+            backgroundColor: selectedAnswer === scenarioData.correctIndex ? '#22C55E12' : '#EF444412',
+            borderColor: selectedAnswer === scenarioData.correctIndex ? '#22C55E' : '#EF4444',
+          }]}>
             <View style={styles.feedbackHeader}>
               <Ionicons
-                name={
-                  timedOut || selectedAnswer !== currentScenario.correctIndex
-                    ? 'close-circle'
-                    : 'checkmark-circle'
-                }
+                name={selectedAnswer === scenarioData.correctIndex ? 'checkmark-circle' : 'close-circle'}
                 size={20}
-                color={
-                  timedOut || selectedAnswer !== currentScenario.correctIndex
-                    ? '#EF4444'
-                    : '#22C55E'
-                }
+                color={selectedAnswer === scenarioData.correctIndex ? '#22C55E' : '#EF4444'}
               />
-              <Text
-                style={[
-                  styles.feedbackTitle,
-                  {
-                    color:
-                      timedOut || selectedAnswer !== currentScenario.correctIndex
-                        ? '#EF4444'
-                        : '#22C55E',
-                  },
-                ]}
-              >
-                {timedOut
-                  ? "Time's Up!"
-                  : selectedAnswer === currentScenario.correctIndex
-                  ? 'Correct!'
-                  : 'Incorrect'}
+              <Text style={[styles.feedbackTitle, { color: selectedAnswer === scenarioData.correctIndex ? '#22C55E' : '#EF4444' }]}>
+                {selectedAnswer === scenarioData.correctIndex ? "Correct Read!" : "Not Quite"}
               </Text>
             </View>
-            <Text style={[styles.feedbackText, { color: theme.text }]}>
-              {currentScenario.explanation}
-            </Text>
+            <Text style={[styles.feedbackText, { color: theme.text }]}>{scenarioData.explanation}</Text>
           </View>
         )}
 
-        {/* Submit / Next */}
+        {/* Action button */}
         {!submitted ? (
           <TouchableOpacity
-            style={[
-              styles.submitBtn,
-              {
-                backgroundColor: selectedAnswer !== null ? theme.primary : theme.border,
-                opacity: selectedAnswer !== null ? 1 : 0.6,
-              },
-            ]}
+            style={[styles.actionBtn, { backgroundColor: selectedAnswer !== null ? theme.primary : theme.border }]}
             onPress={handleSubmit}
+            disabled={selectedAnswer === null || saving}
             activeOpacity={selectedAnswer !== null ? 0.85 : 1}
-            disabled={selectedAnswer === null}
           >
-            <Text style={styles.submitBtnText}>Submit Answer</Text>
+            <Text style={styles.actionBtnText}>Submit Response</Text>
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
-            style={[styles.submitBtn, { backgroundColor: theme.primary }]}
-            onPress={handleNext}
+            style={[styles.actionBtn, { backgroundColor: theme.primary }]}
+            onPress={handleFinish}
             activeOpacity={0.85}
           >
-            <Text style={styles.submitBtnText}>
-              {isLastQuestion ? 'Finish Session' : 'Next Scenario'}
-            </Text>
-            <Ionicons name={isLastQuestion ? 'checkmark' : 'arrow-forward'} size={18} color="#FFF" />
+            <Text style={styles.actionBtnText}>View Results</Text>
+            <Ionicons name="arrow-forward" size={18} color="#fff" />
           </TouchableOpacity>
         )}
 
-        <View style={styles.bottomSpacer} />
+        <View style={{ height: 32 }} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -481,148 +318,88 @@ const styles = StyleSheet.create({
   navHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
+    gap: 10,
   },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  navCenter: { flex: 1, alignItems: 'center' },
-  navCategory: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.8 },
-  navProgress: { fontSize: 16, fontWeight: '800', marginTop: 1 },
-  timerBadge: {
-    width: 44,
-    height: 36,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  timerText: { fontSize: 14, fontWeight: '900' },
+  backBtn: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
+  navCenter: { flex: 1 },
+  navCategory: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.6 },
+  navTitle: { fontSize: 14, fontWeight: '700', marginTop: 1 },
+  categoryPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+  categoryPillText: { fontSize: 11, fontWeight: '700' },
 
   scrollContent: { padding: 16, paddingBottom: 40 },
 
-  // Court diagram
-  courtDiagram: {
+  courtWrapper: {
     borderRadius: 14,
     borderWidth: 1,
     padding: 12,
-    marginBottom: 16,
     alignItems: 'center',
+    backgroundColor: '#1B5E2080',
+    marginBottom: 14,
   },
   courtInner: {
-    width: '100%',
-    height: 140,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderRadius: 8,
     position: 'relative',
-    marginBottom: 6,
-  },
-  courtCenter: {
-    position: 'absolute',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    top: '50%',
-    left: '50%',
-    marginTop: -20,
-    marginLeft: -20,
-  },
-  courtBall: {
-    position: 'absolute',
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  courtPlayer: {
-    position: 'absolute',
-    width: 22,
-    height: 22,
-    borderRadius: 11,
     borderWidth: 1.5,
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderColor: 'rgba(255,255,255,0.3)',
+    borderRadius: 4,
+    backgroundColor: '#2D7A3C',
   },
-  courtPlayerDef: {
+  paint: {
     position: 'absolute',
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 100,
+    height: 56,
     borderWidth: 1.5,
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderColor: 'rgba(255,255,255,0.35)',
+    left: 100,
+    top: 0,
   },
-  courtLabel: { fontSize: 11, fontStyle: 'italic' },
+  centerLine: { position: 'absolute', left: 0, right: 0, height: 1.5, backgroundColor: 'rgba(255,255,255,0.25)', top: '50%' },
+  playerToken: { position: 'absolute', width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  offToken: { backgroundColor: '#3B82F6', borderWidth: 1.5, borderColor: '#1D4ED8' },
+  defToken: { backgroundColor: '#EF4444', borderWidth: 1.5, borderColor: '#B91C1C' },
+  tokenLabel: { color: '#fff', fontSize: 11, fontWeight: '900' },
+  tokenLabelDef: { color: '#fff', fontSize: 10, fontWeight: '900' },
+  ball: { position: 'absolute', width: 18, height: 18 },
 
-  // Scenario
-  scenarioCard: {
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 16,
-    marginBottom: 16,
-  },
-  scenarioHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
-  scenarioHeaderText: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6 },
-  scenarioText: { fontSize: 15, lineHeight: 23 },
+  legendRow: { flexDirection: 'row', gap: 16, marginTop: 8 },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  legendDot: { width: 10, height: 10, borderRadius: 5 },
+  legendText: { fontSize: 10 },
 
-  // Answers
-  answersSection: { gap: 10, marginBottom: 16 },
-  answerBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 12,
-    borderWidth: 1.5,
-    padding: 14,
-    gap: 12,
-  },
-  answerLabelCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  answerLabel: { fontSize: 13, fontWeight: '800' },
-  answerText: { flex: 1, fontSize: 14, lineHeight: 20 },
+  stepsCard: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 12 },
+  stepsHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
+  stepsHeaderText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
+  stepRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 10 },
+  stepNum: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
+  stepNumText: { fontSize: 11, fontWeight: '800' },
+  stepText: { flex: 1, fontSize: 13, lineHeight: 19 },
 
-  // Feedback
-  feedbackCard: {
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 16,
-    marginBottom: 16,
-  },
+  questionCard: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 14 },
+  questionHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
+  questionHeaderText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
+  questionText: { fontSize: 15, lineHeight: 22 },
+
+  optionsSection: { gap: 10, marginBottom: 14 },
+  optionBtn: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1.5, padding: 14, gap: 12 },
+  optionLabelCircle: { width: 28, height: 28, borderRadius: 14, borderWidth: 1.5, justifyContent: 'center', alignItems: 'center' },
+  optionLabel: { fontSize: 13, fontWeight: '800' },
+  optionText: { flex: 1, fontSize: 14, lineHeight: 20 },
+
+  feedbackCard: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 14 },
   feedbackHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   feedbackTitle: { fontSize: 15, fontWeight: '800' },
   feedbackText: { fontSize: 14, lineHeight: 21 },
 
-  // Submit
-  submitBtn: {
+  actionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
     paddingVertical: 16,
     borderRadius: 14,
-    shadowColor: '#FF6B00',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.28,
-    shadowRadius: 8,
-    elevation: 5,
   },
-  submitBtnText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
-
-  bottomSpacer: { height: 20 },
+  actionBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 });

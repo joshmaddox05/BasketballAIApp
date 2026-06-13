@@ -26,9 +26,24 @@ import ParentHomeScreen from '../screens/main/ParentHomeScreen';
 // Import DBE screens needed directly in role navigators
 import ScoutLabSearchScreen from '../screens/main/ScoutLabSearchScreen';
 import CoachMarketDashboardScreen from '../screens/main/CoachMarketDashboardScreen';
+import CoachMarketScreen from '../screens/main/CoachMarketScreen';
 import FamilyDashboardScreen from '../screens/main/FamilyDashboardScreen';
 import HoopCommunityScreen from '../screens/main/HoopCommunityScreen';
 import MentorshipScreen from '../screens/main/MentorshipScreen';
+
+// Import role-specific management screens
+import CoachAthletesScreen from '../screens/main/CoachAthletesScreen';
+import CoachSessionsScreen from '../screens/main/CoachSessionsScreen';
+import ScoutWatchlistScreen from '../screens/main/ScoutWatchlistScreen';
+import ScoutReportsScreen from '../screens/main/ScoutReportsScreen';
+import MessagingScreen from '../screens/main/MessagingScreen';
+import ProgressReportScreen from '../screens/main/ProgressReportScreen';
+
+// Import legal/support screens (replacing inline placeholders)
+import HelpCenterScreen from '../screens/main/HelpCenterScreen';
+import ContactUsScreen from '../screens/main/ContactUsScreen';
+import PrivacyPolicyScreen from '../screens/main/PrivacyPolicyScreen';
+import TermsOfServiceScreen from '../screens/main/TermsOfServiceScreen';
 
 // Import the shared screens utility
 import { addSharedScreensToStack } from './SharedStackNavigator';
@@ -326,6 +341,9 @@ export default function MainNavigator() {
 // ─── Coach Navigator ──────────────────────────────────────────────────────────
 const CoachHomeStack = createStackNavigator();
 const CoachTrainingStack = createStackNavigator();
+const CoachAthletesStack = createStackNavigator();
+const CoachMarketCoachStack = createStackNavigator();
+const CoachSessionsStack = createStackNavigator();
 const CoachProfileStack = createStackNavigator();
 const CoachTab = createBottomTabNavigator();
 
@@ -348,12 +366,44 @@ function CoachTrainingStackNavigator() {
     );
 }
 
+function CoachAthletesStackNavigator() {
+    return (
+        <CoachAthletesStack.Navigator screenOptions={{ headerShown: false }}>
+            <CoachAthletesStack.Screen name="CoachAthletesMain" component={CoachAthletesScreen} />
+            {addSharedScreensToStack(CoachAthletesStack)}
+        </CoachAthletesStack.Navigator>
+    );
+}
+
+function CoachMarketCoachStackNavigator() {
+    return (
+        <CoachMarketCoachStack.Navigator screenOptions={{ headerShown: false }}>
+            <CoachMarketCoachStack.Screen name="CoachMarketDashMain" component={CoachMarketDashboardScreen} />
+            <CoachMarketCoachStack.Screen name="CoachMarketBrowse" component={CoachMarketScreen} options={{ headerShown: false }} />
+            {addSharedScreensToStack(CoachMarketCoachStack)}
+        </CoachMarketCoachStack.Navigator>
+    );
+}
+
+function CoachSessionsStackNavigator() {
+    return (
+        <CoachSessionsStack.Navigator screenOptions={{ headerShown: false }}>
+            <CoachSessionsStack.Screen name="CoachSessionsMain" component={CoachSessionsScreen} />
+            {addSharedScreensToStack(CoachSessionsStack)}
+        </CoachSessionsStack.Navigator>
+    );
+}
+
 function CoachProfileStackNavigator() {
     return (
         <CoachProfileStack.Navigator screenOptions={{ headerShown: false }}>
             <CoachProfileStack.Screen name="CoachProfileMain" component={ProfileScreen} />
             <CoachProfileStack.Screen name="EditProfile" component={EditProfileScreen} options={{ headerShown: false }} />
             <CoachProfileStack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
+            <CoachProfileStack.Screen name="HelpCenter" component={HelpCenterScreen} options={{ headerShown: false }} />
+            <CoachProfileStack.Screen name="ContactUs" component={ContactUsScreen} options={{ headerShown: false }} />
+            <CoachProfileStack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} options={{ headerShown: false }} />
+            <CoachProfileStack.Screen name="TermsOfService" component={TermsOfServiceScreen} options={{ headerShown: false }} />
             <CoachProfileStack.Screen name="Notifications" component={NotificationsScreen} options={{ headerShown: false }} />
             {addSharedScreensToStack(CoachProfileStack)}
         </CoachProfileStack.Navigator>
@@ -382,9 +432,9 @@ export function CoachMainNavigator() {
             })}
         >
             <CoachTab.Screen name="CoachHome" component={CoachHomeStackNavigator} options={{ title: 'Home' }} />
-            <CoachTab.Screen name="Athletes" component={CoachTrainingStackNavigator} options={{ title: 'Training' }} />
-            <CoachTab.Screen name="CoachMarket" component={CoachHomeStackNavigator} options={{ title: 'Market' }} />
-            <CoachTab.Screen name="Sessions" component={CoachHomeStackNavigator} options={{ title: 'Sessions' }} />
+            <CoachTab.Screen name="Athletes" component={CoachAthletesStackNavigator} options={{ title: 'Athletes' }} />
+            <CoachTab.Screen name="CoachMarket" component={CoachMarketCoachStackNavigator} options={{ title: 'Market' }} />
+            <CoachTab.Screen name="Sessions" component={CoachSessionsStackNavigator} options={{ title: 'Sessions' }} />
             <CoachTab.Screen name="CoachProfile" component={CoachProfileStackNavigator} options={{ title: 'Profile' }} />
         </CoachTab.Navigator>
     );
@@ -392,6 +442,9 @@ export function CoachMainNavigator() {
 
 // ─── Scout Navigator ──────────────────────────────────────────────────────────
 const ScoutDiscoverStack = createStackNavigator();
+const ScoutWatchlistStack = createStackNavigator();
+const ScoutReportsStack = createStackNavigator();
+const ScoutMessagingStack = createStackNavigator();
 const ScoutProfileStack = createStackNavigator();
 const ScoutTab = createBottomTabNavigator();
 
@@ -402,6 +455,33 @@ function ScoutDiscoverStackNavigator() {
             <ScoutDiscoverStack.Screen name="ScoutLabSearch" component={ScoutLabSearchScreen} options={{ headerShown: false }} />
             {addSharedScreensToStack(ScoutDiscoverStack)}
         </ScoutDiscoverStack.Navigator>
+    );
+}
+
+function ScoutWatchlistStackNavigator() {
+    return (
+        <ScoutWatchlistStack.Navigator screenOptions={{ headerShown: false }}>
+            <ScoutWatchlistStack.Screen name="ScoutWatchlistMain" component={ScoutWatchlistScreen} />
+            {addSharedScreensToStack(ScoutWatchlistStack)}
+        </ScoutWatchlistStack.Navigator>
+    );
+}
+
+function ScoutReportsStackNavigator() {
+    return (
+        <ScoutReportsStack.Navigator screenOptions={{ headerShown: false }}>
+            <ScoutReportsStack.Screen name="ScoutReportsMain" component={ScoutReportsScreen} />
+            {addSharedScreensToStack(ScoutReportsStack)}
+        </ScoutReportsStack.Navigator>
+    );
+}
+
+function ScoutMessagingStackNavigator() {
+    return (
+        <ScoutMessagingStack.Navigator screenOptions={{ headerShown: false }}>
+            <ScoutMessagingStack.Screen name="ScoutMessagingMain" component={MessagingScreen} />
+            {addSharedScreensToStack(ScoutMessagingStack)}
+        </ScoutMessagingStack.Navigator>
     );
 }
 
@@ -438,9 +518,9 @@ export function ScoutMainNavigator() {
             })}
         >
             <ScoutTab.Screen name="Discover" component={ScoutDiscoverStackNavigator} />
-            <ScoutTab.Screen name="Watchlist" component={ScoutDiscoverStackNavigator} options={{ title: 'Watchlist' }} />
-            <ScoutTab.Screen name="Reports" component={ScoutDiscoverStackNavigator} options={{ title: 'Reports' }} />
-            <ScoutTab.Screen name="Messages" component={ScoutDiscoverStackNavigator} options={{ title: 'Messages' }} />
+            <ScoutTab.Screen name="Watchlist" component={ScoutWatchlistStackNavigator} options={{ title: 'Watchlist' }} />
+            <ScoutTab.Screen name="Reports" component={ScoutReportsStackNavigator} options={{ title: 'Reports' }} />
+            <ScoutTab.Screen name="Messages" component={ScoutMessagingStackNavigator} options={{ title: 'Messages' }} />
             <ScoutTab.Screen name="ScoutProfile" component={ScoutProfileStackNavigator} options={{ title: 'Profile' }} />
         </ScoutTab.Navigator>
     );
@@ -448,7 +528,9 @@ export function ScoutMainNavigator() {
 
 // ─── Parent Navigator ─────────────────────────────────────────────────────────
 const ParentHomeStack = createStackNavigator();
+const ParentProgressStack = createStackNavigator();
 const ParentCommunityStack = createStackNavigator();
+const ParentMessagesStack = createStackNavigator();
 const ParentProfileStack = createStackNavigator();
 const ParentTab = createBottomTabNavigator();
 
@@ -459,6 +541,25 @@ function ParentHomeStackNavigator() {
             <ParentHomeStack.Screen name="FamilyDashboard" component={FamilyDashboardScreen} options={{ headerShown: false }} />
             {addSharedScreensToStack(ParentHomeStack)}
         </ParentHomeStack.Navigator>
+    );
+}
+
+function ParentProgressStackNavigator() {
+    return (
+        <ParentProgressStack.Navigator screenOptions={{ headerShown: false }}>
+            <ParentProgressStack.Screen name="ParentProgressMain" component={FamilyDashboardScreen} />
+            <ParentProgressStack.Screen name="ProgressReport" component={ProgressReportScreen} options={{ headerShown: false }} />
+            {addSharedScreensToStack(ParentProgressStack)}
+        </ParentProgressStack.Navigator>
+    );
+}
+
+function ParentMessagesStackNavigator() {
+    return (
+        <ParentMessagesStack.Navigator screenOptions={{ headerShown: false }}>
+            <ParentMessagesStack.Screen name="ParentMessagesMain" component={MessagingScreen} />
+            {addSharedScreensToStack(ParentMessagesStack)}
+        </ParentMessagesStack.Navigator>
     );
 }
 
@@ -505,18 +606,13 @@ export function ParentMainNavigator() {
             })}
         >
             <ParentTab.Screen name="ParentHome" component={ParentHomeStackNavigator} options={{ title: 'Home' }} />
-            <ParentTab.Screen name="Progress" component={ParentHomeStackNavigator} options={{ title: 'Progress' }} />
+            <ParentTab.Screen name="Progress" component={ParentProgressStackNavigator} options={{ title: 'Progress' }} />
             <ParentTab.Screen name="Community" component={ParentCommunityStackNavigator} />
-            <ParentTab.Screen name="Messages" component={ParentHomeStackNavigator} />
+            <ParentTab.Screen name="Messages" component={ParentMessagesStackNavigator} options={{ title: 'Messages' }} />
             <ParentTab.Screen name="ParentProfile" component={ParentProfileStackNavigator} options={{ title: 'Profile' }} />
         </ParentTab.Navigator>
     );
 }
 
-// Placeholder components for screens that might not exist yet
-// You can replace these with real screen imports when they're ready
+// CreatePostScreen placeholder (not yet implemented as a full screen)
 const CreatePostScreen = () => <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><Text>Create Post Screen</Text></View>;
-const HelpCenterScreen = () => <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><Text>Help Center Screen</Text></View>;
-const ContactUsScreen = () => <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><Text>Contact Us Screen</Text></View>;
-const PrivacyPolicyScreen = () => <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><Text>Privacy Policy Screen</Text></View>;
-const TermsOfServiceScreen = () => <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><Text>Terms of Service Screen</Text></View>;

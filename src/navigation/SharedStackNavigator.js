@@ -19,6 +19,13 @@ import BuildWorkoutScreen from '../screens/main/BuildWorkoutScreen';
 import CustomPlanDetailScreen from '../screens/main/CustomPlanDetailScreen';
 import CustomPlanDayScreen from '../screens/main/CustomPlanDayScreen';
 
+// Import role management + messaging screens
+import ScoutReportsScreen from '../screens/main/ScoutReportsScreen';
+import MessagingScreen from '../screens/main/MessagingScreen';
+import ProgressReportScreen from '../screens/main/ProgressReportScreen';
+import SimCoachFilmLibraryScreen from '../screens/main/SimCoachFilmLibraryScreen';
+import SimCoachGamePlanBuilderScreen from '../screens/main/SimCoachGamePlanBuilderScreen';
+
 // Import DBE module screens (shared across tabs)
 import ShotDNAScreen from '../screens/main/ShotDNAScreen';
 import ShotDNAArchetypeScreen from '../screens/main/ShotDNAArchetypeScreen';
@@ -126,6 +133,12 @@ export const sharedScreens = [
     { name: 'Mentorship', component: MentorshipScreen, options: { headerShown: false } },
     { name: 'LegacyVault', component: LegacyVaultScreen, options: { headerShown: false } },
     { name: 'LegacyVaultArticle', component: LegacyVaultArticleScreen, options: { headerShown: false } },
+    // Role management + new SimCoach screens
+    { name: 'ScoutReports', component: ScoutReportsScreen, options: { headerShown: false } },
+    { name: 'Messaging', component: MessagingScreen, options: { headerShown: false } },
+    { name: 'ProgressReport', component: ProgressReportScreen, options: { headerShown: false } },
+    { name: 'SimCoachFilmLibrary', component: SimCoachFilmLibraryScreen, options: { headerShown: false } },
+    { name: 'SimCoachGamePlanBuilder', component: SimCoachGamePlanBuilderScreen, options: { headerShown: false } },
 ];
 
 // A utility function to add shared screens to any stack navigator

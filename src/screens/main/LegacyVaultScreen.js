@@ -160,19 +160,22 @@ function FeaturedArticleRow({ article, theme }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function LegacyVaultScreen({ navigation }) {
-  const { userData, theme, isDarkMode } = useAppContext();
+  const { userData, theme, isDarkMode, shotDNAProfile } = useAppContext();
   const [searchQuery, setSearchQuery] = useState('');
 
   const userSubscription = userData?.subscription || userData?.subscriptionTier || 'free';
   const hasAccess = canAccessFeature('legacyVault', userSubscription);
 
-  const archetype = MOCK_ARCHETYPE;
+  // Use live ShotDNA archetype if available, fall back to mock
+  const liveArchetypeName = shotDNAProfile?.archetype || shotDNAProfile?.archetypeName;
+  const archetype = liveArchetypeName
+    ? { ...MOCK_ARCHETYPE, name: liveArchetypeName }
+    : MOCK_ARCHETYPE;
   const categories = CATEGORIES;
   const featuredArticles = MOCK_FEATURED_ARTICLES;
 
   const handleCategoryPress = useCallback((category) => {
-    // Navigate to category detail when available
-    navigation.navigate('CommunitySoon');
+    navigation.navigate('LegacyVaultArticle', { category });
   }, [navigation]);
 
   const handleUpgrade = useCallback(() => {
