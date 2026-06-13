@@ -193,6 +193,87 @@ function RecommendedCard({ workout, reason, theme, onPress }) {
   );
 }
 
+const DBE_MODULES = [
+  { key: 'ShotDNA', label: 'ShotDNA™', icon: 'scan-outline', color: '#FF6B00' },
+  { key: 'EvalRank', label: 'EvalRank™', icon: 'stats-chart', color: '#3B82F6' },
+  { key: 'Blueprint360', label: 'Blueprint360™', icon: 'map-outline', color: '#22C55E' },
+  { key: 'SimCoach', label: 'SimCoach™', icon: 'game-controller-outline', color: '#A855F7' },
+  { key: 'ScoutLab', label: 'ScoutLab™', icon: 'search-outline', color: '#F59E0B' },
+  { key: 'CoachMarket', label: 'CoachMarket™', icon: 'storefront-outline', color: '#EC4899' },
+  { key: 'HoopCommunity', label: 'HoopCommunity™', icon: 'people-outline', color: '#06B6D4' },
+  { key: 'LegacyVault', label: 'LegacyVault™', icon: 'library-outline', color: '#8B5CF6' },
+];
+
+function DBEHub({ shotDNAProfile, evalRankScore, simCoachIQScore, theme, navigation }) {
+  return (
+    <View style={[dbeStyles.hubSection]}>
+      {/* Pipeline strip */}
+      <View style={[dbeStyles.pipelineCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        <Text style={[dbeStyles.pipelineTitle, { color: theme.text }]}>Your DBE Pipeline</Text>
+        <View style={dbeStyles.pipelineRow}>
+          <View style={dbeStyles.pipelineStat}>
+            <Text style={[dbeStyles.pipelineValue, { color: evalRankScore?.overallGrade ? theme.primary : theme.textSecondary }]}>
+              {evalRankScore?.overallGrade || '--'}
+            </Text>
+            <Text style={[dbeStyles.pipelineLabel, { color: theme.textSecondary }]}>EvalRank</Text>
+          </View>
+          <View style={[dbeStyles.pipeDivider, { backgroundColor: theme.border }]} />
+          <View style={dbeStyles.pipelineStat}>
+            <Text style={[dbeStyles.pipelineValue, { color: shotDNAProfile ? theme.primary : theme.textSecondary }]}>
+              {shotDNAProfile?.archetype ? shotDNAProfile.archetype.split(' ')[0] : '--'}
+            </Text>
+            <Text style={[dbeStyles.pipelineLabel, { color: theme.textSecondary }]}>Archetype</Text>
+          </View>
+          <View style={[dbeStyles.pipeDivider, { backgroundColor: theme.border }]} />
+          <View style={dbeStyles.pipelineStat}>
+            <Text style={[dbeStyles.pipelineValue, { color: simCoachIQScore ? theme.primary : theme.textSecondary }]}>
+              {simCoachIQScore || '--'}
+            </Text>
+            <Text style={[dbeStyles.pipelineLabel, { color: theme.textSecondary }]}>IQ Score</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Module cards */}
+      <Text style={[dbeStyles.modulesTitle, { color: theme.text }]}>Ecosystem Modules</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={dbeStyles.modulesScroll}>
+        <View style={dbeStyles.modulesRow}>
+          {DBE_MODULES.map((mod) => (
+            <TouchableOpacity
+              key={mod.key}
+              style={[dbeStyles.moduleCard, { backgroundColor: theme.card, borderColor: theme.border }]}
+              onPress={() => navigation.navigate(mod.key)}
+              activeOpacity={0.8}
+            >
+              <View style={[dbeStyles.moduleIcon, { backgroundColor: mod.color + '22' }]}>
+                <Ionicons name={mod.icon} size={22} color={mod.color} />
+              </View>
+              <Text style={[dbeStyles.moduleLabel, { color: theme.text }]} numberOfLines={2}>{mod.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+const dbeStyles = StyleSheet.create({
+  hubSection: { marginBottom: 8 },
+  pipelineCard: { borderRadius: 16, borderWidth: 1, padding: 16, marginBottom: 16 },
+  pipelineTitle: { fontSize: 14, fontWeight: '700', marginBottom: 12 },
+  pipelineRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around' },
+  pipelineStat: { alignItems: 'center', flex: 1 },
+  pipelineValue: { fontSize: 22, fontWeight: '800' },
+  pipelineLabel: { fontSize: 11, marginTop: 2 },
+  pipeDivider: { width: 1, height: 32 },
+  modulesTitle: { fontSize: 16, fontWeight: '700', marginBottom: 10 },
+  modulesScroll: { marginHorizontal: -16 },
+  modulesRow: { flexDirection: 'row', paddingHorizontal: 16, gap: 10 },
+  moduleCard: { width: 88, borderRadius: 14, borderWidth: 1, padding: 12, alignItems: 'center', gap: 8 },
+  moduleIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  moduleLabel: { fontSize: 10, fontWeight: '600', textAlign: 'center', lineHeight: 13 },
+});
+
 function EmptyWorkoutsState({ theme, onPress }) {
   return (
     <View style={[styles.emptyState, { backgroundColor: theme.card, borderColor: theme.border }]}>
@@ -226,6 +307,10 @@ export default function HomeScreen({ navigation }) {
     theme,
     isDarkMode,
     refreshUserData,
+    shotDNAProfile,
+    evalRankScore,
+    blueprint360Plan,
+    simCoachIQScore,
   } = useAppContext();
 
   const [refreshing, setRefreshing] = useState(false);
@@ -339,6 +424,15 @@ export default function HomeScreen({ navigation }) {
         {nextAction ? (
           <NextActionCard action={nextAction} theme={theme} onPress={handleNextActionPress} />
         ) : null}
+
+        {/* ── DBE Ecosystem Hub ── */}
+        <DBEHub
+          shotDNAProfile={shotDNAProfile}
+          evalRankScore={evalRankScore}
+          simCoachIQScore={simCoachIQScore}
+          theme={theme}
+          navigation={navigation}
+        />
 
         {/* ── Weekly Focus ── */}
         <WeeklyFocusRow chips={weeklyChips} theme={theme} />

@@ -3174,3 +3174,315 @@ export const getDailyChallengeStreak = async (uid) => {
     return 0;
   }
 };
+
+// ==================== DBE MODULE: ShotDNA ====================
+
+export const saveShotDNAAnalysis = async (uid, analysisData) => {
+  try {
+    const ref = await addDoc(collection(db, 'users', uid, 'shotDNA'), {
+      ...analysisData,
+      createdAt: serverTimestamp(),
+    });
+    return ref.id;
+  } catch (error) {
+    console.error('Error saving ShotDNA analysis:', error);
+    throw error;
+  }
+};
+
+export const getShotDNAAnalyses = async (uid, limitCount = 20) => {
+  try {
+    const q = query(
+      collection(db, 'users', uid, 'shotDNA'),
+      orderBy('createdAt', 'desc'),
+      limit(limitCount)
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (error) {
+    console.error('Error fetching ShotDNA analyses:', error);
+    return [];
+  }
+};
+
+export const getLatestShotDNAProfile = async (uid) => {
+  try {
+    const analyses = await getShotDNAAnalyses(uid, 1);
+    return analyses[0] || null;
+  } catch (error) {
+    console.error('Error fetching latest ShotDNA profile:', error);
+    return null;
+  }
+};
+
+// ==================== DBE MODULE: EvalRank ====================
+
+export const saveEvalRankScore = async (uid, evalData) => {
+  try {
+    const ref = await addDoc(collection(db, 'users', uid, 'evalRankScores'), {
+      ...evalData,
+      createdAt: serverTimestamp(),
+    });
+    return ref.id;
+  } catch (error) {
+    console.error('Error saving EvalRank score:', error);
+    throw error;
+  }
+};
+
+export const getEvalRankScores = async (uid, limitCount = 10) => {
+  try {
+    const q = query(
+      collection(db, 'users', uid, 'evalRankScores'),
+      orderBy('createdAt', 'desc'),
+      limit(limitCount)
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (error) {
+    console.error('Error fetching EvalRank scores:', error);
+    return [];
+  }
+};
+
+export const getLatestEvalRankScore = async (uid) => {
+  try {
+    const scores = await getEvalRankScores(uid, 1);
+    return scores[0] || null;
+  } catch (error) {
+    console.error('Error fetching latest EvalRank score:', error);
+    return null;
+  }
+};
+
+// ==================== DBE MODULE: Blueprint360 ====================
+
+export const saveBlueprint360Plan = async (uid, planData) => {
+  try {
+    await setDoc(doc(db, 'users', uid, 'blueprint360Plans', 'active'), {
+      ...planData,
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error('Error saving Blueprint360 plan:', error);
+    throw error;
+  }
+};
+
+export const getBlueprint360Plan = async (uid) => {
+  try {
+    const snap = await getDoc(doc(db, 'users', uid, 'blueprint360Plans', 'active'));
+    return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+  } catch (error) {
+    console.error('Error fetching Blueprint360 plan:', error);
+    return null;
+  }
+};
+
+export const updateBlueprint360DayCompletion = async (uid, weekIndex, dayIndex) => {
+  try {
+    await updateDoc(doc(db, 'users', uid, 'blueprint360Plans', 'active'), {
+      [`weeks.${weekIndex}.days.${dayIndex}.completed`]: true,
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error('Error updating Blueprint360 day:', error);
+    throw error;
+  }
+};
+
+// ==================== DBE MODULE: SimCoach ====================
+
+export const saveSimCoachResult = async (uid, resultData) => {
+  try {
+    const ref = await addDoc(collection(db, 'users', uid, 'simCoachResults'), {
+      ...resultData,
+      createdAt: serverTimestamp(),
+    });
+    return ref.id;
+  } catch (error) {
+    console.error('Error saving SimCoach result:', error);
+    throw error;
+  }
+};
+
+export const getSimCoachResults = async (uid, limitCount = 20) => {
+  try {
+    const q = query(
+      collection(db, 'users', uid, 'simCoachResults'),
+      orderBy('createdAt', 'desc'),
+      limit(limitCount)
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (error) {
+    console.error('Error fetching SimCoach results:', error);
+    return [];
+  }
+};
+
+export const getSimCoachIQScore = async (uid) => {
+  try {
+    const results = await getSimCoachResults(uid, 10);
+    if (results.length === 0) return null;
+    const avg = results.reduce((sum, r) => sum + (r.iqScore || 0), 0) / results.length;
+    return Math.round(avg);
+  } catch (error) {
+    console.error('Error computing SimCoach IQ score:', error);
+    return null;
+  }
+};
+
+// ==================== DBE MODULE: ScoutLab ====================
+
+export const saveScoutLabProfile = async (uid, profileData) => {
+  try {
+    await setDoc(doc(db, 'users', uid, 'scoutLabProfile', 'main'), {
+      ...profileData,
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error('Error saving ScoutLab profile:', error);
+    throw error;
+  }
+};
+
+export const getScoutLabProfile = async (uid) => {
+  try {
+    const snap = await getDoc(doc(db, 'users', uid, 'scoutLabProfile', 'main'));
+    return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+  } catch (error) {
+    console.error('Error fetching ScoutLab profile:', error);
+    return null;
+  }
+};
+
+export const searchScoutLabProspects = async ({ position, minGrade, region, ageGroup } = {}) => {
+  try {
+    let q = query(collection(db, 'scoutLabProfiles'), limit(50));
+    if (position) q = query(q, where('position', '==', position));
+    if (region) q = query(q, where('region', '==', region));
+    const snapshot = await getDocs(q);
+    let results = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (minGrade) {
+      const gradeOrder = ['D', 'C', 'C+', 'B-', 'B', 'B+', 'A-', 'A', 'A+'];
+      const minIdx = gradeOrder.indexOf(minGrade);
+      results = results.filter(p => gradeOrder.indexOf(p.evalGrade) >= minIdx);
+    }
+    return results;
+  } catch (error) {
+    console.error('Error searching ScoutLab prospects:', error);
+    return [];
+  }
+};
+
+// ==================== DBE MODULE: CoachMarket ====================
+
+export const getCoachMarketListings = async ({ category, limitCount = 30 } = {}) => {
+  try {
+    let q = query(collection(db, 'coachMarketListings'), orderBy('createdAt', 'desc'), limit(limitCount));
+    if (category) q = query(collection(db, 'coachMarketListings'), where('category', '==', category), limit(limitCount));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (error) {
+    console.error('Error fetching CoachMarket listings:', error);
+    return [];
+  }
+};
+
+export const saveCoachMarketListing = async (coachUid, listingData) => {
+  try {
+    const ref = await addDoc(collection(db, 'coachMarketListings'), {
+      ...listingData,
+      coachUid,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+    return ref.id;
+  } catch (error) {
+    console.error('Error saving CoachMarket listing:', error);
+    throw error;
+  }
+};
+
+export const getCoachListings = async (coachUid) => {
+  try {
+    const q = query(
+      collection(db, 'coachMarketListings'),
+      where('coachUid', '==', coachUid),
+      orderBy('createdAt', 'desc')
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (error) {
+    console.error('Error fetching coach listings:', error);
+    return [];
+  }
+};
+
+// ==================== DBE MODULE: HoopCommunity ====================
+
+export const getHoopCommunityFeed = async (limitCount = 30) => {
+  try {
+    const q = query(
+      collection(db, 'hoopCommunityPosts'),
+      orderBy('createdAt', 'desc'),
+      limit(limitCount)
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (error) {
+    console.error('Error fetching HoopCommunity feed:', error);
+    return [];
+  }
+};
+
+export const postToHoopCommunity = async (uid, postData) => {
+  try {
+    const ref = await addDoc(collection(db, 'hoopCommunityPosts'), {
+      ...postData,
+      authorUid: uid,
+      likes: 0,
+      comments: 0,
+      createdAt: serverTimestamp(),
+    });
+    return ref.id;
+  } catch (error) {
+    console.error('Error posting to HoopCommunity:', error);
+    throw error;
+  }
+};
+
+export const likeHoopCommunityPost = async (postId) => {
+  try {
+    await updateDoc(doc(db, 'hoopCommunityPosts', postId), {
+      likes: increment(1),
+    });
+  } catch (error) {
+    console.error('Error liking post:', error);
+  }
+};
+
+// ==================== DBE MODULE: LegacyVault ====================
+
+export const getLegacyVaultArticles = async ({ category, limitCount = 30 } = {}) => {
+  try {
+    let q = query(collection(db, 'legacyVault'), orderBy('createdAt', 'desc'), limit(limitCount));
+    if (category) q = query(collection(db, 'legacyVault'), where('category', '==', category), limit(limitCount));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (error) {
+    console.error('Error fetching LegacyVault articles:', error);
+    return [];
+  }
+};
+
+export const getLegacyVaultArticle = async (articleId) => {
+  try {
+    const snap = await getDoc(doc(db, 'legacyVault', articleId));
+    return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+  } catch (error) {
+    console.error('Error fetching LegacyVault article:', error);
+    return null;
+  }
+};

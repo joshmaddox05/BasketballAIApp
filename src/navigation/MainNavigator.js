@@ -18,6 +18,18 @@ import ProgressScreen from '../screens/main/ProgressScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
 import SettingsScreen from '../screens/main/SettingsScreen';
 
+// Import role-specific home screens
+import CoachHomeScreen from '../screens/main/CoachHomeScreen';
+import ScoutHomeScreen from '../screens/main/ScoutHomeScreen';
+import ParentHomeScreen from '../screens/main/ParentHomeScreen';
+
+// Import DBE screens needed directly in role navigators
+import ScoutLabSearchScreen from '../screens/main/ScoutLabSearchScreen';
+import CoachMarketDashboardScreen from '../screens/main/CoachMarketDashboardScreen';
+import FamilyDashboardScreen from '../screens/main/FamilyDashboardScreen';
+import HoopCommunityScreen from '../screens/main/HoopCommunityScreen';
+import MentorshipScreen from '../screens/main/MentorshipScreen';
+
 // Import the shared screens utility
 import { addSharedScreensToStack } from './SharedStackNavigator';
 import AllWorkoutsScreen from "../screens/main/AllWorkoutsScreen";
@@ -308,6 +320,196 @@ export default function MainNavigator() {
         <TourProvider navigationRef={navigationRef}>
             <MainNavigatorContent />
         </TourProvider>
+    );
+}
+
+// ─── Coach Navigator ──────────────────────────────────────────────────────────
+const CoachHomeStack = createStackNavigator();
+const CoachTrainingStack = createStackNavigator();
+const CoachProfileStack = createStackNavigator();
+const CoachTab = createBottomTabNavigator();
+
+function CoachHomeStackNavigator() {
+    return (
+        <CoachHomeStack.Navigator screenOptions={{ headerShown: false }}>
+            <CoachHomeStack.Screen name="CoachHomeMain" component={CoachHomeScreen} />
+            <CoachHomeStack.Screen name="CoachMarketDashboard" component={CoachMarketDashboardScreen} options={{ headerShown: false }} />
+            {addSharedScreensToStack(CoachHomeStack)}
+        </CoachHomeStack.Navigator>
+    );
+}
+
+function CoachTrainingStackNavigator() {
+    return (
+        <CoachTrainingStack.Navigator screenOptions={{ headerShown: false }}>
+            <CoachTrainingStack.Screen name="CoachTrainingMain" component={TrainingScreen} />
+            {addSharedScreensToStack(CoachTrainingStack)}
+        </CoachTrainingStack.Navigator>
+    );
+}
+
+function CoachProfileStackNavigator() {
+    return (
+        <CoachProfileStack.Navigator screenOptions={{ headerShown: false }}>
+            <CoachProfileStack.Screen name="CoachProfileMain" component={ProfileScreen} />
+            <CoachProfileStack.Screen name="EditProfile" component={EditProfileScreen} options={{ headerShown: false }} />
+            <CoachProfileStack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
+            <CoachProfileStack.Screen name="Notifications" component={NotificationsScreen} options={{ headerShown: false }} />
+            {addSharedScreensToStack(CoachProfileStack)}
+        </CoachProfileStack.Navigator>
+    );
+}
+
+export function CoachMainNavigator() {
+    const { theme } = useAppContext();
+    return (
+        <CoachTab.Navigator
+            screenOptions={({ route }) => ({
+                tabBarIcon: ({ focused, color, size }) => {
+                    const icons = {
+                        CoachHome: focused ? 'home' : 'home-outline',
+                        Athletes: focused ? 'people' : 'people-outline',
+                        CoachMarket: focused ? 'storefront' : 'storefront-outline',
+                        Sessions: focused ? 'calendar' : 'calendar-outline',
+                        CoachProfile: focused ? 'person' : 'person-outline',
+                    };
+                    return <Ionicons name={icons[route.name] || 'ellipse'} size={size} color={color} />;
+                },
+                tabBarActiveTintColor: theme.tabActive,
+                tabBarInactiveTintColor: theme.tabInactive,
+                headerShown: false,
+                tabBarStyle: { backgroundColor: theme.tabBar, borderTopColor: theme.border, paddingBottom: 5, paddingTop: 5 },
+            })}
+        >
+            <CoachTab.Screen name="CoachHome" component={CoachHomeStackNavigator} options={{ title: 'Home' }} />
+            <CoachTab.Screen name="Athletes" component={CoachTrainingStackNavigator} options={{ title: 'Training' }} />
+            <CoachTab.Screen name="CoachMarket" component={CoachHomeStackNavigator} options={{ title: 'Market' }} />
+            <CoachTab.Screen name="Sessions" component={CoachHomeStackNavigator} options={{ title: 'Sessions' }} />
+            <CoachTab.Screen name="CoachProfile" component={CoachProfileStackNavigator} options={{ title: 'Profile' }} />
+        </CoachTab.Navigator>
+    );
+}
+
+// ─── Scout Navigator ──────────────────────────────────────────────────────────
+const ScoutDiscoverStack = createStackNavigator();
+const ScoutProfileStack = createStackNavigator();
+const ScoutTab = createBottomTabNavigator();
+
+function ScoutDiscoverStackNavigator() {
+    return (
+        <ScoutDiscoverStack.Navigator screenOptions={{ headerShown: false }}>
+            <ScoutDiscoverStack.Screen name="ScoutHomeMain" component={ScoutHomeScreen} />
+            <ScoutDiscoverStack.Screen name="ScoutLabSearch" component={ScoutLabSearchScreen} options={{ headerShown: false }} />
+            {addSharedScreensToStack(ScoutDiscoverStack)}
+        </ScoutDiscoverStack.Navigator>
+    );
+}
+
+function ScoutProfileStackNavigator() {
+    return (
+        <ScoutProfileStack.Navigator screenOptions={{ headerShown: false }}>
+            <ScoutProfileStack.Screen name="ScoutProfileMain" component={ProfileScreen} />
+            <ScoutProfileStack.Screen name="EditProfile" component={EditProfileScreen} options={{ headerShown: false }} />
+            <ScoutProfileStack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
+            {addSharedScreensToStack(ScoutProfileStack)}
+        </ScoutProfileStack.Navigator>
+    );
+}
+
+export function ScoutMainNavigator() {
+    const { theme } = useAppContext();
+    return (
+        <ScoutTab.Navigator
+            screenOptions={({ route }) => ({
+                tabBarIcon: ({ focused, color, size }) => {
+                    const icons = {
+                        Discover: focused ? 'search' : 'search-outline',
+                        Watchlist: focused ? 'bookmark' : 'bookmark-outline',
+                        Reports: focused ? 'document-text' : 'document-text-outline',
+                        Messages: focused ? 'chatbubbles' : 'chatbubbles-outline',
+                        ScoutProfile: focused ? 'person' : 'person-outline',
+                    };
+                    return <Ionicons name={icons[route.name] || 'ellipse'} size={size} color={color} />;
+                },
+                tabBarActiveTintColor: theme.tabActive,
+                tabBarInactiveTintColor: theme.tabInactive,
+                headerShown: false,
+                tabBarStyle: { backgroundColor: theme.tabBar, borderTopColor: theme.border, paddingBottom: 5, paddingTop: 5 },
+            })}
+        >
+            <ScoutTab.Screen name="Discover" component={ScoutDiscoverStackNavigator} />
+            <ScoutTab.Screen name="Watchlist" component={ScoutDiscoverStackNavigator} options={{ title: 'Watchlist' }} />
+            <ScoutTab.Screen name="Reports" component={ScoutDiscoverStackNavigator} options={{ title: 'Reports' }} />
+            <ScoutTab.Screen name="Messages" component={ScoutDiscoverStackNavigator} options={{ title: 'Messages' }} />
+            <ScoutTab.Screen name="ScoutProfile" component={ScoutProfileStackNavigator} options={{ title: 'Profile' }} />
+        </ScoutTab.Navigator>
+    );
+}
+
+// ─── Parent Navigator ─────────────────────────────────────────────────────────
+const ParentHomeStack = createStackNavigator();
+const ParentCommunityStack = createStackNavigator();
+const ParentProfileStack = createStackNavigator();
+const ParentTab = createBottomTabNavigator();
+
+function ParentHomeStackNavigator() {
+    return (
+        <ParentHomeStack.Navigator screenOptions={{ headerShown: false }}>
+            <ParentHomeStack.Screen name="ParentHomeMain" component={ParentHomeScreen} />
+            <ParentHomeStack.Screen name="FamilyDashboard" component={FamilyDashboardScreen} options={{ headerShown: false }} />
+            {addSharedScreensToStack(ParentHomeStack)}
+        </ParentHomeStack.Navigator>
+    );
+}
+
+function ParentCommunityStackNavigator() {
+    return (
+        <ParentCommunityStack.Navigator screenOptions={{ headerShown: false }}>
+            <ParentCommunityStack.Screen name="ParentCommunityMain" component={HoopCommunityScreen} />
+            <ParentCommunityStack.Screen name="Mentorship" component={MentorshipScreen} options={{ headerShown: false }} />
+            {addSharedScreensToStack(ParentCommunityStack)}
+        </ParentCommunityStack.Navigator>
+    );
+}
+
+function ParentProfileStackNavigator() {
+    return (
+        <ParentProfileStack.Navigator screenOptions={{ headerShown: false }}>
+            <ParentProfileStack.Screen name="ParentProfileMain" component={ProfileScreen} />
+            <ParentProfileStack.Screen name="EditProfile" component={EditProfileScreen} options={{ headerShown: false }} />
+            <ParentProfileStack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
+            {addSharedScreensToStack(ParentProfileStack)}
+        </ParentProfileStack.Navigator>
+    );
+}
+
+export function ParentMainNavigator() {
+    const { theme } = useAppContext();
+    return (
+        <ParentTab.Navigator
+            screenOptions={({ route }) => ({
+                tabBarIcon: ({ focused, color, size }) => {
+                    const icons = {
+                        ParentHome: focused ? 'home' : 'home-outline',
+                        Progress: focused ? 'stats-chart' : 'stats-chart-outline',
+                        Community: focused ? 'people' : 'people-outline',
+                        Messages: focused ? 'chatbubbles' : 'chatbubbles-outline',
+                        ParentProfile: focused ? 'person' : 'person-outline',
+                    };
+                    return <Ionicons name={icons[route.name] || 'ellipse'} size={size} color={color} />;
+                },
+                tabBarActiveTintColor: theme.tabActive,
+                tabBarInactiveTintColor: theme.tabInactive,
+                headerShown: false,
+                tabBarStyle: { backgroundColor: theme.tabBar, borderTopColor: theme.border, paddingBottom: 5, paddingTop: 5 },
+            })}
+        >
+            <ParentTab.Screen name="ParentHome" component={ParentHomeStackNavigator} options={{ title: 'Home' }} />
+            <ParentTab.Screen name="Progress" component={ParentHomeStackNavigator} options={{ title: 'Progress' }} />
+            <ParentTab.Screen name="Community" component={ParentCommunityStackNavigator} />
+            <ParentTab.Screen name="Messages" component={ParentHomeStackNavigator} />
+            <ParentTab.Screen name="ParentProfile" component={ParentProfileStackNavigator} options={{ title: 'Profile' }} />
+        </ParentTab.Navigator>
     );
 }
 

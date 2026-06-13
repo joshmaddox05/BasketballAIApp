@@ -31,7 +31,11 @@ import {
   updateChallengeProgress,
   getAIAnalysisStats,
   getWorkoutHistory,
-  setUserStats
+  setUserStats,
+  getLatestShotDNAProfile,
+  getLatestEvalRankScore,
+  getBlueprint360Plan,
+  getSimCoachIQScore
 } from '../services/firestoreService';
 
 // Import workout templates
@@ -146,6 +150,12 @@ export const AppProvider = ({ children }) => {
     const [showMilestoneCelebration, setShowMilestoneCelebration] = useState(false);
     const [aiAnalysisStats, setAIAnalysisStats] = useState(null);
 
+    // DBE module state
+    const [shotDNAProfile, setShotDNAProfile] = useState(null);
+    const [evalRankScore, setEvalRankScore] = useState(null);
+    const [blueprint360Plan, setBlueprint360Plan] = useState(null);
+    const [simCoachIQScore, setSimCoachIQScore] = useState(null);
+
     // Dark mode state management
     const systemColorScheme = useColorScheme();
     const [isDarkMode, setIsDarkMode] = useState(false);
@@ -234,6 +244,19 @@ export const AppProvider = ({ children }) => {
                         setDailyChallenge(challenge);
                         setDailyChallengeProgress(dailyChallengeProgress);
                         setAIAnalysisStats(aiStats);
+
+                        // Load DBE module data in background (non-blocking)
+                        Promise.all([
+                            getLatestShotDNAProfile(authUser.uid),
+                            getLatestEvalRankScore(authUser.uid),
+                            getBlueprint360Plan(authUser.uid),
+                            getSimCoachIQScore(authUser.uid),
+                        ]).then(([dnaProfile, evalScore, bp360, iqScore]) => {
+                            setShotDNAProfile(dnaProfile);
+                            setEvalRankScore(evalScore);
+                            setBlueprint360Plan(bp360);
+                            setSimCoachIQScore(iqScore);
+                        }).catch(() => {});
 
                         // Show the challenge modal on login only if today's challenge isn't completed yet
                         // Delay slightly to ensure navigation is ready
@@ -867,7 +890,16 @@ export const AppProvider = ({ children }) => {
             triggerMilestone,
             dismissMilestone,
             refreshAIStats,
-            updateUserDataLocally
+            updateUserDataLocally,
+            // DBE module state
+            shotDNAProfile,
+            setShotDNAProfile,
+            evalRankScore,
+            setEvalRankScore,
+            blueprint360Plan,
+            setBlueprint360Plan,
+            simCoachIQScore,
+            setSimCoachIQScore
         }}>
             {children}
         </AppContext.Provider>

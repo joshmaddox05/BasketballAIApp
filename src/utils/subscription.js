@@ -106,9 +106,18 @@ export const CONTENT_ACCESS = {
     videoLibrary: SUBSCRIPTION_TIERS.FREE,
     advancedVideoLibrary: SUBSCRIPTION_TIERS.PREMIUM,
     challenges: SUBSCRIPTION_TIERS.FREE,
-    exclusiveChallenges: SUBSCRIPTION_TIERS.PREMIUM,  // Premium feature
-    exclusiveWorkouts: SUBSCRIPTION_TIERS.BASIC,      // Basic feature - Premium workouts
+    exclusiveChallenges: SUBSCRIPTION_TIERS.PREMIUM,
+    exclusiveWorkouts: SUBSCRIPTION_TIERS.BASIC,
     leaderboard: SUBSCRIPTION_TIERS.FREE,
+    // DBE Ecosystem modules
+    shotDNA: SUBSCRIPTION_TIERS.PRO,
+    evalRank: SUBSCRIPTION_TIERS.PREMIUM,
+    blueprint360: SUBSCRIPTION_TIERS.BASIC,
+    simCoach: SUBSCRIPTION_TIERS.PREMIUM,
+    scoutLab: SUBSCRIPTION_TIERS.PRO,
+    coachMarket: SUBSCRIPTION_TIERS.PREMIUM,
+    hoopCommunity: SUBSCRIPTION_TIERS.FREE,
+    legacyVault: SUBSCRIPTION_TIERS.PREMIUM,
   }
 };
 // Check if user has access to content

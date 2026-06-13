@@ -19,6 +19,30 @@ import BuildWorkoutScreen from '../screens/main/BuildWorkoutScreen';
 import CustomPlanDetailScreen from '../screens/main/CustomPlanDetailScreen';
 import CustomPlanDayScreen from '../screens/main/CustomPlanDayScreen';
 
+// Import DBE module screens (shared across tabs)
+import ShotDNAScreen from '../screens/main/ShotDNAScreen';
+import ShotDNAArchetypeScreen from '../screens/main/ShotDNAArchetypeScreen';
+import ShotDNAHistoryScreen from '../screens/main/ShotDNAHistoryScreen';
+import EvalRankScreen from '../screens/main/EvalRankScreen';
+import EvalRankDetailScreen from '../screens/main/EvalRankDetailScreen';
+import EvalRankBadgesScreen from '../screens/main/EvalRankBadgesScreen';
+import Blueprint360Screen from '../screens/main/Blueprint360Screen';
+import Blueprint360PlanDetailScreen from '../screens/main/Blueprint360PlanDetailScreen';
+import SimCoachScreen from '../screens/main/SimCoachScreen';
+import SimCoachScenarioScreen from '../screens/main/SimCoachScenarioScreen';
+import SimCoachResultsScreen from '../screens/main/SimCoachResultsScreen';
+import ScoutLabScreen from '../screens/main/ScoutLabScreen';
+import ScoutLabProfileScreen from '../screens/main/ScoutLabProfileScreen';
+import ScoutLabSearchScreen from '../screens/main/ScoutLabSearchScreen';
+import CoachMarketScreen from '../screens/main/CoachMarketScreen';
+import CoachMarketListingScreen from '../screens/main/CoachMarketListingScreen';
+import CoachMarketDashboardScreen from '../screens/main/CoachMarketDashboardScreen';
+import HoopCommunityScreen from '../screens/main/HoopCommunityScreen';
+import MentorshipScreen from '../screens/main/MentorshipScreen';
+import LegacyVaultScreen from '../screens/main/LegacyVaultScreen';
+import LegacyVaultArticleScreen from '../screens/main/LegacyVaultArticleScreen';
+import Blueprint360MilestoneScreen from '../screens/main/Blueprint360MilestoneScreen';
+
 // Create a stack for shared screens
 const SharedStack = createStackNavigator();
 
@@ -78,7 +102,30 @@ export const sharedScreens = [
         name: 'CustomPlanDay',
         component: CustomPlanDayScreen,
         options: { headerShown: false }
-    }
+    },
+    // DBE Module screens
+    { name: 'ShotDNA', component: ShotDNAScreen, options: { headerShown: false } },
+    { name: 'ShotDNAArchetype', component: ShotDNAArchetypeScreen, options: { headerShown: false } },
+    { name: 'ShotDNAHistory', component: ShotDNAHistoryScreen, options: { headerShown: false } },
+    { name: 'EvalRank', component: EvalRankScreen, options: { headerShown: false } },
+    { name: 'EvalRankDetail', component: EvalRankDetailScreen, options: { headerShown: false } },
+    { name: 'EvalRankBadges', component: EvalRankBadgesScreen, options: { headerShown: false } },
+    { name: 'Blueprint360', component: Blueprint360Screen, options: { headerShown: false } },
+    { name: 'Blueprint360PlanDetail', component: Blueprint360PlanDetailScreen, options: { headerShown: false } },
+    { name: 'Blueprint360Milestones', component: Blueprint360MilestoneScreen, options: { headerShown: false } },
+    { name: 'SimCoach', component: SimCoachScreen, options: { headerShown: false } },
+    { name: 'SimCoachScenario', component: SimCoachScenarioScreen, options: { headerShown: false } },
+    { name: 'SimCoachResults', component: SimCoachResultsScreen, options: { headerShown: false } },
+    { name: 'ScoutLab', component: ScoutLabScreen, options: { headerShown: false } },
+    { name: 'ScoutLabProfile', component: ScoutLabProfileScreen, options: { headerShown: false } },
+    { name: 'ScoutLabSearch', component: ScoutLabSearchScreen, options: { headerShown: false } },
+    { name: 'CoachMarket', component: CoachMarketScreen, options: { headerShown: false } },
+    { name: 'CoachMarketListing', component: CoachMarketListingScreen, options: { headerShown: false } },
+    { name: 'CoachMarketDashboard', component: CoachMarketDashboardScreen, options: { headerShown: false } },
+    { name: 'HoopCommunity', component: HoopCommunityScreen, options: { headerShown: false } },
+    { name: 'Mentorship', component: MentorshipScreen, options: { headerShown: false } },
+    { name: 'LegacyVault', component: LegacyVaultScreen, options: { headerShown: false } },
+    { name: 'LegacyVaultArticle', component: LegacyVaultArticleScreen, options: { headerShown: false } },
 ];
 
 // A utility function to add shared screens to any stack navigator
