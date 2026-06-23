@@ -50,6 +50,10 @@ import LegacyVaultScreen from '../screens/main/LegacyVaultScreen';
 import LegacyVaultArticleScreen from '../screens/main/LegacyVaultArticleScreen';
 import Blueprint360MilestoneScreen from '../screens/main/Blueprint360MilestoneScreen';
 
+// Import connection (role-linking) screens
+import LinkAccountScreen from '../screens/main/LinkAccountScreen';
+import ConnectionsScreen from '../screens/main/ConnectionsScreen';
+
 // Create a stack for shared screens
 const SharedStack = createStackNavigator();
 
@@ -139,6 +143,9 @@ export const sharedScreens = [
     { name: 'ProgressReport', component: ProgressReportScreen, options: { headerShown: false } },
     { name: 'SimCoachFilmLibrary', component: SimCoachFilmLibraryScreen, options: { headerShown: false } },
     { name: 'SimCoachGamePlanBuilder', component: SimCoachGamePlanBuilderScreen, options: { headerShown: false } },
+    // Connections (role linking)
+    { name: 'LinkAccount', component: LinkAccountScreen, options: { headerShown: false } },
+    { name: 'Connections', component: ConnectionsScreen, options: { headerShown: false } },
 ];
 
 // A utility function to add shared screens to any stack navigator

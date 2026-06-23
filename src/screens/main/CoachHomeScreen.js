@@ -1,83 +1,57 @@
 // CoachHomeScreen.js - Dashboard for coaches with athletes, sessions, and market overview
 import React, { useState, useCallback } from 'react';
-import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, ScrollView, TextInput } from 'react-native';
+import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAppContext } from '../../context/AppContext';
-import { canAccessFeature } from '../../utils/subscription';
+import { getLinkedPlayers, getLinkedPlayerSummary } from '../../services/firestoreService';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Mock data
+// Data mapping helpers (Firestore docs -> presentational shapes)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const MOCK_STATS = {
-  activeAthletes: 12,
-  sessionsThisWeek: 8,
-  revenueThisMonth: 2340,
+const toDate = (value) => {
+  if (!value) return null;
+  if (value.toDate) return value.toDate();
+  if (value.seconds) return new Date(value.seconds * 1000);
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? null : d;
 };
 
-const MOCK_ATHLETES = [
-  {
-    id: 'ath_001',
-    name: 'Jordan Hayes',
-    level: 'Varsity',
-    lastSession: 'Jun 11, 2026',
-    position: 'PG',
-    progress: 78,
-    statusColor: '#4CAF50',
-  },
-  {
-    id: 'ath_002',
-    name: 'Marcus Ortega',
-    level: 'JV',
-    lastSession: 'Jun 10, 2026',
-    position: 'SF',
-    progress: 62,
-    statusColor: '#FF9800',
-  },
-  {
-    id: 'ath_003',
-    name: 'Deja Williams',
-    level: 'Elite Prospect',
-    lastSession: 'Jun 9, 2026',
-    position: 'SG',
-    progress: 91,
-    statusColor: '#4CAF50',
-  },
-];
+const shortDate = (value) => {
+  const d = toDate(value);
+  return d ? d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'No sessions';
+};
 
-const MOCK_SESSIONS = [
-  {
-    id: 'sess_001',
-    time: '10:00 AM',
-    athleteName: 'Jordan Hayes',
-    sessionType: 'Ball Handling & Playmaking',
-    duration: '60 min',
-    location: 'Court A',
-    icon: 'basketball-outline',
-  },
-  {
-    id: 'sess_002',
-    time: '2:30 PM',
-    athleteName: 'Deja Williams',
-    sessionType: 'Shot Mechanics Deep Dive',
-    duration: '90 min',
-    location: 'Film Room + Gym',
-    icon: 'analytics-outline',
-  },
-];
+const countRecent = (activities) => {
+  const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  return (activities || []).filter((a) => {
+    const d = toDate(a.createdAt);
+    return d && d.getTime() >= weekAgo;
+  }).length;
+};
 
-const MOCK_MARKET = {
-  topListing: 'Elite Guard Development Program',
-  views: 347,
-  sales: 18,
-  rating: 4.9,
-  revenue: 899,
+const statusColorFor = (progress) => (progress >= 75 ? '#4CAF50' : progress >= 50 ? '#FF9800' : '#EF4444');
+
+const mapAthlete = (linked, summary) => {
+  const profile = summary.profile || {};
+  const goal = profile?.preferences?.trainingDays?.length || 5;
+  const progress = Math.min(100, Math.round((countRecent(summary.activities) / goal) * 100));
+  const level = typeof profile.level === 'number' ? profile.level : 1;
+  return {
+    id: linked.uid,
+    name: profile.displayName || linked.name || 'Athlete',
+    level: `Level ${level}`,
+    lastSession: shortDate((summary.activities || [])[0]?.createdAt),
+    position: profile.position || '—',
+    progress,
+    statusColor: statusColorFor(progress),
+  };
 };
 
 const QUICK_ACTIONS = [
   { id: 'add_athlete', label: 'Add Athlete', icon: 'person-add-outline', color: '#5C6BC0' },
-  { id: 'schedule_session', label: 'Schedule Session', icon: 'calendar-outline', color: '#26A69A' },
   { id: 'create_content', label: 'Create Content', icon: 'create-outline', color: '#FF6B00' },
 ];
 
@@ -274,20 +248,54 @@ function QuickActions({ theme, onAction }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function CoachHomeScreen({ navigation }) {
-  const { userData, theme, isDarkMode } = useAppContext();
+  const { user, userData, theme, isDarkMode } = useAppContext();
   const coachName = userData?.displayName || userData?.name || 'Coach';
+  const coachUid = user?.uid;
+
+  const [loading, setLoading] = useState(true);
+  const [athletes, setAthletes] = useState([]);
+
+  const loadRoster = useCallback(async () => {
+    if (!coachUid) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      const linkedPlayers = await getLinkedPlayers(coachUid);
+      const mapped = await Promise.all(
+        linkedPlayers.map(async (linked) => {
+          const summary = await getLinkedPlayerSummary(linked.uid);
+          return { athlete: mapAthlete(linked, summary), recent: countRecent(summary.activities) };
+        })
+      );
+      setAthletes(mapped);
+    } finally {
+      setLoading(false);
+    }
+  }, [coachUid]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadRoster();
+    }, [loadRoster])
+  );
+
+  const stats = {
+    activeAthletes: athletes.length,
+    sessionsThisWeek: athletes.reduce((sum, a) => sum + a.recent, 0),
+    revenueThisMonth: 0,
+  };
 
   const handleQuickAction = useCallback(
     (actionId) => {
       if (actionId === 'add_athlete') {
-        navigation.navigate('EditProfile');
-      } else if (actionId === 'schedule_session') {
-        navigation.navigate('AddActivity');
+        navigation.navigate('LinkAccount', { onLinked: loadRoster });
       } else if (actionId === 'create_content') {
         navigation.navigate('BuildWorkout');
       }
     },
-    [navigation],
+    [navigation, loadRoster],
   );
 
   return (
@@ -300,7 +308,7 @@ export default function CoachHomeScreen({ navigation }) {
         showsVerticalScrollIndicator={false}
       >
         {/* Stats Strip */}
-        <StatsStrip stats={MOCK_STATS} theme={theme} />
+        <StatsStrip stats={stats} theme={theme} />
 
         {/* Quick Actions */}
         <View style={styles.section}>
@@ -312,42 +320,23 @@ export default function CoachHomeScreen({ navigation }) {
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
             <Text style={[styles.sectionTitle, { color: theme.text }]}>My Athletes</Text>
-            <TouchableOpacity activeOpacity={0.7}>
+            <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.navigate('Athletes')}>
               <Text style={[styles.seeAllText, { color: theme.primary }]}>See All</Text>
             </TouchableOpacity>
           </View>
-          {MOCK_ATHLETES.map((athlete) => (
-            <AthleteCard key={athlete.id} athlete={athlete} theme={theme} />
-          ))}
-        </View>
-
-        {/* Today's Sessions */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeaderRow}>
-            <View>
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>Today's Sessions</Text>
-              <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
-                {MOCK_SESSIONS.length} upcoming
+          {loading ? (
+            <ActivityIndicator color={theme.primary} style={{ marginTop: 16 }} />
+          ) : athletes.length === 0 ? (
+            <View style={[styles.emptyCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+              <Text style={[styles.emptyCardText, { color: theme.textSecondary }]}>
+                No athletes linked yet. Tap “Add Athlete” to connect with a player's invite code.
               </Text>
             </View>
-            <TouchableOpacity activeOpacity={0.7}>
-              <Text style={[styles.seeAllText, { color: theme.primary }]}>Full Schedule</Text>
-            </TouchableOpacity>
-          </View>
-          {MOCK_SESSIONS.map((session) => (
-            <SessionCard key={session.id} session={session} theme={theme} />
-          ))}
-        </View>
-
-        {/* CoachMarket Performance */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>CoachMarket Performance</Text>
-            <TouchableOpacity activeOpacity={0.7}>
-              <Text style={[styles.seeAllText, { color: theme.primary }]}>Manage</Text>
-            </TouchableOpacity>
-          </View>
-          <MarketCard market={MOCK_MARKET} theme={theme} />
+          ) : (
+            athletes.map(({ athlete }) => (
+              <AthleteCard key={athlete.id} athlete={athlete} theme={theme} />
+            ))
+          )}
         </View>
 
         <View style={styles.bottomPad} />
@@ -705,5 +694,14 @@ const styles = StyleSheet.create({
   },
   bottomPad: {
     height: 24,
+  },
+  emptyCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 16,
+  },
+  emptyCardText: {
+    fontSize: 13,
+    lineHeight: 19,
   },
 });

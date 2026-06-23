@@ -13,45 +13,31 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAppContext } from '../../context/AppContext';
 import { canAccessFeature } from '../../utils/subscription';
+import {
+  getScoutingReports,
+  saveScoutingReport,
+  deleteScoutingReport,
+} from '../../services/firestoreService';
 
 const POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'];
 const GRADES = ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D'];
 const RECOMMENDATIONS = ['Offer', 'Watch', 'Pass', 'Follow Up'];
 
-const MOCK_REPORTS = [
-  {
-    id: 'r1',
-    athleteName: 'Marcus Johnson',
-    position: 'PG',
-    evalGrade: 'A-',
-    date: 'Jun 11, 2026',
-    status: 'submitted',
-    notes: 'Elite court vision. Needs work on shooting off the dribble.',
-    recommendation: 'Offer',
-  },
-  {
-    id: 'r2',
-    athleteName: 'Darius Williams',
-    position: 'SF',
-    evalGrade: 'B+',
-    date: 'Jun 8, 2026',
-    status: 'draft',
-    notes: 'Athletic freak. Raw but high ceiling.',
-    recommendation: 'Watch',
-  },
-  {
-    id: 'r3',
-    athleteName: 'Kevin Torres',
-    position: 'C',
-    evalGrade: 'B',
-    date: 'Jun 4, 2026',
-    status: 'submitted',
-    notes: 'Good post moves. Defense needs improvement.',
-    recommendation: 'Follow Up',
-  },
-];
+const toDate = (value) => {
+  if (!value) return null;
+  if (value.toDate) return value.toDate();
+  if (value.seconds) return new Date(value.seconds * 1000);
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? null : d;
+};
+
+const formatReportDate = (value) => {
+  const d = toDate(value) || new Date();
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
 
 const GRADE_COLOR = (g) => {
   if (!g) return '#9CA3AF';
@@ -230,13 +216,26 @@ function ReportFormModal({ visible, onClose, onSave, initial, theme }) {
 }
 
 export default function ScoutReportsScreen({ navigation }) {
-  const { userData, theme, isDarkMode } = useAppContext();
+  const { user, userData, theme, isDarkMode } = useAppContext();
+  const scoutUid = user?.uid;
   const subscription = userData?.subscription || 'free';
   const hasAccess = canAccessFeature('scoutLab', subscription);
 
-  const [reports, setReports] = useState(MOCK_REPORTS);
+  const [reports, setReports] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingReport, setEditingReport] = useState(null);
+
+  const loadReports = useCallback(async () => {
+    if (!scoutUid) return;
+    const saved = await getScoutingReports(scoutUid);
+    setReports(saved.map((r) => ({ ...r, date: formatReportDate(r.updatedAt || r.createdAt) })));
+  }, [scoutUid]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (hasAccess) loadReports();
+    }, [hasAccess, loadReports])
+  );
 
   const handleNew = useCallback(() => {
     setEditingReport(null);
@@ -254,31 +253,30 @@ export default function ScoutReportsScreen({ navigation }) {
       {
         text: 'Delete',
         style: 'destructive',
-        onPress: () => setReports((prev) => prev.filter((r) => r.id !== id)),
+        onPress: async () => {
+          setReports((prev) => prev.filter((r) => r.id !== id));
+          try {
+            await deleteScoutingReport(scoutUid, id);
+          } catch (error) {
+            Alert.alert('Error', error.message || 'Could not delete report.');
+            loadReports();
+          }
+        },
       },
     ]);
-  }, []);
+  }, [scoutUid, loadReports]);
 
-  const handleSave = useCallback((data) => {
-    if (editingReport) {
-      setReports((prev) =>
-        prev.map((r) =>
-          r.id === editingReport.id
-            ? { ...r, ...data, date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) }
-            : r
-        )
-      );
-    } else {
-      const newReport = {
-        id: Date.now().toString(),
-        ...data,
-        date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      };
-      setReports((prev) => [newReport, ...prev]);
-    }
+  const handleSave = useCallback(async (data) => {
+    const payload = editingReport ? { ...data, id: editingReport.id } : data;
     setModalVisible(false);
     setEditingReport(null);
-  }, [editingReport]);
+    try {
+      await saveScoutingReport(scoutUid, payload);
+      await loadReports();
+    } catch (error) {
+      Alert.alert('Error', error.message || 'Could not save report.');
+    }
+  }, [editingReport, scoutUid, loadReports]);
 
   if (!hasAccess) {
     return (

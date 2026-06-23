@@ -1,89 +1,86 @@
 import React, { useState, useCallback } from 'react';
-import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, ScrollView, TextInput } from 'react-native';
+import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAppContext } from '../../context/AppContext';
-import { canAccessFeature } from '../../utils/subscription';
+import { getLinkedPlayers, getLinkedPlayerSummary } from '../../services/firestoreService';
+import { getLevelTitle } from '../../utils/constants';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Mock data
+// Data mapping helpers (Firestore docs -> presentational shapes)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const MOCK_CHILD = {
-  name: 'Marcus',
-  level: 7,
-  levelTitle: 'Rising Star',
-  streak: 12,
-  subscriptionTier: 'premium',
-  avatarInitials: 'MJ',
-  totalWorkouts: 48,
-  joinDate: 'Sep 2025',
+const ACTIVITY_ICONS = [
+  { match: /shoot|shot|three|3pt|mid/i, icon: 'radio-button-on' },
+  { match: /dribbl|handl|ball/i, icon: 'basketball' },
+  { match: /defen|footwork|slide/i, icon: 'footsteps' },
+  { match: /condition|cardio|run|sprint/i, icon: 'fitness' },
+];
+
+const iconForActivity = (title = '') => {
+  const found = ACTIVITY_ICONS.find((a) => a.match.test(title));
+  return found ? found.icon : 'barbell';
 };
 
-const MOCK_RECENT_ACTIVITY = [
-  {
-    id: 'a1',
-    title: 'Ball Handling Fundamentals',
-    completedAt: 'Today, 4:15 PM',
-    duration: '28 min',
-    xpEarned: 120,
-    icon: 'basketball',
-  },
-  {
-    id: 'a2',
-    title: 'Mid-Range Shooting Drills',
-    completedAt: 'Yesterday, 5:00 PM',
-    duration: '35 min',
-    xpEarned: 150,
-    icon: 'radio-button-on',
-  },
-  {
-    id: 'a3',
-    title: 'Defensive Footwork',
-    completedAt: 'Jun 10, 3:30 PM',
-    duration: '22 min',
-    xpEarned: 95,
-    icon: 'footsteps',
-  },
-];
+const toDate = (value) => {
+  if (!value) return null;
+  if (value.toDate) return value.toDate();
+  if (value.seconds) return new Date(value.seconds * 1000);
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? null : d;
+};
 
-const MOCK_UPCOMING_SESSIONS = [
-  {
-    id: 's1',
-    title: 'Post Move Mastery',
-    scheduledFor: 'Tomorrow, 4:00 PM',
-    coachName: 'Coach Rivera',
-    type: 'Live Session',
-    icon: 'videocam',
-  },
-  {
-    id: 's2',
-    title: 'Three-Point Shooting Workshop',
-    scheduledFor: 'Jun 16, 5:30 PM',
-    coachName: 'Self-Guided',
-    type: 'Workout',
-    icon: 'fitness',
-  },
-];
+const formatWhen = (value) => {
+  const d = toDate(value);
+  if (!d) return '';
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+};
 
-const MOCK_ACHIEVEMENTS = [
-  {
-    id: 'ach1',
-    title: 'Hot Streak',
-    description: '10 days in a row',
-    icon: 'flame',
-    earnedAt: '2 days ago',
-    color: '#FF6B00',
-  },
-  {
-    id: 'ach2',
-    title: 'Sharpshooter',
-    description: 'Completed 5 shooting workouts',
-    icon: 'trophy',
-    earnedAt: '5 days ago',
-    color: '#FFD700',
-  },
-];
+const initialsFor = (name = '') =>
+  name
+    .split(' ')
+    .map((n) => n[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase() || '?';
+
+const mapChild = (linked, profile) => {
+  const stats = profile?.stats || {};
+  const level = profile?.level || 1;
+  const name = profile?.displayName || linked?.name || 'Athlete';
+  return {
+    name,
+    level,
+    levelTitle: typeof level === 'number' ? getLevelTitle(level) : 'Player',
+    streak: stats.currentStreak || 0,
+    subscriptionTier: profile?.subscription || 'free',
+    avatarInitials: initialsFor(name),
+    totalWorkouts: stats.totalWorkouts || 0,
+    joinDate: profile?.createdAt ? formatWhen(profile.createdAt) : '—',
+  };
+};
+
+const mapActivity = (a) => ({
+  id: a.id,
+  title: a.title || a.name || 'Training',
+  completedAt: a.date || formatWhen(a.createdAt),
+  duration: a.duration ? `${a.duration} min` : '',
+  xpEarned: a.xpEarned || a.xp || 0,
+  icon: a.icon || iconForActivity(a.title || a.name),
+});
+
+const ACHIEVEMENT_COLORS = ['#FF6B00', '#FFD700', '#60A5FA', '#A78BFA'];
+
+const mapAchievement = (ach, idx) => ({
+  id: ach.id,
+  title: ach.title || ach.name || 'Achievement',
+  description: ach.description || '',
+  icon: ach.icon || 'trophy',
+  earnedAt: formatWhen(ach.unlockedAt),
+  color: ach.color || ACHIEVEMENT_COLORS[idx % ACHIEVEMENT_COLORS.length],
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Sub-components
@@ -225,43 +222,104 @@ function AchievementCard({ achievement, theme }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function FamilyDashboardScreen({ navigation }) {
-  const { userData, theme, isDarkMode } = useAppContext();
+  const { user, theme, isDarkMode } = useAppContext();
+  const parentUid = user?.uid;
 
-  const child = MOCK_CHILD;
-  const recentActivity = MOCK_RECENT_ACTIVITY;
-  const upcomingSessions = MOCK_UPCOMING_SESSIONS;
-  const achievements = MOCK_ACHIEVEMENTS;
+  const [loading, setLoading] = useState(true);
+  const [child, setChild] = useState(null);
+  const [recentActivity, setRecentActivity] = useState([]);
+  const [achievements, setAchievements] = useState([]);
+
+  const loadChild = useCallback(async () => {
+    if (!parentUid) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      const linkedPlayers = await getLinkedPlayers(parentUid);
+      const linked = linkedPlayers[0];
+      if (!linked) {
+        setChild(null);
+        return;
+      }
+      const summary = await getLinkedPlayerSummary(linked.uid);
+      setChild(mapChild(linked, summary.profile));
+      setRecentActivity((summary.activities || []).slice(0, 5).map(mapActivity));
+      setAchievements((summary.achievements || []).slice(0, 2).map(mapAchievement));
+    } finally {
+      setLoading(false);
+    }
+  }, [parentUid]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadChild();
+    }, [loadChild])
+  );
 
   const handleMessageCoach = useCallback(() => {
-    // Navigate to coach messaging when available
-    navigation.navigate('CommunitySoon');
+    navigation.navigate('Messaging');
   }, [navigation]);
 
   const handleViewFullProgress = useCallback(() => {
     navigation.navigate('Progress');
   }, [navigation]);
 
+  const renderHeader = () => (
+    <View style={[styles.header, { borderBottomColor: theme.border }]}>
+      <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+        <Ionicons name="chevron-back" size={24} color={theme.text} />
+      </TouchableOpacity>
+      <Text style={[styles.headerTitle, { color: theme.text }]}>Family Dashboard</Text>
+      <View style={styles.headerIconButton} />
+    </View>
+  );
+
+  // Loading state
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+        <StatusBar style={isDarkMode ? 'light' : 'dark'} />
+        {renderHeader()}
+        <View style={styles.centered}>
+          <ActivityIndicator color={theme.primary} size="large" />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Empty state — no linked child
+  if (!child) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+        <StatusBar style={isDarkMode ? 'light' : 'dark'} />
+        {renderHeader()}
+        <View style={styles.centered}>
+          <View style={[styles.emptyIconWrap, { backgroundColor: theme.primary + '18' }]}>
+            <Ionicons name="people-outline" size={36} color={theme.primary} />
+          </View>
+          <Text style={[styles.emptyTitle, { color: theme.text }]}>Link your child</Text>
+          <Text style={[styles.emptySub, { color: theme.textSecondary }]}>
+            Connect to your child's account with their invite code to follow their training and progress.
+          </Text>
+          <TouchableOpacity
+            style={[styles.emptyButton, { backgroundColor: theme.primary }]}
+            onPress={() => navigation.navigate('LinkAccount', { onLinked: loadChild })}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="link" size={18} color="#FFFFFF" />
+            <Text style={styles.emptyButtonText}>Link Your Child</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <StatusBar style={isDarkMode ? 'light' : 'dark'} />
-
-      {/* Header */}
-      <View style={[styles.header, { borderBottomColor: theme.border }]}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="chevron-back" size={24} color={theme.text} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>Family Dashboard</Text>
-        <TouchableOpacity
-          style={[styles.headerIconButton, { backgroundColor: theme.card }]}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="settings-outline" size={20} color={theme.text} />
-        </TouchableOpacity>
-      </View>
+      {renderHeader()}
 
       <ScrollView
         style={styles.scroll}
@@ -292,38 +350,32 @@ export default function FamilyDashboardScreen({ navigation }) {
         </View>
 
         {/* Recent Activity */}
-        <SectionHeader
-          title="Recent Activity"
-          actionLabel="See All"
-          onAction={() => navigation.navigate('AllActivities')}
-          theme={theme}
-        />
-        <View style={styles.activityList}>
-          {recentActivity.map((item) => (
-            <ActivityItem key={item.id} activity={item} theme={theme} />
-          ))}
-        </View>
-
-        {/* Upcoming Sessions */}
-        <SectionHeader title="Upcoming Sessions" theme={theme} />
-        <View style={styles.sessionList}>
-          {upcomingSessions.map((session) => (
-            <UpcomingSessionItem key={session.id} session={session} theme={theme} />
-          ))}
-        </View>
+        <SectionHeader title="Recent Activity" theme={theme} />
+        {recentActivity.length === 0 ? (
+          <Text style={[styles.placeholderText, { color: theme.textSecondary }]}>
+            No recent activity yet.
+          </Text>
+        ) : (
+          <View style={styles.activityList}>
+            {recentActivity.map((item) => (
+              <ActivityItem key={item.id} activity={item} theme={theme} />
+            ))}
+          </View>
+        )}
 
         {/* Recent Achievements */}
-        <SectionHeader
-          title="Recently Earned"
-          actionLabel="All Achievements"
-          onAction={() => navigation.navigate('Achievements')}
-          theme={theme}
-        />
-        <View style={styles.achievementsRow}>
-          {achievements.map((ach) => (
-            <AchievementCard key={ach.id} achievement={ach} theme={theme} />
-          ))}
-        </View>
+        <SectionHeader title="Recently Earned" theme={theme} />
+        {achievements.length === 0 ? (
+          <Text style={[styles.placeholderText, { color: theme.textSecondary }]}>
+            No achievements earned yet.
+          </Text>
+        ) : (
+          <View style={styles.achievementsRow}>
+            {achievements.map((ach) => (
+              <AchievementCard key={ach.id} achievement={ach} theme={theme} />
+            ))}
+          </View>
+        )}
 
         <View style={styles.bottomSpacer} />
       </ScrollView>
@@ -621,5 +673,49 @@ const styles = StyleSheet.create({
 
   bottomSpacer: {
     height: 32,
+  },
+
+  // Loading / empty / placeholder states
+  centered: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+    gap: 12,
+  },
+  emptyIconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  emptySub: {
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  emptyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  emptyButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  placeholderText: {
+    fontSize: 13,
+    marginBottom: 24,
   },
 });

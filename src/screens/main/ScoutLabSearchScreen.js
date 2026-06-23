@@ -1,16 +1,24 @@
 // ScoutLabSearchScreen.js - Scout/Recruiter prospect search and watchlist
-import React, { useState, useCallback } from 'react';
-import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, ScrollView, TextInput } from 'react-native';
+import React, { useState, useCallback, useEffect } from 'react';
+import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, ScrollView, TextInput, Alert } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAppContext } from '../../context/AppContext';
-import { canAccessFeature } from '../../utils/subscription';
+import {
+  searchScoutLabProspects,
+  saveWatchlistEntry,
+  getWatchlist,
+  removeWatchlistEntry,
+} from '../../services/firestoreService';
 
 const POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'];
 const GRADES = ['A+', 'A', 'B+', 'B', 'C'];
 const REGIONS = ['All Regions', 'West', 'Midwest', 'South', 'Northeast', 'Southeast'];
 
-const MOCK_PROSPECTS = [
+// Sample prospect catalog. Live results from the `scoutLabProfiles` directory
+// take precedence; this is shown only when the directory has no entries yet.
+const SAMPLE_PROSPECTS = [
   {
     id: '1',
     name: 'Marcus Webb',
@@ -213,7 +221,8 @@ function WatchlistEmptyState({ theme }) {
 }
 
 export default function ScoutLabSearchScreen({ navigation }) {
-  const { userData, theme, isDarkMode } = useAppContext();
+  const { user, theme, isDarkMode } = useAppContext();
+  const scoutUid = user?.uid;
 
   const [activeTab, setActiveTab] = useState('search'); // 'search' | 'watchlist'
   const [searchQuery, setSearchQuery] = useState('');
@@ -221,18 +230,62 @@ export default function ScoutLabSearchScreen({ navigation }) {
   const [activePosition, setActivePosition] = useState(null);
   const [activeGrade, setActiveGrade] = useState(null);
   const [activeRegion, setActiveRegion] = useState('All Regions');
+  const [prospects, setProspects] = useState([]);
   const [watchlist, setWatchlist] = useState([]);
 
-  const handleAddWatchlist = useCallback((prospect) => {
-    setWatchlist((prev) => {
-      if (prev.find((p) => p.id === prospect.id)) return prev;
-      return [...prev, prospect];
-    });
+  // Load the live prospect directory (falls back to sample data when empty).
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const live = await searchScoutLabProspects({});
+      if (active) setProspects(live && live.length > 0 ? live : SAMPLE_PROSPECTS);
+    })();
+    return () => {
+      active = false;
+    };
   }, []);
 
-  const handleRemoveWatchlist = useCallback((prospectId) => {
-    setWatchlist((prev) => prev.filter((p) => p.id !== prospectId));
-  }, []);
+  // Load the persisted watchlist whenever the screen gains focus.
+  const loadWatchlist = useCallback(async () => {
+    if (!scoutUid) return;
+    const saved = await getWatchlist(scoutUid);
+    setWatchlist(saved.map((w) => ({ ...w, id: w.prospectUid || w.id })));
+  }, [scoutUid]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadWatchlist();
+    }, [loadWatchlist])
+  );
+
+  const handleAddWatchlist = useCallback(
+    async (prospect) => {
+      if (!scoutUid) return;
+      // Optimistic update
+      setWatchlist((prev) => (prev.find((p) => p.id === prospect.id) ? prev : [...prev, prospect]));
+      try {
+        await saveWatchlistEntry(scoutUid, prospect);
+      } catch (error) {
+        Alert.alert('Error', error.message || 'Could not save to watchlist.');
+        loadWatchlist();
+      }
+    },
+    [scoutUid, loadWatchlist]
+  );
+
+  const handleRemoveWatchlist = useCallback(
+    async (prospectId) => {
+      if (!scoutUid) return;
+      setWatchlist((prev) => prev.filter((p) => p.id !== prospectId));
+      try {
+        await removeWatchlistEntry(scoutUid, String(prospectId));
+      } catch (error) {
+        Alert.alert('Error', error.message || 'Could not remove from watchlist.');
+        loadWatchlist();
+      }
+    },
+    [scoutUid, loadWatchlist]
+  );
 
   const togglePosition = useCallback((pos) => {
     setActivePosition((prev) => (prev === pos ? null : pos));
@@ -246,13 +299,13 @@ export default function ScoutLabSearchScreen({ navigation }) {
     setActiveRegion((prev) => (prev === region ? 'All Regions' : region));
   }, []);
 
-  const filteredProspects = MOCK_PROSPECTS.filter((p) => {
+  const filteredProspects = prospects.filter((p) => {
     const q = searchQuery.trim().toLowerCase();
     const matchesQuery =
       !q ||
-      p.name.toLowerCase().includes(q) ||
-      p.school.toLowerCase().includes(q) ||
-      p.city.toLowerCase().includes(q);
+      (p.name || '').toLowerCase().includes(q) ||
+      (p.school || '').toLowerCase().includes(q) ||
+      (p.city || '').toLowerCase().includes(q);
     const matchesPosition = !activePosition || p.position === activePosition;
     const matchesGrade = !activeGrade || p.evalGrade === activeGrade;
     const matchesRegion = activeRegion === 'All Regions' || p.region === activeRegion;

@@ -215,6 +215,19 @@ const ProfileScreen = ({ navigation }) => {
                 <View style={[styles.sectionContainer, { backgroundColor: theme.card }]}>
                     <Text style={[styles.sectionTitle, { color: theme.text }]}>Account</Text>
 
+                    {(!userData?.role || userData?.role === 'player') && (
+                        <TouchableOpacity
+                            style={[styles.settingItem, { borderBottomColor: theme.border }]}
+                            onPress={() => navigation.navigate('Connections')}
+                        >
+                            <View style={styles.settingLeft}>
+                                <Ionicons name="link-outline" size={24} color={theme.textSecondary} />
+                                <Text style={[styles.settingLabel, { color: theme.text }]}>Connections</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
+                        </TouchableOpacity>
+                    )}
+
                     <TouchableOpacity
                         style={[styles.settingItem, { borderBottomColor: theme.border }]}
                         onPress={() => Alert.alert('Privacy', 'Privacy settings coming soon!')}

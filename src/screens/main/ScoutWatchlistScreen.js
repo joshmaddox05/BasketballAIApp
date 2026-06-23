@@ -1,20 +1,76 @@
-import React, { useState } from 'react';
-import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAppContext } from '../../context/AppContext';
-
-const WATCHLIST = [
-  { id: 1, name: 'Marcus Thompson', position: 'PG', classYear: '2027', region: 'Southeast', evalGrade: 'A-', iqScore: 84, addedDate: 'Jun 10', note: 'Elite court vision. Watch his next AAU game.' },
-  { id: 2, name: 'Devon Williams', position: 'SG', classYear: '2026', region: 'Midwest', evalGrade: 'B+', iqScore: 76, addedDate: 'Jun 8', note: 'Shooting improving. Follow Blueprint360 progress.' },
-  { id: 3, name: 'Amir Hassan', position: 'PF', classYear: '2027', region: 'West', evalGrade: 'B', iqScore: 71, addedDate: 'Jun 5', note: 'Physical tools are there. Needs consistency.' },
-];
+import { getWatchlist, removeWatchlistEntry } from '../../services/firestoreService';
 
 const GRADE_COLOR = { 'A+': '#22C55E', 'A': '#22C55E', 'A-': '#22C55E', 'B+': '#FF6B00', 'B': '#F59E0B', 'B-': '#F59E0B', 'C+': '#EF4444', 'C': '#EF4444' };
 
+const toDate = (value) => {
+  if (!value) return null;
+  if (value.toDate) return value.toDate();
+  if (value.seconds) return new Date(value.seconds * 1000);
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? null : d;
+};
+
+const shortDate = (value) => {
+  const d = toDate(value);
+  return d ? d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '—';
+};
+
 export default function ScoutWatchlistScreen({ navigation }) {
-  const { theme, isDarkMode } = useAppContext();
+  const { user, theme, isDarkMode } = useAppContext();
+  const scoutUid = user?.uid;
+
   const [selected, setSelected] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [watchlist, setWatchlist] = useState([]);
+
+  const loadWatchlist = useCallback(async () => {
+    if (!scoutUid) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      const saved = await getWatchlist(scoutUid);
+      setWatchlist(
+        saved.map((w) => ({
+          id: w.prospectUid || w.id,
+          name: w.name || 'Unknown',
+          position: w.position || '—',
+          classYear: w.classYear || '—',
+          region: w.region || '—',
+          evalGrade: w.evalGrade || '—',
+          iqScore: w.iqScore != null ? w.iqScore : '—',
+          addedDate: shortDate(w.savedAt),
+          note: w.note || 'No notes added.',
+        }))
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [scoutUid]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadWatchlist();
+    }, [loadWatchlist])
+  );
+
+  const handleRemove = useCallback(
+    (prospectId) => {
+      setWatchlist((prev) => prev.filter((p) => p.id !== prospectId));
+      removeWatchlistEntry(scoutUid, String(prospectId)).catch((error) => {
+        Alert.alert('Error', error.message || 'Could not remove prospect.');
+        loadWatchlist();
+      });
+    },
+    [scoutUid, loadWatchlist]
+  );
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
@@ -22,11 +78,13 @@ export default function ScoutWatchlistScreen({ navigation }) {
       <View style={[styles.header, { borderBottomColor: theme.border }]}>
         <Text style={[styles.headerTitle, { color: theme.text }]}>Watchlist</Text>
         <View style={[styles.countBadge, { backgroundColor: theme.primary + '22' }]}>
-          <Text style={[styles.countText, { color: theme.primary }]}>{WATCHLIST.length} prospects</Text>
+          <Text style={[styles.countText, { color: theme.primary }]}>{watchlist.length} prospects</Text>
         </View>
       </View>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {WATCHLIST.length === 0 ? (
+        {loading ? (
+          <ActivityIndicator color={theme.primary} size="large" style={{ marginTop: 60 }} />
+        ) : watchlist.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="bookmark-outline" size={48} color={theme.textSecondary} />
             <Text style={[styles.emptyTitle, { color: theme.text }]}>No saved prospects</Text>
@@ -36,7 +94,7 @@ export default function ScoutWatchlistScreen({ navigation }) {
             </TouchableOpacity>
           </View>
         ) : (
-          WATCHLIST.map(p => (
+          watchlist.map(p => (
             <TouchableOpacity key={p.id} style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]} onPress={() => setSelected(selected === p.id ? null : p.id)} activeOpacity={0.8}>
               <View style={styles.cardTop}>
                 <View style={[styles.avatar, { backgroundColor: theme.primary + '22' }]}>
@@ -74,7 +132,7 @@ export default function ScoutWatchlistScreen({ navigation }) {
                     <TouchableOpacity style={[styles.actionBtn, { backgroundColor: theme.primary }]} onPress={() => navigation.navigate('ScoutLabProfile', { uid: p.id })}>
                       <Text style={styles.actionBtnText}>View Profile</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={[styles.removeBtn, { borderColor: '#EF444440' }]}>
+                    <TouchableOpacity style={[styles.removeBtn, { borderColor: '#EF444440' }]} onPress={() => handleRemove(p.id)}>
                       <Ionicons name="trash-outline" size={16} color="#EF4444" />
                       <Text style={[styles.removeBtnText, { color: '#EF4444' }]}>Remove</Text>
                     </TouchableOpacity>

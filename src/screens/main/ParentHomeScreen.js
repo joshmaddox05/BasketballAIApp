@@ -1,84 +1,90 @@
 // ParentHomeScreen.js - Parent/Family Hub home dashboard
 import React, { useState, useCallback } from 'react';
-import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, ScrollView, TextInput } from 'react-native';
+import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAppContext } from '../../context/AppContext';
-import { canAccessFeature } from '../../utils/subscription';
+import { getLinkedPlayers, getLinkedPlayerSummary } from '../../services/firestoreService';
+import { getLevelTitle } from '../../utils/constants';
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
+// ─── Data mapping helpers (Firestore docs -> presentational shapes) ────────────
 
-const MOCK_CHILD = {
-  name: 'Tyler Johnson',
-  age: 14,
-  level: 7,
-  streak: 11,
-  position: 'SG',
-  team: 'Metro Youth Academy',
-  recentAchievement: {
-    title: 'Sharpshooter',
-    description: 'Hit 50+ three-pointers this month',
-    icon: 'trophy-outline',
-    earnedDate: 'Jun 11',
-  },
-  avatarInitials: 'TJ',
+const toDate = (value) => {
+  if (!value) return null;
+  if (value.toDate) return value.toDate();
+  if (value.seconds) return new Date(value.seconds * 1000);
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? null : d;
 };
 
-const MOCK_WEEK = {
-  workoutsCompleted: 4,
-  workoutsGoal: 5,
-  sessionsScheduled: 2,
-  nextSession: 'Saturday, Jun 15 · 10:00 AM',
+const shortDate = (value) => {
+  const d = toDate(value);
+  return d ? d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
 };
 
-const MOCK_ACTIVITY = [
-  {
-    id: '1',
-    type: 'workout',
-    title: 'Completed Shooting Drill',
-    detail: 'Ball Handling Pro · 28 min',
-    time: '3h ago',
+const initialsFor = (name = '') =>
+  name
+    .split(' ')
+    .map((n) => n[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase() || '?';
+
+const mapChild = (linked, profile, latestAchievement) => {
+  const stats = profile?.stats || {};
+  const level = profile?.level || 1;
+  const name = profile?.displayName || linked?.name || 'Athlete';
+  return {
+    name,
+    age: profile?.age || '—',
+    level: typeof level === 'number' ? level : 1,
+    levelTitle: getLevelTitle(typeof level === 'number' ? level : 1),
+    streak: stats.currentStreak || 0,
+    position: profile?.position || '—',
+    team: profile?.team || 'Independent',
+    avatarInitials: initialsFor(name),
+    recentAchievement: latestAchievement
+      ? {
+          title: latestAchievement.title || latestAchievement.name || 'Achievement',
+          description: latestAchievement.description || '',
+          icon: latestAchievement.icon || 'trophy-outline',
+          earnedDate: shortDate(latestAchievement.unlockedAt),
+        }
+      : {
+          title: 'Getting started',
+          description: 'Complete a workout to earn the first achievement',
+          icon: 'sparkles-outline',
+          earnedDate: '',
+        },
+  };
+};
+
+const mapWeek = (profile, activities) => {
+  const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const completed = (activities || []).filter((a) => {
+    const d = toDate(a.createdAt);
+    return d && d.getTime() >= weekAgo;
+  }).length;
+  const goal = profile?.preferences?.trainingDays?.length || 5;
+  return {
+    workoutsCompleted: completed,
+    workoutsGoal: goal,
+    sessionsScheduled: 0,
+    nextSession: '—',
+  };
+};
+
+const mapActivityFeed = (activities) =>
+  (activities || []).slice(0, 4).map((a) => ({
+    id: a.id,
+    title: a.title || a.name || 'Training session',
+    detail: a.duration ? `${a.duration} min` : a.category || 'Workout',
+    time: shortDate(a.createdAt),
     icon: 'basketball-outline',
     accentType: 'primary',
-  },
-  {
-    id: '2',
-    type: 'achievement',
-    title: 'New Achievement Unlocked',
-    detail: '"Sharpshooter" — 50+ three-pointers',
-    time: '1d ago',
-    icon: 'trophy-outline',
-    accentType: 'gold',
-  },
-  {
-    id: '3',
-    type: 'challenge',
-    title: 'Daily Challenge Completed',
-    detail: '100 free throws — Score: 87/100',
-    time: '2d ago',
-    icon: 'checkmark-circle-outline',
-    accentType: 'green',
-  },
-];
-
-const MOCK_MESSAGES = [
-  {
-    id: '1',
-    sender: 'Coach Rivera',
-    preview: "Tyler had a great session today — his footwork is really improving. Keep up the consistency!",
-    time: '1h ago',
-    unread: true,
-    avatarInitials: 'CR',
-  },
-  {
-    id: '2',
-    sender: 'Academy Staff',
-    preview: "Reminder: Saturday morning session starts at 10:00 AM. Please arrive 15 minutes early.",
-    time: '5h ago',
-    unread: false,
-    avatarInitials: 'AS',
-  },
-];
+  }));
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -239,24 +245,106 @@ function MessageCard({ message, theme, isDarkMode }) {
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function ParentHomeScreen({ navigation }) {
-  const { userData, theme, isDarkMode } = useAppContext();
-  const [refreshing, setRefreshing] = useState(false);
+  const { user, userData, theme, isDarkMode } = useAppContext();
+  const parentUid = user?.uid;
 
   const name = userData?.displayName || userData?.name || 'Parent';
   const firstName = name.split(' ')[0];
 
-  const child = userData?.linkedChild || MOCK_CHILD;
-  const week = userData?.weekSummary || MOCK_WEEK;
-  const activityFeed = MOCK_ACTIVITY;
-  const messages = MOCK_MESSAGES;
+  const [loading, setLoading] = useState(true);
+  const [child, setChild] = useState(null);
+  const [week, setWeek] = useState(null);
+  const [activityFeed, setActivityFeed] = useState([]);
 
-  const handleRefresh = useCallback(() => {
-    setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1200);
-  }, []);
+  const loadChild = useCallback(async () => {
+    if (!parentUid) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      const linkedPlayers = await getLinkedPlayers(parentUid);
+      const linked = linkedPlayers[0];
+      if (!linked) {
+        setChild(null);
+        return;
+      }
+      const summary = await getLinkedPlayerSummary(linked.uid);
+      const latestAchievement = (summary.achievements || [])[0];
+      setChild(mapChild(linked, summary.profile, latestAchievement));
+      setWeek(mapWeek(summary.profile, summary.activities));
+      setActivityFeed(mapActivityFeed(summary.activities));
+    } finally {
+      setLoading(false);
+    }
+  }, [parentUid]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadChild();
+    }, [loadChild])
+  );
 
   const bgColor = isDarkMode ? '#0F0F0F' : '#F5F5F5';
   const sectionBg = isDarkMode ? '#1A1A1A' : '#FFFFFF';
+
+  const renderHeader = () => (
+    <View style={styles.header}>
+      <View>
+        <Text style={[styles.screenTitle, { color: theme.text }]}>Family Hub</Text>
+        <Text style={[styles.greeting, { color: theme.textSecondary }]}>Hello, {firstName}</Text>
+      </View>
+      <TouchableOpacity
+        style={[styles.notifBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
+        onPress={() => navigation.navigate('Notifications')}
+        activeOpacity={0.8}
+      >
+        <Ionicons name="notifications-outline" size={22} color={theme.text} />
+      </TouchableOpacity>
+    </View>
+  );
+
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: bgColor }]}>
+        <StatusBar style={isDarkMode ? 'light' : 'dark'} />
+        <View style={[styles.scrollContent, { flex: 1 }]}>
+          {renderHeader()}
+          <View style={styles.centered}>
+            <ActivityIndicator color={theme.primary} size="large" />
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!child) {
+    return (
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: bgColor }]}>
+        <StatusBar style={isDarkMode ? 'light' : 'dark'} />
+        <View style={[styles.scrollContent, { flex: 1 }]}>
+          {renderHeader()}
+          <View style={styles.centered}>
+            <View style={[styles.emptyIconWrap, { backgroundColor: theme.primary + '18' }]}>
+              <Ionicons name="people-outline" size={36} color={theme.primary} />
+            </View>
+            <Text style={[styles.emptyTitle, { color: theme.text }]}>Link your child</Text>
+            <Text style={[styles.emptySub, { color: theme.textSecondary }]}>
+              Connect to your child's account with their invite code to follow their training and progress.
+            </Text>
+            <TouchableOpacity
+              style={[styles.emptyButton, { backgroundColor: theme.primary }]}
+              onPress={() => navigation.navigate('LinkAccount', { onLinked: loadChild })}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="link" size={18} color="#FFFFFF" />
+              <Text style={styles.emptyButtonText}>Link Your Child</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: bgColor }]}>
@@ -266,25 +354,7 @@ export default function ParentHomeScreen({ navigation }) {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={[styles.screenTitle, { color: theme.text }]}>Family Hub</Text>
-            <Text style={[styles.greeting, { color: theme.textSecondary }]}>
-              Hello, {firstName}
-            </Text>
-          </View>
-          <TouchableOpacity
-            style={[styles.notifBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
-            onPress={() => navigation.navigate('Notifications')}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="notifications-outline" size={22} color={theme.text} />
-            {messages.some((m) => m.unread) && (
-              <View style={[styles.notifDot, { backgroundColor: theme.primary }]} />
-            )}
-          </TouchableOpacity>
-        </View>
+        {renderHeader()}
 
         {/* Child Summary Card */}
         <ChildSummaryCard child={child} theme={theme} />
@@ -299,38 +369,25 @@ export default function ParentHomeScreen({ navigation }) {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: theme.text }]}>Recent Activity</Text>
-            <TouchableOpacity activeOpacity={0.7}>
-              <Text style={[styles.seeAll, { color: theme.primary }]}>See All</Text>
-            </TouchableOpacity>
           </View>
-          <View style={[styles.activityContainer, { backgroundColor: sectionBg, borderColor: theme.border }]}>
-            {activityFeed.map((item, index) => (
-              <ActivityItem
-                key={item.id}
-                item={item}
-                theme={theme}
-                isLast={index === activityFeed.length - 1}
-              />
-            ))}
-          </View>
-        </View>
-
-        {/* Messages */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>Messages</Text>
-            <TouchableOpacity activeOpacity={0.7}>
-              <Text style={[styles.seeAll, { color: theme.primary }]}>All Messages</Text>
-            </TouchableOpacity>
-          </View>
-          {messages.map((message) => (
-            <MessageCard
-              key={message.id}
-              message={message}
-              theme={theme}
-              isDarkMode={isDarkMode}
-            />
-          ))}
+          {activityFeed.length === 0 ? (
+            <View style={[styles.activityContainer, { backgroundColor: sectionBg, borderColor: theme.border }]}>
+              <Text style={[styles.emptyFeedText, { color: theme.textSecondary }]}>
+                No recent activity yet.
+              </Text>
+            </View>
+          ) : (
+            <View style={[styles.activityContainer, { backgroundColor: sectionBg, borderColor: theme.border }]}>
+              {activityFeed.map((item, index) => (
+                <ActivityItem
+                  key={item.id}
+                  item={item}
+                  theme={theme}
+                  isLast={index === activityFeed.length - 1}
+                />
+              ))}
+            </View>
+          )}
         </View>
 
         {/* Progress Report Button */}
@@ -696,5 +753,49 @@ const styles = StyleSheet.create({
 
   bottomPad: {
     height: 32,
+  },
+
+  // Loading / empty states
+  centered: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+    gap: 12,
+  },
+  emptyIconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  emptySub: {
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  emptyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  emptyButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  emptyFeedText: {
+    fontSize: 13,
+    padding: 16,
   },
 });

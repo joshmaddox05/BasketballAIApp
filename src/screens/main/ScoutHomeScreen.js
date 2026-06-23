@@ -1,100 +1,60 @@
 // ScoutHomeScreen.js - Scout/Recruiter home dashboard
 import React, { useState, useCallback } from 'react';
-import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, ScrollView, TextInput } from 'react-native';
+import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAppContext } from '../../context/AppContext';
-import { canAccessFeature } from '../../utils/subscription';
+import {
+  getWatchlist,
+  getScoutingReports,
+  searchScoutLabProspects,
+} from '../../services/firestoreService';
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
+// ─── Data mapping helpers ──────────────────────────────────────────────────────
 
-const MOCK_STATS = {
-  prospectsSaved: 47,
-  reportsWritten: 12,
-  activeWatches: 8,
+const toDate = (value) => {
+  if (!value) return null;
+  if (value.toDate) return value.toDate();
+  if (value.seconds) return new Date(value.seconds * 1000);
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? null : d;
 };
 
-const MOCK_TRENDING_PROSPECTS = [
-  {
-    id: '1',
-    name: 'Marcus Williams',
-    grade: 'A+',
-    position: 'PG',
-    region: 'Southeast',
-    height: '6\'2"',
-    classYear: '2026',
-    school: 'Oak Ridge HS',
-    trending: 'up',
-  },
-  {
-    id: '2',
-    name: 'DeShawn Carter',
-    grade: 'A',
-    position: 'SF',
-    region: 'Midwest',
-    height: '6\'7"',
-    classYear: '2025',
-    school: 'Lincoln Academy',
-    trending: 'up',
-  },
-  {
-    id: '3',
-    name: 'Jaylen Brooks',
-    grade: 'B+',
-    position: 'C',
-    region: 'Northeast',
-    height: '6\'11"',
-    classYear: '2026',
-    school: 'St. Thomas Prep',
-    trending: 'stable',
-  },
-];
+const shortDate = (value) => {
+  const d = toDate(value);
+  return d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—';
+};
 
-const MOCK_WATCHLIST_UPDATES = [
-  {
-    id: '1',
-    prospectName: 'Marcus Williams',
-    update: 'Scored 34 pts in regional semifinal',
-    time: '2h ago',
-    icon: 'basketball-outline',
-    type: 'performance',
-  },
-  {
-    id: '2',
-    prospectName: 'DeShawn Carter',
-    update: 'Added new highlight reel',
-    time: '1d ago',
-    icon: 'videocam-outline',
-    type: 'media',
-  },
-  {
-    id: '3',
-    prospectName: 'Jaylen Brooks',
-    update: 'EvalRank score updated: 82 → 87',
-    time: '2d ago',
-    icon: 'trending-up-outline',
-    type: 'rank',
-  },
-];
+const mapTrending = (p) => ({
+  id: p.id,
+  name: p.name || 'Prospect',
+  grade: p.evalGrade || 'B',
+  position: p.position || '—',
+  region: p.region || '—',
+  height: p.height || '—',
+  classYear: p.classYear || '—',
+  school: p.school || '—',
+  trending: 'stable',
+});
 
-const MOCK_REPORTS = [
-  {
-    id: '1',
-    title: 'Marcus Williams — Mid-Season Eval',
-    prospect: 'Marcus Williams',
-    date: 'Jun 10, 2026',
-    pages: 4,
-    status: 'Final',
-  },
-  {
-    id: '2',
-    title: 'Southeast Regional Prospects Summary',
-    prospect: 'Multiple',
-    date: 'Jun 5, 2026',
-    pages: 9,
-    status: 'Draft',
-  },
-];
+const mapWatchUpdate = (w) => ({
+  id: w.prospectUid || w.id,
+  prospectName: w.name || 'Prospect',
+  update: `${w.position || '—'} · ${w.region || '—'} · EvalRank ${w.evalGrade || '—'}`,
+  time: shortDate(w.savedAt),
+  icon: 'bookmark-outline',
+  type: 'watch',
+});
+
+const mapReport = (r) => ({
+  id: r.id,
+  title: `${r.athleteName || 'Athlete'} — ${r.recommendation || 'Report'}`,
+  prospect: r.athleteName || 'Athlete',
+  date: shortDate(r.updatedAt || r.createdAt),
+  pages: 1,
+  status: r.status === 'submitted' ? 'Final' : 'Draft',
+});
 
 // ─── Grade Badge ──────────────────────────────────────────────────────────────
 
@@ -225,30 +185,48 @@ function ReportCard({ report, theme, onDownload }) {
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function ScoutHomeScreen({ navigation }) {
-  const { userData, theme, isDarkMode } = useAppContext();
-  const [refreshing, setRefreshing] = useState(false);
+  const { user, userData, theme, isDarkMode } = useAppContext();
+  const scoutUid = user?.uid;
 
   const name = userData?.displayName || userData?.name || 'Scout';
   const firstName = name.split(' ')[0];
 
-  const stats = userData?.scoutStats || MOCK_STATS;
-  const trendingProspects = MOCK_TRENDING_PROSPECTS;
-  const watchlistUpdates = MOCK_WATCHLIST_UPDATES;
-  const reports = MOCK_REPORTS;
+  const [watchlist, setWatchlist] = useState([]);
+  const [reports, setReports] = useState([]);
+  const [trendingProspects, setTrendingProspects] = useState([]);
 
-  const handleRefresh = useCallback(() => {
-    setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1200);
-  }, []);
+  const loadDashboard = useCallback(async () => {
+    if (!scoutUid) return;
+    const [savedWatchlist, savedReports, prospects] = await Promise.all([
+      getWatchlist(scoutUid),
+      getScoutingReports(scoutUid),
+      searchScoutLabProspects({}),
+    ]);
+    setWatchlist(savedWatchlist);
+    setReports(savedReports.map(mapReport));
+    setTrendingProspects((prospects || []).slice(0, 3).map(mapTrending));
+  }, [scoutUid]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadDashboard();
+    }, [loadDashboard])
+  );
+
+  const stats = {
+    prospectsSaved: watchlist.length,
+    reportsWritten: reports.length,
+    activeWatches: watchlist.length,
+  };
+  const watchlistUpdates = watchlist.slice(0, 3).map(mapWatchUpdate);
 
   const handleProspectPress = useCallback((prospect) => {
     navigation.navigate('ScoutLabProfile', { prospectId: prospect.id, prospectName: prospect.name });
   }, [navigation]);
 
   const handleDownloadReport = useCallback((report) => {
-    // In production: trigger PDF download or share sheet
-    console.log('Download report:', report.id);
-  }, []);
+    navigation.navigate('ScoutReports');
+  }, [navigation]);
 
   const bgColor = isDarkMode ? '#0F0F0F' : '#F5F5F5';
   const sectionBg = isDarkMode ? '#1A1A1A' : '#FFFFFF';
@@ -297,40 +275,48 @@ export default function ScoutHomeScreen({ navigation }) {
         </View>
 
         {/* Trending Prospects */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>Trending Prospects</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('ScoutLab')} activeOpacity={0.7}>
-              <Text style={[styles.seeAll, { color: theme.primary }]}>See All</Text>
-            </TouchableOpacity>
+        {trendingProspects.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>Prospects</Text>
+              <TouchableOpacity onPress={() => navigation.navigate('ScoutLabSearch')} activeOpacity={0.7}>
+                <Text style={[styles.seeAll, { color: theme.primary }]}>See All</Text>
+              </TouchableOpacity>
+            </View>
+            {trendingProspects.map((prospect) => (
+              <ProspectCard
+                key={prospect.id}
+                prospect={prospect}
+                theme={theme}
+                onPress={() => handleProspectPress(prospect)}
+              />
+            ))}
           </View>
-          {trendingProspects.map((prospect) => (
-            <ProspectCard
-              key={prospect.id}
-              prospect={prospect}
-              theme={theme}
-              onPress={() => handleProspectPress(prospect)}
-            />
-          ))}
-        </View>
+        )}
 
-        {/* Watchlist Updates */}
+        {/* Watchlist */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>Recent Watchlist Updates</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('ScoutLab')} activeOpacity={0.7}>
-              <Text style={[styles.seeAll, { color: theme.primary }]}>View All</Text>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>My Watchlist</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('ScoutLabSearch')} activeOpacity={0.7}>
+              <Text style={[styles.seeAll, { color: theme.primary }]}>Search</Text>
             </TouchableOpacity>
           </View>
           <View style={[styles.updatesContainer, { backgroundColor: sectionBg, borderColor: theme.border }]}>
-            {watchlistUpdates.map((item, index) => (
-              <WatchlistUpdateItem
-                key={item.id}
-                item={item}
-                theme={theme}
-                isLast={index === watchlistUpdates.length - 1}
-              />
-            ))}
+            {watchlistUpdates.length === 0 ? (
+              <Text style={[styles.emptyInline, { color: theme.textSecondary }]}>
+                No prospects saved yet. Search to add prospects to your watchlist.
+              </Text>
+            ) : (
+              watchlistUpdates.map((item, index) => (
+                <WatchlistUpdateItem
+                  key={item.id}
+                  item={item}
+                  theme={theme}
+                  isLast={index === watchlistUpdates.length - 1}
+                />
+              ))
+            )}
           </View>
         </View>
 
@@ -338,18 +324,26 @@ export default function ScoutHomeScreen({ navigation }) {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: theme.text }]}>My Reports</Text>
-            <TouchableOpacity activeOpacity={0.7}>
+            <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.navigate('ScoutReports')}>
               <Text style={[styles.seeAll, { color: theme.primary }]}>All Reports</Text>
             </TouchableOpacity>
           </View>
-          {reports.map((report) => (
-            <ReportCard
-              key={report.id}
-              report={report}
-              theme={theme}
-              onDownload={() => handleDownloadReport(report)}
-            />
-          ))}
+          {reports.length === 0 ? (
+            <View style={[styles.updatesContainer, { backgroundColor: sectionBg, borderColor: theme.border }]}>
+              <Text style={[styles.emptyInline, { color: theme.textSecondary }]}>
+                No reports yet. Create one from the Reports tab.
+              </Text>
+            </View>
+          ) : (
+            reports.map((report) => (
+              <ReportCard
+                key={report.id}
+                report={report}
+                theme={theme}
+                onDownload={() => handleDownloadReport(report)}
+              />
+            ))
+          )}
         </View>
 
         {/* Quick Actions */}
@@ -535,6 +529,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     overflow: 'hidden',
+  },
+  emptyInline: {
+    fontSize: 13,
+    padding: 16,
+    lineHeight: 19,
   },
   updateItem: {
     flexDirection: 'row',

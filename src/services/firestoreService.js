@@ -3486,3 +3486,340 @@ export const getLegacyVaultArticle = async (articleId) => {
     return null;
   }
 };
+
+// ==================== CONNECTIONS (Role Linking) ====================
+// Invite-code based linking between a player (consent owner) and a
+// parent/coach (role-holder). Mirrors the friends-system pattern:
+//   - players/{player}/connections/{roleHolder}  -> who is linked to me
+//   - users/{roleHolder}/linkedPlayers/{player}  -> my roster / child list
+
+// Avoids visually ambiguous characters (0/O, 1/I).
+const INVITE_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+const generateRandomInviteCode = (length = 6) => {
+  let code = '';
+  for (let i = 0; i < length; i++) {
+    code += INVITE_CODE_CHARS.charAt(Math.floor(Math.random() * INVITE_CODE_CHARS.length));
+  }
+  return code;
+};
+
+/**
+ * Generate a shareable invite code owned by a player.
+ * @param {string} playerUid - The player generating the code (consent owner)
+ * @param {Object} [options]
+ * @param {string} [options.intendedRole] - 'parent' | 'coach' (informational)
+ * @returns {Promise<string>} The generated code
+ */
+export const generateInviteCode = async (playerUid, { intendedRole = null } = {}) => {
+  try {
+    const playerDoc = await getDoc(doc(db, 'users', playerUid));
+    const player = playerDoc.data() || {};
+
+    // Generate a unique code (retry on the rare collision)
+    let code = null;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const candidate = generateRandomInviteCode(6);
+      const existing = await getDoc(doc(db, 'inviteCodes', candidate));
+      if (!existing.exists()) {
+        code = candidate;
+        break;
+      }
+    }
+    if (!code) {
+      throw new Error('Could not generate a unique invite code. Please try again.');
+    }
+
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+
+    await setDoc(doc(db, 'inviteCodes', code), {
+      code,
+      ownerUid: playerUid,
+      ownerName: player.displayName || 'Anonymous',
+      ownerPhotoURL: player.photoURL || null,
+      ownerLevel: player.level || null,
+      intendedRole,
+      used: false,
+      usedBy: null,
+      createdAt: serverTimestamp(),
+      expiresAt,
+    });
+
+    return code;
+  } catch (error) {
+    console.error('Error generating invite code:', error);
+    throw error;
+  }
+};
+
+/**
+ * Redeem an invite code to link a role-holder to a player.
+ * Writes both mirror docs and marks the code used.
+ * @param {string} code - The invite code
+ * @param {Object} redeemer - { uid, displayName, photoURL, role }
+ * @returns {Promise<{ ownerUid: string, ownerName: string }>}
+ */
+export const redeemInviteCode = async (code, redeemer) => {
+  try {
+    const normalized = (code || '').trim().toUpperCase();
+    if (!normalized) throw new Error('Please enter an invite code.');
+
+    const redeemerUid = redeemer?.uid;
+    if (!redeemerUid) throw new Error('You must be signed in to redeem a code.');
+
+    const codeRef = doc(db, 'inviteCodes', normalized);
+    const codeSnap = await getDoc(codeRef);
+    if (!codeSnap.exists()) throw new Error('Invalid invite code.');
+
+    const invite = codeSnap.data();
+    if (invite.used) throw new Error('This invite code has already been used.');
+
+    const expiresAt = invite.expiresAt?.toDate
+      ? invite.expiresAt.toDate()
+      : invite.expiresAt
+        ? new Date(invite.expiresAt)
+        : null;
+    if (expiresAt && expiresAt < new Date()) {
+      throw new Error('This invite code has expired.');
+    }
+
+    const ownerUid = invite.ownerUid;
+    if (ownerUid === redeemerUid) throw new Error('You cannot link to your own account.');
+
+    const redeemerRole = redeemer?.role || 'parent';
+
+    await Promise.all([
+      // Player's connections: who is linked to me
+      setDoc(doc(db, 'users', ownerUid, 'connections', redeemerUid), {
+        role: redeemerRole,
+        name: redeemer?.displayName || 'Anonymous',
+        photoURL: redeemer?.photoURL || null,
+        linkedAt: serverTimestamp(),
+        status: 'active',
+      }),
+      // Role-holder's roster: my child / athlete
+      setDoc(doc(db, 'users', redeemerUid, 'linkedPlayers', ownerUid), {
+        name: invite.ownerName || 'Anonymous',
+        level: invite.ownerLevel || null,
+        photoURL: invite.ownerPhotoURL || null,
+        linkedAt: serverTimestamp(),
+        status: 'active',
+      }),
+      // Mark code as used
+      updateDoc(codeRef, {
+        used: true,
+        usedBy: redeemerUid,
+        usedAt: serverTimestamp(),
+      }),
+    ]);
+
+    return { ownerUid, ownerName: invite.ownerName || 'Anonymous' };
+  } catch (error) {
+    console.error('Error redeeming invite code:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get the players linked to a role-holder (coach roster / parent's children).
+ * @param {string} roleHolderUid
+ * @returns {Promise<Array>}
+ */
+export const getLinkedPlayers = async (roleHolderUid) => {
+  try {
+    const q = query(
+      collection(db, 'users', roleHolderUid, 'linkedPlayers'),
+      where('status', '==', 'active')
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((d) => ({ uid: d.id, ...d.data() }));
+  } catch (error) {
+    console.error('Error getting linked players:', error);
+    return [];
+  }
+};
+
+/**
+ * Get the role-holders connected to a player (for management / revoke).
+ * @param {string} playerUid
+ * @returns {Promise<Array>}
+ */
+export const getConnections = async (playerUid) => {
+  try {
+    const q = query(
+      collection(db, 'users', playerUid, 'connections'),
+      where('status', '==', 'active')
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((d) => ({ uid: d.id, ...d.data() }));
+  } catch (error) {
+    console.error('Error getting connections:', error);
+    return [];
+  }
+};
+
+/**
+ * Remove a connection from either side (deletes both mirror docs).
+ * @param {string} playerUid
+ * @param {string} roleHolderUid
+ * @returns {Promise<void>}
+ */
+export const removeConnection = async (playerUid, roleHolderUid) => {
+  try {
+    await Promise.all([
+      deleteDoc(doc(db, 'users', playerUid, 'connections', roleHolderUid)),
+      deleteDoc(doc(db, 'users', roleHolderUid, 'linkedPlayers', playerUid)),
+    ]);
+  } catch (error) {
+    console.error('Error removing connection:', error);
+    throw error;
+  }
+};
+
+/**
+ * Aggregate a linked player's progress for parent/coach dashboards.
+ * Reuses existing DBE getters; each source fails soft so one denied
+ * read doesn't blank the whole dashboard.
+ * @param {string} playerUid
+ * @returns {Promise<Object>}
+ */
+export const getLinkedPlayerSummary = async (playerUid) => {
+  const [profile, evalRank, blueprint, activities, achievements] = await Promise.all([
+    getUserProfile(playerUid).catch(() => null),
+    getLatestEvalRankScore(playerUid).catch(() => null),
+    getBlueprint360Plan(playerUid).catch(() => null),
+    getUserActivities(playerUid, 10).catch(() => []),
+    getUserAchievements(playerUid).catch(() => []),
+  ]);
+  return { uid: playerUid, profile, evalRank, blueprint, activities, achievements };
+};
+
+// ==================== SCOUT: Watchlist & Reports ====================
+// Owner-only snapshots — no consent link required. A scout discovers
+// prospects via searchScoutLabProspects and bookmarks a snapshot.
+
+/**
+ * Save (or update) a prospect snapshot to the scout's watchlist.
+ * @param {string} scoutUid
+ * @param {Object} prospect - A result from searchScoutLabProspects
+ * @param {string} [note]
+ * @returns {Promise<void>}
+ */
+export const saveWatchlistEntry = async (scoutUid, prospect, note = '') => {
+  try {
+    const prospectId = String(prospect.id || prospect.uid || '');
+    if (!prospectId) throw new Error('Prospect is missing an id.');
+    // Store the full prospect snapshot so the watchlist renders without a re-fetch.
+    const { id, ...rest } = prospect;
+    await setDoc(doc(db, 'users', scoutUid, 'watchlist', prospectId), {
+      ...rest,
+      prospectUid: prospectId,
+      name: prospect.name || prospect.displayName || 'Unknown',
+      note,
+      savedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error('Error saving watchlist entry:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get a scout's watchlist.
+ * @param {string} scoutUid
+ * @returns {Promise<Array>}
+ */
+export const getWatchlist = async (scoutUid) => {
+  try {
+    const q = query(
+      collection(db, 'users', scoutUid, 'watchlist'),
+      orderBy('savedAt', 'desc')
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+  } catch (error) {
+    console.error('Error getting watchlist:', error);
+    return [];
+  }
+};
+
+/**
+ * Remove a prospect from the watchlist.
+ * @param {string} scoutUid
+ * @param {string} prospectUid
+ * @returns {Promise<void>}
+ */
+export const removeWatchlistEntry = async (scoutUid, prospectUid) => {
+  try {
+    await deleteDoc(doc(db, 'users', scoutUid, 'watchlist', prospectUid));
+  } catch (error) {
+    console.error('Error removing watchlist entry:', error);
+    throw error;
+  }
+};
+
+/**
+ * Save (create or update) a scouting report.
+ * @param {string} scoutUid
+ * @param {Object} report - Pass report.id to update an existing one
+ * @returns {Promise<string>} The report id
+ */
+export const saveScoutingReport = async (scoutUid, report) => {
+  try {
+    const { id, ...data } = report || {};
+    if (id) {
+      await setDoc(
+        doc(db, 'users', scoutUid, 'scoutingReports', id),
+        { ...data, updatedAt: serverTimestamp() },
+        { merge: true }
+      );
+      return id;
+    }
+    const ref = await addDoc(collection(db, 'users', scoutUid, 'scoutingReports'), {
+      ...data,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+    return ref.id;
+  } catch (error) {
+    console.error('Error saving scouting report:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get a scout's scouting reports.
+ * @param {string} scoutUid
+ * @param {number} [limitCount]
+ * @returns {Promise<Array>}
+ */
+export const getScoutingReports = async (scoutUid, limitCount = 50) => {
+  try {
+    const q = query(
+      collection(db, 'users', scoutUid, 'scoutingReports'),
+      orderBy('createdAt', 'desc'),
+      limit(limitCount)
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+  } catch (error) {
+    console.error('Error getting scouting reports:', error);
+    return [];
+  }
+};
+
+/**
+ * Delete a scouting report.
+ * @param {string} scoutUid
+ * @param {string} reportId
+ * @returns {Promise<void>}
+ */
+export const deleteScoutingReport = async (scoutUid, reportId) => {
+  try {
+    await deleteDoc(doc(db, 'users', scoutUid, 'scoutingReports', reportId));
+  } catch (error) {
+    console.error('Error deleting scouting report:', error);
+    throw error;
+  }
+};
