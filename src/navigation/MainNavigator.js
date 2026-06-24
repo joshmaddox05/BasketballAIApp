@@ -24,12 +24,10 @@ import ScoutHomeScreen from '../screens/main/ScoutHomeScreen';
 import ParentHomeScreen from '../screens/main/ParentHomeScreen';
 
 // Import DBE screens needed directly in role navigators
-import ScoutLabSearchScreen from '../screens/main/ScoutLabSearchScreen';
 import CoachMarketDashboardScreen from '../screens/main/CoachMarketDashboardScreen';
 import CoachMarketScreen from '../screens/main/CoachMarketScreen';
 import FamilyDashboardScreen from '../screens/main/FamilyDashboardScreen';
 import HoopCommunityScreen from '../screens/main/HoopCommunityScreen';
-import MentorshipScreen from '../screens/main/MentorshipScreen';
 
 // Import role-specific management screens
 import CoachAthletesScreen from '../screens/main/CoachAthletesScreen';
@@ -37,7 +35,6 @@ import CoachSessionsScreen from '../screens/main/CoachSessionsScreen';
 import ScoutWatchlistScreen from '../screens/main/ScoutWatchlistScreen';
 import ScoutReportsScreen from '../screens/main/ScoutReportsScreen';
 import MessagingScreen from '../screens/main/MessagingScreen';
-import ProgressReportScreen from '../screens/main/ProgressReportScreen';
 
 // Import legal/support screens (replacing inline placeholders)
 import HelpCenterScreen from '../screens/main/HelpCenterScreen';
@@ -351,7 +348,7 @@ function CoachHomeStackNavigator() {
     return (
         <CoachHomeStack.Navigator screenOptions={{ headerShown: false }}>
             <CoachHomeStack.Screen name="CoachHomeMain" component={CoachHomeScreen} />
-            <CoachHomeStack.Screen name="CoachMarketDashboard" component={CoachMarketDashboardScreen} options={{ headerShown: false }} />
+            {/* CoachMarketDashboard is registered via shared screens */}
             {addSharedScreensToStack(CoachHomeStack)}
         </CoachHomeStack.Navigator>
     );
@@ -413,6 +410,7 @@ function CoachProfileStackNavigator() {
 export function CoachMainNavigator() {
     const { theme } = useAppContext();
     return (
+        <TourProvider navigationRef={navigationRef}>
         <CoachTab.Navigator
             screenOptions={({ route }) => ({
                 tabBarIcon: ({ focused, color, size }) => {
@@ -437,6 +435,8 @@ export function CoachMainNavigator() {
             <CoachTab.Screen name="Sessions" component={CoachSessionsStackNavigator} options={{ title: 'Sessions' }} />
             <CoachTab.Screen name="CoachProfile" component={CoachProfileStackNavigator} options={{ title: 'Profile' }} />
         </CoachTab.Navigator>
+        <TourOverlay theme={theme} />
+        </TourProvider>
     );
 }
 
@@ -452,7 +452,7 @@ function ScoutDiscoverStackNavigator() {
     return (
         <ScoutDiscoverStack.Navigator screenOptions={{ headerShown: false }}>
             <ScoutDiscoverStack.Screen name="ScoutHomeMain" component={ScoutHomeScreen} />
-            <ScoutDiscoverStack.Screen name="ScoutLabSearch" component={ScoutLabSearchScreen} options={{ headerShown: false }} />
+            {/* ScoutLabSearch is registered via shared screens */}
             {addSharedScreensToStack(ScoutDiscoverStack)}
         </ScoutDiscoverStack.Navigator>
     );
@@ -499,6 +499,7 @@ function ScoutProfileStackNavigator() {
 export function ScoutMainNavigator() {
     const { theme } = useAppContext();
     return (
+        <TourProvider navigationRef={navigationRef}>
         <ScoutTab.Navigator
             screenOptions={({ route }) => ({
                 tabBarIcon: ({ focused, color, size }) => {
@@ -523,6 +524,8 @@ export function ScoutMainNavigator() {
             <ScoutTab.Screen name="Messages" component={ScoutMessagingStackNavigator} options={{ title: 'Messages' }} />
             <ScoutTab.Screen name="ScoutProfile" component={ScoutProfileStackNavigator} options={{ title: 'Profile' }} />
         </ScoutTab.Navigator>
+        <TourOverlay theme={theme} />
+        </TourProvider>
     );
 }
 
@@ -548,7 +551,7 @@ function ParentProgressStackNavigator() {
     return (
         <ParentProgressStack.Navigator screenOptions={{ headerShown: false }}>
             <ParentProgressStack.Screen name="ParentProgressMain" component={FamilyDashboardScreen} />
-            <ParentProgressStack.Screen name="ProgressReport" component={ProgressReportScreen} options={{ headerShown: false }} />
+            {/* ProgressReport is registered via shared screens */}
             {addSharedScreensToStack(ParentProgressStack)}
         </ParentProgressStack.Navigator>
     );
@@ -567,7 +570,7 @@ function ParentCommunityStackNavigator() {
     return (
         <ParentCommunityStack.Navigator screenOptions={{ headerShown: false }}>
             <ParentCommunityStack.Screen name="ParentCommunityMain" component={HoopCommunityScreen} />
-            <ParentCommunityStack.Screen name="Mentorship" component={MentorshipScreen} options={{ headerShown: false }} />
+            {/* Mentorship is registered via shared screens */}
             {addSharedScreensToStack(ParentCommunityStack)}
         </ParentCommunityStack.Navigator>
     );
@@ -587,6 +590,7 @@ function ParentProfileStackNavigator() {
 export function ParentMainNavigator() {
     const { theme } = useAppContext();
     return (
+        <TourProvider navigationRef={navigationRef}>
         <ParentTab.Navigator
             screenOptions={({ route }) => ({
                 tabBarIcon: ({ focused, color, size }) => {
@@ -611,6 +615,8 @@ export function ParentMainNavigator() {
             <ParentTab.Screen name="Messages" component={ParentMessagesStackNavigator} options={{ title: 'Messages' }} />
             <ParentTab.Screen name="ParentProfile" component={ParentProfileStackNavigator} options={{ title: 'Profile' }} />
         </ParentTab.Navigator>
+        <TourOverlay theme={theme} />
+        </TourProvider>
     );
 }
 

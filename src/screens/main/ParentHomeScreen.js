@@ -7,6 +7,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useAppContext } from '../../context/AppContext';
 import { getLinkedPlayers, getLinkedPlayerSummary } from '../../services/firestoreService';
 import { getLevelTitle } from '../../utils/constants';
+import ModuleGrid from '../../components/features/ModuleGrid';
+import { getModulesForRole } from '../../config/roleModules';
 
 // ─── Data mapping helpers (Firestore docs -> presentational shapes) ────────────
 
@@ -405,6 +407,17 @@ export default function ParentHomeScreen({ navigation }) {
           </View>
           <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.8)" />
         </TouchableOpacity>
+
+        {/* Resources */}
+        <View style={styles.section}>
+          <ModuleGrid
+            title="Resources"
+            modules={getModulesForRole('parent')}
+            subscription={userData?.subscription || 'free'}
+            theme={theme}
+            navigation={navigation}
+          />
+        </View>
 
         <View style={styles.bottomPad} />
       </ScrollView>

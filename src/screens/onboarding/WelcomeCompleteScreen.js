@@ -20,9 +20,32 @@ import welcomeBackground from '../../../assets/welcome-background.jpg';
 
 const { width, height } = Dimensions.get('window');
 
+// Role-aware welcome copy for non-player roles (players get the full training summary).
+const ROLE_WELCOME = {
+    coach: {
+        icon: 'clipboard',
+        title: 'Your coaching hub is ready',
+        message: 'Manage your athletes, build game plans, and track team progress — all in one place.',
+    },
+    scout: {
+        icon: 'search',
+        title: 'Your scouting toolkit is ready',
+        message: 'Discover prospects, build your watchlist, and generate professional scouting reports.',
+    },
+    parent: {
+        icon: 'heart',
+        title: "You're all set",
+        message: "Monitor your child's development, view progress reports, and stay connected with their coach.",
+    },
+};
+
 const WelcomeCompleteScreen = ({ navigation }) => {
     const { userData, theme: contextTheme, isDarkMode, completeOnboarding } = useAppContext();
     const theme = contextTheme || getTheme(isDarkMode || false);
+
+    const role = userData?.role || 'player';
+    const isPlayer = role === 'player';
+    const roleWelcome = ROLE_WELCOME[role];
 
     const [fadeAnim] = useState(new Animated.Value(0));
     const [slideAnim] = useState(new Animated.Value(50));
@@ -99,9 +122,14 @@ const WelcomeCompleteScreen = ({ navigation }) => {
         return workouts[area] || "Personalized Training";
     };
 
-    const handleStartTraining = () => {
+    const handleStartTraining = async () => {
         if (isCompleting) return;
-        navigation.navigate('RoleSelection');
+        setIsCompleting(true);
+        try {
+            await completeOnboarding();
+        } catch (error) {
+            setIsCompleting(false);
+        }
     };
 
     return (
@@ -138,11 +166,14 @@ const WelcomeCompleteScreen = ({ navigation }) => {
                             {getGreeting()}, {userData.displayName || 'Champion'}! 🏀
                         </Text>
                         <Text style={styles.subtitle}>
-                            Welcome to your personalized basketball training journey
+                            {isPlayer
+                                ? 'Welcome to your personalized basketball training journey'
+                                : (roleWelcome?.message || 'Welcome to your basketball development hub')}
                         </Text>
                     </View>
 
-                    {/* User Profile Summary */}
+                    {/* User Profile Summary (player-only training breakdown) */}
+                    {isPlayer ? (
                     <View style={styles.profileSummary}>
                         <View style={styles.summaryCard}>
                             <View style={styles.summaryHeader}>
@@ -177,8 +208,22 @@ const WelcomeCompleteScreen = ({ navigation }) => {
                             </Text>
                         </View>
                     </View>
+                    ) : (
+                    <View style={styles.profileSummary}>
+                        <View style={styles.summaryCard}>
+                            <View style={styles.summaryHeader}>
+                                <Ionicons name={roleWelcome?.icon || 'rocket'} size={24} color="#FF6B00" />
+                                <Text style={styles.summaryTitle}>{roleWelcome?.title || "You're all set"}</Text>
+                            </View>
+                            <Text style={styles.summaryText}>
+                                {roleWelcome?.message || 'Your personalized hub is ready to go.'}
+                            </Text>
+                        </View>
+                    </View>
+                    )}
 
-                    {/* Quick Stats Preview */}
+                    {/* Quick Stats Preview (player-only) */}
+                    {isPlayer && (
                     <View style={styles.statsPreview}>
                         <Text style={styles.statsTitle}>Your Training Dashboard</Text>
                         <View style={styles.statsRow}>
@@ -196,6 +241,7 @@ const WelcomeCompleteScreen = ({ navigation }) => {
                             </View>
                         </View>
                     </View>
+                    )}
 
                     {/* Action Buttons */}
                     <View style={styles.buttonsContainer}>
@@ -206,7 +252,7 @@ const WelcomeCompleteScreen = ({ navigation }) => {
                         >
                             <Ionicons name="play" size={20} color="#FFF" />
                             <Text style={styles.startTrainingButtonText}>
-                                {isCompleting ? 'Setting up your profile...' : 'Start Training'}
+                                {isCompleting ? 'Setting up your profile...' : (isPlayer ? 'Start Training' : 'Get Started')}
                             </Text>
                         </TouchableOpacity>
 

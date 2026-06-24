@@ -12,7 +12,7 @@ const Stack = createStackNavigator();
 
 const OnboardingNavigator = () => {
     return (
-        <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="SkillAssessment">
+        <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="RoleSelection">
             <Stack.Screen name="SkillAssessment" component={SkillAssessmentScreen} />
             <Stack.Screen name="GoalSetting" component={GoalSettingScreen} />
             <Stack.Screen name="Personalization" component={PersonalizationScreen} />

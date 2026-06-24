@@ -5,6 +5,8 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAppContext } from '../../context/AppContext';
+import ModuleGrid from '../../components/features/ModuleGrid';
+import { getModulesForRole } from '../../config/roleModules';
 import {
   getWatchlist,
   getScoutingReports,
@@ -352,7 +354,7 @@ export default function ScoutHomeScreen({ navigation }) {
           <View style={styles.quickActionsRow}>
             <TouchableOpacity
               style={[styles.quickActionBtn, { backgroundColor: theme.primary }]}
-              onPress={() => navigation.navigate('ScoutLab')}
+              onPress={() => navigation.navigate('ScoutLabSearch')}
               activeOpacity={0.85}
             >
               <Ionicons name="search-outline" size={20} color="#FFFFFF" />
@@ -360,7 +362,7 @@ export default function ScoutHomeScreen({ navigation }) {
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.quickActionBtn, { backgroundColor: theme.card, borderColor: theme.border, borderWidth: 1 }]}
-              onPress={() => navigation.navigate('ScoutLab')}
+              onPress={() => navigation.navigate('ScoutReports')}
               activeOpacity={0.85}
             >
               <Ionicons name="create-outline" size={20} color={theme.primary} />
@@ -369,13 +371,24 @@ export default function ScoutHomeScreen({ navigation }) {
           </View>
           <TouchableOpacity
             style={[styles.watchlistBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
-            onPress={() => navigation.navigate('ScoutLab')}
+            onPress={() => navigation.navigate('ScoutLabSearch')}
             activeOpacity={0.85}
           >
             <Ionicons name="bookmark-outline" size={20} color={theme.primary} />
             <Text style={[styles.watchlistBtnText, { color: theme.text }]}>View Watchlist</Text>
             <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
           </TouchableOpacity>
+        </View>
+
+        {/* Scout Tools */}
+        <View style={styles.section}>
+          <ModuleGrid
+            title="Scout Tools"
+            modules={getModulesForRole('scout')}
+            subscription={userData?.subscription || 'free'}
+            theme={theme}
+            navigation={navigation}
+          />
         </View>
 
         <View style={styles.bottomPad} />

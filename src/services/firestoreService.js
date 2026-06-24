@@ -3357,6 +3357,67 @@ export const getScoutLabProfile = async (uid) => {
   }
 };
 
+/**
+ * Publish (or update) the player's public directory entry so scouts can
+ * discover them via searchScoutLabProspects. The directory doc is keyed by the
+ * player's uid and mirrors the searchable snapshot. Also flags the player's own
+ * profile as visible. Requires the player's consent (called from a visibility toggle).
+ * @param {string} uid
+ * @param {Object} profileData - searchable fields (name, position, evalGrade, region, ...)
+ * @returns {Promise<void>}
+ */
+export const publishScoutLabProfile = async (uid, profileData = {}) => {
+  try {
+    const entry = {
+      uid,
+      name: profileData.name || 'Athlete',
+      position: profileData.position || null,
+      evalGrade: profileData.evalGrade || null,
+      region: profileData.region || null,
+      school: profileData.school || null,
+      classYear: profileData.classYear || null,
+      height: profileData.height || null,
+      city: profileData.city || null,
+      iqScore: profileData.iqScore ?? null,
+      updatedAt: serverTimestamp(),
+    };
+    await Promise.all([
+      // Public directory entry (one per player, keyed by uid)
+      setDoc(doc(db, 'scoutLabProfiles', uid), entry),
+      // Mirror into the player's own subcollection + mark as visible
+      setDoc(
+        doc(db, 'users', uid, 'scoutLabProfile', 'main'),
+        { ...entry, directoryVisible: true },
+        { merge: true }
+      ),
+    ]);
+  } catch (error) {
+    console.error('Error publishing ScoutLab profile:', error);
+    throw error;
+  }
+};
+
+/**
+ * Remove the player's public directory entry (opt out of scout discovery).
+ * @param {string} uid
+ * @returns {Promise<void>}
+ */
+export const unpublishScoutLabProfile = async (uid) => {
+  try {
+    await Promise.all([
+      deleteDoc(doc(db, 'scoutLabProfiles', uid)),
+      setDoc(
+        doc(db, 'users', uid, 'scoutLabProfile', 'main'),
+        { directoryVisible: false },
+        { merge: true }
+      ),
+    ]);
+  } catch (error) {
+    console.error('Error unpublishing ScoutLab profile:', error);
+    throw error;
+  }
+};
+
 export const searchScoutLabProspects = async ({ position, minGrade, region, ageGroup } = {}) => {
   try {
     let q = query(collection(db, 'scoutLabProfiles'), limit(50));

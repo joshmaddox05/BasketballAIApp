@@ -314,13 +314,15 @@ const SettingsScreen = ({ navigation }) => {
                 {/* Support Section */}
                 <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>SUPPORT</Text>
 
-                <SettingRow
-                    icon="map-outline"
-                    title="App Tour"
-                    subtitle="Take a guided tour of the app"
-                    onPress={handleStartTour}
-                    rightComponent={<Ionicons name="chevron-forward" size={20} color={theme.textTertiary} />}
-                />
+                {(!userData?.role || userData?.role === 'player') && (
+                    <SettingRow
+                        icon="map-outline"
+                        title="App Tour"
+                        subtitle="Take a guided tour of the app"
+                        onPress={handleStartTour}
+                        rightComponent={<Ionicons name="chevron-forward" size={20} color={theme.textTertiary} />}
+                    />
+                )}
 
                 <SettingRow
                     icon="help-circle-outline"

@@ -1,4 +1,4 @@
-// RoleSelectionScreen.js - Role selection at end of onboarding
+// RoleSelectionScreen.js - Role selection at the start of onboarding
 import React, { useState, useCallback } from 'react';
 import {
   SafeAreaView,
@@ -53,7 +53,7 @@ const ROLES = [
 ];
 
 export default function RoleSelectionScreen({ navigation }) {
-  const { completeOnboarding, isDarkMode } = useAppContext();
+  const { updateUserDataLocally, isDarkMode } = useAppContext();
   const theme = getTheme(isDarkMode);
 
   const [selectedRole, setSelectedRole] = useState('player');
@@ -66,12 +66,23 @@ export default function RoleSelectionScreen({ navigation }) {
       if (user) {
         await updateUserProfile(user.uid, { role: selectedRole });
       }
-      await completeOnboarding();
+      // Propagate the role into local context immediately so the correct role
+      // navigator renders the moment onboarding completes (no relogin needed).
+      updateUserDataLocally({ role: selectedRole });
+
+      // Players continue through skill assessment; other roles skip straight to
+      // the final welcome step.
+      if (selectedRole === 'player') {
+        navigation.navigate('SkillAssessment');
+      } else {
+        navigation.navigate('WelcomeComplete');
+      }
     } catch (err) {
       Alert.alert('Error', 'Could not save your role. Please try again.');
+    } finally {
       setLoading(false);
     }
-  }, [selectedRole, completeOnboarding]);
+  }, [selectedRole, updateUserDataLocally, navigation]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>

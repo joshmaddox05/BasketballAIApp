@@ -34,7 +34,9 @@ const getStripe = () => {
  * Create a subscription payment for the user
  * This is a callable function that creates a customer, ephemeral key, and subscription
  */
-exports.createSubscriptionPayment = onCall({ secrets: [stripeSecretKey] }, async (request) => {
+// minInstances: 1 keeps one instance warm so payment requests never hit a
+// scale-from-zero cold start (which was being aborted as "no available instance").
+exports.createSubscriptionPayment = onCall({ secrets: [stripeSecretKey], minInstances: 1 }, async (request) => {
   try {
     const stripe = getStripe();
     const { userId, priceId, email } = request.data;

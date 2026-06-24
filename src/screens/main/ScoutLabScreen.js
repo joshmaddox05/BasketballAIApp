@@ -1,5 +1,5 @@
 // ScoutLabScreen.js - Athlete's ScoutLab view: exposure, recruiting, scout activity
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   SafeAreaView,
   StyleSheet,
@@ -8,11 +8,18 @@ import {
   TouchableOpacity,
   ScrollView,
   TextInput,
+  Switch,
+  Alert,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
 import { canAccessFeature } from '../../utils/subscription';
+import {
+  getScoutLabProfile,
+  publishScoutLabProfile,
+  unpublishScoutLabProfile,
+} from '../../services/firestoreService';
 
 // ---------------------------------------------------------------------------
 // Mock data – replaced by real API data in production
@@ -141,7 +148,7 @@ function LockedUpgradeCard({ theme, onUpgrade }) {
 // Main Screen
 // ---------------------------------------------------------------------------
 export default function ScoutLabScreen({ navigation }) {
-  const { userData, theme, isDarkMode } = useAppContext();
+  const { user, userData, theme, isDarkMode, evalRankScore } = useAppContext();
 
   const subscription = userData?.subscription || 'free';
   const hasAccess = canAccessFeature('scoutLab', subscription);
@@ -149,6 +156,54 @@ export default function ScoutLabScreen({ navigation }) {
   const name = userData?.displayName || userData?.name || 'Athlete';
   const position = userData?.position || 'PG';
   const grade = userData?.grade || '10th';
+
+  const playerUid = user?.uid;
+  const [directoryVisible, setDirectoryVisible] = useState(false);
+  const [toggling, setToggling] = useState(false);
+
+  // Load the player's current directory visibility on mount.
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      if (!playerUid) return;
+      const profile = await getScoutLabProfile(playerUid);
+      if (active) setDirectoryVisible(!!profile?.directoryVisible);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [playerUid]);
+
+  const handleToggleVisibility = useCallback(
+    async (next) => {
+      if (!playerUid || toggling) return;
+      setToggling(true);
+      setDirectoryVisible(next); // optimistic
+      try {
+        if (next) {
+          await publishScoutLabProfile(playerUid, {
+            name,
+            position: userData?.position || null,
+            evalGrade: evalRankScore?.overallGrade || null,
+            region: userData?.region || null,
+            school: userData?.school || null,
+            classYear: userData?.classYear || userData?.graduationYear || null,
+            height: userData?.height || null,
+            city: userData?.city || null,
+            iqScore: userData?.simCoachIQ ?? null,
+          });
+        } else {
+          await unpublishScoutLabProfile(playerUid);
+        }
+      } catch (error) {
+        setDirectoryVisible(!next); // revert on failure
+        Alert.alert('Error', error.message || 'Could not update your recruiting visibility.');
+      } finally {
+        setToggling(false);
+      }
+    },
+    [playerUid, toggling, name, userData, evalRankScore]
+  );
 
   const handleBoostAction = useCallback(
     (actionId) => {
@@ -233,6 +288,32 @@ export default function ScoutLabScreen({ navigation }) {
                 </Text>
               </View>
             </View>
+          </View>
+        </View>
+
+        {/* ── Recruiting Visibility Toggle ────────────────────────────────── */}
+        <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          <View style={styles.visibilityRow}>
+            <View style={[styles.visibilityIconWrap, { backgroundColor: theme.primary + '18' }]}>
+              <Ionicons name={directoryVisible ? 'eye' : 'eye-off'} size={20} color={theme.primary} />
+            </View>
+            <View style={styles.visibilityText}>
+              <Text style={[styles.cardTitle, { color: theme.text, marginBottom: 2 }]}>
+                Recruiting Visibility
+              </Text>
+              <Text style={[styles.cardSubtitle, { color: theme.textSecondary, marginBottom: 0 }]}>
+                {directoryVisible
+                  ? 'Scouts can find you in prospect search'
+                  : 'Hidden from scout prospect search'}
+              </Text>
+            </View>
+            <Switch
+              value={directoryVisible}
+              onValueChange={handleToggleVisibility}
+              disabled={toggling}
+              trackColor={{ false: theme.border, true: theme.primary }}
+              thumbColor="#fff"
+            />
           </View>
         </View>
 
@@ -404,6 +485,10 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   cardEditLink: { fontSize: 14, fontWeight: '600' },
+
+  visibilityRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  visibilityIconWrap: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+  visibilityText: { flex: 1 },
 
   divider: { height: StyleSheet.hairlineWidth },
 

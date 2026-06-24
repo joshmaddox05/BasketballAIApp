@@ -58,8 +58,12 @@ service cloud.firestore {
         allow write: if isOwner(uid);
       }
 
-      // DBE progress (EvalRank, Blueprint360, SimCoach) - owner read/write,
+      // DBE progress (ShotDNA, EvalRank, Blueprint360, SimCoach) - owner read/write,
       // connected role-holder (parent/coach) read-only for dashboards
+      match /shotDNA/{analysisId} {
+        allow read: if isOwner(uid) || isConnectedTo(uid);
+        allow write: if isOwner(uid);
+      }
       match /evalRankScores/{scoreId} {
         allow read: if isOwner(uid) || isConnectedTo(uid);
         allow write: if isOwner(uid);
@@ -170,10 +174,40 @@ service cloud.firestore {
       allow delete: if isSignedIn() && resource.data.ownerUid == request.auth.uid;
     }
 
-    // ScoutLab prospect directory - signed-in scouts can search/read
+    // ScoutLab prospect directory - signed-in scouts can search/read.
+    // A player publishes/removes their own directory entry (doc id == their uid).
     match /scoutLabProfiles/{profileId} {
       allow read: if isSignedIn();
-      allow write: if false; // Populated by players via their own subcollection / admin sync
+      allow write: if isSignedIn() && profileId == request.auth.uid;
+    }
+
+    // DBE Module: CoachMarket listings - signed-in read, coach owns their listings
+    match /coachMarketListings/{listingId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.coachUid == request.auth.uid;
+      allow update, delete: if isSignedIn() && resource.data.coachUid == request.auth.uid;
+    }
+
+    // DBE Module: HoopCommunity posts - signed-in read, author owns their posts.
+    // Updates allowed for any signed-in user (likes/comment counters).
+    match /hoopCommunityPosts/{postId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.authorUid == request.auth.uid;
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn() && resource.data.authorUid == request.auth.uid;
+    }
+
+    // DBE Module: LegacyVault articles - signed-in read, admin-curated
+    match /legacyVault/{articleId} {
+      allow read: if isSignedIn();
+      allow write: if false; // Admin only
+    }
+
+    // Head-to-head challenge match results - signed-in participants read/write
+    match /challengeMatches/{matchId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn();
+      allow delete: if false;
     }
 
     // Workout templates - public read, admin write only

@@ -22,6 +22,8 @@ import {
   getRecommendationReason,
 } from '../../utils/homeHelpers';
 import { getPersonalizedWorkouts } from '../../services/workoutPersonalizationEngine';
+import ModuleGrid from '../../components/features/ModuleGrid';
+import { getModulesForRole } from '../../config/roleModules';
 
 const shootingThumbnail = require('../../../assets/shooting-thumbnail.jpg');
 const dribblingThumbnail = require('../../../assets/dribbling-thumbnail.png');
@@ -193,18 +195,7 @@ function RecommendedCard({ workout, reason, theme, onPress }) {
   );
 }
 
-const DBE_MODULES = [
-  { key: 'ShotDNA', label: 'ShotDNA™', icon: 'scan-outline', color: '#FF6B00' },
-  { key: 'EvalRank', label: 'EvalRank™', icon: 'stats-chart', color: '#3B82F6' },
-  { key: 'Blueprint360', label: 'Blueprint360™', icon: 'map-outline', color: '#22C55E' },
-  { key: 'SimCoach', label: 'SimCoach™', icon: 'game-controller-outline', color: '#A855F7' },
-  { key: 'ScoutLab', label: 'ScoutLab™', icon: 'search-outline', color: '#F59E0B' },
-  { key: 'CoachMarket', label: 'CoachMarket™', icon: 'storefront-outline', color: '#EC4899' },
-  { key: 'HoopCommunity', label: 'HoopCommunity™', icon: 'people-outline', color: '#06B6D4' },
-  { key: 'LegacyVault', label: 'LegacyVault™', icon: 'library-outline', color: '#8B5CF6' },
-];
-
-function DBEHub({ shotDNAProfile, evalRankScore, simCoachIQScore, theme, navigation }) {
+function DBEHub({ shotDNAProfile, evalRankScore, simCoachIQScore, subscription, theme, navigation }) {
   return (
     <View style={[dbeStyles.hubSection]}>
       {/* Pipeline strip */}
@@ -235,24 +226,13 @@ function DBEHub({ shotDNAProfile, evalRankScore, simCoachIQScore, theme, navigat
       </View>
 
       {/* Module cards */}
-      <Text style={[dbeStyles.modulesTitle, { color: theme.text }]}>Ecosystem Modules</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={dbeStyles.modulesScroll}>
-        <View style={dbeStyles.modulesRow}>
-          {DBE_MODULES.map((mod) => (
-            <TouchableOpacity
-              key={mod.key}
-              style={[dbeStyles.moduleCard, { backgroundColor: theme.card, borderColor: theme.border }]}
-              onPress={() => navigation.navigate(mod.key)}
-              activeOpacity={0.8}
-            >
-              <View style={[dbeStyles.moduleIcon, { backgroundColor: mod.color + '22' }]}>
-                <Ionicons name={mod.icon} size={22} color={mod.color} />
-              </View>
-              <Text style={[dbeStyles.moduleLabel, { color: theme.text }]} numberOfLines={2}>{mod.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </ScrollView>
+      <ModuleGrid
+        title="Ecosystem Modules"
+        modules={getModulesForRole('player')}
+        subscription={subscription}
+        theme={theme}
+        navigation={navigation}
+      />
     </View>
   );
 }
@@ -266,12 +246,6 @@ const dbeStyles = StyleSheet.create({
   pipelineValue: { fontSize: 22, fontWeight: '800' },
   pipelineLabel: { fontSize: 11, marginTop: 2 },
   pipeDivider: { width: 1, height: 32 },
-  modulesTitle: { fontSize: 16, fontWeight: '700', marginBottom: 10 },
-  modulesScroll: { marginHorizontal: -16 },
-  modulesRow: { flexDirection: 'row', paddingHorizontal: 16, gap: 10 },
-  moduleCard: { width: 88, borderRadius: 14, borderWidth: 1, padding: 12, alignItems: 'center', gap: 8 },
-  moduleIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  moduleLabel: { fontSize: 10, fontWeight: '600', textAlign: 'center', lineHeight: 13 },
 });
 
 function EmptyWorkoutsState({ theme, onPress }) {
@@ -430,6 +404,7 @@ export default function HomeScreen({ navigation }) {
           shotDNAProfile={shotDNAProfile}
           evalRankScore={evalRankScore}
           simCoachIQScore={simCoachIQScore}
+          subscription={subscription}
           theme={theme}
           navigation={navigation}
         />

@@ -6,6 +6,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAppContext } from '../../context/AppContext';
 import { getLinkedPlayers, getLinkedPlayerSummary } from '../../services/firestoreService';
+import ModuleGrid from '../../components/features/ModuleGrid';
+import { getModulesForRole } from '../../config/roleModules';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Data mapping helpers (Firestore docs -> presentational shapes)
@@ -314,6 +316,17 @@ export default function CoachHomeScreen({ navigation }) {
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: theme.text }]}>Quick Actions</Text>
           <QuickActions theme={theme} onAction={handleQuickAction} />
+        </View>
+
+        {/* Coach Tools */}
+        <View style={styles.section}>
+          <ModuleGrid
+            title="Coach Tools"
+            modules={getModulesForRole('coach')}
+            subscription={userData?.subscription || 'free'}
+            theme={theme}
+            navigation={navigation}
+          />
         </View>
 
         {/* My Athletes */}

@@ -1,5 +1,5 @@
-// ProgressReportScreen.js - Parent view of linked child's EvalRank + Blueprint360 progress
-import React from 'react';
+// ProgressReportScreen.js - Parent view of the linked child's EvalRank + Blueprint360 progress
+import React, { useState, useCallback } from 'react';
 import {
   SafeAreaView,
   StyleSheet,
@@ -7,89 +7,208 @@ import {
   Text,
   TouchableOpacity,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAppContext } from '../../context/AppContext';
+import { getLinkedPlayers, getLinkedPlayerSummary } from '../../services/firestoreService';
 
-const MOCK_SKILLS = [
-  { label: 'Shooting', pct: 72, grade: 'B+' },
-  { label: 'Dribbling', pct: 65, grade: 'B' },
-  { label: 'Defense', pct: 54, grade: 'C+' },
-  { label: 'Basketball IQ', pct: 78, grade: 'B+' },
-  { label: 'Athleticism', pct: 81, grade: 'A-' },
-];
+// ─────────────────────────────────────────────────────────────────────────────
+// Data mapping helpers (Firestore docs -> presentational shapes)
+// ─────────────────────────────────────────────────────────────────────────────
 
-const MOCK_MILESTONES = [
-  { id: 'm1', label: '5-Day Training Streak', date: 'Jun 10', done: true },
-  { id: 'm2', label: 'First EvalRank Assessment', date: 'Jun 6', done: true },
-  { id: 'm3', label: 'Blueprint360 Plan Started', date: 'Jun 1', done: true },
-  { id: 'm4', label: 'ShotDNA Archetype Unlocked', date: 'Upcoming', done: false },
-];
+const gradeColorFor = (grade, theme) => {
+  const g = (grade || '').toUpperCase();
+  if (g.startsWith('A')) return '#22C55E';
+  if (g.startsWith('B')) return theme.primary;
+  if (g.startsWith('C')) return '#F59E0B';
+  if (g.startsWith('D')) return '#EF4444';
+  return theme.textSecondary;
+};
+
+// Fallback percentage when an EvalRank skill has no numeric score
+const gradeToPct = (grade) => {
+  const g = (grade || '').toUpperCase();
+  if (g.startsWith('A')) return 88;
+  if (g.startsWith('B')) return 74;
+  if (g.startsWith('C')) return 58;
+  if (g.startsWith('D')) return 42;
+  return 50;
+};
+
+// EvalRank skillGrades may be an array of { label, grade, score } (canonical)
+// or an object of { label: grade }. Normalise both to { label, grade, pct }.
+const mapSkills = (evalRank) => {
+  const raw = evalRank?.skillGrades;
+  if (Array.isArray(raw)) {
+    return raw.map((s) => ({
+      label: s.label,
+      grade: s.grade,
+      pct: typeof s.score === 'number' ? s.score : gradeToPct(s.grade),
+    }));
+  }
+  if (raw && typeof raw === 'object') {
+    return Object.entries(raw).map(([label, grade]) => ({ label, grade, pct: gradeToPct(grade) }));
+  }
+  return [];
+};
+
+const toDate = (value) => {
+  if (!value) return null;
+  if (value.toDate) return value.toDate();
+  if (value.seconds) return new Date(value.seconds * 1000);
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? null : d;
+};
+
+const formatWhen = (value) => {
+  const d = toDate(value);
+  if (!d) return '';
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+};
+
+const mapMilestones = (achievements) =>
+  (achievements || []).slice(0, 5).map((a) => ({
+    id: a.id,
+    label: a.title || a.name || 'Achievement',
+    date: formatWhen(a.unlockedAt) || 'Earned',
+    done: true,
+  }));
 
 function SkillBar({ skill, theme }) {
-  const gradeColor =
-    skill.pct >= 80 ? '#22C55E' :
-    skill.pct >= 65 ? theme.primary :
-    '#F59E0B';
-
+  const color = gradeColorFor(skill.grade, theme);
   return (
     <View style={styles.skillRow}>
       <View style={styles.skillLabelRow}>
         <Text style={[styles.skillLabel, { color: theme.text }]}>{skill.label}</Text>
         <View style={styles.skillRightRow}>
-          <Text style={[styles.skillPct, { color: gradeColor }]}>{skill.pct}%</Text>
-          <View style={[styles.gradePill, { backgroundColor: gradeColor + '18' }]}>
-            <Text style={[styles.gradeText, { color: gradeColor }]}>{skill.grade}</Text>
+          <Text style={[styles.skillPct, { color }]}>{skill.pct}%</Text>
+          <View style={[styles.gradePill, { backgroundColor: color + '18' }]}>
+            <Text style={[styles.gradeText, { color }]}>{skill.grade}</Text>
           </View>
         </View>
       </View>
       <View style={[styles.skillTrack, { backgroundColor: theme.border }]}>
-        <View style={[styles.skillFill, { width: `${skill.pct}%`, backgroundColor: gradeColor }]} />
+        <View style={[styles.skillFill, { width: `${skill.pct}%`, backgroundColor: color }]} />
       </View>
     </View>
   );
 }
 
+function EmptyHint({ text, theme }) {
+  return <Text style={[styles.emptyHint, { color: theme.textSecondary }]}>{text}</Text>;
+}
+
 export default function ProgressReportScreen({ navigation }) {
-  const { userData, theme, isDarkMode, evalRankScore, blueprint360Plan } = useAppContext();
+  const { user, theme, isDarkMode } = useAppContext();
+  const parentUid = user?.uid;
 
-  const childName = userData?.linkedChildName || 'Your Child';
-  const overallGrade = evalRankScore?.overallGrade || 'B+';
-  const gradeColor = overallGrade.startsWith('A') ? '#22C55E' : overallGrade.startsWith('B') ? theme.primary : '#F59E0B';
+  const [loading, setLoading] = useState(true);
+  const [child, setChild] = useState(null);
+  const [evalRank, setEvalRank] = useState(null);
+  const [blueprint, setBlueprint] = useState(null);
+  const [milestones, setMilestones] = useState([]);
 
-  const skillGrades = evalRankScore?.skillGrades;
-  const skills = skillGrades
-    ? Object.entries(skillGrades).map(([label, grade]) => ({
-        label,
-        grade,
-        pct: grade.startsWith('A') ? 85 : grade.startsWith('B') ? 72 : 54,
-      }))
-    : MOCK_SKILLS;
+  const loadChild = useCallback(async () => {
+    if (!parentUid) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      const linkedPlayers = await getLinkedPlayers(parentUid);
+      const linked = linkedPlayers[0];
+      if (!linked) {
+        setChild(null);
+        return;
+      }
+      const summary = await getLinkedPlayerSummary(linked.uid);
+      setChild({ name: summary.profile?.displayName || linked.name || 'Your Child' });
+      setEvalRank(summary.evalRank);
+      setBlueprint(summary.blueprint);
+      setMilestones(mapMilestones(summary.achievements));
+    } finally {
+      setLoading(false);
+    }
+  }, [parentUid]);
 
-  const todayWorkout = blueprint360Plan?.todayWorkout?.title || 'Shooting Form Fundamentals';
-  const daysCompleted = blueprint360Plan?.weekProgress || 3;
+  useFocusEffect(
+    useCallback(() => {
+      loadChild();
+    }, [loadChild])
+  );
+
+  const renderHeader = (subtitle) => (
+    <View style={[styles.header, { borderBottomColor: theme.border }]}>
+      <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+        <Ionicons name="arrow-back" size={24} color={theme.text} />
+      </TouchableOpacity>
+      <View>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>Progress Report</Text>
+        {subtitle ? <Text style={[styles.headerSub, { color: theme.textSecondary }]}>{subtitle}</Text> : null}
+      </View>
+      <TouchableOpacity
+        style={[styles.messageBtn, { backgroundColor: theme.primary + '18' }]}
+        onPress={() => navigation.navigate('Messaging')}
+        activeOpacity={0.7}
+      >
+        <Ionicons name="chatbubble-outline" size={20} color={theme.primary} />
+      </TouchableOpacity>
+    </View>
+  );
+
+  // Loading state
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+        <StatusBar style={isDarkMode ? 'light' : 'dark'} />
+        {renderHeader()}
+        <View style={styles.centered}>
+          <ActivityIndicator color={theme.primary} size="large" />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Empty state — no linked child
+  if (!child) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+        <StatusBar style={isDarkMode ? 'light' : 'dark'} />
+        {renderHeader()}
+        <View style={styles.centered}>
+          <View style={[styles.emptyIconWrap, { backgroundColor: theme.primary + '18' }]}>
+            <Ionicons name="people-outline" size={36} color={theme.primary} />
+          </View>
+          <Text style={[styles.emptyTitle, { color: theme.text }]}>Link your child</Text>
+          <Text style={[styles.emptySub, { color: theme.textSecondary }]}>
+            Connect to your child's account with their invite code to follow their training and progress.
+          </Text>
+          <TouchableOpacity
+            style={[styles.emptyButton, { backgroundColor: theme.primary }]}
+            onPress={() => navigation.navigate('LinkAccount', { onLinked: loadChild })}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="link" size={18} color="#FFFFFF" />
+            <Text style={styles.emptyButtonText}>Link Your Child</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const overallGrade = evalRank?.overallGrade || '--';
+  const gradeColor = gradeColorFor(overallGrade, theme);
+  const skills = mapSkills(evalRank);
+  const todayWorkout = blueprint?.todayWorkout?.title;
+  const daysCompleted = blueprint?.weekProgress ?? 0;
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <StatusBar style={isDarkMode ? 'light' : 'dark'} />
-
-      <View style={[styles.header, { borderBottomColor: theme.border }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={theme.text} />
-        </TouchableOpacity>
-        <View>
-          <Text style={[styles.headerTitle, { color: theme.text }]}>Progress Report</Text>
-          <Text style={[styles.headerSub, { color: theme.textSecondary }]}>{childName}</Text>
-        </View>
-        <TouchableOpacity
-          style={[styles.messageBtn, { backgroundColor: theme.primary + '18' }]}
-          onPress={() => navigation.navigate('Messaging')}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="chatbubble-outline" size={20} color={theme.primary} />
-        </TouchableOpacity>
-      </View>
+      {renderHeader(child.name)}
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* Overall EvalRank Grade */}
@@ -102,12 +221,11 @@ export default function ProgressReportScreen({ navigation }) {
             <View style={styles.gradeInfo}>
               <Text style={[styles.gradeTitle, { color: theme.text }]}>Overall Grade</Text>
               <Text style={[styles.gradeDesc, { color: theme.textSecondary }]}>
-                Based on latest evaluation across all skill areas
+                {evalRank
+                  ? 'Based on latest evaluation across all skill areas'
+                  : 'No evaluation completed yet'}
               </Text>
-              <TouchableOpacity
-                onPress={() => navigation.navigate('EvalRank')}
-                activeOpacity={0.7}
-              >
+              <TouchableOpacity onPress={() => navigation.navigate('EvalRank')} activeOpacity={0.7}>
                 <Text style={[styles.viewLink, { color: theme.primary }]}>View Full Evaluation →</Text>
               </TouchableOpacity>
             </View>
@@ -117,57 +235,71 @@ export default function ProgressReportScreen({ navigation }) {
         {/* Skill Breakdown */}
         <Text style={[styles.sectionTitle, { color: theme.text }]}>Skill Breakdown</Text>
         <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          {skills.slice(0, 5).map((s) => (
-            <SkillBar key={s.label} skill={s} theme={theme} />
-          ))}
+          {skills.length > 0 ? (
+            skills.slice(0, 5).map((s) => <SkillBar key={s.label} skill={s} theme={theme} />)
+          ) : (
+            <EmptyHint text="No skill evaluation yet. Encourage your child to complete an EvalRank assessment." theme={theme} />
+          )}
         </View>
 
         {/* Blueprint360 Summary */}
         <Text style={[styles.sectionTitle, { color: theme.text }]}>Blueprint360™ Plan</Text>
         <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <View style={styles.planRow}>
-            <View style={[styles.planIcon, { backgroundColor: '#22C55E18' }]}>
-              <Ionicons name="map-outline" size={20} color="#22C55E" />
-            </View>
-            <View style={styles.planInfo}>
-              <Text style={[styles.planLabel, { color: theme.text }]}>Today's Focus</Text>
-              <Text style={[styles.planTitle, { color: theme.primary }]}>{todayWorkout}</Text>
-            </View>
-          </View>
-          <View style={[styles.divider, { backgroundColor: theme.border }]} />
-          <View style={styles.weekRow}>
-            <Text style={[styles.weekLabel, { color: theme.textSecondary }]}>This Week</Text>
-            <View style={styles.dots}>
-              {[0, 1, 2, 3, 4].map((i) => (
-                <View
-                  key={i}
-                  style={[styles.dot, { backgroundColor: i < daysCompleted ? theme.primary : theme.border }]}
-                />
-              ))}
-            </View>
-            <Text style={[styles.weekCount, { color: theme.primary }]}>{daysCompleted}/5 days</Text>
-          </View>
+          {blueprint ? (
+            <>
+              <View style={styles.planRow}>
+                <View style={[styles.planIcon, { backgroundColor: '#22C55E18' }]}>
+                  <Ionicons name="map-outline" size={20} color="#22C55E" />
+                </View>
+                <View style={styles.planInfo}>
+                  <Text style={[styles.planLabel, { color: theme.text }]}>Today's Focus</Text>
+                  <Text style={[styles.planTitle, { color: theme.primary }]}>
+                    {todayWorkout || 'Rest day'}
+                  </Text>
+                </View>
+              </View>
+              <View style={[styles.divider, { backgroundColor: theme.border }]} />
+              <View style={styles.weekRow}>
+                <Text style={[styles.weekLabel, { color: theme.textSecondary }]}>This Week</Text>
+                <View style={styles.dots}>
+                  {[0, 1, 2, 3, 4].map((i) => (
+                    <View
+                      key={i}
+                      style={[styles.dot, { backgroundColor: i < daysCompleted ? theme.primary : theme.border }]}
+                    />
+                  ))}
+                </View>
+                <Text style={[styles.weekCount, { color: theme.primary }]}>{daysCompleted}/5 days</Text>
+              </View>
+            </>
+          ) : (
+            <EmptyHint text="No active training plan yet." theme={theme} />
+          )}
         </View>
 
         {/* Recent Milestones */}
         <Text style={[styles.sectionTitle, { color: theme.text }]}>Recent Milestones</Text>
         <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          {MOCK_MILESTONES.map((m, i) => (
-            <View key={m.id}>
-              <View style={styles.milestoneRow}>
-                <View style={[styles.milestoneDot, { backgroundColor: m.done ? '#22C55E18' : theme.border + '40' }]}>
-                  <Ionicons name={m.done ? 'checkmark-circle' : 'time-outline'} size={18} color={m.done ? '#22C55E' : theme.textSecondary} />
+          {milestones.length > 0 ? (
+            milestones.map((m, i) => (
+              <View key={m.id}>
+                <View style={styles.milestoneRow}>
+                  <View style={[styles.milestoneDot, { backgroundColor: m.done ? '#22C55E18' : theme.border + '40' }]}>
+                    <Ionicons name={m.done ? 'checkmark-circle' : 'time-outline'} size={18} color={m.done ? '#22C55E' : theme.textSecondary} />
+                  </View>
+                  <View style={styles.milestoneInfo}>
+                    <Text style={[styles.milestoneLabel, { color: m.done ? theme.text : theme.textSecondary }]}>
+                      {m.label}
+                    </Text>
+                    <Text style={[styles.milestoneDate, { color: theme.textSecondary }]}>{m.date}</Text>
+                  </View>
                 </View>
-                <View style={styles.milestoneInfo}>
-                  <Text style={[styles.milestoneLabel, { color: m.done ? theme.text : theme.textSecondary }]}>
-                    {m.label}
-                  </Text>
-                  <Text style={[styles.milestoneDate, { color: theme.textSecondary }]}>{m.date}</Text>
-                </View>
+                {i < milestones.length - 1 && <View style={[styles.divider, { backgroundColor: theme.border }]} />}
               </View>
-              {i < MOCK_MILESTONES.length - 1 && <View style={[styles.divider, { backgroundColor: theme.border }]} />}
-            </View>
-          ))}
+            ))
+          ) : (
+            <EmptyHint text="No milestones earned yet." theme={theme} />
+          )}
         </View>
 
         {/* Message Coach CTA */}
@@ -206,6 +338,8 @@ const styles = StyleSheet.create({
 
   card: { borderRadius: 14, borderWidth: 1, padding: 16, marginBottom: 4 },
   divider: { height: 1, marginVertical: 10 },
+
+  emptyHint: { fontSize: 13, lineHeight: 19 },
 
   gradeCard: { borderRadius: 16, borderWidth: 1, padding: 16, marginBottom: 4 },
   gradeCardInner: { flexDirection: 'row', alignItems: 'center', gap: 16 },
@@ -262,4 +396,12 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   ctaBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+
+  // Loading / empty states
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
+  emptyIconWrap: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  emptyTitle: { fontSize: 18, fontWeight: '700', marginBottom: 8 },
+  emptySub: { fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 20 },
+  emptyButton: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 24, paddingVertical: 13, borderRadius: 12 },
+  emptyButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
 });

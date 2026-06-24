@@ -250,34 +250,36 @@ const ProfileScreen = ({ navigation }) => {
                         <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
                     </TouchableOpacity>
 
-                    <TouchableOpacity
-                        style={[styles.settingItem, { borderBottomColor: theme.border }]}
-                        onPress={() => {
-                            Alert.alert(
-                                'Take a Tour',
-                                'Would you like to take the app tour again?',
-                                [
-                                    { text: 'Cancel', style: 'cancel' },
-                                    {
-                                        text: 'Start Tour',
-                                        onPress: async () => {
-                                            await resetTour();
-                                            navigation.navigate('Home');
-                                            setTimeout(() => {
-                                                startTour();
-                                            }, 500);
+                    {(!userData?.role || userData?.role === 'player') && (
+                        <TouchableOpacity
+                            style={[styles.settingItem, { borderBottomColor: theme.border }]}
+                            onPress={() => {
+                                Alert.alert(
+                                    'Take a Tour',
+                                    'Would you like to take the app tour again?',
+                                    [
+                                        { text: 'Cancel', style: 'cancel' },
+                                        {
+                                            text: 'Start Tour',
+                                            onPress: async () => {
+                                                await resetTour();
+                                                navigation.navigate('Home');
+                                                setTimeout(() => {
+                                                    startTour();
+                                                }, 500);
+                                            }
                                         }
-                                    }
-                                ]
-                            );
-                        }}
-                    >
-                        <View style={styles.settingLeft}>
-                            <Ionicons name="compass-outline" size={24} color={theme.textSecondary} />
-                            <Text style={[styles.settingLabel, { color: theme.text }]}>Take a Tour</Text>
-                        </View>
-                        <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
-                    </TouchableOpacity>
+                                    ]
+                                );
+                            }}
+                        >
+                            <View style={styles.settingLeft}>
+                                <Ionicons name="compass-outline" size={24} color={theme.textSecondary} />
+                                <Text style={[styles.settingLabel, { color: theme.text }]}>Take a Tour</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
+                        </TouchableOpacity>
+                    )}
 
                     <TouchableOpacity
                         style={[styles.settingItem, { borderBottomWidth: 0 }]}
