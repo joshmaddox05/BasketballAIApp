@@ -40,14 +40,9 @@ const TrainingCategoryScreen = ({ route, navigation }) => {
         return !hasAccess(userSubscription, requiredTier);
     };
 
-    // Get display name for required tier
+    // Get display name for required tier (two-tier model: Free or Pro)
     const getTierDisplayName = (tier) => {
-        switch (tier) {
-            case SUBSCRIPTION_TIERS.BASIC: return 'Basic';
-            case SUBSCRIPTION_TIERS.PREMIUM: return 'Premium';
-            case SUBSCRIPTION_TIERS.PRO: return 'Pro';
-            default: return 'Premium';
-        }
+        return tier === SUBSCRIPTION_TIERS.FREE ? 'Free' : 'Pro';
     };
 
     // Check if a workout is recommended for the current user

@@ -19,6 +19,7 @@ import {
   getScoutLabProfile,
   publishScoutLabProfile,
   unpublishScoutLabProfile,
+  isHighSchoolGrade,
 } from '../../services/firestoreService';
 
 // ---------------------------------------------------------------------------
@@ -148,7 +149,7 @@ function LockedUpgradeCard({ theme, onUpgrade }) {
 // Main Screen
 // ---------------------------------------------------------------------------
 export default function ScoutLabScreen({ navigation }) {
-  const { user, userData, theme, isDarkMode, evalRankScore } = useAppContext();
+  const { user, userData, theme, isDarkMode, evalRankScore, shotDNAProfile } = useAppContext();
 
   const subscription = userData?.subscription || 'free';
   const hasAccess = canAccessFeature('scoutLab', subscription);
@@ -177,20 +178,29 @@ export default function ScoutLabScreen({ navigation }) {
   const handleToggleVisibility = useCallback(
     async (next) => {
       if (!playerUid || toggling) return;
+      // Discovery is high-school only (grades 9–12). Guard before publishing.
+      if (next && !isHighSchoolGrade(userData?.gradeLevel)) {
+        Alert.alert(
+          'High-school athletes only',
+          'Scout discovery is available to high-school athletes (grades 9–12). Set your grade level in Edit Profile to enable it.'
+        );
+        return;
+      }
       setToggling(true);
       setDirectoryVisible(next); // optimistic
       try {
         if (next) {
+          // Per COO policy the public entry is minimal: name, grade, size,
+          // position, archetype, main attributes, evaluation score only.
           await publishScoutLabProfile(playerUid, {
             name,
+            gradeLevel: userData?.gradeLevel,
             position: userData?.position || null,
-            evalGrade: evalRankScore?.overallGrade || null,
-            region: userData?.region || null,
-            school: userData?.school || null,
-            classYear: userData?.classYear || userData?.graduationYear || null,
             height: userData?.height || null,
-            city: userData?.city || null,
-            iqScore: userData?.simCoachIQ ?? null,
+            archetype: shotDNAProfile?.archetype || null,
+            mainAttributes: userData?.preferences?.focusAreas || null,
+            evaluationScore: evalRankScore?.overallGrade || null,
+            region: userData?.region || null,
           });
         } else {
           await unpublishScoutLabProfile(playerUid);
@@ -202,7 +212,7 @@ export default function ScoutLabScreen({ navigation }) {
         setToggling(false);
       }
     },
-    [playerUid, toggling, name, userData, evalRankScore]
+    [playerUid, toggling, name, userData, evalRankScore, shotDNAProfile]
   );
 
   const handleBoostAction = useCallback(

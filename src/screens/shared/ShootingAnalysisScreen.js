@@ -673,11 +673,9 @@ const ShootingAnalysisScreen = ({ navigation }) => {
                                     [{
                                         text: 'OK',
                                         onPress: () => {
-                                            // Reset navigation to main tab with Home screen
-                                            navigation.reset({
-                                                index: 0,
-                                                routes: [{ name: 'Training', params: { screen: 'TrainingMain' } }],
-                                            });
+                                            // Land the user in the Training browser (now a pushed
+                                            // screen folded under Blueprint360, not a tab).
+                                            navigation.navigate('Training');
                                         }
                                     }]
                                 );

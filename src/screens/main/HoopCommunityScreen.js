@@ -270,6 +270,23 @@ const HoopCommunityScreen = ({ navigation }) => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {/* Challenges live inside HoopCommunity now that the Challenges tab was folded in. */}
+        <TouchableOpacity
+          style={[styles.challengeBanner, { backgroundColor: theme.card || '#1C1C1E', borderColor: theme.border || '#2C2C2E' }]}
+          activeOpacity={0.85}
+          onPress={() => navigation.navigate('Challenges')}
+        >
+          <View style={[styles.challengeIcon, { backgroundColor: '#FF6B0022' }]}>
+            <Ionicons name="trophy" size={22} color="#FF6B00" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.challengeTitle, { color: theme.text || '#FFFFFF' }]}>Challenges</Text>
+            <Text style={[styles.challengeSub, { color: theme.textSecondary || '#8E8E93' }]}>
+              Compete solo, head-to-head, or in groups
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={theme.textSecondary || '#8E8E93'} />
+        </TouchableOpacity>
         {posts.map(post => renderPostCard(post))}
         <View style={styles.bottomPad} />
       </ScrollView>
@@ -448,6 +465,24 @@ const styles = StyleSheet.create({
   bottomPad: {
     height: 90,
   },
+  challengeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    marginBottom: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  challengeIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  challengeTitle: { fontSize: 16, fontWeight: '700' },
+  challengeSub: { fontSize: 12, marginTop: 2 },
   fab: {
     position: 'absolute',
     bottom: 24,

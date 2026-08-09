@@ -1,0 +1,36 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Profile images
+    match /users/{userId}/profile/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth.uid == userId
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+
+    // Activity images
+    match /users/{userId}/activities/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth.uid == userId
+                   && request.resource.size < 10 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+
+    // SimCoach game film (owner-only video upload)
+    match /users/{userId}/films/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth.uid == userId
+                   && request.resource.size < 500 * 1024 * 1024
+                   && request.resource.contentType.matches('video/.*');
+    }
+
+    // CoachMarket drill videos (owner-only video upload)
+    match /users/{userId}/drills/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth.uid == userId
+                   && request.resource.size < 500 * 1024 * 1024
+                   && request.resource.contentType.matches('video/.*');
+    }
+  }
+}

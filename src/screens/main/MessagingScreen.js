@@ -1,5 +1,5 @@
-// MessagingScreen.js - Shared messaging UI for coach, scout, and parent roles
-import React, { useState, useCallback } from 'react';
+// MessagingScreen.js - Real-time 1:1 chat (inbox + thread) for all roles.
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   SafeAreaView,
   StyleSheet,
@@ -10,42 +10,80 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
+  Modal,
+  Image,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
+import {
+  listenToConversations,
+  listenToMessages,
+  sendMessage,
+  markConversationRead,
+  getOrCreateConversation,
+  getMessageableContacts,
+} from '../../services/firestoreService';
 
-const MOCK_THREADS = {
-  coach: [
-    { id: 't1', name: 'Marcus Johnson', role: 'Athlete', lastMessage: "Coach, when is our next session?", time: '2m', unread: 2, avatar: 'MJ' },
-    { id: 't2', name: 'Darius Williams', role: 'Athlete', lastMessage: 'I worked on those footwork drills.', time: '1h', unread: 0, avatar: 'DW' },
-    { id: 't3', name: 'Kevin Torres', role: 'Athlete', lastMessage: 'My jumper has been feeling off.', time: '3h', unread: 1, avatar: 'KT' },
-    { id: 't4', name: 'Sarah (Parent)', role: 'Parent', lastMessage: "Can we schedule a call to discuss Marcus's progress?", time: '1d', unread: 0, avatar: 'S' },
-  ],
-  scout: [
-    { id: 't1', name: 'Marcus Johnson', role: 'Athlete', lastMessage: 'Thanks for watching my game!', time: '30m', unread: 1, avatar: 'MJ' },
-    { id: 't2', name: 'Coach Davis', role: 'Coach', lastMessage: "Here's his updated highlights.", time: '2h', unread: 0, avatar: 'CD' },
-    { id: 't3', name: 'TJ Wright', role: 'Athlete', lastMessage: "I'm interested in your program.", time: '1d', unread: 3, avatar: 'TW' },
-  ],
-  parent: [
-    { id: 't1', name: 'Coach Davis', role: 'Coach', lastMessage: "Marcus had a great session today.", time: '1h', unread: 1, avatar: 'CD' },
-    { id: 't2', name: 'Marcus Johnson', role: 'Child', lastMessage: 'Mom, can you pick me up at 6?', time: '3h', unread: 0, avatar: 'MJ' },
-    { id: 't3', name: 'Academy Admin', role: 'Admin', lastMessage: 'Your payment receipt is attached.', time: '2d', unread: 0, avatar: 'AA' },
-  ],
-  player: [
-    { id: 't1', name: 'Coach Davis', role: 'Coach', lastMessage: 'Great session today. Keep it up!', time: '2h', unread: 0, avatar: 'CD' },
-    { id: 't2', name: 'Academy', role: 'Admin', lastMessage: 'Your next session is tomorrow at 4pm.', time: '1d', unread: 1, avatar: 'A' },
-  ],
+// ─── helpers ────────────────────────────────────────────────────────────────
+const toDate = (value) => {
+  if (!value) return null;
+  if (value.toDate) return value.toDate();
+  if (value.seconds) return new Date(value.seconds * 1000);
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? null : d;
 };
 
-const MOCK_MESSAGES = [
-  { id: 'm1', from: 'other', text: "Hey, how's your training going?", time: '10:00 AM' },
-  { id: 'm2', from: 'me', text: 'Really well! My shot feels great this week.', time: '10:02 AM' },
-  { id: 'm3', from: 'other', text: "That's awesome. Keep working on the footwork.", time: '10:05 AM' },
-  { id: 'm4', from: 'me', text: "Will do. When's our next session?", time: '10:07 AM' },
-  { id: 'm5', from: 'other', text: 'Wednesday at 4pm. I will send you the game plan beforehand.', time: '10:08 AM' },
-];
+const initialsOf = (name) =>
+  (name || 'User').split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase();
 
+const timeAgo = (value) => {
+  const d = toDate(value);
+  if (!d) return '';
+  const s = Math.floor((Date.now() - d.getTime()) / 1000);
+  if (s < 60) return 'now';
+  if (s < 3600) return `${Math.floor(s / 60)}m`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h`;
+  return `${Math.floor(s / 86400)}d`;
+};
+
+const clockTime = (value) => {
+  const d = toDate(value);
+  return d ? d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '';
+};
+
+// Map a conversation doc → the thread shape ThreadItem renders.
+const mapThread = (conv, myUid) => {
+  const otherUid = (conv.participants || []).find((p) => p !== myUid);
+  const info = (conv.participantInfo || {})[otherUid] || {};
+  const lastRead = toDate(conv.lastRead?.[myUid]);
+  const lastAt = toDate(conv.lastMessageAt);
+  const unread = !!conv.lastMessage && conv.lastSenderUid !== myUid && (!lastRead || (lastAt && lastAt > lastRead));
+  return {
+    convId: conv.id,
+    otherUid,
+    name: info.name || 'User',
+    photoURL: info.photoURL || null,
+    lastMessage: conv.lastMessage || 'No messages yet',
+    time: timeAgo(conv.lastMessageAt),
+    unread,
+  };
+};
+
+// ─── Avatar ─────────────────────────────────────────────────────────────────
+function Avatar({ name, photoURL, size, theme }) {
+  if (photoURL) {
+    return <Image source={{ uri: photoURL }} style={{ width: size, height: size, borderRadius: size / 2 }} />;
+  }
+  return (
+    <View style={[styles.avatar, { width: size, height: size, borderRadius: size / 2, backgroundColor: theme.primary + '25' }]}>
+      <Text style={[styles.avatarText, { color: theme.primary, fontSize: size * 0.34 }]}>{initialsOf(name)}</Text>
+    </View>
+  );
+}
+
+// ─── Thread row ──────────────────────────────────────────────────────────────
 function ThreadItem({ thread, theme, onPress }) {
   return (
     <TouchableOpacity
@@ -53,47 +91,57 @@ function ThreadItem({ thread, theme, onPress }) {
       onPress={() => onPress(thread)}
       activeOpacity={0.75}
     >
-      <View style={[styles.avatar, { backgroundColor: theme.primary + '25' }]}>
-        <Text style={[styles.avatarText, { color: theme.primary }]}>{thread.avatar}</Text>
-      </View>
+      <Avatar name={thread.name} photoURL={thread.photoURL} size={48} theme={theme} />
       <View style={styles.threadInfo}>
         <View style={styles.threadTopRow}>
           <Text style={[styles.threadName, { color: theme.text }]}>{thread.name}</Text>
           <Text style={[styles.threadTime, { color: theme.textSecondary }]}>{thread.time}</Text>
         </View>
         <View style={styles.threadBottomRow}>
-          <Text style={[styles.threadLast, { color: theme.textSecondary }]} numberOfLines={1}>
+          <Text
+            style={[styles.threadLast, { color: thread.unread ? theme.text : theme.textSecondary, fontWeight: thread.unread ? '700' : '400' }]}
+            numberOfLines={1}
+          >
             {thread.lastMessage}
           </Text>
-          {thread.unread > 0 && (
-            <View style={[styles.unreadBadge, { backgroundColor: theme.primary }]}>
-              <Text style={styles.unreadCount}>{thread.unread}</Text>
-            </View>
-          )}
-        </View>
-        <View style={[styles.rolePill, { backgroundColor: theme.border }]}>
-          <Text style={[styles.roleText, { color: theme.textSecondary }]}>{thread.role}</Text>
+          {thread.unread && <View style={[styles.unreadDot, { backgroundColor: theme.primary }]} />}
         </View>
       </View>
     </TouchableOpacity>
   );
 }
 
-function ChatView({ thread, theme, onBack }) {
-  const [messages, setMessages] = useState(MOCK_MESSAGES);
+// ─── Chat view ───────────────────────────────────────────────────────────────
+function ChatView({ conversation, myUid, theme, onBack }) {
+  const { convId, name, photoURL } = conversation;
+  const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
+  const [sending, setSending] = useState(false);
+  const scrollRef = useRef(null);
 
-  const handleSend = useCallback(() => {
-    if (!inputText.trim()) return;
-    const newMsg = {
-      id: Date.now().toString(),
-      from: 'me',
-      text: inputText.trim(),
-      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-    };
-    setMessages((prev) => [...prev, newMsg]);
+  useEffect(() => {
+    if (!convId) return undefined;
+    const unsub = listenToMessages(convId, (msgs) => {
+      setMessages(msgs);
+      markConversationRead(convId, myUid);
+      requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
+    });
+    return () => unsub();
+  }, [convId, myUid]);
+
+  const handleSend = useCallback(async () => {
+    const text = inputText.trim();
+    if (!text || sending) return;
     setInputText('');
-  }, [inputText]);
+    setSending(true);
+    try {
+      await sendMessage(convId, { uid: myUid }, text);
+    } catch (_) {
+      setInputText(text); // restore on failure
+    } finally {
+      setSending(false);
+    }
+  }, [inputText, sending, convId, myUid]);
 
   return (
     <KeyboardAvoidingView
@@ -105,42 +153,40 @@ function ChatView({ thread, theme, onBack }) {
         <TouchableOpacity onPress={onBack} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={22} color={theme.text} />
         </TouchableOpacity>
-        <View style={[styles.chatAvatar, { backgroundColor: theme.primary + '25' }]}>
-          <Text style={[styles.chatAvatarText, { color: theme.primary }]}>{thread.avatar}</Text>
-        </View>
+        <Avatar name={name} photoURL={photoURL} size={36} theme={theme} />
         <View style={styles.chatHeaderInfo}>
-          <Text style={[styles.chatName, { color: theme.text }]}>{thread.name}</Text>
-          <Text style={[styles.chatRole, { color: theme.textSecondary }]}>{thread.role}</Text>
+          <Text style={[styles.chatName, { color: theme.text }]}>{name}</Text>
         </View>
       </View>
 
-      <ScrollView
-        contentContainerStyle={styles.messagesContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {messages.map((msg) => (
-          <View
-            key={msg.id}
-            style={[
-              styles.messageBubble,
-              msg.from === 'me'
-                ? [styles.myBubble, { backgroundColor: theme.primary }]
-                : [styles.theirBubble, { backgroundColor: theme.card, borderColor: theme.border }],
-            ]}
-          >
-            <Text style={[styles.messageText, { color: msg.from === 'me' ? '#fff' : theme.text }]}>
-              {msg.text}
-            </Text>
-            <Text
-              style={[
-                styles.messageTime,
-                { color: msg.from === 'me' ? 'rgba(255,255,255,0.65)' : theme.textSecondary },
-              ]}
-            >
-              {msg.time}
+      <ScrollView ref={scrollRef} contentContainerStyle={styles.messagesContent} showsVerticalScrollIndicator={false}>
+        {messages.length === 0 ? (
+          <View style={styles.chatEmpty}>
+            <Text style={[styles.chatEmptyText, { color: theme.textSecondary }]}>
+              No messages yet. Say hello 👋
             </Text>
           </View>
-        ))}
+        ) : (
+          messages.map((msg) => {
+            const mine = msg.senderUid === myUid;
+            return (
+              <View
+                key={msg.id}
+                style={[
+                  styles.messageBubble,
+                  mine
+                    ? [styles.myBubble, { backgroundColor: theme.primary }]
+                    : [styles.theirBubble, { backgroundColor: theme.card, borderColor: theme.border }],
+                ]}
+              >
+                <Text style={[styles.messageText, { color: mine ? '#fff' : theme.text }]}>{msg.text}</Text>
+                <Text style={[styles.messageTime, { color: mine ? 'rgba(255,255,255,0.65)' : theme.textSecondary }]}>
+                  {clockTime(msg.createdAt)}
+                </Text>
+              </View>
+            );
+          })
+        )}
       </ScrollView>
 
       <View style={[styles.inputBar, { backgroundColor: theme.card, borderTopColor: theme.border }]}>
@@ -151,14 +197,12 @@ function ChatView({ thread, theme, onBack }) {
           value={inputText}
           onChangeText={setInputText}
           multiline
-          returnKeyType="send"
-          onSubmitEditing={handleSend}
         />
         <TouchableOpacity
           style={[styles.sendBtn, { backgroundColor: inputText.trim() ? theme.primary : theme.border }]}
           onPress={handleSend}
           activeOpacity={0.85}
-          disabled={!inputText.trim()}
+          disabled={!inputText.trim() || sending}
         >
           <Ionicons name="send" size={18} color="#fff" />
         </TouchableOpacity>
@@ -167,22 +211,113 @@ function ChatView({ thread, theme, onBack }) {
   );
 }
 
-export default function MessagingScreen({ navigation }) {
-  const { userData, theme, isDarkMode } = useAppContext();
-  const role = userData?.role || 'player';
-  const [activeThread, setActiveThread] = useState(null);
+// ─── Compose (contact picker) ────────────────────────────────────────────────
+function ComposeModal({ visible, contacts, onPick, onClose, theme }) {
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+        <View style={[styles.header, { borderBottomColor: theme.border }]}>
+          <TouchableOpacity onPress={onClose}>
+            <Ionicons name="close" size={24} color={theme.text} />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: theme.text }]}>New Message</Text>
+          <View style={{ width: 24 }} />
+        </View>
+        <ScrollView>
+          {contacts.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="people-outline" size={40} color={theme.textSecondary} />
+              <Text style={[styles.emptyTitle, { color: theme.text }]}>No contacts yet</Text>
+              <Text style={[styles.emptySub, { color: theme.textSecondary }]}>
+                Link with an athlete or coach to start messaging.
+              </Text>
+            </View>
+          ) : (
+            contacts.map((c) => (
+              <TouchableOpacity
+                key={c.uid}
+                style={[styles.threadItem, { borderBottomColor: theme.border }]}
+                onPress={() => onPick(c)}
+                activeOpacity={0.75}
+              >
+                <Avatar name={c.name} photoURL={c.photoURL} size={44} theme={theme} />
+                <View style={styles.threadInfo}>
+                  <Text style={[styles.threadName, { color: theme.text }]}>{c.name}</Text>
+                  {!!c.role && <Text style={[styles.threadTime, { color: theme.textSecondary }]}>{c.role}</Text>}
+                </View>
+              </TouchableOpacity>
+            ))
+          )}
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
+  );
+}
 
-  const threads = MOCK_THREADS[role] || MOCK_THREADS.player;
-  const totalUnread = threads.reduce((sum, t) => sum + t.unread, 0);
+// ─── Main ────────────────────────────────────────────────────────────────────
+export default function MessagingScreen({ navigation, route }) {
+  const { user, userData, theme, isDarkMode } = useAppContext();
+  const myUid = user?.uid;
+  const myName = userData?.displayName || userData?.name || 'Me';
+  const myPhoto = userData?.photoURL || null;
 
-  if (activeThread) {
+  const [conversations, setConversations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [activeConv, setActiveConv] = useState(null);
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [contacts, setContacts] = useState([]);
+
+  // Inbox subscription
+  useEffect(() => {
+    if (!myUid) { setLoading(false); return undefined; }
+    const unsub = listenToConversations(myUid, (convs) => {
+      setConversations(convs.map((c) => mapThread(c, myUid)));
+      setLoading(false);
+    });
+    return () => unsub();
+  }, [myUid]);
+
+  // Direct-open when navigated with { otherUid, otherName }
+  useEffect(() => {
+    const otherUid = route.params?.otherUid;
+    if (!otherUid || !myUid) return;
+    (async () => {
+      const convId = await getOrCreateConversation(
+        { uid: myUid, name: myName, photoURL: myPhoto },
+        { uid: otherUid, name: route.params?.otherName, photoURL: route.params?.otherPhotoURL }
+      );
+      setActiveConv({ convId, otherUid, name: route.params?.otherName || 'User', photoURL: route.params?.otherPhotoURL || null });
+    })();
+  }, [route.params?.otherUid]);
+
+  const openThread = useCallback((thread) => {
+    setActiveConv({ convId: thread.convId, otherUid: thread.otherUid, name: thread.name, photoURL: thread.photoURL });
+  }, []);
+
+  const openCompose = useCallback(async () => {
+    setComposeOpen(true);
+    setContacts(await getMessageableContacts(myUid));
+  }, [myUid]);
+
+  const handlePickContact = useCallback(async (c) => {
+    setComposeOpen(false);
+    const convId = await getOrCreateConversation(
+      { uid: myUid, name: myName, photoURL: myPhoto },
+      { uid: c.uid, name: c.name, photoURL: c.photoURL }
+    );
+    setActiveConv({ convId, otherUid: c.uid, name: c.name, photoURL: c.photoURL });
+  }, [myUid, myName, myPhoto]);
+
+  if (activeConv) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
         <StatusBar style={isDarkMode ? 'light' : 'dark'} />
-        <ChatView thread={activeThread} theme={theme} onBack={() => setActiveThread(null)} />
+        <ChatView conversation={activeConv} myUid={myUid} theme={theme} onBack={() => setActiveConv(null)} />
       </SafeAreaView>
     );
   }
+
+  const totalUnread = conversations.filter((t) => t.unread).length;
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
@@ -195,36 +330,45 @@ export default function MessagingScreen({ navigation }) {
         <View>
           <Text style={[styles.headerTitle, { color: theme.text }]}>Messages</Text>
           {totalUnread > 0 && (
-            <Text style={[styles.headerSub, { color: theme.primary }]}>
-              {totalUnread} unread
-            </Text>
+            <Text style={[styles.headerSub, { color: theme.primary }]}>{totalUnread} unread</Text>
           )}
         </View>
         <TouchableOpacity
           style={[styles.composeBtn, { backgroundColor: theme.primary + '18' }]}
+          onPress={openCompose}
           activeOpacity={0.7}
         >
           <Ionicons name="create-outline" size={22} color={theme.primary} />
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {threads.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Ionicons name="chatbubbles-outline" size={44} color={theme.textSecondary} />
-            <Text style={[styles.emptyTitle, { color: theme.text }]}>No messages yet</Text>
-          </View>
-        ) : (
-          threads.map((thread) => (
-            <ThreadItem
-              key={thread.id}
-              thread={thread}
-              theme={theme}
-              onPress={setActiveThread}
-            />
-          ))
-        )}
-      </ScrollView>
+      {loading ? (
+        <ActivityIndicator color={theme.primary} style={{ marginTop: 40 }} />
+      ) : (
+        <ScrollView showsVerticalScrollIndicator={false}>
+          {conversations.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="chatbubbles-outline" size={44} color={theme.textSecondary} />
+              <Text style={[styles.emptyTitle, { color: theme.text }]}>No messages yet</Text>
+              <Text style={[styles.emptySub, { color: theme.textSecondary }]}>
+                Tap the compose button to message a linked athlete or coach.
+              </Text>
+            </View>
+          ) : (
+            conversations.map((thread) => (
+              <ThreadItem key={thread.convId} thread={thread} theme={theme} onPress={openThread} />
+            ))
+          )}
+        </ScrollView>
+      )}
+
+      <ComposeModal
+        visible={composeOpen}
+        contacts={contacts}
+        onPick={handlePickContact}
+        onClose={() => setComposeOpen(false)}
+        theme={theme}
+      />
     </SafeAreaView>
   );
 }
@@ -246,47 +390,25 @@ const styles = StyleSheet.create({
 
   threadItem: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderBottomWidth: 1,
     gap: 12,
   },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: { fontSize: 16, fontWeight: '800' },
+  avatar: { alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontWeight: '800' },
   threadInfo: { flex: 1 },
   threadTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   threadName: { fontSize: 15, fontWeight: '700' },
   threadTime: { fontSize: 11 },
-  threadBottomRow: { flexDirection: 'row', alignItems: 'center', marginTop: 3 },
+  threadBottomRow: { flexDirection: 'row', alignItems: 'center', marginTop: 3, gap: 8 },
   threadLast: { flex: 1, fontSize: 13, lineHeight: 18 },
-  unreadBadge: {
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 5,
-    marginLeft: 8,
-  },
-  unreadCount: { color: '#fff', fontSize: 11, fontWeight: '800' },
-  rolePill: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-    marginTop: 4,
-  },
-  roleText: { fontSize: 10, fontWeight: '600' },
+  unreadDot: { width: 10, height: 10, borderRadius: 5 },
 
-  emptyState: { alignItems: 'center', paddingTop: 80, gap: 10 },
+  emptyState: { alignItems: 'center', paddingTop: 80, gap: 8, paddingHorizontal: 40 },
   emptyTitle: { fontSize: 18, fontWeight: '700' },
+  emptySub: { fontSize: 13, textAlign: 'center', lineHeight: 19 },
 
   // Chat view
   chatHeader: {
@@ -297,18 +419,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     gap: 10,
   },
-  chatAvatar: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  chatAvatarText: { fontSize: 13, fontWeight: '800' },
   chatHeaderInfo: { flex: 1 },
   chatName: { fontSize: 16, fontWeight: '700' },
-  chatRole: { fontSize: 12 },
 
-  messagesContent: { padding: 16, gap: 10 },
-  messageBubble: {
-    maxWidth: '80%',
-    padding: 12,
-    borderRadius: 16,
-  },
+  messagesContent: { padding: 16, gap: 10, flexGrow: 1 },
+  chatEmpty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60 },
+  chatEmptyText: { fontSize: 14 },
+  messageBubble: { maxWidth: '80%', padding: 12, borderRadius: 16 },
   myBubble: { alignSelf: 'flex-end', borderBottomRightRadius: 4 },
   theirBubble: { alignSelf: 'flex-start', borderWidth: 1, borderBottomLeftRadius: 4 },
   messageText: { fontSize: 14, lineHeight: 20 },
@@ -330,11 +447,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     maxHeight: 100,
   },
-  sendBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  sendBtn: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
 });

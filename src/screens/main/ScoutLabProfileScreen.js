@@ -126,24 +126,41 @@ function StatBadge({ badge, theme }) {
 export default function ScoutLabProfileScreen({ navigation, route }) {
   const { userData, theme, isDarkMode } = useAppContext();
 
-  // route.params.uid can be used in production to fetch another user's profile
-  const viewingUid = route?.params?.uid || null;
+  // A scout opens this with { prospect, profile } after parent approval; the
+  // player opens their own with no params. Render the prospect when provided.
+  const prospect = route?.params?.prospect || null;
+  const passedProfile = route?.params?.profile || null;
+  const viewingUid = prospect?.id || prospect?.uid || route?.params?.uid || null;
   const isOwnProfile = !viewingUid || viewingUid === userData?.uid;
 
-  // Profile data – falls back to mock values when not on real user data
-  const name = userData?.displayName || userData?.name || 'Jordan M.';
-  const position = userData?.position || 'PG';
-  const age = userData?.age || 16;
-  const grade = userData?.grade || '10th';
-  const location = userData?.location || 'Los Angeles, CA';
-  const evalGrade = userData?.evalGrade || 'A-';
-  const shotDNA = userData?.shotDNAArchetype || 'Precision Sniper';
-  const blueprintStatus = userData?.blueprint360Status || 'Active';
+  const GRADE_LABEL = { 9: '9th', 10: '10th', 11: '11th', 12: '12th' };
+
+  let name, position, age, grade, location, evalGrade, shotDNA, blueprintStatus;
+  if (isOwnProfile) {
+    name = userData?.displayName || userData?.name || 'Jordan M.';
+    position = userData?.position || 'PG';
+    age = userData?.age || 16;
+    grade = userData?.grade || GRADE_LABEL[userData?.gradeLevel] || '10th';
+    location = userData?.location || 'Los Angeles, CA';
+    evalGrade = userData?.evalGrade || 'A-';
+    shotDNA = userData?.shotDNAArchetype || 'Precision Sniper';
+    blueprintStatus = userData?.blueprint360Status || 'Active';
+  } else {
+    // Scout view — minimal public fields only (no city/school per policy).
+    name = prospect?.name || passedProfile?.displayName || 'Athlete';
+    position = prospect?.position || passedProfile?.position || '—';
+    age = null;
+    grade = GRADE_LABEL[prospect?.gradeLevel ?? passedProfile?.gradeLevel] || '—';
+    location = prospect?.region || null;
+    evalGrade = prospect?.evaluationScore || '—';
+    shotDNA = prospect?.archetype || '—';
+    blueprintStatus = passedProfile?.blueprint ? 'Active' : '—';
+  }
 
   const statBadges = buildStatBadges({ evalGrade, shotDNA, blueprintStatus });
 
   // Profile URL would come from backend in production
-  const profileLink = `https://basketballai.app/profile/${userData?.uid || 'demo'}`;
+  const profileLink = `https://basketballai.app/profile/${viewingUid || userData?.uid || 'demo'}`;
 
   const handleShare = useCallback(async () => {
     try {
@@ -222,14 +239,16 @@ export default function ScoutLabProfileScreen({ navigation, route }) {
               <Text style={[styles.profileName, { color: theme.text }]}>{name}</Text>
               <Text style={[styles.profilePosition, { color: theme.primary }]}>{position}</Text>
               <Text style={[styles.profileDetail, { color: theme.textSecondary }]}>
-                Age {age} · {grade} Grade
+                {age ? `Age ${age} · ` : ''}{grade} Grade
               </Text>
-              <View style={styles.locationRow}>
-                <Ionicons name="location-outline" size={13} color={theme.textTertiary} />
-                <Text style={[styles.locationText, { color: theme.textTertiary }]}>
-                  {location}
-                </Text>
-              </View>
+              {location ? (
+                <View style={styles.locationRow}>
+                  <Ionicons name="location-outline" size={13} color={theme.textTertiary} />
+                  <Text style={[styles.locationText, { color: theme.textTertiary }]}>
+                    {location}
+                  </Text>
+                </View>
+              ) : null}
             </View>
           </View>
 

@@ -6,13 +6,25 @@ import {
     View,
     TouchableOpacity,
     ScrollView,
-    SafeAreaView
+    SafeAreaView,
+    Alert
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
+import { getCurrentUser } from '../../services/authService';
+import { updateUserProfile } from '../../services/firestoreService';
 
 const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+// Grade level drives scout discoverability (high-school only, grades 9–12).
+const GRADE_LEVELS = [
+    { value: 9, label: '9th' },
+    { value: 10, label: '10th' },
+    { value: 11, label: '11th' },
+    { value: 12, label: '12th' },
+    { value: 0, label: 'Not HS' },
+];
 
 const WORKOUT_DURATIONS = [
     { value: 15, label: '15 min' },
@@ -23,7 +35,9 @@ const WORKOUT_DURATIONS = [
 ];
 
 const PersonalizationScreen = ({ navigation }) => {
-    const { userData, updateUserPreferences } = useAppContext();
+    const { userData, updateUserPreferences, updateUserDataLocally } = useAppContext();
+
+    const [gradeLevel, setGradeLevel] = useState(userData?.gradeLevel ?? null);
 
     const [selectedDays, setSelectedDays] = useState({
         Mon: true,
@@ -81,6 +95,15 @@ const PersonalizationScreen = ({ navigation }) => {
             focusAreas: Object.keys(focusAreas).filter(area => focusAreas[area])
         });
 
+        // Persist grade level (root profile field — drives scout discoverability)
+        if (gradeLevel != null) {
+            const user = getCurrentUser();
+            if (user) {
+                updateUserProfile(user.uid, { gradeLevel }).catch(() => {});
+            }
+            updateUserDataLocally({ gradeLevel });
+        }
+
         // Navigate to features intro
         navigation.navigate('FeaturesIntro');
     };
@@ -112,6 +135,34 @@ const PersonalizationScreen = ({ navigation }) => {
                 <Text style={styles.subtitle}>
                     Set your preferences to create a personalized training schedule that works for you.
                 </Text>
+
+                {/* Grade Level */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Grade Level</Text>
+                    <Text style={styles.sectionSubtitle}>Used to determine recruiting eligibility (high-school athletes only)</Text>
+
+                    <View style={styles.durationContainer}>
+                        {GRADE_LEVELS.map(grade => (
+                            <TouchableOpacity
+                                key={grade.value}
+                                style={[
+                                    styles.durationButton,
+                                    gradeLevel === grade.value && styles.selectedDurationButton
+                                ]}
+                                onPress={() => setGradeLevel(grade.value)}
+                            >
+                                <Text
+                                    style={[
+                                        styles.durationButtonText,
+                                        gradeLevel === grade.value && styles.selectedDurationButtonText
+                                    ]}
+                                >
+                                    {grade.label}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </View>
 
                 {/* Training Days */}
                 <View style={styles.section}>

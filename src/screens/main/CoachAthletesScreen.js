@@ -165,7 +165,23 @@ export default function CoachAthletesScreen({ navigation }) {
                 </View>
                 <Text style={[styles.lastSession, { color: theme.textSecondary }]}>Blueprint: {a.blueprintStatus} · Last session {a.lastSession}</Text>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
+              <View style={styles.rowActions}>
+                <TouchableOpacity
+                  style={[styles.messageBtn, { backgroundColor: theme.backgroundTertiary || theme.border + '60' }]}
+                  onPress={() => navigation.navigate('Messaging', { otherUid: a.id, otherName: a.name })}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="chatbubble-ellipses-outline" size={16} color={theme.textSecondary} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.assignBtn, { backgroundColor: theme.primary + '18', borderColor: theme.primary + '40' }]}
+                  onPress={() => navigation.navigate('AssignWorkout', { athlete: { uid: a.id, name: a.name } })}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="clipboard-outline" size={16} color={theme.primary} />
+                  <Text style={[styles.assignBtnText, { color: theme.primary }]}>Assign</Text>
+                </TouchableOpacity>
+              </View>
             </TouchableOpacity>
           ))}
           <View style={{ height: 32 }} />
@@ -200,6 +216,10 @@ const styles = StyleSheet.create({
   progressFill: { height: 4, borderRadius: 2 },
   adherenceNum: { fontSize: 11, width: 30 },
   lastSession: { fontSize: 11 },
+  rowActions: { alignItems: 'flex-end', gap: 6 },
+  messageBtn: { width: 30, height: 30, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  assignBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1 },
+  assignBtnText: { fontSize: 12, fontWeight: '700' },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 12 },
   emptyIconWrap: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   emptyTitle: { fontSize: 20, fontWeight: '800' },

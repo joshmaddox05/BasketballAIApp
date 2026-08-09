@@ -1,5 +1,6 @@
-// SimCoachGamePlanBuilderScreen.js - Coach court editor: build play-by-play game plans
-import React, { useState, useCallback } from 'react';
+// SimCoachGamePlanBuilderScreen.js - Coach editor: build a custom SimCoach scenario
+// (game plan) — play steps + a tactical question — then save + assign to athletes.
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   SafeAreaView,
   StyleSheet,
@@ -10,10 +11,16 @@ import {
   TextInput,
   Alert,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
+import { getLinkedPlayers, assignToAthlete, saveGamePlan } from '../../services/firestoreService';
+import BasketballHalfCourt from '../../components/features/BasketballHalfCourt';
+
+const CATEGORIES = ['Offense', 'Defense', 'Transition'];
+const OPTION_LABELS = ['A', 'B', 'C', 'D'];
 
 const OFFENSIVE_POSITIONS = [
   { id: 'o1', label: '1', x: 0.5, y: 0.55 },
@@ -31,27 +38,15 @@ const DEFENSIVE_POSITIONS = [
   { id: 'd5', label: 'X', x: 0.7, y: 0.25 },
 ];
 
-const MOCK_ATHLETES = [
-  { id: 'a1', name: 'Marcus Johnson' },
-  { id: 'a2', name: 'Darius Williams' },
-  { id: 'a3', name: 'Kevin Torres' },
-  { id: 'a4', name: 'TJ Wright' },
-  { id: 'a5', name: 'Chris Lee' },
-];
-
 function CourtDiagram({ theme }) {
   const COURT_W = 300;
   const COURT_H = 180;
 
   return (
-    <View style={[styles.courtWrapper, { backgroundColor: '#1B5E2080' }]}>
+    <View style={styles.courtWrapper}>
       <View style={[styles.courtInner, { width: COURT_W, height: COURT_H }]}>
-        {/* Paint */}
-        <View style={styles.paint} />
-        {/* Three point arc (simplified as a circle outline) */}
-        <View style={styles.arcOuter} />
-        {/* Center line */}
-        <View style={styles.centerLine} />
+        {/* Basketball half-court backdrop (SVG) */}
+        <BasketballHalfCourt width={COURT_W} height={COURT_H} style={styles.courtSvg} />
 
         {/* Offensive players (blue) */}
         {OFFENSIVE_POSITIONS.map((p) => (
@@ -100,23 +95,30 @@ function CourtDiagram({ theme }) {
   );
 }
 
-function AssignModal({ visible, athletes, selected, onToggle, onClose, onConfirm, theme }) {
+function AssignModal({ visible, athletes, selected, onToggle, onClose, onConfirm, assigning, theme }) {
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={[styles.modalContainer, { backgroundColor: theme.background }]}>
         <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
-          <TouchableOpacity onPress={onClose}>
+          <TouchableOpacity onPress={onClose} disabled={assigning}>
             <Ionicons name="close" size={24} color={theme.text} />
           </TouchableOpacity>
           <Text style={[styles.modalTitle, { color: theme.text }]}>Assign to Athletes</Text>
-          <TouchableOpacity onPress={onConfirm}>
-            <Text style={[styles.modalSave, { color: theme.primary }]}>Send</Text>
+          <TouchableOpacity onPress={onConfirm} disabled={assigning}>
+            {assigning
+              ? <ActivityIndicator color={theme.primary} size="small" />
+              : <Text style={[styles.modalSave, { color: theme.primary }]}>Send</Text>}
           </TouchableOpacity>
         </View>
         <ScrollView contentContainerStyle={{ padding: 16 }}>
           <Text style={[styles.modalSubtitle, { color: theme.textSecondary }]}>
             Select athletes to receive this game plan as a SimCoach scenario.
           </Text>
+          {athletes.length === 0 && (
+            <Text style={[styles.modalSubtitle, { color: theme.textSecondary }]}>
+              No linked athletes yet. Add an athlete first.
+            </Text>
+          )}
           {athletes.map((a) => {
             const isSelected = selected.includes(a.id);
             return (
@@ -143,33 +145,103 @@ function AssignModal({ visible, athletes, selected, onToggle, onClose, onConfirm
 }
 
 export default function SimCoachGamePlanBuilderScreen({ navigation, route }) {
-  const { userData, theme, isDarkMode } = useAppContext();
-  const opponentName = route.params?.opponentName || 'Opponent';
+  const { user, userData, theme, isDarkMode } = useAppContext();
+  const coachUid = user?.uid;
+  const coachName = userData?.displayName || userData?.name || 'Coach';
+  const editingPlan = route.params?.plan || null;
 
-  const [planTitle, setPlanTitle] = useState(`vs ${opponentName} — Game Plan`);
-  const [steps, setSteps] = useState([
-    { id: '1', text: 'Ball handler initiates pick-and-roll at the top of the key.' },
-    { id: '2', text: 'Roller dives hard toward the paint. Screener reads the coverage.' },
-  ]);
+  const [planId, setPlanId] = useState(editingPlan?.id || null);
+  const [planTitle, setPlanTitle] = useState(editingPlan?.title || 'New Game Plan');
+  const [category, setCategory] = useState(editingPlan?.category || 'Offense');
+  const [steps, setSteps] = useState(
+    (editingPlan?.playSteps || [
+      'Ball handler initiates the action at the top of the key.',
+    ]).map((text, i) => ({ id: String(i), text }))
+  );
   const [newStep, setNewStep] = useState('');
+  const [question, setQuestion] = useState(editingPlan?.question || '');
+  const [options, setOptions] = useState(() => {
+    const base = ['', '', '', ''];
+    (editingPlan?.options || []).forEach((o, i) => { if (i < 4) base[i] = o.text || ''; });
+    return base;
+  });
+  const [correctIndex, setCorrectIndex] = useState(editingPlan?.correctIndex ?? 0);
+  const [explanation, setExplanation] = useState(editingPlan?.explanation || '');
+
   const [assignModal, setAssignModal] = useState(false);
+  const [roster, setRoster] = useState([]);
   const [selectedAthletes, setSelectedAthletes] = useState([]);
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [assigning, setAssigning] = useState(false);
 
   const handleAddStep = useCallback(() => {
     if (!newStep.trim()) return;
     setSteps((prev) => [...prev, { id: Date.now().toString(), text: newStep.trim() }]);
     setNewStep('');
+    setSaved(false);
   }, [newStep]);
 
   const handleDeleteStep = useCallback((id) => {
     setSteps((prev) => prev.filter((s) => s.id !== id));
+    setSaved(false);
   }, []);
 
-  const handleSave = useCallback(() => {
-    setSaved(true);
-    Alert.alert('Saved', 'Game plan saved to your library.', [{ text: 'OK' }]);
+  const setOption = useCallback((idx, text) => {
+    setOptions((prev) => prev.map((o, i) => (i === idx ? text : o)));
+    setSaved(false);
   }, []);
+
+  // Build the scenario payload (same shape as the static catalog).
+  const buildPayload = useCallback(() => ({
+    title: planTitle.trim() || 'Game Plan',
+    category,
+    playSteps: steps.map((s) => s.text),
+    question: question.trim(),
+    options: options
+      .map((text, i) => ({ label: OPTION_LABELS[i], text: text.trim() }))
+      .filter((o) => o.text),
+    correctIndex,
+    explanation: explanation.trim(),
+  }), [planTitle, category, steps, question, options, correctIndex, explanation]);
+
+  const validate = useCallback(() => {
+    if (!planTitle.trim()) return 'Add a title.';
+    if (steps.length === 0) return 'Add at least one play step.';
+    if (!question.trim()) return 'Add a tactical question.';
+    if (options.filter((o) => o.trim()).length < 2) return 'Add at least two answer options.';
+    if (!options[correctIndex] || !options[correctIndex].trim()) return 'The correct answer must have text.';
+    return null;
+  }, [planTitle, steps, question, options, correctIndex]);
+
+  const persist = useCallback(async () => {
+    const id = await saveGamePlan(coachUid, { id: planId, ...buildPayload() });
+    setPlanId(id);
+    return id;
+  }, [coachUid, planId, buildPayload]);
+
+  const handleSave = useCallback(async () => {
+    const err = validate();
+    if (err) { Alert.alert('Incomplete', err); return; }
+    setSaving(true);
+    try {
+      await persist();
+      setSaved(true);
+      Alert.alert('Saved', 'Game plan saved to your library.');
+    } catch (e) {
+      Alert.alert('Error', 'Could not save. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  }, [validate, persist]);
+
+  const openAssign = useCallback(async () => {
+    const err = validate();
+    if (err) { Alert.alert('Incomplete', err); return; }
+    setAssignModal(true);
+    const linked = await getLinkedPlayers(coachUid);
+    setRoster(linked.map((a) => ({ id: a.uid, name: a.name || 'Athlete' })));
+  }, [validate, coachUid]);
 
   const handleToggleAthlete = useCallback((id) => {
     setSelectedAthletes((prev) =>
@@ -177,18 +249,37 @@ export default function SimCoachGamePlanBuilderScreen({ navigation, route }) {
     );
   }, []);
 
-  const handleAssignConfirm = useCallback(() => {
+  const handleAssignConfirm = useCallback(async () => {
     if (selectedAthletes.length === 0) {
       Alert.alert('No Athletes Selected', 'Select at least one athlete to send the game plan to.');
       return;
     }
-    setAssignModal(false);
-    Alert.alert(
-      'Game Plan Sent!',
-      `Assigned to ${selectedAthletes.length} athlete${selectedAthletes.length > 1 ? 's' : ''} as a SimCoach scenario.`,
-      [{ text: 'OK', onPress: () => navigation.goBack() }]
-    );
-  }, [selectedAthletes, navigation]);
+    setAssigning(true);
+    try {
+      const id = await persist();               // ensure the plan is saved first
+      const payload = buildPayload();
+      await Promise.all(
+        selectedAthletes.map((athleteUid) =>
+          assignToAthlete(
+            athleteUid,
+            { uid: coachUid, displayName: coachName },
+            { type: 'scenario', title: payload.title, refId: id, scenario: payload }
+          )
+        )
+      );
+      setAssignModal(false);
+      setSaved(true);
+      Alert.alert(
+        'Game Plan Sent!',
+        `Assigned to ${selectedAthletes.length} athlete${selectedAthletes.length > 1 ? 's' : ''} as a SimCoach scenario.`,
+        [{ text: 'OK', onPress: () => navigation.goBack() }]
+      );
+    } catch (e) {
+      Alert.alert('Error', 'Could not assign. Please try again.');
+    } finally {
+      setAssigning(false);
+    }
+  }, [selectedAthletes, persist, buildPayload, coachUid, coachName, navigation]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
@@ -199,26 +290,45 @@ export default function SimCoachGamePlanBuilderScreen({ navigation, route }) {
           <Ionicons name="arrow-back" size={24} color={theme.text} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: theme.text }]} numberOfLines={1}>
-          Game Plan Builder
+          {editingPlan ? 'Edit Game Plan' : 'Game Plan Builder'}
         </Text>
         <TouchableOpacity
           style={[styles.saveBtn, { backgroundColor: saved ? '#22C55E' : theme.primary }]}
           onPress={handleSave}
+          disabled={saving}
           activeOpacity={0.85}
         >
-          <Ionicons name={saved ? 'checkmark' : 'save-outline'} size={18} color="#fff" />
+          {saving ? <ActivityIndicator color="#fff" size="small" /> : (
+            <Ionicons name={saved ? 'checkmark' : 'save-outline'} size={18} color="#fff" />
+          )}
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {/* Plan title */}
         <TextInput
           style={[styles.titleInput, { backgroundColor: theme.card, borderColor: theme.border, color: theme.text }]}
           value={planTitle}
-          onChangeText={setPlanTitle}
+          onChangeText={(t) => { setPlanTitle(t); setSaved(false); }}
           placeholder="Game plan title"
           placeholderTextColor={theme.textSecondary}
         />
+
+        {/* Category */}
+        <View style={styles.categoryRow}>
+          {CATEGORIES.map((c) => {
+            const sel = category === c;
+            return (
+              <TouchableOpacity
+                key={c}
+                style={[styles.categoryChip, { backgroundColor: sel ? theme.primary + '18' : theme.card, borderColor: sel ? theme.primary : theme.border }]}
+                onPress={() => { setCategory(c); setSaved(false); }}
+              >
+                <Text style={[styles.categoryChipText, { color: sel ? theme.primary : theme.text }]}>{c}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
 
         {/* Court diagram */}
         <Text style={[styles.sectionTitle, { color: theme.text }]}>Court View</Text>
@@ -259,14 +369,57 @@ export default function SimCoachGamePlanBuilderScreen({ navigation, route }) {
           </TouchableOpacity>
         </View>
 
+        {/* Tactical question */}
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>Tactical Question</Text>
+        <TextInput
+          style={[styles.questionInput, { backgroundColor: theme.card, borderColor: theme.border, color: theme.text }]}
+          value={question}
+          onChangeText={(t) => { setQuestion(t); setSaved(false); }}
+          placeholder="What's the correct read here?"
+          placeholderTextColor={theme.textSecondary}
+          multiline
+        />
+
+        <Text style={[styles.helperLabel, { color: theme.textSecondary }]}>Answer options (tap the circle to mark the correct one)</Text>
+        {options.map((opt, i) => {
+          const isCorrect = correctIndex === i;
+          return (
+            <View key={i} style={[styles.optionRow, { backgroundColor: theme.card, borderColor: isCorrect ? '#22C55E' : theme.border }]}>
+              <TouchableOpacity
+                onPress={() => { setCorrectIndex(i); setSaved(false); }}
+                style={[styles.optionRadio, { borderColor: isCorrect ? '#22C55E' : theme.border, backgroundColor: isCorrect ? '#22C55E' : 'transparent' }]}
+              >
+                {isCorrect && <Ionicons name="checkmark" size={13} color="#fff" />}
+              </TouchableOpacity>
+              <Text style={[styles.optionLabel, { color: theme.textSecondary }]}>{OPTION_LABELS[i]}</Text>
+              <TextInput
+                style={[styles.optionInput, { color: theme.text }]}
+                value={opt}
+                onChangeText={(t) => setOption(i, t)}
+                placeholder={`Option ${OPTION_LABELS[i]}`}
+                placeholderTextColor={theme.textSecondary}
+              />
+            </View>
+          );
+        })}
+
+        <TextInput
+          style={[styles.questionInput, { backgroundColor: theme.card, borderColor: theme.border, color: theme.text, marginTop: 10 }]}
+          value={explanation}
+          onChangeText={(t) => { setExplanation(t); setSaved(false); }}
+          placeholder="Explanation shown after the athlete answers (optional)"
+          placeholderTextColor={theme.textSecondary}
+          multiline
+        />
+
         {/* Assign CTA */}
         <TouchableOpacity
           style={[styles.assignBtn, { backgroundColor: theme.primary }]}
-          onPress={() => setAssignModal(true)}
+          onPress={openAssign}
           activeOpacity={0.85}
         >
           <Ionicons name="people-outline" size={18} color="#fff" />
-          <Text style={styles.assignBtnText}>Assign to Athletes</Text>
+          <Text style={styles.assignBtnText}>Save & Assign to Athletes</Text>
         </TouchableOpacity>
 
         <View style={{ height: 40 }} />
@@ -274,11 +427,12 @@ export default function SimCoachGamePlanBuilderScreen({ navigation, route }) {
 
       <AssignModal
         visible={assignModal}
-        athletes={MOCK_ATHLETES}
+        athletes={roster}
         selected={selectedAthletes}
         onToggle={handleToggleAthlete}
         onClose={() => setAssignModal(false)}
         onConfirm={handleAssignConfirm}
+        assigning={assigning}
         theme={theme}
       />
     </SafeAreaView>
@@ -309,8 +463,41 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 4,
+    marginBottom: 10,
   },
+  categoryRow: { flexDirection: 'row', gap: 8, marginBottom: 4 },
+  categoryChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5 },
+  categoryChipText: { fontSize: 13, fontWeight: '600' },
+  questionInput: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 14,
+    minHeight: 60,
+    textAlignVertical: 'top',
+  },
+  helperLabel: { fontSize: 12, marginTop: 12, marginBottom: 8 },
+  optionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1.5,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 8,
+  },
+  optionRadio: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  optionLabel: { fontSize: 13, fontWeight: '700', width: 14 },
+  optionInput: { flex: 1, fontSize: 14 },
 
   // Court
   courtWrapper: {
@@ -320,38 +507,13 @@ const styles = StyleSheet.create({
   },
   courtInner: {
     position: 'relative',
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.3)',
-    borderRadius: 4,
+    borderRadius: 8,
     overflow: 'hidden',
-    backgroundColor: '#2D7A3C',
   },
-  paint: {
+  courtSvg: {
     position: 'absolute',
-    width: 100,
-    height: 60,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.4)',
-    left: 100,
     top: 0,
-  },
-  arcOuter: {
-    position: 'absolute',
-    width: 140,
-    height: 80,
-    borderRadius: 70,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.3)',
-    left: 80,
-    top: -10,
-  },
-  centerLine: {
-    position: 'absolute',
     left: 0,
-    right: 0,
-    height: 1.5,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    top: '50%',
   },
   playerToken: {
     position: 'absolute',

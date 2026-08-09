@@ -10,6 +10,8 @@ PODS:
     - GoogleUtilities/UserDefaults (~> 8.0)
     - PromisesObjC (~> 2.4)
   - BEMCheckBox (1.4.1)
+  - EASClient (1.0.8):
+    - ExpoModulesCore
   - EXApplication (7.0.8):
     - ExpoModulesCore
   - EXAV (16.0.7):
@@ -21,7 +23,7 @@ PODS:
     - ExpoModulesCore
     - React-Core
   - EXJSONUtils (0.15.0)
-  - EXManifests (1.0.8):
+  - EXManifests (1.0.10):
     - ExpoModulesCore
   - EXNotifications (0.32.14):
     - ExpoModulesCore
@@ -277,6 +279,35 @@ PODS:
     - Yoga
   - ExpoVideo (3.0.11):
     - ExpoModulesCore
+  - EXStructuredHeaders (5.0.0)
+  - EXUpdates (29.0.16):
+    - EASClient
+    - EXManifests
+    - ExpoModulesCore
+    - EXStructuredHeaders
+    - EXUpdatesInterface
+    - hermes-engine
+    - RCTRequired
+    - RCTTypeSafety
+    - ReachabilitySwift
+    - React-Core
+    - React-Core-prebuilt
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - Yoga
   - EXUpdatesInterface (2.0.0):
     - ExpoModulesCore
   - FBLazyVector (0.81.4)
@@ -301,6 +332,9 @@ PODS:
   - hermes-engine (0.81.4):
     - hermes-engine/Pre-built (= 0.81.4)
   - hermes-engine/Pre-built (0.81.4)
+  - MediaPipeTasksCommon (0.10.12)
+  - MediaPipeTasksVision (0.10.12):
+    - MediaPipeTasksCommon (= 0.10.12)
   - PromisesObjC (2.4.0)
   - RCTDeprecation (0.81.4)
   - RCTRequired (0.81.4)
@@ -308,6 +342,7 @@ PODS:
     - FBLazyVector (= 0.81.4)
     - RCTRequired (= 0.81.4)
     - React-Core (= 0.81.4)
+  - ReachabilitySwift (5.2.4)
   - React (0.81.4):
     - React-Core (= 0.81.4)
     - React-Core/DevSupport (= 0.81.4)
@@ -1717,6 +1752,28 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - react-native-worklets-core (1.6.3):
+    - hermes-engine
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-Core-prebuilt
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - Yoga
   - React-NativeModulesApple (0.81.4):
     - hermes-engine
     - React-callinvoker
@@ -2067,6 +2124,30 @@ PODS:
     - React-utils (= 0.81.4)
     - ReactNativeDependencies
   - ReactNativeDependencies (0.81.4)
+  - ReactNativeMediaPipe (0.6.0):
+    - hermes-engine
+    - MediaPipeTasksVision (= 0.10.12)
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-Core-prebuilt
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - VisionCamera
+    - Yoga
   - RNCAsyncStorage (2.2.0):
     - hermes-engine
     - RCTRequired
@@ -2303,6 +2384,28 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - RNVectorIcons (10.3.0):
+    - hermes-engine
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-Core-prebuilt
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - Yoga
   - RNWorklets (0.6.1):
     - hermes-engine
     - RCTRequired
@@ -2459,6 +2562,18 @@ PODS:
     - StripeUICore (= 24.19.0)
   - StripeUICore (24.19.0):
     - StripeCore (= 24.19.0)
+  - VisionCamera (4.7.3):
+    - VisionCamera/Core (= 4.7.3)
+    - VisionCamera/FrameProcessors (= 4.7.3)
+    - VisionCamera/React (= 4.7.3)
+  - VisionCamera/Core (4.7.3)
+  - VisionCamera/FrameProcessors (4.7.3):
+    - React
+    - React-callinvoker
+    - react-native-worklets-core
+  - VisionCamera/React (4.7.3):
+    - React-Core
+    - VisionCamera/FrameProcessors
   - Yoga (0.0.0)
   - ZXingObjC/Core (3.6.9)
   - ZXingObjC/OneD (3.6.9):
@@ -2467,6 +2582,7 @@ PODS:
     - ZXingObjC/Core
 
 DEPENDENCIES:
+  - EASClient (from `../node_modules/expo-eas-client/ios`)
   - EXApplication (from `../node_modules/expo-application/ios`)
   - EXAV (from `../node_modules/expo-av/ios`)
   - EXConstants (from `../node_modules/expo-constants/ios`)
@@ -2494,6 +2610,8 @@ DEPENDENCIES:
   - ExpoMediaLibrary (from `../node_modules/expo-media-library/ios`)
   - ExpoModulesCore (from `../node_modules/expo-modules-core`)
   - ExpoVideo (from `../node_modules/expo-video/ios`)
+  - EXStructuredHeaders (from `../node_modules/expo-structured-headers/ios`)
+  - EXUpdates (from `../node_modules/expo-updates/ios`)
   - EXUpdatesInterface (from `../node_modules/expo-updates-interface/ios`)
   - FBLazyVector (from `../node_modules/react-native/Libraries/FBLazyVector`)
   - hermes-engine (from `../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec`)
@@ -2534,6 +2652,7 @@ DEPENDENCIES:
   - react-native-safe-area-context (from `../node_modules/react-native-safe-area-context`)
   - "react-native-slider (from `../node_modules/@react-native-community/slider`)"
   - react-native-webview (from `../node_modules/react-native-webview`)
+  - react-native-worklets-core (from `../node_modules/react-native-worklets-core`)
   - React-NativeModulesApple (from `../node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios`)
   - React-oscompat (from `../node_modules/react-native/ReactCommon/oscompat`)
   - React-perflogger (from `../node_modules/react-native/ReactCommon/reactperflogger`)
@@ -2565,6 +2684,7 @@ DEPENDENCIES:
   - ReactCodegen (from `build/generated/ios`)
   - ReactCommon/turbomodule/core (from `../node_modules/react-native/ReactCommon`)
   - ReactNativeDependencies (from `../node_modules/react-native/third-party-podspecs/ReactNativeDependencies.podspec`)
+  - ReactNativeMediaPipe (from `../node_modules/react-native-mediapipe`)
   - "RNCAsyncStorage (from `../node_modules/@react-native-async-storage/async-storage`)"
   - "RNCCheckbox (from `../node_modules/@react-native-community/checkbox`)"
   - RNGestureHandler (from `../node_modules/react-native-gesture-handler`)
@@ -2572,8 +2692,10 @@ DEPENDENCIES:
   - RNReanimated (from `../node_modules/react-native-reanimated`)
   - RNScreens (from `../node_modules/react-native-screens`)
   - RNSVG (from `../node_modules/react-native-svg`)
+  - RNVectorIcons (from `../node_modules/react-native-vector-icons`)
   - RNWorklets (from `../node_modules/react-native-worklets`)
   - "stripe-react-native (from `../node_modules/@stripe/stripe-react-native`)"
+  - VisionCamera (from `../node_modules/react-native-vision-camera`)
   - Yoga (from `../node_modules/react-native/ReactCommon/yoga`)
 
 SPEC REPOS:
@@ -2585,7 +2707,10 @@ SPEC REPOS:
     - GoogleUtilities
     - GTMAppAuth
     - GTMSessionFetcher
+    - MediaPipeTasksCommon
+    - MediaPipeTasksVision
     - PromisesObjC
+    - ReachabilitySwift
     - Stripe
     - StripeApplePay
     - StripeCore
@@ -2597,6 +2722,8 @@ SPEC REPOS:
     - ZXingObjC
 
 EXTERNAL SOURCES:
+  EASClient:
+    :path: "../node_modules/expo-eas-client/ios"
   EXApplication:
     :path: "../node_modules/expo-application/ios"
   EXAV:
@@ -2651,6 +2778,10 @@ EXTERNAL SOURCES:
     :path: "../node_modules/expo-modules-core"
   ExpoVideo:
     :path: "../node_modules/expo-video/ios"
+  EXStructuredHeaders:
+    :path: "../node_modules/expo-structured-headers/ios"
+  EXUpdates:
+    :path: "../node_modules/expo-updates/ios"
   EXUpdatesInterface:
     :path: "../node_modules/expo-updates-interface/ios"
   FBLazyVector:
@@ -2730,6 +2861,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/@react-native-community/slider"
   react-native-webview:
     :path: "../node_modules/react-native-webview"
+  react-native-worklets-core:
+    :path: "../node_modules/react-native-worklets-core"
   React-NativeModulesApple:
     :path: "../node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios"
   React-oscompat:
@@ -2792,6 +2925,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon"
   ReactNativeDependencies:
     :podspec: "../node_modules/react-native/third-party-podspecs/ReactNativeDependencies.podspec"
+  ReactNativeMediaPipe:
+    :path: "../node_modules/react-native-mediapipe"
   RNCAsyncStorage:
     :path: "../node_modules/@react-native-async-storage/async-storage"
   RNCCheckbox:
@@ -2806,10 +2941,14 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native-screens"
   RNSVG:
     :path: "../node_modules/react-native-svg"
+  RNVectorIcons:
+    :path: "../node_modules/react-native-vector-icons"
   RNWorklets:
     :path: "../node_modules/react-native-worklets"
   stripe-react-native:
     :path: "../node_modules/@stripe/stripe-react-native"
+  VisionCamera:
+    :path: "../node_modules/react-native-vision-camera"
   Yoga:
     :path: "../node_modules/react-native/ReactCommon/yoga"
 
@@ -2817,12 +2956,13 @@ SPEC CHECKSUMS:
   AppAuth: 1c1a8afa7e12f2ec3a294d9882dfa5ab7d3cb063
   AppCheckCore: cc8fd0a3a230ddd401f326489c99990b013f0c4f
   BEMCheckBox: 5ba6e37ade3d3657b36caecc35c8b75c6c2b1a4e
+  EASClient: ed58524bf0bb6375fbf106e1877ab9ac4ce24623
   EXApplication: 13420f8139864183f8a04fd6099077bdf8cfb186
   EXAV: f33ecd2d85522045cb1f0cc2fae3aa53e4e0c3c0
   EXConstants: 42beb731d147822313b2340b8bb9ebe7a38a3762
   EXImageLoader: e501c001bc40b8326605e82e6e80363c80fe06b5
   EXJSONUtils: 1d3e4590438c3ee593684186007028a14b3686cd
-  EXManifests: 7469efed75d694ce3c43a6da9c6f3886f66d3c26
+  EXManifests: 83ef0844fcf06d6099b12a7bdbd7d36fc0e1dd16
   EXNotifications: 9baf142be760f0ba45d5c0bbbdab70657bc421b0
   Expo: dddfac8aa1ebd553785b02b5e6631c800313ec48
   expo-dev-client: ae83ec9417f6f75bdc566a42da26974bd416018b
@@ -2844,6 +2984,8 @@ SPEC CHECKSUMS:
   ExpoMediaLibrary: 648cee3f5dcba13410ec9cc8ac9a426e89a61a31
   ExpoModulesCore: b9c17ef5c208549022fef93618c84385dca8e47a
   ExpoVideo: 7e39a5933892dc640b1b83013f3f9d9d37072151
+  EXStructuredHeaders: c951e77f2d936f88637421e9588c976da5827368
+  EXUpdates: b6e093bbead0d600f10a96c6cf131706e5861209
   EXUpdatesInterface: 1436757deb0d574b84bba063bd024c315e0ec08b
   FBLazyVector: 9e0cd874afd81d9a4d36679daca991b58b260d42
   GoogleSignIn: c7f09cfbc85a1abf69187be091997c317cc33b77
@@ -2851,10 +2993,13 @@ SPEC CHECKSUMS:
   GTMAppAuth: 217a876b249c3c585a54fd6f73e6b58c4f5c4238
   GTMSessionFetcher: 5aea5ba6bd522a239e236100971f10cb71b96ab6
   hermes-engine: 35c763d57c9832d0eef764316ca1c4d043581394
+  MediaPipeTasksCommon: 254e6bff77804b262f6ecf180477142ea551e802
+  MediaPipeTasksVision: 78d5c47cd7996b4d815bacba0a52dbf01458dfaf
   PromisesObjC: f5707f49cb48b9636751c5b2e7d227e43fba9f47
   RCTDeprecation: 7487d6dda857ccd4cb3dd6ecfccdc3170e85dcbc
   RCTRequired: 54128b7df8be566881d48c7234724a78cb9b6157
   RCTTypeSafety: d2b07797a79e45d7b19e1cd2f53c79ab419fe217
+  ReachabilitySwift: 32793e867593cfc1177f5d16491e3a197d2fccda
   React: 2073376f47c71b7e9a0af7535986a77522ce1049
   React-callinvoker: 00fa0972a70df7408a4f088144b67207b157e386
   React-Core: 7edc3b0763d7a47cf5610b32e0e790ac10dd5410
@@ -2888,6 +3033,7 @@ SPEC CHECKSUMS:
   react-native-safe-area-context: add9b4ba236fe95ec600604d0fc72f395433dd59
   react-native-slider: b76fa3dd989d25e8c2751c2a546674dfc0c2b6f8
   react-native-webview: a4f0775a31b73cf13cfc3d2d2b119aa94ec76e49
+  react-native-worklets-core: 035f9e7d5ffe30ac03def2749ec5196329ea0e5f
   React-NativeModulesApple: e653919faff1f76eadf02373bda26c085bf348e3
   React-oscompat: 73db7dbc80edef36a9d6ed3c6c4e1724ead4236d
   React-perflogger: f2116e7a0c1562ed7cbcaa2c90e8fdb0bc28df78
@@ -2919,6 +3065,7 @@ SPEC CHECKSUMS:
   ReactCodegen: c7382a9d84b5826fec1441c7eec6e424499bc8c0
   ReactCommon: b720ccad5e1e8a528746c39b671825fcb7207d3c
   ReactNativeDependencies: ed6d1e64802b150399f04f1d5728ec16b437251e
+  ReactNativeMediaPipe: ff048126b051d9ca9beb99cb80725ffd3080e7ed
   RNCAsyncStorage: e85a99325df9eb0191a6ee2b2a842644c7eb29f4
   RNCCheckbox: 471ebdc33884c084f362615c1ef3507496cc07f1
   RNGestureHandler: 6a488ce85c88e82d8610db1108daf04e9b2d5162
@@ -2926,6 +3073,7 @@ SPEC CHECKSUMS:
   RNReanimated: 1c03486192caeabe2795787e4bb046116383be7a
   RNScreens: dd61bc3a3e6f6901ad833efa411917d44827cf51
   RNSVG: 2825ee146e0f6a16221e852299943e4cceef4528
+  RNVectorIcons: af977c18ed27deba54ed038b439fca2911a08cfc
   RNWorklets: 83609071441ac7d623f1e0e63b9043f4f345e2a2
   Stripe: d1824162e4bcb6ead10401a0dc8e8a3d5ffee41f
   stripe-react-native: 59aa1685f453d1b5a311d784a08a1b617cd0e5a4
@@ -2936,9 +3084,10 @@ SPEC CHECKSUMS:
   StripePaymentSheet: b126816213ae4f56ff4525ad25f94bb985a43e27
   StripePaymentsUI: 05d4be35b34f821d5ddc8617dee04219f3646253
   StripeUICore: d07bd63a4b53dee8cab4d6f81ce5a7ab3e28511e
+  VisionCamera: 47f10351a1b6a8d251b90986ae72ca5f52331954
   Yoga: 051f086b5ccf465ff2ed38a2cf5a558ae01aaaa1
   ZXingObjC: 8898711ab495761b2dbbdec76d90164a6d7e14c5
 
-PODFILE CHECKSUM: b898fd911725af5c6e7b12d05007f398a24d5600
+PODFILE CHECKSUM: ea8badf98a19eecded3467d3ef4141f4f8cab6fe
 
 COCOAPODS: 1.15.2

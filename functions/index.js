@@ -4,6 +4,7 @@
 const { onCall } = require('firebase-functions/v2/https');
 const { onRequest } = require('firebase-functions/v2/https');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
+const { onDocumentCreated } = require('firebase-functions/v2/firestore');
 const { setGlobalOptions } = require('firebase-functions/v2');
 const { defineSecret } = require('firebase-functions/params');
 const admin = require('firebase-admin');
@@ -307,6 +308,259 @@ exports.updateSubscription = onCall({ secrets: [stripeSecretKey] }, async (reque
   }
 });
 
+// ==================== CoachMarket: Stripe Connect payouts ====================
+// Coaches onboard to a Stripe Express account so buyers can pay them directly.
+// Buyer payments are destination charges: the platform collects, keeps a fee, and
+// transfers the remainder to the coach's connected account.
+
+const PLATFORM_FEE_PCT = 0.15; // platform keeps 15% of each CoachMarket sale
+
+// Compute whether a connected account can receive destination charges.
+const connectAccountEnabled = (account) =>
+  !!(account && account.charges_enabled && account.details_submitted);
+
+/**
+ * Create (or reuse) a Stripe Express connected account for a coach.
+ */
+exports.createConnectAccount = onCall({ secrets: [stripeSecretKey] }, async (request) => {
+  if (!request.auth) throw new Error('User must be authenticated');
+  const stripe = getStripe();
+  const userId = request.auth.uid;
+
+  try {
+    const userRef = admin.firestore().collection('users').doc(userId);
+    const userDoc = await userRef.get();
+    const userData = userDoc.data() || {};
+
+    let accountId = userData.stripeConnectAccountId;
+    if (!accountId) {
+      const account = await stripe.accounts.create({
+        type: 'express',
+        email: userData.email || request.auth.token.email || undefined,
+        capabilities: { transfers: { requested: true } },
+        business_type: 'individual',
+        metadata: { firebaseUID: userId },
+      });
+      accountId = account.id;
+      await userRef.update({ stripeConnectAccountId: accountId });
+    }
+
+    return { success: true, accountId };
+  } catch (error) {
+    console.error('Error creating Connect account:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+/**
+ * Create an onboarding link for the coach's Express account (KYC flow).
+ */
+exports.createConnectOnboardingLink = onCall({ secrets: [stripeSecretKey] }, async (request) => {
+  if (!request.auth) throw new Error('User must be authenticated');
+  const stripe = getStripe();
+  const userId = request.auth.uid;
+
+  try {
+    const userRef = admin.firestore().collection('users').doc(userId);
+    const userDoc = await userRef.get();
+    const userData = userDoc.data() || {};
+
+    let accountId = userData.stripeConnectAccountId;
+    if (!accountId) {
+      const account = await stripe.accounts.create({
+        type: 'express',
+        email: userData.email || request.auth.token.email || undefined,
+        capabilities: { transfers: { requested: true } },
+        business_type: 'individual',
+        metadata: { firebaseUID: userId },
+      });
+      accountId = account.id;
+      await userRef.update({ stripeConnectAccountId: accountId });
+    }
+
+    // Stripe requires http(s) return/refresh URLs (custom app schemes are rejected).
+    // The coach returns to the app manually and taps "refresh status", so these just
+    // need to be valid URLs — we point them at the Firebase domain.
+    const accountLink = await stripe.accountLinks.create({
+      account: accountId,
+      refresh_url: 'https://basketball-ai-app-db000.web.app/connect-refresh',
+      return_url: 'https://basketball-ai-app-db000.web.app/connect-return',
+      type: 'account_onboarding',
+    });
+
+    return { success: true, url: accountLink.url };
+  } catch (error) {
+    console.error('Error creating Connect onboarding link:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+/**
+ * Retrieve the coach's Connect account status and cache it on the user doc.
+ */
+exports.getConnectAccountStatus = onCall({ secrets: [stripeSecretKey] }, async (request) => {
+  if (!request.auth) throw new Error('User must be authenticated');
+  const stripe = getStripe();
+  const userId = request.auth.uid;
+
+  try {
+    const userRef = admin.firestore().collection('users').doc(userId);
+    const userDoc = await userRef.get();
+    const accountId = (userDoc.data() || {}).stripeConnectAccountId;
+
+    if (!accountId) {
+      return { success: true, hasAccount: false, payoutsEnabled: false };
+    }
+
+    const account = await stripe.accounts.retrieve(accountId);
+    const enabled = connectAccountEnabled(account);
+
+    await userRef.update({
+      connectPayoutsEnabled: enabled,
+      connectDetailsSubmitted: !!account.details_submitted,
+    });
+
+    return {
+      success: true,
+      hasAccount: true,
+      payoutsEnabled: enabled,
+      detailsSubmitted: !!account.details_submitted,
+    };
+  } catch (error) {
+    console.error('Error getting Connect account status:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+/**
+ * Retrieve the coach's Stripe balance (available + pending, USD) for in-app display.
+ */
+exports.getConnectBalance = onCall({ secrets: [stripeSecretKey] }, async (request) => {
+  if (!request.auth) throw new Error('User must be authenticated');
+  const stripe = getStripe();
+  const userId = request.auth.uid;
+
+  try {
+    const userDoc = await admin.firestore().collection('users').doc(userId).get();
+    const accountId = (userDoc.data() || {}).stripeConnectAccountId;
+    if (!accountId) return { success: true, hasAccount: false, available: 0, pending: 0 };
+
+    const balance = await stripe.balance.retrieve({ stripeAccount: accountId });
+    // Sum USD amounts (smallest unit) across the balance buckets → dollars.
+    const sumUsd = (arr) => (arr || [])
+      .filter((b) => b.currency === 'usd')
+      .reduce((sum, b) => sum + (b.amount || 0), 0) / 100;
+
+    return {
+      success: true,
+      hasAccount: true,
+      available: sumUsd(balance.available),
+      pending: sumUsd(balance.pending),
+    };
+  } catch (error) {
+    console.error('Error getting Connect balance:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+/**
+ * Create a one-time login link to the coach's Stripe Express dashboard, where they
+ * can view their balance/payout history and withdraw to their bank.
+ */
+exports.createConnectLoginLink = onCall({ secrets: [stripeSecretKey] }, async (request) => {
+  if (!request.auth) throw new Error('User must be authenticated');
+  const stripe = getStripe();
+  const userId = request.auth.uid;
+
+  try {
+    const userDoc = await admin.firestore().collection('users').doc(userId).get();
+    const accountId = (userDoc.data() || {}).stripeConnectAccountId;
+    if (!accountId) return { success: false, error: 'No connected account. Set up payouts first.' };
+
+    const loginLink = await stripe.accounts.createLoginLink(accountId);
+    return { success: true, url: loginLink.url };
+  } catch (error) {
+    console.error('Error creating Connect login link:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+/**
+ * Create a one-time PaymentIntent for a paid CoachMarket listing. Destination
+ * charge: funds go to the platform, minus a fee, then transfer to the coach's
+ * connected account. Fulfillment happens in the payment_intent.succeeded webhook.
+ */
+exports.createCoachMarketPayment = onCall({ secrets: [stripeSecretKey] }, async (request) => {
+  if (!request.auth) throw new Error('User must be authenticated');
+  const stripe = getStripe();
+  const buyerUid = request.auth.uid;
+  const { listingId, email } = request.data || {};
+
+  try {
+    if (!listingId) throw new Error('Missing listingId');
+
+    const listingDoc = await admin.firestore().collection('coachMarketListings').doc(listingId).get();
+    if (!listingDoc.exists) throw new Error('Listing not found');
+    const listing = listingDoc.data() || {};
+
+    const price = Number(listing.price) || 0;
+    if (price <= 0) throw new Error('This listing is free — no payment required');
+
+    const coachUid = listing.coachUid;
+    if (!coachUid) throw new Error('Listing has no coach');
+    if (coachUid === buyerUid) throw new Error('You cannot purchase your own listing');
+
+    // Load the coach's connected account and verify LIVE with Stripe that it can
+    // receive charges (never trust the cached Firestore flag for authorization).
+    const coachDoc = await admin.firestore().collection('users').doc(coachUid).get();
+    const coachAccountId = (coachDoc.data() || {}).stripeConnectAccountId;
+    if (!coachAccountId) {
+      return { success: false, error: 'This coach has not set up payouts yet.' };
+    }
+    const coachAccount = await stripe.accounts.retrieve(coachAccountId);
+    if (!connectAccountEnabled(coachAccount)) {
+      return { success: false, error: 'This coach cannot accept payments yet.' };
+    }
+
+    // Get or create the buyer's Stripe customer.
+    let customerId = (await admin.firestore().collection('users').doc(buyerUid).get()).data()?.stripeCustomerId;
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        email,
+        metadata: { firebaseUID: buyerUid },
+      });
+      customerId = customer.id;
+      await admin.firestore().collection('users').doc(buyerUid).update({ stripeCustomerId: customerId });
+    }
+
+    const ephemeralKey = await stripe.ephemeralKeys.create(
+      { customer: customerId },
+      { apiVersion: '2024-11-20.acacia' }
+    );
+
+    const amount = Math.round(price * 100);
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount,
+      currency: 'usd',
+      customer: customerId,
+      application_fee_amount: Math.round(amount * PLATFORM_FEE_PCT),
+      transfer_data: { destination: coachAccountId },
+      automatic_payment_methods: { enabled: true },
+      metadata: { type: 'coachmarket', listingId, buyerUid, coachUid },
+    });
+
+    return {
+      success: true,
+      paymentIntentClientSecret: paymentIntent.client_secret,
+      customerEphemeralKeySecret: ephemeralKey.secret,
+      customerId,
+    };
+  } catch (error) {
+    console.error('Error creating CoachMarket payment:', error);
+    return { success: false, error: error.message };
+  }
+});
+
 /**
  * Webhook handler for Stripe events
  */
@@ -345,6 +599,10 @@ exports.stripeWebhook = onRequest({ secrets: [stripeSecretKey, stripeWebhookSecr
         await handlePaymentFailed(event.data.object);
         break;
 
+      case 'payment_intent.succeeded':
+        await handleCoachMarketPaymentSucceeded(event.data.object);
+        break;
+
       default:
         console.log(`Unhandled event type: ${event.type}`);
     }
@@ -370,10 +628,11 @@ async function handleSubscriptionUpdate(subscription) {
   const priceId = subscription.items.data[0].price.id;
   let tier = 'free';
 
-  // Map price IDs to tiers
+  // Two-tier model: any paid price normalizes to 'pro'. Legacy basic/premium/pro
+  // price IDs are all mapped to 'pro' for safety.
   const priceToTierMap = {
-    'price_1STmgCPTDEZhEg0xiJ70H58F': 'basic',
-    'price_1STmgJPTDEZhEg0xSK0Dsa9d': 'premium',
+    'price_1STmgCPTDEZhEg0xiJ70H58F': 'pro',
+    'price_1STmgJPTDEZhEg0xSK0Dsa9d': 'pro',
     'price_1STmgLPTDEZhEg0xp3Srlc8i': 'pro',
   };
 
@@ -506,6 +765,54 @@ async function handlePaymentFailed(invoice) {
 
   } catch (error) {
     console.error('Error handling payment failed:', error);
+  }
+}
+
+// Fulfill a paid CoachMarket purchase once its PaymentIntent succeeds. Only acts on
+// intents tagged with metadata.type === 'coachmarket' (subscription PIs are ignored).
+// Idempotent: skips the sales increment if the purchase was already recorded.
+async function handleCoachMarketPaymentSucceeded(paymentIntent) {
+  const meta = paymentIntent.metadata || {};
+  if (meta.type !== 'coachmarket') return;
+
+  const { listingId, buyerUid } = meta;
+  if (!listingId || !buyerUid) {
+    console.error('CoachMarket payment missing listingId/buyerUid metadata');
+    return;
+  }
+
+  try {
+    const purchaseRef = admin.firestore()
+      .collection('users').doc(buyerUid)
+      .collection('coachMarketPurchases').doc(listingId);
+
+    const existing = await purchaseRef.get();
+    if (existing.exists) {
+      console.log(`CoachMarket purchase ${listingId} already recorded for ${buyerUid}`);
+      return;
+    }
+
+    const listingDoc = await admin.firestore().collection('coachMarketListings').doc(listingId).get();
+    const listing = listingDoc.data() || {};
+
+    await purchaseRef.set({
+      listingId,
+      title: listing.title || '',
+      category: listing.category || null,
+      price: Number(listing.price) || 0,
+      coachUid: listing.coachUid || null,
+      coachName: listing.coachName || null,
+      paymentIntentId: paymentIntent.id,
+      purchasedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await admin.firestore().collection('coachMarketListings').doc(listingId).update({
+      sales: admin.firestore.FieldValue.increment(1),
+    });
+
+    console.log(`CoachMarket purchase ${listingId} fulfilled for ${buyerUid}`);
+  } catch (error) {
+    console.error('Error fulfilling CoachMarket payment:', error);
   }
 }
 
@@ -818,5 +1125,121 @@ exports.sendWorkoutReminder = onSchedule({
   } catch (error) {
     console.error('Error in sendWorkoutReminder:', error);
     throw error;
+  }
+});
+
+/**
+ * Saved-search alerts: when a player publishes to the scout directory, notify
+ * every scout whose saved search matches the new prospect (push + in-app).
+ */
+exports.onProspectPublished = onDocumentCreated('scoutLabProfiles/{prospectId}', async (event) => {
+  const snap = event.data;
+  if (!snap) return;
+  const prospect = snap.data() || {};
+  const prospectId = event.params.prospectId;
+
+  const gradeOrder = ['D', 'C', 'C+', 'B-', 'B', 'B+', 'A-', 'A', 'A+'];
+  const matches = (c) => {
+    if (c.position && c.position !== prospect.position) return false;
+    if (c.region && c.region !== prospect.region) return false;
+    if (c.gradeLevel && c.gradeLevel !== prospect.gradeLevel) return false;
+    if (c.minGrade) {
+      const minIdx = gradeOrder.indexOf(c.minGrade);
+      const pIdx = gradeOrder.indexOf(prospect.evaluationScore);
+      if (pIdx < minIdx) return false;
+    }
+    return true;
+  };
+
+  let searches;
+  try {
+    searches = await admin.firestore().collectionGroup('savedSearches').get();
+  } catch (e) {
+    console.error('Error reading saved searches:', e);
+    return;
+  }
+
+  const notified = new Set();
+  const title = 'New prospect match';
+  const body = `${prospect.name || 'A new prospect'} matches your saved search.`;
+
+  for (const doc of searches.docs) {
+    const scoutUid = doc.ref.parent.parent && doc.ref.parent.parent.id;
+    if (!scoutUid || notified.has(scoutUid)) continue;
+    if (!matches(doc.data() || {})) continue;
+    notified.add(scoutUid);
+
+    try {
+      const scoutDoc = await admin.firestore().collection('users').doc(scoutUid).get();
+      const scout = scoutDoc.data() || {};
+
+      await admin.firestore().collection('users').doc(scoutUid).collection('notifications').add({
+        type: 'prospect_match',
+        title,
+        body,
+        data: { type: 'prospect_match', prospectId },
+        sentAt: admin.firestore.FieldValue.serverTimestamp(),
+        readAt: null,
+      });
+
+      if (scout.pushToken && Expo.isExpoPushToken(scout.pushToken)) {
+        await expo.sendPushNotificationsAsync([{
+          to: scout.pushToken,
+          sound: 'default',
+          title,
+          body,
+          data: { type: 'prospect_match', prospectId },
+          channelId: 'reminders',
+        }]);
+      }
+    } catch (e) {
+      console.error(`Failed to notify scout ${scoutUid}:`, e);
+    }
+  }
+
+  console.log(`Prospect ${prospectId} published — notified ${notified.size} scout(s).`);
+});
+
+/**
+ * Firestore trigger: a new chat message was created. Push it to the OTHER
+ * participant using their stored Expo token (reuses the same send pattern as the
+ * scheduled reminders). Data payload {type:'message', convId} lets a tap open the
+ * thread. No-ops silently if the recipient has no token or disabled notifications.
+ */
+exports.onMessageCreated = onDocumentCreated('conversations/{convId}/messages/{messageId}', async (event) => {
+  const snap = event.data;
+  if (!snap) return;
+  const message = snap.data() || {};
+  const convId = event.params.convId;
+  const senderUid = message.senderUid;
+  if (!senderUid || !message.text) return;
+
+  try {
+    const convDoc = await admin.firestore().collection('conversations').doc(convId).get();
+    const conv = convDoc.data() || {};
+    const participants = conv.participants || [];
+    const recipientUid = participants.find((p) => p !== senderUid);
+    if (!recipientUid) return;
+
+    const recipientDoc = await admin.firestore().collection('users').doc(recipientUid).get();
+    const recipient = recipientDoc.data() || {};
+
+    // Respect an explicit opt-out; default to enabled when unset.
+    if (recipient.notificationSettings && recipient.notificationSettings.enabled === false) return;
+    if (!recipient.pushToken || !Expo.isExpoPushToken(recipient.pushToken)) return;
+
+    const senderName = (conv.participantInfo && conv.participantInfo[senderUid] && conv.participantInfo[senderUid].name) || 'New message';
+    const body = message.text.length > 140 ? `${message.text.slice(0, 140)}…` : message.text;
+
+    await expo.sendPushNotificationsAsync([{
+      to: recipient.pushToken,
+      sound: 'default',
+      title: senderName,
+      body,
+      data: { type: 'message', convId },
+      channelId: 'default',
+    }]);
+  } catch (e) {
+    console.error(`Failed to push message for conversation ${convId}:`, e);
   }
 });

@@ -133,6 +133,11 @@ export default function Blueprint360Screen({ navigation }) {
           <Text style={styles.primaryBtnText}>View Full Plan</Text>
           <Ionicons name="calendar-outline" size={18} color="#fff" />
         </TouchableOpacity>
+        {/* Training library lives inside Blueprint360 now that the Training tab was folded in. */}
+        <TouchableOpacity style={[styles.outlineBtn, { borderColor: theme.primary }]} activeOpacity={0.8} onPress={() => navigation.navigate('Training')}>
+          <Ionicons name="basketball-outline" size={16} color={theme.primary} />
+          <Text style={[styles.outlineBtnText, { color: theme.primary }]}>Browse Training Library</Text>
+        </TouchableOpacity>
         <TouchableOpacity style={[styles.outlineBtn, { borderColor: theme.primary }]} activeOpacity={0.8}>
           <Ionicons name="refresh-outline" size={16} color={theme.primary} />
           <Text style={[styles.outlineBtnText, { color: theme.primary }]}>Regenerate Plan</Text>

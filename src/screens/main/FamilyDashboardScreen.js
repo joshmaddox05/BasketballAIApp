@@ -1,10 +1,11 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAppContext } from '../../context/AppContext';
 import { getLinkedPlayers, getLinkedPlayerSummary } from '../../services/firestoreService';
+import ChildSwitcher from '../../components/parent/ChildSwitcher';
 import { getLevelTitle } from '../../utils/constants';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -222,40 +223,56 @@ function AchievementCard({ achievement, theme }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function FamilyDashboardScreen({ navigation }) {
-  const { user, theme, isDarkMode } = useAppContext();
+  const { user, theme, isDarkMode, selectedChildUid, setSelectedChildUid } = useAppContext();
   const parentUid = user?.uid;
 
   const [loading, setLoading] = useState(true);
+  const [children, setChildren] = useState([]);
   const [child, setChild] = useState(null);
   const [recentActivity, setRecentActivity] = useState([]);
   const [achievements, setAchievements] = useState([]);
 
-  const loadChild = useCallback(async () => {
+  const refreshChildren = useCallback(async () => {
     if (!parentUid) {
       setLoading(false);
       return;
     }
-    setLoading(true);
-    try {
-      const linkedPlayers = await getLinkedPlayers(parentUid);
-      const linked = linkedPlayers[0];
-      if (!linked) {
-        setChild(null);
-        return;
-      }
-      const summary = await getLinkedPlayerSummary(linked.uid);
-      setChild(mapChild(linked, summary.profile));
-      setRecentActivity((summary.activities || []).slice(0, 5).map(mapActivity));
-      setAchievements((summary.achievements || []).slice(0, 2).map(mapAchievement));
-    } finally {
+    const linked = await getLinkedPlayers(parentUid);
+    setChildren(linked);
+    if (linked.length === 0) {
+      setChild(null);
       setLoading(false);
+      return;
     }
-  }, [parentUid]);
+    if (!linked.find((c) => c.uid === selectedChildUid)) {
+      setSelectedChildUid(linked[0].uid);
+    }
+  }, [parentUid, selectedChildUid, setSelectedChildUid]);
+
+  useEffect(() => {
+    const active = children.find((c) => c.uid === selectedChildUid);
+    if (!active) return;
+    let alive = true;
+    setLoading(true);
+    getLinkedPlayerSummary(active.uid)
+      .then((summary) => {
+        if (!alive) return;
+        setChild(mapChild(active, summary.profile));
+        setRecentActivity((summary.activities || []).slice(0, 5).map(mapActivity));
+        setAchievements((summary.achievements || []).slice(0, 2).map(mapAchievement));
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [selectedChildUid, children]);
 
   useFocusEffect(
     useCallback(() => {
-      loadChild();
-    }, [loadChild])
+      refreshChildren();
+    }, [refreshChildren])
   );
 
   const handleMessageCoach = useCallback(() => {
@@ -276,8 +293,8 @@ export default function FamilyDashboardScreen({ navigation }) {
     </View>
   );
 
-  // Loading state
-  if (loading) {
+  // Loading state (initial — keep the switcher visible when switching children)
+  if (loading && !child) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
         <StatusBar style={isDarkMode ? 'light' : 'dark'} />
@@ -289,8 +306,8 @@ export default function FamilyDashboardScreen({ navigation }) {
     );
   }
 
-  // Empty state — no linked child
-  if (!child) {
+  // Empty state — no linked children
+  if (children.length === 0) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
         <StatusBar style={isDarkMode ? 'light' : 'dark'} />
@@ -305,7 +322,7 @@ export default function FamilyDashboardScreen({ navigation }) {
           </Text>
           <TouchableOpacity
             style={[styles.emptyButton, { backgroundColor: theme.primary }]}
-            onPress={() => navigation.navigate('LinkAccount', { onLinked: loadChild })}
+            onPress={() => navigation.navigate('LinkAccount', { onLinked: refreshChildren })}
             activeOpacity={0.85}
           >
             <Ionicons name="link" size={18} color="#FFFFFF" />
@@ -326,8 +343,17 @@ export default function FamilyDashboardScreen({ navigation }) {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {/* Child switcher — multiple children supported */}
+        <ChildSwitcher
+          children={children}
+          selectedUid={selectedChildUid}
+          onSelect={setSelectedChildUid}
+          onAddChild={() => navigation.navigate('LinkAccount', { onLinked: refreshChildren })}
+          theme={theme}
+        />
+
         {/* Child Profile Card */}
-        <ChildProfileCard child={child} theme={theme} />
+        {child && <ChildProfileCard child={child} theme={theme} />}
 
         {/* Action Buttons */}
         <View style={styles.actionRow}>
@@ -346,6 +372,26 @@ export default function FamilyDashboardScreen({ navigation }) {
           >
             <Ionicons name="bar-chart" size={16} color={theme.primary} />
             <Text style={[styles.actionButtonText, { color: theme.primary }]}>View Full Progress</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Recruiting + Edit Athlete */}
+        <View style={styles.actionRow}>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.actionButtonOutline, { borderColor: theme.primary }]}
+            onPress={() => navigation.navigate('ParentScoutLab', { childUid: selectedChildUid })}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="megaphone-outline" size={16} color={theme.primary} />
+            <Text style={[styles.actionButtonText, { color: theme.primary }]}>Recruiting</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.actionButtonOutline, { borderColor: theme.primary }]}
+            onPress={() => navigation.navigate('EditAthleteProfile', { childUid: selectedChildUid })}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="create-outline" size={16} color={theme.primary} />
+            <Text style={[styles.actionButtonText, { color: theme.primary }]}>Edit Athlete</Text>
           </TouchableOpacity>
         </View>
 

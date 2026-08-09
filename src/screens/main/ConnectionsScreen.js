@@ -188,6 +188,13 @@ export default function ConnectionsScreen({ navigation }) {
                   <Text style={[styles.connectionRole, { color: theme.textSecondary }]}>{meta.label}</Text>
                 </View>
                 <TouchableOpacity
+                  style={[styles.messageButton, { backgroundColor: theme.primary + '18' }]}
+                  onPress={() => navigation.navigate('Messaging', { otherUid: c.uid, otherName: c.name })}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="chatbubble-ellipses-outline" size={16} color={theme.primary} />
+                </TouchableOpacity>
+                <TouchableOpacity
                   style={[styles.revokeButton, { borderColor: '#EF444440' }]}
                   onPress={() => handleRevoke(c)}
                   activeOpacity={0.7}
@@ -263,6 +270,14 @@ const styles = StyleSheet.create({
   connectionInfo: { flex: 1 },
   connectionName: { fontSize: 15, fontWeight: '700' },
   connectionRole: { fontSize: 12, marginTop: 2 },
+  messageButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
   revokeButton: {
     paddingHorizontal: 14,
     paddingVertical: 8,

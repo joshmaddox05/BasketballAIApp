@@ -1,14 +1,21 @@
 // ParentHomeScreen.js - Parent/Family Hub home dashboard
-import React, { useState, useCallback } from 'react';
-import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import React, { useState, useCallback, useEffect } from 'react';
+import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAppContext } from '../../context/AppContext';
-import { getLinkedPlayers, getLinkedPlayerSummary } from '../../services/firestoreService';
+import {
+  getLinkedPlayers,
+  getLinkedPlayerSummary,
+  getPendingScoutRequestsForParent,
+  approveScoutAccess,
+  denyScoutAccess,
+} from '../../services/firestoreService';
 import { getLevelTitle } from '../../utils/constants';
 import ModuleGrid from '../../components/features/ModuleGrid';
 import { getModulesForRole } from '../../config/roleModules';
+import ChildSwitcher from '../../components/parent/ChildSwitcher';
 
 // ─── Data mapping helpers (Firestore docs -> presentational shapes) ────────────
 
@@ -247,44 +254,81 @@ function MessageCard({ message, theme, isDarkMode }) {
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function ParentHomeScreen({ navigation }) {
-  const { user, userData, theme, isDarkMode } = useAppContext();
+  const { user, userData, theme, isDarkMode, selectedChildUid, setSelectedChildUid } = useAppContext();
   const parentUid = user?.uid;
 
   const name = userData?.displayName || userData?.name || 'Parent';
   const firstName = name.split(' ')[0];
 
   const [loading, setLoading] = useState(true);
+  const [children, setChildren] = useState([]);
   const [child, setChild] = useState(null);
   const [week, setWeek] = useState(null);
   const [activityFeed, setActivityFeed] = useState([]);
+  const [scoutRequests, setScoutRequests] = useState([]);
 
-  const loadChild = useCallback(async () => {
+  // Load the roster of linked children + scout requests; ensure a valid selection.
+  const refreshChildren = useCallback(async () => {
     if (!parentUid) {
       setLoading(false);
       return;
     }
-    setLoading(true);
-    try {
-      const linkedPlayers = await getLinkedPlayers(parentUid);
-      const linked = linkedPlayers[0];
-      if (!linked) {
-        setChild(null);
-        return;
-      }
-      const summary = await getLinkedPlayerSummary(linked.uid);
-      const latestAchievement = (summary.achievements || [])[0];
-      setChild(mapChild(linked, summary.profile, latestAchievement));
-      setWeek(mapWeek(summary.profile, summary.activities));
-      setActivityFeed(mapActivityFeed(summary.activities));
-    } finally {
+    const linked = await getLinkedPlayers(parentUid);
+    setChildren(linked);
+    getPendingScoutRequestsForParent(parentUid).then(setScoutRequests).catch(() => {});
+    if (linked.length === 0) {
+      setChild(null);
       setLoading(false);
+      return;
     }
-  }, [parentUid]);
+    if (!linked.find((c) => c.uid === selectedChildUid)) {
+      setSelectedChildUid(linked[0].uid);
+    }
+  }, [parentUid, selectedChildUid, setSelectedChildUid]);
+
+  // Load the active child's summary whenever the selection or roster changes.
+  useEffect(() => {
+    const active = children.find((c) => c.uid === selectedChildUid);
+    if (!active) return;
+    let alive = true;
+    setLoading(true);
+    getLinkedPlayerSummary(active.uid)
+      .then((summary) => {
+        if (!alive) return;
+        setChild(mapChild(active, summary.profile, (summary.achievements || [])[0]));
+        setWeek(mapWeek(summary.profile, summary.activities));
+        setActivityFeed(mapActivityFeed(summary.activities));
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [selectedChildUid, children]);
+
+  const handleScoutDecision = useCallback(
+    async (req, approve) => {
+      // Optimistically remove from the list
+      setScoutRequests((prev) => prev.filter((r) => !(r.childUid === req.childUid && r.scoutUid === req.scoutUid)));
+      try {
+        if (approve) {
+          await approveScoutAccess(req.childUid, req.scoutUid, { tier: req.tier, scoutName: req.scoutName });
+        } else {
+          await denyScoutAccess(req.childUid, req.scoutUid);
+        }
+      } catch (e) {
+        Alert.alert('Error', e.message || 'Could not update the request.');
+        getPendingScoutRequestsForParent(parentUid).then(setScoutRequests).catch(() => {});
+      }
+    },
+    [parentUid]
+  );
 
   useFocusEffect(
     useCallback(() => {
-      loadChild();
-    }, [loadChild])
+      refreshChildren();
+    }, [refreshChildren])
   );
 
   const bgColor = isDarkMode ? '#0F0F0F' : '#F5F5F5';
@@ -296,17 +340,26 @@ export default function ParentHomeScreen({ navigation }) {
         <Text style={[styles.screenTitle, { color: theme.text }]}>Family Hub</Text>
         <Text style={[styles.greeting, { color: theme.textSecondary }]}>Hello, {firstName}</Text>
       </View>
-      <TouchableOpacity
-        style={[styles.notifBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
-        onPress={() => navigation.navigate('Notifications')}
-        activeOpacity={0.8}
-      >
-        <Ionicons name="notifications-outline" size={22} color={theme.text} />
-      </TouchableOpacity>
+      <View style={styles.headerActions}>
+        <TouchableOpacity
+          style={[styles.notifBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
+          onPress={() => navigation.navigate('Messaging')}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="chatbubbles-outline" size={22} color={theme.text} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.notifBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
+          onPress={() => navigation.navigate('Notifications')}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="notifications-outline" size={22} color={theme.text} />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 
-  if (loading) {
+  if (loading && !child) {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor: bgColor }]}>
         <StatusBar style={isDarkMode ? 'light' : 'dark'} />
@@ -320,7 +373,7 @@ export default function ParentHomeScreen({ navigation }) {
     );
   }
 
-  if (!child) {
+  if (children.length === 0) {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor: bgColor }]}>
         <StatusBar style={isDarkMode ? 'light' : 'dark'} />
@@ -336,7 +389,7 @@ export default function ParentHomeScreen({ navigation }) {
             </Text>
             <TouchableOpacity
               style={[styles.emptyButton, { backgroundColor: theme.primary }]}
-              onPress={() => navigation.navigate('LinkAccount', { onLinked: loadChild })}
+              onPress={() => navigation.navigate('LinkAccount', { onLinked: refreshChildren })}
               activeOpacity={0.85}
             >
               <Ionicons name="link" size={18} color="#FFFFFF" />
@@ -358,13 +411,35 @@ export default function ParentHomeScreen({ navigation }) {
       >
         {renderHeader()}
 
+        {/* Child switcher — Family Hub supports multiple children */}
+        <ChildSwitcher
+          children={children}
+          selectedUid={selectedChildUid}
+          onSelect={setSelectedChildUid}
+          onAddChild={() => navigation.navigate('LinkAccount', { onLinked: refreshChildren })}
+          theme={theme}
+        />
+
         {/* Child Summary Card */}
-        <ChildSummaryCard child={child} theme={theme} />
+        {child && <ChildSummaryCard child={child} theme={theme} />}
 
         {/* This Week */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: theme.text }]}>This Week</Text>
           <WeekSummary week={week} theme={theme} isDarkMode={isDarkMode} />
+        </View>
+
+        {/* Family Tools — Module Hub is the primary surface */}
+        <View style={styles.section}>
+          <ModuleGrid
+            title="Family Tools"
+            layout="grid"
+            modules={getModulesForRole('parent')}
+            subscription={userData?.subscription || 'free'}
+            theme={theme}
+            navigation={navigation}
+            navParams={{ childUid: selectedChildUid }}
+          />
         </View>
 
         {/* Recent Activity */}
@@ -392,6 +467,45 @@ export default function ParentHomeScreen({ navigation }) {
           )}
         </View>
 
+        {/* Scout access requests — parent authorization for minors */}
+        {scoutRequests.length > 0 && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Scout Access Requests</Text>
+            {scoutRequests.map((req) => (
+              <View
+                key={`${req.childUid}_${req.scoutUid}`}
+                style={[styles.scoutReqCard, { backgroundColor: sectionBg, borderColor: theme.border }]}
+              >
+                <View style={styles.scoutReqInfo}>
+                  <Ionicons name="search-outline" size={20} color={theme.primary} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.scoutReqName, { color: theme.text }]}>{req.scoutName || 'A scout'}</Text>
+                    <Text style={[styles.scoutReqSub, { color: theme.textSecondary }]}>
+                      Requests access to {req.childName || 'your child'}'s evaluation data
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.scoutReqActions}>
+                  <TouchableOpacity
+                    style={[styles.scoutReqDeny, { borderColor: theme.border }]}
+                    onPress={() => handleScoutDecision(req, false)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.scoutReqDenyText, { color: theme.textSecondary }]}>Deny</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.scoutReqApprove, { backgroundColor: theme.primary }]}
+                    onPress={() => handleScoutDecision(req, true)}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.scoutReqApproveText}>Approve</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+
         {/* Progress Report Button */}
         <TouchableOpacity
           style={[styles.progressReportBtn, { backgroundColor: theme.primary }]}
@@ -408,15 +522,24 @@ export default function ParentHomeScreen({ navigation }) {
           <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.8)" />
         </TouchableOpacity>
 
-        {/* Resources */}
-        <View style={styles.section}>
-          <ModuleGrid
-            title="Resources"
-            modules={getModulesForRole('parent')}
-            subscription={userData?.subscription || 'free'}
-            theme={theme}
-            navigation={navigation}
-          />
+        {/* Recruiting + Edit Athlete for the selected child */}
+        <View style={styles.childActionRow}>
+          <TouchableOpacity
+            style={[styles.childActionBtn, { backgroundColor: sectionBg, borderColor: theme.border }]}
+            onPress={() => navigation.navigate('ParentScoutLab', { childUid: selectedChildUid })}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="megaphone-outline" size={18} color={theme.primary} />
+            <Text style={[styles.childActionText, { color: theme.text }]}>Recruiting</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.childActionBtn, { backgroundColor: sectionBg, borderColor: theme.border }]}
+            onPress={() => navigation.navigate('EditAthleteProfile', { childUid: selectedChildUid })}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="create-outline" size={18} color={theme.primary} />
+            <Text style={[styles.childActionText, { color: theme.text }]}>Edit Athlete</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.bottomPad} />
@@ -454,6 +577,11 @@ const styles = StyleSheet.create({
   greeting: {
     fontSize: 14,
     marginTop: 2,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   notifBtn: {
     width: 42,
@@ -587,6 +715,15 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 24,
   },
+  scoutReqCard: { borderRadius: 12, borderWidth: 1, padding: 14, marginBottom: 10 },
+  scoutReqInfo: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  scoutReqName: { fontSize: 15, fontWeight: '700' },
+  scoutReqSub: { fontSize: 12, marginTop: 2 },
+  scoutReqActions: { flexDirection: 'row', gap: 10, marginTop: 12 },
+  scoutReqDeny: { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 10, borderWidth: 1 },
+  scoutReqDenyText: { fontSize: 13, fontWeight: '700' },
+  scoutReqApprove: { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 10 },
+  scoutReqApproveText: { color: '#fff', fontSize: 13, fontWeight: '700' },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -737,6 +874,20 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     marginTop: 4,
   },
+
+  // Child action row (Recruiting / Edit Athlete)
+  childActionRow: { flexDirection: 'row', gap: 10, marginTop: 12 },
+  childActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  childActionText: { fontSize: 14, fontWeight: '600' },
 
   // Progress Report Button
   progressReportBtn: {

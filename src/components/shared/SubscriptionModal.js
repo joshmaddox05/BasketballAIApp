@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
-import { SUBSCRIPTION_PLANS } from '../../utils/subscription';
+import { SUBSCRIPTION_PLANS, isPaidTier } from '../../utils/subscription';
 import i18n from '../../i18n/i18n';
 import { getTheme } from '../../utils/theme';
 import { getPriceId } from '../../config/stripe';
@@ -31,12 +31,14 @@ const SubscriptionModal = ({ visible, onClose, onUpgrade }) => {
 
     const currentPlanId = userData.subscription || 'free';
 
-    // Define tier hierarchy for upgrade/downgrade detection
-    const tierHierarchy = { free: 0, basic: 1, premium: 2, pro: 3 };
+    // Two-tier model: a user is either free (0) or paid (1). Legacy
+    // 'basic'/'premium' values count as paid via isPaidTier.
+    const tierLevel = (id) => (isPaidTier(id) ? 1 : 0);
 
     const handleSelectPlan = async (planId) => {
-        // Don't allow selecting the same plan
-        if (planId === currentPlanId) {
+        // Don't allow re-selecting the plan the user is effectively on
+        // (exact match, or already-paid tapping the single paid plan).
+        if (planId === currentPlanId || (isPaidTier(planId) && isPaidTier(currentPlanId))) {
             return;
         }
 
@@ -54,8 +56,8 @@ const SubscriptionModal = ({ visible, onClose, onUpgrade }) => {
             }
 
             // Determine if this is an upgrade, downgrade, or new subscription
-            const currentTierLevel = tierHierarchy[currentPlanId] || 0;
-            const newTierLevel = tierHierarchy[planId] || 0;
+            const currentTierLevel = tierLevel(currentPlanId);
+            const newTierLevel = tierLevel(planId);
             const isUpgrade = newTierLevel > currentTierLevel;
             const isDowngrade = newTierLevel < currentTierLevel;
             const hasActiveSubscription = currentPlanId !== 'free' && userData.subscriptionDetails?.stripeSubscriptionId;
@@ -214,10 +216,13 @@ const SubscriptionModal = ({ visible, onClose, onUpgrade }) => {
                         </Text>
 
                         {SUBSCRIPTION_PLANS.map((plan) => {
-                            const isCurrentPlan = plan.id === currentPlanId;
+                            // Treat any paid value (incl. legacy basic/premium) as the Pro plan.
+                            const isCurrentPlan = isPaidTier(plan.id)
+                                ? isPaidTier(currentPlanId)
+                                : !isPaidTier(currentPlanId);
                             const isPremium = plan.id !== 'free';
-                            const planLevel = tierHierarchy[plan.id] || 0;
-                            const currentLevel = tierHierarchy[currentPlanId] || 0;
+                            const planLevel = tierLevel(plan.id);
+                            const currentLevel = tierLevel(currentPlanId);
                             const isUpgrade = planLevel > currentLevel;
                             const isDowngrade = planLevel < currentLevel;
 

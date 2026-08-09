@@ -41,9 +41,17 @@ import SimCoachResultsScreen from '../screens/main/SimCoachResultsScreen';
 import ScoutLabScreen from '../screens/main/ScoutLabScreen';
 import ScoutLabProfileScreen from '../screens/main/ScoutLabProfileScreen';
 import ScoutLabSearchScreen from '../screens/main/ScoutLabSearchScreen';
+import ScoutProspectDetailScreen from '../screens/main/ScoutProspectDetailScreen';
+import ParentScoutLabScreen from '../screens/main/ParentScoutLabScreen';
+import EditAthleteProfileScreen from '../screens/main/EditAthleteProfileScreen';
 import CoachMarketScreen from '../screens/main/CoachMarketScreen';
 import CoachMarketListingScreen from '../screens/main/CoachMarketListingScreen';
 import CoachMarketDashboardScreen from '../screens/main/CoachMarketDashboardScreen';
+import CoachSessionsScreen from '../screens/main/CoachSessionsScreen';
+import AssignWorkoutScreen from '../screens/main/AssignWorkoutScreen';
+import CreateDrillScreen from '../screens/main/CreateDrillScreen';
+import EditDrillScreen from '../screens/main/EditDrillScreen';
+import CoachPublicProfileScreen from '../screens/main/CoachPublicProfileScreen';
 import HoopCommunityScreen from '../screens/main/HoopCommunityScreen';
 import MentorshipScreen from '../screens/main/MentorshipScreen';
 import LegacyVaultScreen from '../screens/main/LegacyVaultScreen';
@@ -53,6 +61,18 @@ import Blueprint360MilestoneScreen from '../screens/main/Blueprint360MilestoneSc
 // Import connection (role-linking) screens
 import LinkAccountScreen from '../screens/main/LinkAccountScreen';
 import ConnectionsScreen from '../screens/main/ConnectionsScreen';
+
+// Import Training + Challenges screens (formerly tab-local; now shared so modules can reach them
+// after the Training/Challenges tabs were folded into Blueprint360 / HoopCommunity).
+import TrainingScreen from '../screens/main/TrainingScreen';
+import TrainingCategoryScreen from '../screens/main/TrainingCategoryScreen';
+import TrainingFiltersScreen from '../screens/main/TrainingFiltersScreen';
+import BrowseWorkoutsScreen from '../screens/main/BrowseWorkoutsScreen';
+import CategoryWorkoutsScreen from '../screens/main/CategoryWorkoutsScreen';
+import AllWorkoutsScreen from '../screens/main/AllWorkoutsScreen';
+import AllChallengesScreen from '../screens/main/AllChallengesScreen';
+import ChallengeDetailScreen from '../screens/main/ChallengeDetailScreen';
+import DailyChallengeDetailScreen from '../screens/main/DailyChallengeDetailScreen';
 
 // Create a stack for shared screens
 const SharedStack = createStackNavigator();
@@ -129,10 +149,18 @@ export const sharedScreens = [
     { name: 'SimCoachResults', component: SimCoachResultsScreen, options: { headerShown: false } },
     { name: 'ScoutLab', component: ScoutLabScreen, options: { headerShown: false } },
     { name: 'ScoutLabProfile', component: ScoutLabProfileScreen, options: { headerShown: false } },
+    { name: 'ScoutProspectDetail', component: ScoutProspectDetailScreen, options: { headerShown: false } },
+    { name: 'ParentScoutLab', component: ParentScoutLabScreen, options: { headerShown: false } },
+    { name: 'EditAthleteProfile', component: EditAthleteProfileScreen, options: { headerShown: false } },
     { name: 'ScoutLabSearch', component: ScoutLabSearchScreen, options: { headerShown: false } },
     { name: 'CoachMarket', component: CoachMarketScreen, options: { headerShown: false } },
     { name: 'CoachMarketListing', component: CoachMarketListingScreen, options: { headerShown: false } },
     { name: 'CoachMarketDashboard', component: CoachMarketDashboardScreen, options: { headerShown: false } },
+    { name: 'CoachSessions', component: CoachSessionsScreen, options: { headerShown: false } },
+    { name: 'AssignWorkout', component: AssignWorkoutScreen, options: { headerShown: false } },
+    { name: 'CreateDrill', component: CreateDrillScreen, options: { headerShown: false } },
+    { name: 'EditDrill', component: EditDrillScreen, options: { headerShown: false } },
+    { name: 'CoachPublicProfile', component: CoachPublicProfileScreen, options: { headerShown: false } },
     { name: 'HoopCommunity', component: HoopCommunityScreen, options: { headerShown: false } },
     { name: 'Mentorship', component: MentorshipScreen, options: { headerShown: false } },
     { name: 'LegacyVault', component: LegacyVaultScreen, options: { headerShown: false } },
@@ -146,6 +174,17 @@ export const sharedScreens = [
     // Connections (role linking)
     { name: 'LinkAccount', component: LinkAccountScreen, options: { headerShown: false } },
     { name: 'Connections', component: ConnectionsScreen, options: { headerShown: false } },
+    // Training experience (folded into Blueprint360) — reachable app-wide
+    { name: 'Training', component: TrainingScreen, options: { headerShown: false } },
+    { name: 'TrainingCategory', component: TrainingCategoryScreen, options: { headerShown: false } },
+    { name: 'TrainingFilters', component: TrainingFiltersScreen, options: { headerShown: false } },
+    { name: 'BrowseWorkouts', component: BrowseWorkoutsScreen, options: { headerShown: false } },
+    { name: 'CategoryWorkouts', component: CategoryWorkoutsScreen, options: { headerShown: false } },
+    { name: 'AllWorkouts', component: AllWorkoutsScreen, options: { headerShown: false } },
+    // Challenges experience (folded into HoopCommunity) — reachable app-wide
+    { name: 'Challenges', component: AllChallengesScreen, options: { headerShown: false } },
+    { name: 'ChallengeDetail', component: ChallengeDetailScreen, options: { headerShown: false } },
+    { name: 'DailyChallengeDetail', component: DailyChallengeDetailScreen, options: { headerShown: false } },
 ];
 
 // A utility function to add shared screens to any stack navigator

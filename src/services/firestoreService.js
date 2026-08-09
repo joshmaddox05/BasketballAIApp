@@ -21,6 +21,31 @@ import {
 import { db } from '../config/firebaseConfig';
 import { ACHIEVEMENTS, getLevelFromXP } from '../data/achievements';
 
+/**
+ * Recursively remove `undefined` values from an object/array so it is safe to
+ * write to Firestore (which rejects any `undefined` field, including nested).
+ * `null` is preserved (Firestore accepts it); Date / Timestamp / other class
+ * instances are passed through untouched.
+ * @param {*} value
+ * @returns {*}
+ */
+const removeUndefined = (value) => {
+  if (Array.isArray(value)) {
+    return value
+      .filter((item) => item !== undefined)
+      .map((item) => removeUndefined(item));
+  }
+  if (value && typeof value === 'object' && value.constructor === Object) {
+    return Object.entries(value).reduce((acc, [key, val]) => {
+      if (val !== undefined) {
+        acc[key] = removeUndefined(val);
+      }
+      return acc;
+    }, {});
+  }
+  return value;
+};
+
 // ==================== USER OPERATIONS ====================
 
 /**
@@ -230,7 +255,7 @@ export const addWorkoutCompletion = async (uid, workoutCompletionData) => {
   try {
     const activityRef = await addDoc(collection(db, 'users', uid, 'activities'), {
       type: 'workout',
-      ...workoutCompletionData,
+      ...removeUndefined(workoutCompletionData),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     });
@@ -3357,28 +3382,36 @@ export const getScoutLabProfile = async (uid) => {
   }
 };
 
+// High-school grades 9–12 are the only scout-discoverable cohort (per COO policy).
+export const isHighSchoolGrade = (gradeLevel) =>
+  Number.isInteger(gradeLevel) && gradeLevel >= 9 && gradeLevel <= 12;
+
 /**
  * Publish (or update) the player's public directory entry so scouts can
  * discover them via searchScoutLabProspects. The directory doc is keyed by the
- * player's uid and mirrors the searchable snapshot. Also flags the player's own
- * profile as visible. Requires the player's consent (called from a visibility toggle).
+ * player's uid. Per COO policy the PUBLIC entry is intentionally minimal —
+ * name, grade, size, position, archetype, main attributes, main evaluation
+ * score only (no school/city/contact). Deeper data unlocks via a parent-
+ * authorized, tier-gated access request (Phase 2). High-school players only.
  * @param {string} uid
- * @param {Object} profileData - searchable fields (name, position, evalGrade, region, ...)
+ * @param {Object} profileData
  * @returns {Promise<void>}
  */
 export const publishScoutLabProfile = async (uid, profileData = {}) => {
   try {
+    if (!isHighSchoolGrade(profileData.gradeLevel)) {
+      throw new Error('Only high-school athletes (grades 9–12) can be listed for scouts.');
+    }
     const entry = {
       uid,
       name: profileData.name || 'Athlete',
+      gradeLevel: profileData.gradeLevel,           // public "grade"
       position: profileData.position || null,
-      evalGrade: profileData.evalGrade || null,
-      region: profileData.region || null,
-      school: profileData.school || null,
-      classYear: profileData.classYear || null,
-      height: profileData.height || null,
-      city: profileData.city || null,
-      iqScore: profileData.iqScore ?? null,
+      height: profileData.height || null,           // "size"
+      archetype: profileData.archetype || null,
+      mainAttributes: profileData.mainAttributes || null,
+      evaluationScore: profileData.evaluationScore || null, // platform ranking (authoritative)
+      region: profileData.region || null,           // coarse geo — for filtering only, not exact location
       updatedAt: serverTimestamp(),
     };
     await Promise.all([
@@ -3418,17 +3451,20 @@ export const unpublishScoutLabProfile = async (uid) => {
   }
 };
 
-export const searchScoutLabProspects = async ({ position, minGrade, region, ageGroup } = {}) => {
+export const searchScoutLabProspects = async ({ position, minGrade, region, gradeLevel } = {}) => {
   try {
     let q = query(collection(db, 'scoutLabProfiles'), limit(50));
     if (position) q = query(q, where('position', '==', position));
     if (region) q = query(q, where('region', '==', region));
     const snapshot = await getDocs(q);
     let results = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    // High-school only (defensive — the directory should only ever contain HS players).
+    results = results.filter(p => isHighSchoolGrade(p.gradeLevel));
+    if (gradeLevel) results = results.filter(p => p.gradeLevel === gradeLevel);
     if (minGrade) {
       const gradeOrder = ['D', 'C', 'C+', 'B-', 'B', 'B+', 'A-', 'A', 'A+'];
       const minIdx = gradeOrder.indexOf(minGrade);
-      results = results.filter(p => gradeOrder.indexOf(p.evalGrade) >= minIdx);
+      results = results.filter(p => gradeOrder.indexOf(p.evaluationScore || p.evalGrade) >= minIdx);
     }
     return results;
   } catch (error) {
@@ -3477,6 +3513,79 @@ export const getCoachListings = async (coachUid) => {
     return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
   } catch (error) {
     console.error('Error fetching coach listings:', error);
+    return [];
+  }
+};
+
+export const getCoachMarketListing = async (listingId) => {
+  try {
+    const snap = await getDoc(doc(db, 'coachMarketListings', listingId));
+    return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+  } catch (error) {
+    console.error('Error fetching CoachMarket listing:', error);
+    return null;
+  }
+};
+
+export const updateCoachMarketListing = async (listingId, data) => {
+  try {
+    await updateDoc(doc(db, 'coachMarketListings', listingId), {
+      ...data,
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error('Error updating CoachMarket listing:', error);
+    throw error;
+  }
+};
+
+export const deleteCoachMarketListing = async (listingId) => {
+  try {
+    await deleteDoc(doc(db, 'coachMarketListings', listingId));
+  } catch (error) {
+    console.error('Error deleting CoachMarket listing:', error);
+    throw error;
+  }
+};
+
+/**
+ * Record a (free-enroll) purchase of a CoachMarket listing and bump the
+ * listing's sales counter. Payments are deferred — this grants access only.
+ * @param {Object} buyer - { uid, displayName }
+ * @param {Object} listing - a listing from getCoachMarketListings
+ */
+export const purchaseCoachMarketListing = async (buyer, listing) => {
+  try {
+    const buyerUid = buyer?.uid;
+    const listingId = listing?.id;
+    if (!buyerUid || !listingId) throw new Error('Missing buyer or listing.');
+
+    await Promise.all([
+      setDoc(doc(db, 'users', buyerUid, 'coachMarketPurchases', listingId), {
+        listingId,
+        title: listing.title || '',
+        category: listing.category || null,
+        price: listing.price || 0,
+        coachUid: listing.coachUid || null,
+        coachName: listing.coachName || null,
+        purchasedAt: serverTimestamp(),
+      }),
+      updateDoc(doc(db, 'coachMarketListings', listingId), {
+        sales: increment(1),
+      }),
+    ]);
+  } catch (error) {
+    console.error('Error purchasing CoachMarket listing:', error);
+    throw error;
+  }
+};
+
+export const getUserCoachMarketPurchases = async (uid) => {
+  try {
+    const snapshot = await getDocs(collection(db, 'users', uid, 'coachMarketPurchases'));
+    return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (error) {
+    console.error('Error fetching CoachMarket purchases:', error);
     return [];
   }
 };
@@ -3756,6 +3865,388 @@ export const getLinkedPlayerSummary = async (playerUid) => {
   return { uid: playerUid, profile, evalRank, blueprint, activities, achievements };
 };
 
+// ==================== COACH: Assignments (coach → athlete) ====================
+// A linked coach assigns a workout or SimCoach scenario to an athlete. Stored on
+// the athlete so it surfaces on their side; the athlete flips status to
+// 'completed'. Firestore rules gate writes to the athlete or a connected coach.
+
+/**
+ * Assign a workout or scenario to a linked athlete.
+ * @param {string} athleteUid
+ * @param {Object} coach - { uid, displayName }
+ * @param {Object} assignment - { type, title, note, refId, dueDate }
+ * @returns {Promise<string>} the new assignment id
+ */
+export const assignToAthlete = async (athleteUid, coach, assignment) => {
+  try {
+    if (!athleteUid) throw new Error('Missing athlete.');
+    const ref = await addDoc(collection(db, 'users', athleteUid, 'assignments'), {
+      coachUid: coach?.uid || null,
+      coachName: coach?.displayName || 'Coach',
+      type: assignment?.type || 'workout',
+      title: assignment?.title || 'Assignment',
+      note: assignment?.note || '',
+      refId: assignment?.refId || null,
+      // For coach-authored game plans: the full scenario payload is embedded so
+      // the athlete never has to read the coach's gamePlans subcollection.
+      scenario: assignment?.scenario || null,
+      dueDate: assignment?.dueDate || null,
+      status: 'assigned',
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+    return ref.id;
+  } catch (error) {
+    console.error('Error assigning to athlete:', error);
+    throw error;
+  }
+};
+
+/**
+ * Read an athlete's assignments (athlete surfacing / coach review).
+ * @param {string} athleteUid
+ * @param {Object} [filters] - { status, type }
+ * @returns {Promise<Array>}
+ */
+export const getAthleteAssignments = async (athleteUid, { status, type } = {}) => {
+  try {
+    const snapshot = await getDocs(collection(db, 'users', athleteUid, 'assignments'));
+    let items = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (status) items = items.filter(a => a.status === status);
+    if (type) items = items.filter(a => a.type === type);
+    // Newest first (createdAt may be a Firestore Timestamp or null while pending)
+    items.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+    return items;
+  } catch (error) {
+    console.error('Error fetching athlete assignments:', error);
+    return [];
+  }
+};
+
+export const updateAssignmentStatus = async (athleteUid, assignmentId, status) => {
+  try {
+    await updateDoc(doc(db, 'users', athleteUid, 'assignments', assignmentId), {
+      status,
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error('Error updating assignment status:', error);
+    throw error;
+  }
+};
+
+// ==================== COACH: SimCoach Game Plans ====================
+// A coach authors a custom scenario ("game plan") — same shape as the static
+// simCoachScenarios catalog — stored in their own subcollection. When assigned,
+// the payload is embedded into the athlete's assignment (see assignToAthlete).
+
+/**
+ * Create or update a coach's game plan. Pass plan.id to update.
+ * @param {string} coachUid
+ * @param {Object} plan - { id?, title, category, playSteps[], question, options[], correctIndex, explanation }
+ * @returns {Promise<string>} the game plan id
+ */
+export const saveGamePlan = async (coachUid, plan) => {
+  try {
+    const data = {
+      title: plan.title || 'Untitled Game Plan',
+      category: plan.category || 'Offense',
+      playSteps: Array.isArray(plan.playSteps) ? plan.playSteps : [],
+      question: plan.question || '',
+      options: Array.isArray(plan.options) ? plan.options : [],
+      correctIndex: typeof plan.correctIndex === 'number' ? plan.correctIndex : 0,
+      explanation: plan.explanation || '',
+      updatedAt: serverTimestamp(),
+    };
+    if (plan.id) {
+      await updateDoc(doc(db, 'users', coachUid, 'gamePlans', plan.id), data);
+      return plan.id;
+    }
+    const ref = await addDoc(collection(db, 'users', coachUid, 'gamePlans'), {
+      ...data,
+      createdAt: serverTimestamp(),
+    });
+    return ref.id;
+  } catch (error) {
+    console.error('Error saving game plan:', error);
+    throw error;
+  }
+};
+
+export const getGamePlans = async (coachUid) => {
+  try {
+    const snapshot = await getDocs(collection(db, 'users', coachUid, 'gamePlans'));
+    const items = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    items.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+    return items;
+  } catch (error) {
+    console.error('Error fetching game plans:', error);
+    return [];
+  }
+};
+
+export const deleteGamePlan = async (coachUid, planId) => {
+  try {
+    await deleteDoc(doc(db, 'users', coachUid, 'gamePlans', planId));
+  } catch (error) {
+    console.error('Error deleting game plan:', error);
+    throw error;
+  }
+};
+
+// ==================== COACH: Film library ====================
+// A coach's uploaded game film. Metadata lives here; the video file itself lives in
+// Storage under users/{uid}/films/ (see src/utils/filmUpload.js). Owner-only, so it
+// mirrors the gamePlans subcollection. No AI extraction yet — coaches build game
+// plans manually from their film.
+
+/**
+ * Save uploaded film metadata for a coach.
+ * @param {string} coachUid
+ * @param {Object} meta - { opponentName, note, videoUrl, storagePath, durationSec? }
+ * @returns {Promise<string>} the film id
+ */
+export const saveFilm = async (coachUid, meta) => {
+  try {
+    const ref = await addDoc(collection(db, 'users', coachUid, 'films'), {
+      opponentName: meta.opponentName || 'Untitled Film',
+      note: meta.note || '',
+      videoUrl: meta.videoUrl || '',
+      storagePath: meta.storagePath || '',
+      durationSec: typeof meta.durationSec === 'number' ? meta.durationSec : null,
+      status: 'uploaded',
+      createdAt: serverTimestamp(),
+    });
+    return ref.id;
+  } catch (error) {
+    console.error('Error saving film:', error);
+    throw error;
+  }
+};
+
+export const getFilms = async (coachUid) => {
+  try {
+    const snapshot = await getDocs(collection(db, 'users', coachUid, 'films'));
+    const items = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    items.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+    return items;
+  } catch (error) {
+    console.error('Error fetching films:', error);
+    return [];
+  }
+};
+
+export const deleteFilm = async (coachUid, filmId) => {
+  try {
+    await deleteDoc(doc(db, 'users', coachUid, 'films', filmId));
+    // Note: the Storage object is left in place (best-effort cleanup is a follow-up).
+  } catch (error) {
+    console.error('Error deleting film:', error);
+    throw error;
+  }
+};
+
+// ==================== COACH: Sessions ====================
+// A coach schedules a session with a linked athlete. Top-level collection so both
+// parties can read/write their own sessions (rules check coachUid/athleteUid).
+
+export const createCoachingSession = async (session) => {
+  try {
+    const ref = await addDoc(collection(db, 'coachingSessions'), {
+      coachUid: session.coachUid,
+      coachName: session.coachName || 'Coach',
+      athleteUid: session.athleteUid,
+      athleteName: session.athleteName || 'Athlete',
+      type: session.type || 'Training Session',
+      scheduledAt: session.scheduledAt || null,
+      location: session.location || '',
+      mode: session.mode || 'court',
+      amount: session.amount || 0,
+      status: 'pending',
+      rating: null,
+      createdAt: serverTimestamp(),
+    });
+    return ref.id;
+  } catch (error) {
+    console.error('Error creating coaching session:', error);
+    throw error;
+  }
+};
+
+export const getCoachSessions = async (coachUid) => {
+  try {
+    const q = query(
+      collection(db, 'coachingSessions'),
+      where('coachUid', '==', coachUid),
+      orderBy('scheduledAt', 'asc')
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (error) {
+    console.error('Error fetching coach sessions:', error);
+    return [];
+  }
+};
+
+export const getAthleteSessions = async (athleteUid) => {
+  try {
+    const q = query(
+      collection(db, 'coachingSessions'),
+      where('athleteUid', '==', athleteUid),
+      orderBy('scheduledAt', 'asc')
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (error) {
+    console.error('Error fetching athlete sessions:', error);
+    return [];
+  }
+};
+
+export const updateSessionStatus = async (sessionId, status) => {
+  try {
+    await updateDoc(doc(db, 'coachingSessions', sessionId), { status });
+  } catch (error) {
+    console.error('Error updating session status:', error);
+    throw error;
+  }
+};
+
+// ==================== MESSAGING (1:1 real-time chat) ====================
+// Top-level conversations keyed by a deterministic sorted-pair id. Participant-
+// gated by rules. The app only surfaces message buttons between linked users.
+
+/** Deterministic conversation id for a pair of uids. */
+export const conversationIdFor = (a, b) => [a, b].sort().join('_');
+
+/**
+ * Get (or lazily create) the conversation between two users.
+ * @param {Object} me    - { uid, name, photoURL }
+ * @param {Object} other - { uid, name, photoURL }
+ * @returns {Promise<string>} conversation id
+ */
+export const getOrCreateConversation = async (me, other) => {
+  try {
+    const convId = conversationIdFor(me.uid, other.uid);
+    const ref = doc(db, 'conversations', convId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) {
+      await setDoc(ref, {
+        participants: [me.uid, other.uid],
+        participantInfo: {
+          [me.uid]: { name: me.name || 'Me', photoURL: me.photoURL || null },
+          [other.uid]: { name: other.name || 'User', photoURL: other.photoURL || null },
+        },
+        lastMessage: '',
+        lastMessageAt: serverTimestamp(),
+        lastSenderUid: null,
+        lastRead: {},
+        createdAt: serverTimestamp(),
+      });
+    }
+    return convId;
+  } catch (error) {
+    console.error('Error getting/creating conversation:', error);
+    throw error;
+  }
+};
+
+/** Real-time listener for a user's inbox (most-recent first). Returns unsub. */
+export const listenToConversations = (uid, callback) => {
+  const q = query(
+    collection(db, 'conversations'),
+    where('participants', 'array-contains', uid),
+    orderBy('lastMessageAt', 'desc')
+  );
+  return onSnapshot(
+    q,
+    (snapshot) => callback(snapshot.docs.map((d) => ({ id: d.id, ...d.data() }))),
+    (error) => {
+      console.error('Error listening to conversations:', error);
+      callback([]);
+    }
+  );
+};
+
+/**
+ * Send a message and bump the conversation summary. Marks the sender caught-up.
+ * @param {string} convId
+ * @param {Object} sender - { uid }
+ * @param {string} text
+ */
+export const sendMessage = async (convId, sender, text) => {
+  const body = (text || '').trim();
+  if (!body) return;
+  try {
+    await addDoc(collection(db, 'conversations', convId, 'messages'), {
+      senderUid: sender.uid,
+      text: body,
+      createdAt: serverTimestamp(),
+    });
+    await updateDoc(doc(db, 'conversations', convId), {
+      lastMessage: body,
+      lastMessageAt: serverTimestamp(),
+      lastSenderUid: sender.uid,
+      [`lastRead.${sender.uid}`]: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error('Error sending message:', error);
+    throw error;
+  }
+};
+
+/** Real-time listener for a conversation's messages (oldest first). Returns unsub. */
+export const listenToMessages = (convId, callback) => {
+  const q = query(
+    collection(db, 'conversations', convId, 'messages'),
+    orderBy('createdAt', 'asc')
+  );
+  return onSnapshot(
+    q,
+    (snapshot) => callback(snapshot.docs.map((d) => ({ id: d.id, ...d.data() }))),
+    (error) => {
+      console.error('Error listening to messages:', error);
+      callback([]);
+    }
+  );
+};
+
+/** Mark the conversation caught-up for this user (clears their unread state). */
+export const markConversationRead = async (convId, uid) => {
+  try {
+    await updateDoc(doc(db, 'conversations', convId), {
+      [`lastRead.${uid}`]: serverTimestamp(),
+    });
+  } catch (error) {
+    // Non-fatal — read receipts are best-effort.
+    console.error('Error marking conversation read:', error);
+  }
+};
+
+/**
+ * People this user can message: their roster (linked players) + their connections
+ * (linked coaches/parents), de-duped. Works for every role, both directions.
+ * @returns {Promise<Array<{uid,name,photoURL,role}>>}
+ */
+export const getMessageableContacts = async (uid) => {
+  try {
+    const [players, connections] = await Promise.all([
+      getLinkedPlayers(uid).catch(() => []),
+      getConnections(uid).catch(() => []),
+    ]);
+    const byUid = new Map();
+    [...players, ...connections].forEach((c) => {
+      if (c?.uid && !byUid.has(c.uid)) {
+        byUid.set(c.uid, { uid: c.uid, name: c.name || 'User', photoURL: c.photoURL || null, role: c.role || null });
+      }
+    });
+    return Array.from(byUid.values());
+  } catch (error) {
+    console.error('Error getting messageable contacts:', error);
+    return [];
+  }
+};
+
 // ==================== SCOUT: Watchlist & Reports ====================
 // Owner-only snapshots — no consent link required. A scout discovers
 // prospects via searchScoutLabProspects and bookmarks a snapshot.
@@ -3778,10 +4269,33 @@ export const saveWatchlistEntry = async (scoutUid, prospect, note = '') => {
       prospectUid: prospectId,
       name: prospect.name || prospect.displayName || 'Unknown',
       note,
+      status: prospect.status || 'watching', // watching → contacted → offer → committed → pass
       savedAt: serverTimestamp(),
-    });
+    }, { merge: true });
   } catch (error) {
     console.error('Error saving watchlist entry:', error);
+    throw error;
+  }
+};
+
+// Recruiting status lifecycle for a tracked prospect (confirmed with COO).
+export const WATCHLIST_STATUSES = ['watching', 'contacted', 'offer', 'committed', 'pass'];
+
+/**
+ * Advance a watchlisted prospect's recruiting status.
+ * @param {string} scoutUid
+ * @param {string} prospectUid
+ * @param {string} status - one of WATCHLIST_STATUSES
+ * @returns {Promise<void>}
+ */
+export const updateWatchlistStatus = async (scoutUid, prospectUid, status) => {
+  try {
+    await updateDoc(doc(db, 'users', scoutUid, 'watchlist', String(prospectUid)), {
+      status,
+      statusUpdatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error('Error updating watchlist status:', error);
     throw error;
   }
 };
@@ -3826,9 +4340,25 @@ export const removeWatchlistEntry = async (scoutUid, prospectUid) => {
  * @param {Object} report - Pass report.id to update an existing one
  * @returns {Promise<string>} The report id
  */
+// Standardized scouting rubric (1–5 per dimension) so reports are comparable
+// across scouts. Dimensions reflect the COO's evaluation criteria.
+export const SCOUTING_RUBRIC = [
+  { key: 'skill', label: 'Skill / Scoring' },
+  { key: 'athleticism', label: 'Athleticism' },
+  { key: 'iq', label: 'Basketball IQ' },
+  { key: 'defense', label: 'Defense' },
+  { key: 'character', label: 'Character' },
+  { key: 'academics', label: 'Academics' },
+  { key: 'consistency', label: 'Consistency' },
+];
+
 export const saveScoutingReport = async (scoutUid, report) => {
   try {
     const { id, ...data } = report || {};
+    // Reports must be tied to a registered platform athlete (COO policy).
+    if (!id && !data.prospectUid) {
+      throw new Error('A report must be linked to a prospect from your watchlist.');
+    }
     if (id) {
       await setDoc(
         doc(db, 'users', scoutUid, 'scoutingReports', id),
@@ -3881,6 +4411,205 @@ export const deleteScoutingReport = async (scoutUid, reportId) => {
     await deleteDoc(doc(db, 'users', scoutUid, 'scoutingReports', reportId));
   } catch (error) {
     console.error('Error deleting scouting report:', error);
+    throw error;
+  }
+};
+
+// ==================== SCOUT ACCESS (parent-authorized, tier-gated) ====================
+// A scout requests deeper access to a (minor) prospect; the prospect's PARENT
+// approves. Approval writes a scoutConnections doc under the player, which grants
+// the scout read access via the canViewPlayerData() security-rule helper. The
+// *depth* of data shown is gated client-side by the scout's subscription tier.
+
+/**
+ * Scout requests parent-authorized access to a prospect.
+ * @param {string} scoutUid
+ * @param {Object} prospect - directory/watchlist entry (must have id/uid)
+ * @param {Object} [opts] - { tier }
+ * @returns {Promise<void>}
+ */
+export const requestScoutAccess = async (scoutUid, prospect, { tier = 'free' } = {}) => {
+  try {
+    const playerUid = String(prospect.id || prospect.uid || '');
+    if (!playerUid) throw new Error('Prospect is missing an id.');
+    const scoutDoc = await getDoc(doc(db, 'users', scoutUid));
+    await setDoc(
+      doc(db, 'users', playerUid, 'scoutAccessRequests', scoutUid),
+      {
+        scoutUid,
+        scoutName: scoutDoc.data()?.displayName || 'A scout',
+        tier,
+        prospectName: prospect.name || null,
+        status: 'pending',
+        requestedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+  } catch (error) {
+    console.error('Error requesting scout access:', error);
+    throw error;
+  }
+};
+
+/**
+ * Current access status of a scout to a player: 'approved' | 'pending' | 'denied' | 'none'.
+ * @param {string} playerUid
+ * @param {string} scoutUid
+ * @returns {Promise<string>}
+ */
+export const getScoutAccessStatus = async (playerUid, scoutUid) => {
+  // Check approval first and independently — the scout can always read their own
+  // scoutConnection, but may not be able to read the request doc, so these reads
+  // must not be coupled (a denied request read must not mask an approval).
+  try {
+    const conn = await getDoc(doc(db, 'users', playerUid, 'scoutConnections', scoutUid));
+    if (conn.exists()) return 'approved';
+  } catch (error) {
+    // ignore — fall through to request lookup
+  }
+  try {
+    const req = await getDoc(doc(db, 'users', playerUid, 'scoutAccessRequests', scoutUid));
+    if (req.exists()) return req.data().status || 'pending';
+  } catch (error) {
+    // ignore — treat as no status
+  }
+  return 'none';
+};
+
+/**
+ * Pending scout-access requests across all of a parent's linked children.
+ * @param {string} parentUid
+ * @returns {Promise<Array>} requests annotated with childUid
+ */
+export const getPendingScoutRequestsForParent = async (parentUid) => {
+  try {
+    const children = await getLinkedPlayers(parentUid);
+    const lists = await Promise.all(
+      children.map(async (child) => {
+        try {
+          const q = query(
+            collection(db, 'users', child.uid, 'scoutAccessRequests'),
+            where('status', '==', 'pending')
+          );
+          const snap = await getDocs(q);
+          return snap.docs.map((d) => ({
+            id: d.id,
+            childUid: child.uid,
+            childName: child.name || 'your child',
+            ...d.data(),
+          }));
+        } catch {
+          return [];
+        }
+      })
+    );
+    return lists.flat();
+  } catch (error) {
+    console.error('Error fetching scout requests for parent:', error);
+    return [];
+  }
+};
+
+/**
+ * Parent approves a scout's access to their child (creates the scoutConnection).
+ * @param {string} childUid
+ * @param {string} scoutUid
+ * @param {Object} [opts] - { tier, scoutName }
+ * @returns {Promise<void>}
+ */
+export const approveScoutAccess = async (childUid, scoutUid, { tier = 'free', scoutName = null } = {}) => {
+  try {
+    await Promise.all([
+      setDoc(doc(db, 'users', childUid, 'scoutConnections', scoutUid), {
+        scoutUid,
+        playerUid: childUid,
+        scoutName,
+        tier,
+        status: 'approved',
+        approvedAt: serverTimestamp(),
+      }),
+      updateDoc(doc(db, 'users', childUid, 'scoutAccessRequests', scoutUid), {
+        status: 'approved',
+        resolvedAt: serverTimestamp(),
+      }),
+    ]);
+  } catch (error) {
+    console.error('Error approving scout access:', error);
+    throw error;
+  }
+};
+
+/**
+ * Parent denies a scout's access request.
+ * @param {string} childUid
+ * @param {string} scoutUid
+ * @returns {Promise<void>}
+ */
+export const denyScoutAccess = async (childUid, scoutUid) => {
+  try {
+    await updateDoc(doc(db, 'users', childUid, 'scoutAccessRequests', scoutUid), {
+      status: 'denied',
+      resolvedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error('Error denying scout access:', error);
+    throw error;
+  }
+};
+// ==================== SCOUT: Saved searches + alerts ====================
+// A scout saves search criteria; a Cloud Function matches newly-published
+// prospects against saved searches and pushes an alert + in-app notification.
+
+/**
+ * Save a search (criteria) for the scout.
+ * @param {string} scoutUid
+ * @param {Object} criteria - { name?, position?, region?, minGrade?, gradeLevel? }
+ * @returns {Promise<string>} saved search id
+ */
+export const saveSearch = async (scoutUid, criteria = {}) => {
+  try {
+    const ref = await addDoc(collection(db, 'users', scoutUid, 'savedSearches'), {
+      name: criteria.name || null,
+      position: criteria.position || null,
+      region: criteria.region || null,
+      minGrade: criteria.minGrade || null,
+      gradeLevel: criteria.gradeLevel || null,
+      createdAt: serverTimestamp(),
+    });
+    return ref.id;
+  } catch (error) {
+    console.error('Error saving search:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get the scout's saved searches.
+ * @param {string} scoutUid
+ * @returns {Promise<Array>}
+ */
+export const getSavedSearches = async (scoutUid) => {
+  try {
+    const q = query(collection(db, 'users', scoutUid, 'savedSearches'), orderBy('createdAt', 'desc'));
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  } catch (error) {
+    console.error('Error fetching saved searches:', error);
+    return [];
+  }
+};
+
+/**
+ * Delete a saved search.
+ * @param {string} scoutUid
+ * @param {string} searchId
+ * @returns {Promise<void>}
+ */
+export const deleteSavedSearch = async (scoutUid, searchId) => {
+  try {
+    await deleteDoc(doc(db, 'users', scoutUid, 'savedSearches', searchId));
+  } catch (error) {
+    console.error('Error deleting saved search:', error);
     throw error;
   }
 };

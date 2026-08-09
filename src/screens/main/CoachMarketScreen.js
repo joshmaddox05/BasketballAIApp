@@ -1,126 +1,49 @@
 // CoachMarketScreen.js - Coaching marketplace hub
 import React, { useState, useCallback } from 'react';
-import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, ScrollView, TextInput } from 'react-native';
+import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, ScrollView, TextInput, ActivityIndicator } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAppContext } from '../../context/AppContext';
 import { canAccessFeature } from '../../utils/subscription';
+import { getCoachMarketListings, getUserCoachMarketPurchases } from '../../services/firestoreService';
 
-const CATEGORIES = ['All', 'Shooting', 'Dribbling', 'Defense', 'Physical', 'Mental'];
+const CATEGORIES = ['All', 'Shooting', 'Ball Handling', 'Defense', 'Physical', 'Mental'];
+const AVATAR_COLORS = ['#FF6B00', '#8b5cf6', '#06b6d4', '#22c55e', '#f59e0b', '#ec4899'];
+const FEATURED_ACCENTS = ['#FF6B00', '#8b5cf6'];
 
-const MOCK_FEATURED = [
-  {
-    id: 'f1',
-    title: 'Elite Shooting System',
-    coach: 'Coach Ray Mitchell',
-    tagline: '12-week shooting overhaul',
-    category: 'Shooting',
-    rating: 4.9,
-    reviewCount: 312,
-    price: '$49',
-    badgeText: 'Top Rated',
-    accentColor: '#FF6B00',
-  },
-  {
-    id: 'f2',
-    title: 'Pro Ball Handling Blueprint',
-    coach: 'Coach Deja Williams',
-    tagline: 'Handles like a pro in 30 days',
-    category: 'Dribbling',
-    rating: 4.8,
-    reviewCount: 188,
-    price: '$39',
-    badgeText: 'Trending',
-    accentColor: '#8b5cf6',
-  },
-];
+const initialsOf = (name) =>
+  (name || 'Coach').split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase();
 
-const MOCK_LISTINGS = [
-  {
-    id: 'l1',
-    name: 'Ray Mitchell',
-    initials: 'RM',
-    avatarColor: '#FF6B00',
-    drillName: 'Catch-and-Shoot Mastery Series',
-    rating: 4.9,
-    reviewCount: 142,
-    price: '$19',
-    category: 'Shooting',
-    level: 'Intermediate',
-  },
-  {
-    id: 'l2',
-    name: 'Deja Williams',
-    initials: 'DW',
-    avatarColor: '#8b5cf6',
-    drillName: 'Crossover Fundamentals Bootcamp',
-    rating: 4.7,
-    reviewCount: 97,
-    price: '$14',
-    category: 'Dribbling',
-    level: 'Beginner',
-  },
-  {
-    id: 'l3',
-    name: 'Marcus Hill',
-    initials: 'MH',
-    avatarColor: '#06b6d4',
-    drillName: 'Lock-Down Defense Drills',
-    rating: 4.8,
-    reviewCount: 74,
-    price: '$22',
-    category: 'Defense',
-    level: 'Advanced',
-  },
-  {
-    id: 'l4',
-    name: 'Lisa Chen',
-    initials: 'LC',
-    avatarColor: '#22c55e',
-    drillName: 'Speed & Agility Power Pack',
-    rating: 4.6,
-    reviewCount: 115,
-    price: '$17',
-    category: 'Physical',
-    level: 'Intermediate',
-  },
-  {
-    id: 'l5',
-    name: 'Kevin Okafor',
-    initials: 'KO',
-    avatarColor: '#f59e0b',
-    drillName: 'Mental Toughness Masterclass',
-    rating: 4.9,
-    reviewCount: 203,
-    price: '$29',
-    category: 'Mental',
-    level: 'All Levels',
-  },
-  {
-    id: 'l6',
-    name: 'Simone Reyes',
-    initials: 'SR',
-    avatarColor: '#ec4899',
-    drillName: 'Off-Ball Movement Clinic',
-    rating: 4.5,
-    reviewCount: 58,
-    price: '$12',
-    category: 'Defense',
-    level: 'Beginner',
-  },
-  {
-    id: 'l7',
-    name: 'Andre Parks',
-    initials: 'AP',
-    avatarColor: '#FF6B00',
-    drillName: 'Mid-Range Pull-Up Precision',
-    rating: 4.7,
-    reviewCount: 86,
-    price: '$16',
-    category: 'Shooting',
-    level: 'Intermediate',
-  },
-];
+// Firestore listing → browse card shape.
+const mapListingCard = (l, idx) => ({
+  id: l.id,
+  raw: l,
+  name: l.coachName || 'Coach',
+  initials: initialsOf(l.coachName),
+  avatarColor: AVATAR_COLORS[idx % AVATAR_COLORS.length],
+  drillName: l.title || 'Untitled Drill',
+  rating: l.rating || 0,
+  reviewCount: l.sales || 0,
+  price: `$${(l.price || 0).toFixed(0)}`,
+  category: l.category || 'General',
+  level: 'All Levels',
+});
+
+// Top sellers → featured card shape.
+const mapFeaturedCard = (l, idx) => ({
+  id: l.id,
+  raw: l,
+  title: l.title || 'Untitled Drill',
+  coach: l.coachName || 'Coach',
+  tagline: l.description || 'Coaching content',
+  category: l.category || 'General',
+  rating: l.rating || 0,
+  reviewCount: l.sales || 0,
+  price: `$${(l.price || 0).toFixed(0)}`,
+  badgeText: idx === 0 ? 'Top Seller' : 'Popular',
+  accentColor: FEATURED_ACCENTS[idx % FEATURED_ACCENTS.length],
+});
 
 function StarRating({ rating, theme }) {
   const full = Math.floor(rating);
@@ -201,7 +124,11 @@ function FeaturedCard({ item, theme, onPress }) {
 
 function ListingCard({ item, theme, onPreview }) {
   return (
-    <View style={[styles.listingCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+    <TouchableOpacity
+      style={[styles.listingCard, { backgroundColor: theme.card, borderColor: theme.border }]}
+      activeOpacity={0.85}
+      onPress={onPreview}
+    >
       <View style={styles.listingTop}>
         <CoachAvatar initials={item.initials} color={item.avatarColor} size={48} />
         <View style={styles.listingInfo}>
@@ -233,11 +160,11 @@ function ListingCard({ item, theme, onPreview }) {
             activeOpacity={0.85}
             onPress={onPreview}
           >
-            <Text style={styles.listingPreviewBtnText}>Preview</Text>
+            <Text style={styles.listingPreviewBtnText}>View</Text>
           </TouchableOpacity>
         </View>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -279,19 +206,51 @@ function MyPurchasesEmptyState({ theme }) {
 }
 
 export default function CoachMarketScreen({ navigation }) {
-  const { userData, theme, isDarkMode } = useAppContext();
+  const { user, userData, theme, isDarkMode } = useAppContext();
   const subscription = userData?.subscription || 'free';
   const hasPremiumAccess = canAccessFeature('coachMarket', subscription);
 
   const [activeTab, setActiveTab] = useState('browse'); // 'browse' | 'purchases'
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
+  const [listings, setListings] = useState([]);
+  const [purchases, setPurchases] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const handlePreview = useCallback((item) => {
-    // In a real app this would open a preview modal or video player
-  }, []);
+  const load = useCallback(async () => {
+    if (!hasPremiumAccess) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    const [all, mine] = await Promise.all([
+      getCoachMarketListings({ limitCount: 50 }),
+      user?.uid ? getUserCoachMarketPurchases(user.uid) : Promise.resolve([]),
+    ]);
+    // Only publicly live listings appear in browse.
+    setListings(all.filter((l) => (l.status || 'live') === 'live'));
+    setPurchases(mine);
+    setLoading(false);
+  }, [hasPremiumAccess, user?.uid]);
 
-  const filteredListings = MOCK_LISTINGS.filter((item) => {
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
+
+  const openListing = useCallback(
+    (raw) => navigation.navigate('CoachMarketListing', { listing: raw }),
+    [navigation]
+  );
+
+  const cards = listings.map(mapListingCard);
+  const featured = [...listings]
+    .sort((a, b) => (b.sales || 0) - (a.sales || 0))
+    .slice(0, 2)
+    .map(mapFeaturedCard);
+
+  const filteredListings = cards.filter((item) => {
     const q = searchQuery.trim().toLowerCase();
     const matchesQuery =
       !q ||
@@ -349,10 +308,19 @@ export default function CoachMarketScreen({ navigation }) {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {hasPremiumAccess ? (
+          {!hasPremiumAccess ? (
+            <UpgradeGate theme={theme} navigation={navigation} />
+          ) : purchases.length === 0 ? (
             <MyPurchasesEmptyState theme={theme} />
           ) : (
-            <UpgradeGate theme={theme} navigation={navigation} />
+            purchases.map((p, idx) => (
+              <ListingCard
+                key={p.id}
+                item={mapListingCard({ ...p, title: p.title }, idx)}
+                theme={theme}
+                onPreview={() => openListing({ id: p.listingId, ...p })}
+              />
+            ))
           )}
           <View style={styles.bottomSpacer} />
         </ScrollView>
@@ -410,27 +378,33 @@ export default function CoachMarketScreen({ navigation }) {
           {/* Subscription gate overlay — shown if user lacks access */}
           {!hasPremiumAccess ? (
             <UpgradeGate theme={theme} navigation={navigation} />
+          ) : loading ? (
+            <ActivityIndicator color={theme.primary} style={{ marginTop: 40 }} />
           ) : (
             <>
               {/* Featured section */}
-              <View style={styles.sectionHeader}>
-                <Text style={[styles.sectionTitle, { color: theme.text }]}>Featured</Text>
-                <View style={[styles.featuredBadgePill, { backgroundColor: theme.primary + '20' }]}>
-                  <Ionicons name="flame" size={12} color={theme.primary} />
-                  <Text style={[styles.featuredBadgePillText, { color: theme.primary }]}>Hot</Text>
-                </View>
-              </View>
+              {featured.length > 0 && (
+                <>
+                  <View style={styles.sectionHeader}>
+                    <Text style={[styles.sectionTitle, { color: theme.text }]}>Featured</Text>
+                    <View style={[styles.featuredBadgePill, { backgroundColor: theme.primary + '20' }]}>
+                      <Ionicons name="flame" size={12} color={theme.primary} />
+                      <Text style={[styles.featuredBadgePillText, { color: theme.primary }]}>Hot</Text>
+                    </View>
+                  </View>
 
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={styles.featuredScroll}
-                contentContainerStyle={styles.featuredScrollContent}
-              >
-                {MOCK_FEATURED.map((item) => (
-                  <FeaturedCard key={item.id} item={item} theme={theme} onPress={() => {}} />
-                ))}
-              </ScrollView>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.featuredScroll}
+                    contentContainerStyle={styles.featuredScrollContent}
+                  >
+                    {featured.map((item) => (
+                      <FeaturedCard key={item.id} item={item} theme={theme} onPress={() => openListing(item.raw)} />
+                    ))}
+                  </ScrollView>
+                </>
+              )}
 
               {/* Browse section */}
               <View style={[styles.sectionHeader, { marginTop: 8 }]}>
@@ -447,7 +421,7 @@ export default function CoachMarketScreen({ navigation }) {
                   </View>
                   <Text style={[styles.emptyTitle, { color: theme.text }]}>No Listings Found</Text>
                   <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
-                    Try searching for a different term or selecting another category.
+                    No coaching drills match yet. Coaches publish content from their CoachMarket dashboard.
                   </Text>
                 </View>
               ) : (
@@ -456,7 +430,7 @@ export default function CoachMarketScreen({ navigation }) {
                     key={item.id}
                     item={item}
                     theme={theme}
-                    onPreview={() => handlePreview(item)}
+                    onPreview={() => openListing(item.raw)}
                   />
                 ))
               )}

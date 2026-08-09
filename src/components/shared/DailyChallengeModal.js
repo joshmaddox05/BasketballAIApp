@@ -60,10 +60,7 @@ const DailyChallengeModal = ({ visible, challenge, onDismiss, theme }) => {
         }
         onDismiss();
         try {
-            navigation.navigate('Challenges', {
-                screen: 'DailyChallengeDetail',
-                params: { challenge, progress: null }
-            });
+            navigation.navigate('DailyChallengeDetail', { challenge, progress: null });
         } catch (error) {
             console.error('Error navigating to daily challenge:', error);
         }

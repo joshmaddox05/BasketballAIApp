@@ -19,7 +19,7 @@ export const MODULE_META = {
     icon: 'stats-chart',
     color: '#3B82F6',
     feature: 'evalRank',
-    description: 'Skill evaluation & grade',
+    description: 'Grade, stats & progress',
   },
   Blueprint360: {
     key: 'Blueprint360',
@@ -27,7 +27,7 @@ export const MODULE_META = {
     icon: 'map-outline',
     color: '#22C55E',
     feature: 'blueprint360',
-    description: 'Adaptive training plan',
+    description: 'Your plan & workouts',
   },
   SimCoach: {
     key: 'SimCoach',
@@ -43,7 +43,15 @@ export const MODULE_META = {
     icon: 'search-outline',
     color: '#F59E0B',
     feature: 'scoutLab',
-    description: 'Recruiting exposure & search',
+    description: 'Recruiting exposure (player)',
+  },
+  ScoutLabSearch: {
+    key: 'ScoutLabSearch',
+    label: 'Prospect Search',
+    icon: 'search-outline',
+    color: '#F59E0B',
+    feature: 'scoutLab',
+    description: 'Discover & search prospects',
   },
   ScoutReports: {
     key: 'ScoutReports',
@@ -52,6 +60,14 @@ export const MODULE_META = {
     color: '#0EA5E9',
     feature: 'scoutLab',
     description: 'Scouting reports',
+  },
+  ParentScoutLab: {
+    key: 'ParentScoutLab',
+    label: 'Recruiting',
+    icon: 'megaphone-outline',
+    color: '#F59E0B',
+    feature: 'parentRecruiting', // unmapped in subscription.js → free (consent is never paywalled)
+    description: "Child's recruiting & visibility",
   },
   CoachMarket: {
     key: 'CoachMarket',
@@ -67,7 +83,7 @@ export const MODULE_META = {
     icon: 'people-outline',
     color: '#06B6D4',
     feature: 'hoopCommunity',
-    description: 'Community & mentorship',
+    description: 'Challenges & community',
   },
   LegacyVault: {
     key: 'LegacyVault',
@@ -84,18 +100,26 @@ export const MODULE_META = {
 // the child's EvalRank) are reached via the roster / Progress Report screens,
 // not listed here.
 export const ROLE_MODULES = {
-  player: ['ShotDNA', 'EvalRank', 'Blueprint360', 'SimCoach', 'ScoutLab', 'CoachMarket', 'HoopCommunity', 'LegacyVault'],
+  // Fold hosts lead: Blueprint360 (Training), EvalRank (Progress), HoopCommunity (Challenges).
+  player: ['Blueprint360', 'EvalRank', 'HoopCommunity', 'ShotDNA', 'SimCoach', 'ScoutLab', 'CoachMarket', 'LegacyVault'],
   coach: ['SimCoach', 'CoachMarket', 'HoopCommunity', 'LegacyVault'],
-  scout: ['ScoutLab', 'ScoutReports', 'HoopCommunity', 'LegacyVault'],
-  parent: ['HoopCommunity', 'LegacyVault'],
+  // Coach sub-types diverge: org coaches are team/IQ-centric (SimCoach), skills
+  // trainers are marketplace-centric (CoachMarket).
+  coachOrg: ['SimCoach', 'HoopCommunity', 'LegacyVault'],
+  coachTrainer: ['CoachMarket', 'HoopCommunity', 'LegacyVault'],
+  scout: ['ScoutLabSearch', 'ScoutReports', 'HoopCommunity', 'LegacyVault'],
+  parent: ['ParentScoutLab', 'HoopCommunity', 'LegacyVault'],
 };
 
 /**
  * Ordered module descriptors a role should see. Defaults to the player set.
  * @param {string} role - 'player' | 'coach' | 'scout' | 'parent'
+ * @param {string} [coachType] - for role 'coach': 'org' | 'trainer' (picks the sub-set)
  * @returns {Array<Object>} MODULE_META entries
  */
-export const getModulesForRole = (role) => {
-  const keys = ROLE_MODULES[role] || ROLE_MODULES.player;
+export const getModulesForRole = (role, coachType) => {
+  let key = role;
+  if (role === 'coach') key = coachType === 'trainer' ? 'coachTrainer' : 'coachOrg';
+  const keys = ROLE_MODULES[key] || ROLE_MODULES.player;
   return keys.map((k) => MODULE_META[k]).filter(Boolean);
 };

@@ -1,58 +1,131 @@
 // CoachMarketListingScreen.js - Drill/course detail view for CoachMarket
 import React, { useState, useCallback } from 'react';
-import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, ScrollView, TextInput } from 'react-native';
+import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { useAppContext } from '../../context/AppContext';
-import { canAccessFeature } from '../../utils/subscription';
+import { purchaseCoachMarketListing, getUserCoachMarketPurchases } from '../../services/firestoreService';
+import { useSubscriptionPayment, processCoachMarketPayment } from '../../services/stripePaymentService';
 
-const MOCK_LISTING = {
-  id: 'listing_001',
-  title: 'Elite Pull-Up Jumper Mechanics: Zero to Consistent',
-  category: 'Shooting',
-  rating: 4.8,
-  ratingCount: 142,
-  duration: '38:24',
-  price: 19.99,
-  description:
-    'Master the pull-up jumper from any spot on the floor with a proven 5-step mechanics framework. This drill series breaks down footwork, balance point, and release consistency so you can create your own shot off the dribble at any level.',
-  fullDescription:
-    'This comprehensive drill course takes you through the complete mechanics of the pull-up jumper used by elite guards and forwards. Coach Marcus Thompson breaks down each phase — from the gather step and hip load through the one-motion release — with slow-motion breakdowns, live reps, and correction cues. Whether you are a youth player building your first pull-up or a high school player trying to make it automatic, this series gives you the framework and the reps to get there.',
-  whatYoullLearn: [
-    'Proper gather step and footwork for any pull-up situation',
-    'How to create balance and elevation off the dribble',
-    'One-motion shooting mechanics to improve release consistency',
-    'In-game application drills for pull-ups off screens and ISO sets',
-  ],
-  coach: {
-    id: 'coach_marcus',
-    name: 'Marcus Thompson',
-    title: 'Former D1 Assistant Coach',
-    verified: true,
-    totalStudents: 2340,
-    totalListings: 18,
-  },
+const formatDuration = (sec) => {
+  if (!sec || sec <= 0) return '—';
+  const m = Math.floor(sec / 60);
+  const s = Math.round(sec % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+};
+
+// Normalize a Firestore listing (or a purchase record) into the detail shape.
+const normalizeListing = (raw = {}) => {
+  const drills = Array.isArray(raw.drills) ? raw.drills : [];
+  const learn = Array.isArray(raw.learningPoints) && raw.learningPoints.length
+    ? raw.learningPoints
+    : (Array.isArray(raw.whatYoullLearn) ? raw.whatYoullLearn : []);
+  return {
+    id: raw.id || raw.listingId || null,
+    coachUid: raw.coachUid || null,
+    title: raw.title || 'Coaching Drill',
+    category: raw.category || 'General',
+    type: raw.type || (drills.length > 1 ? 'series' : 'single'),
+    level: raw.level || 'All Levels',
+    rating: raw.rating || 0,
+    ratingCount: raw.sales || 0,
+    duration: raw.durationSec ? formatDuration(raw.durationSec) : (raw.duration || '—'),
+    price: raw.price || 0,
+    fullDescription: raw.description || 'Coaching content from a verified coach on CoachMarket.',
+    whatYoullLearn: learn,
+    drills,
+    coach: {
+      name: raw.coachName || 'Coach',
+      title: 'CoachMarket Coach',
+      verified: true,
+      totalStudents: raw.sales || 0,
+    },
+  };
 };
 
 const CoachMarketListingScreen = ({ navigation, route }) => {
-  const listing = route.params?.listing || MOCK_LISTING;
-  const { userData, theme, isDarkMode } = useAppContext();
+  const raw = route.params?.listing || {};
+  const listing = normalizeListing(raw);
+  const { user, userData, theme, isDarkMode } = useAppContext();
 
   const [purchased, setPurchased] = useState(false);
+  const [purchasing, setPurchasing] = useState(false);
   const [previewActive, setPreviewActive] = useState(false);
+  const [activeVideoUrl, setActiveVideoUrl] = useState(null);
 
-  const handlePurchase = useCallback(() => {
-    // In production this would trigger a payment flow
-    setPurchased(true);
-  }, []);
+  const { initializePaymentSheet, openPaymentSheet } = useSubscriptionPayment();
+
+  const isOwnListing = listing.coachUid && listing.coachUid === user?.uid;
+  const canWatch = purchased || isOwnListing;
+  const drillsWithVideo = listing.drills.filter((d) => d.videoUrl);
+
+  const player = useVideoPlayer(null, (p) => { p.loop = false; });
+
+  const playVideo = useCallback((url) => {
+    if (!url) return;
+    setActiveVideoUrl(url);
+    try {
+      player.replace({ uri: url });
+      player.play();
+    } catch (_) { /* player not ready */ }
+  }, [player]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!user?.uid || !listing.id) return;
+      let active = true;
+      (async () => {
+        const mine = await getUserCoachMarketPurchases(user.uid);
+        if (active) setPurchased(mine.some((p) => p.id === listing.id || p.listingId === listing.id));
+      })();
+      return () => { active = false; };
+    }, [user?.uid, listing.id])
+  );
+
+  const handlePurchase = useCallback(async () => {
+    if (purchasing || !listing.id) return;
+    setPurchasing(true);
+    try {
+      if (listing.price > 0) {
+        // Paid listing → Stripe payment sheet (destination charge to the coach).
+        // The purchase record is written server-side by the webhook on success.
+        const email = userData?.email || user?.email;
+        const result = await processCoachMarketPayment(
+          listing.id,
+          email,
+          initializePaymentSheet,
+          openPaymentSheet
+        );
+        if (result.success) {
+          setPurchased(true);
+          Alert.alert('Success! 🎉', 'Payment complete — you now have lifetime access.');
+        }
+      } else {
+        // Free listing → immediate enroll.
+        await purchaseCoachMarketListing(
+          { uid: user?.uid, displayName: userData?.displayName },
+          raw
+        );
+        setPurchased(true);
+      }
+    } catch (err) {
+      Alert.alert('Error', 'Could not complete. Please try again.');
+    } finally {
+      setPurchasing(false);
+    }
+  }, [purchasing, listing.id, listing.price, user?.uid, user?.email, userData?.displayName, userData?.email, raw, initializePaymentSheet, openPaymentSheet]);
 
   const handlePreview = useCallback(() => {
     setPreviewActive(true);
   }, []);
 
   const handleViewProfile = useCallback(() => {
-    navigation.navigate('CoachProfile', { coachId: listing.coach.id });
-  }, [navigation, listing.coach.id]);
+    if (listing.coachUid) {
+      navigation.navigate('CoachPublicProfile', { coachUid: listing.coachUid });
+    }
+  }, [navigation, listing.coachUid]);
 
   const handleBack = useCallback(() => {
     navigation.goBack();
@@ -110,24 +183,26 @@ const CoachMarketListingScreen = ({ navigation, route }) => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Video Preview Placeholder */}
+        {/* Video area — plays real video once owned; otherwise a thumbnail. */}
         <View style={[styles.videoPreview, { backgroundColor: '#111' }]}>
-          {previewActive ? (
-            <View style={styles.videoActivePlaceholder}>
-              <Ionicons name="play-circle" size={56} color={primary} />
-              <Text style={[styles.videoActiveText, { color: textSecondary }]}>
-                Preview playing... (2 min free)
-              </Text>
-            </View>
+          {activeVideoUrl ? (
+            <VideoView player={player} style={styles.videoPlayer} allowsFullscreen contentFit="contain" />
           ) : (
             <>
-              {/* Simulated video thumbnail gradient */}
-              <View style={styles.videoThumbnailOverlay}>
+              <TouchableOpacity
+                style={styles.videoThumbnailOverlay}
+                activeOpacity={0.85}
+                onPress={() => (canWatch && drillsWithVideo[0] ? playVideo(drillsWithVideo[0].videoUrl) : handlePreview())}
+              >
                 <View style={[styles.playCircle, { backgroundColor: 'rgba(255,107,0,0.92)' }]}>
-                  <Ionicons name="play" size={32} color="#FFF" style={{ marginLeft: 4 }} />
+                  <Ionicons name={canWatch ? 'play' : 'lock-closed'} size={30} color="#FFF" style={{ marginLeft: canWatch ? 4 : 0 }} />
                 </View>
-              </View>
-              {/* Duration badge */}
+                {!canWatch && (
+                  <Text style={[styles.videoActiveText, { color: textSecondary, marginTop: 10 }]}>
+                    {drillsWithVideo.length > 0 ? 'Purchase to watch' : 'No preview available'}
+                  </Text>
+                )}
+              </TouchableOpacity>
               <View style={[styles.durationBadge, { backgroundColor: 'rgba(0,0,0,0.75)' }]}>
                 <Ionicons name="time-outline" size={12} color="#FFF" />
                 <Text style={styles.durationText}>{listing.duration}</Text>
@@ -190,30 +265,69 @@ const CoachMarketListingScreen = ({ navigation, route }) => {
 
         {/* Description */}
         <View style={[styles.section, { backgroundColor: card, borderColor: border }]}>
-          <Text style={[styles.sectionTitle, { color: textPrimary }]}>About This Drill Series</Text>
+          <Text style={[styles.sectionTitle, { color: textPrimary }]}>
+            {listing.type === 'series' ? 'About This Drill Series' : 'About This Drill'}
+          </Text>
           <Text style={[styles.descriptionText, { color: textSecondary }]}>
             {listing.fullDescription}
           </Text>
         </View>
 
+        {/* Drills — series shows the full list; each is playable once owned. */}
+        {listing.type === 'series' && listing.drills.length > 0 && (
+          <View style={[styles.section, { backgroundColor: card, borderColor: border }]}>
+            <Text style={[styles.sectionTitle, { color: textPrimary }]}>
+              {listing.drills.length} Drill{listing.drills.length === 1 ? '' : 's'}
+            </Text>
+            {listing.drills.map((d, i) => {
+              const isActive = d.videoUrl && d.videoUrl === activeVideoUrl;
+              const playable = canWatch && !!d.videoUrl;
+              return (
+                <TouchableOpacity
+                  key={i}
+                  style={styles.drillRow}
+                  activeOpacity={playable ? 0.7 : 1}
+                  onPress={() => playable && playVideo(d.videoUrl)}
+                >
+                  <View style={[styles.drillIndex, { backgroundColor: `${primary}22` }]}>
+                    <Ionicons
+                      name={playable ? (isActive ? 'pause' : 'play') : (d.videoUrl ? 'lock-closed' : 'ellipse-outline')}
+                      size={14}
+                      color={primary}
+                    />
+                  </View>
+                  <Text style={[styles.drillRowTitle, { color: textPrimary }]} numberOfLines={1}>
+                    {d.title || `Drill ${i + 1}`}
+                  </Text>
+                  <Text style={[styles.drillRowMeta, { color: textSecondary }]}>{formatDuration(d.durationSec)}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+
         {/* What You'll Learn */}
-        <View style={[styles.section, { backgroundColor: card, borderColor: border }]}>
-          <Text style={[styles.sectionTitle, { color: textPrimary }]}>What You'll Learn</Text>
-          {listing.whatYoullLearn.map((point, index) => (
-            <View key={index} style={styles.bulletRow}>
-              <View style={[styles.checkCircle, { backgroundColor: `${primary}22` }]}>
-                <Ionicons name="checkmark" size={14} color={primary} />
+        {listing.whatYoullLearn.length > 0 && (
+          <View style={[styles.section, { backgroundColor: card, borderColor: border }]}>
+            <Text style={[styles.sectionTitle, { color: textPrimary }]}>What You'll Learn</Text>
+            {listing.whatYoullLearn.map((point, index) => (
+              <View key={index} style={styles.bulletRow}>
+                <View style={[styles.checkCircle, { backgroundColor: `${primary}22` }]}>
+                  <Ionicons name="checkmark" size={14} color={primary} />
+                </View>
+                <Text style={[styles.bulletText, { color: textSecondary }]}>{point}</Text>
               </View>
-              <Text style={[styles.bulletText, { color: textSecondary }]}>{point}</Text>
-            </View>
-          ))}
-        </View>
+            ))}
+          </View>
+        )}
 
         {/* Purchase Section */}
         <View style={[styles.purchaseSection, { backgroundColor: card, borderColor: border }]}>
           <View style={styles.priceRow}>
             <View style={styles.priceLabelCol}>
-              <Text style={[styles.priceLabel, { color: textSecondary }]}>One-time purchase</Text>
+              <Text style={[styles.priceLabel, { color: textSecondary }]}>
+                {listing.price > 0 ? 'Listed price' : 'Free access'}
+              </Text>
               <Text style={[styles.priceValue, { color: textPrimary }]}>
                 ${listing.price.toFixed(2)}
               </Text>
@@ -224,25 +338,37 @@ const CoachMarketListingScreen = ({ navigation, route }) => {
             </View>
           </View>
 
-          {purchased ? (
+          {isOwnListing ? (
+            <View style={[styles.purchasedButton, { backgroundColor: border }]}>
+              <Ionicons name="person-outline" size={20} color={textSecondary} />
+              <Text style={[styles.purchasedButtonText, { color: textSecondary }]}>This is your listing</Text>
+            </View>
+          ) : purchased ? (
             <View style={[styles.purchasedButton, { backgroundColor: '#4CAF50' }]}>
               <Ionicons name="checkmark-circle-outline" size={20} color="#FFF" />
-              <Text style={styles.purchasedButtonText}>Purchased — Start Watching</Text>
+              <Text style={styles.purchasedButtonText}>You have access</Text>
             </View>
           ) : (
             <TouchableOpacity
               style={[styles.purchaseButton, { backgroundColor: primary }]}
               onPress={handlePurchase}
+              disabled={purchasing}
               activeOpacity={0.8}
             >
-              <Ionicons name="cart-outline" size={20} color="#FFF" />
-              <Text style={styles.purchaseButtonText}>
-                Purchase for ${listing.price.toFixed(2)}
-              </Text>
+              {purchasing ? (
+                <ActivityIndicator color="#FFF" />
+              ) : (
+                <>
+                  <Ionicons name="cart-outline" size={20} color="#FFF" />
+                  <Text style={styles.purchaseButtonText}>
+                    {listing.price > 0 ? `Buy · $${listing.price.toFixed(2)}` : 'Get Access'}
+                  </Text>
+                </>
+              )}
             </TouchableOpacity>
           )}
 
-          {!purchased && (
+          {!purchased && !isOwnListing && (
             <TouchableOpacity onPress={handlePreview} activeOpacity={0.7} style={styles.previewLinkWrapper}>
               <Ionicons name="play-circle-outline" size={16} color={primary} />
               <Text style={[styles.previewLink, { color: primary }]}>Preview First 2 Min Free</Text>
@@ -298,6 +424,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     position: 'relative',
     overflow: 'hidden',
+  },
+  videoPlayer: {
+    width: '100%',
+    height: 220,
+  },
+  drillRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 10,
+  },
+  drillIndex: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  drillRowTitle: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  drillRowMeta: {
+    fontSize: 12,
   },
   videoThumbnailOverlay: {
     position: 'absolute',

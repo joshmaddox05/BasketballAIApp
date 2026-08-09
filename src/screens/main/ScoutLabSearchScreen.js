@@ -10,6 +10,9 @@ import {
   saveWatchlistEntry,
   getWatchlist,
   removeWatchlistEntry,
+  saveSearch,
+  getSavedSearches,
+  deleteSavedSearch,
 } from '../../services/firestoreService';
 
 const POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'];
@@ -146,7 +149,7 @@ function ProspectCard({ prospect, isWatchlisted, onAddWatchlist, onRemoveWatchli
     <TouchableOpacity
       style={[styles.prospectCard, { backgroundColor: theme.card, borderColor: theme.border }]}
       activeOpacity={0.8}
-      onPress={() => navigation && navigation.navigate('ScoutLabProfile', { prospectId: prospect.id })}
+      onPress={() => navigation && navigation.navigate('ScoutProspectDetail', { prospect })}
     >
       <View style={styles.prospectCardTop}>
         {/* Avatar */}
@@ -232,6 +235,7 @@ export default function ScoutLabSearchScreen({ navigation }) {
   const [activeRegion, setActiveRegion] = useState('All Regions');
   const [prospects, setProspects] = useState([]);
   const [watchlist, setWatchlist] = useState([]);
+  const [savedSearches, setSavedSearches] = useState([]);
 
   // Load the live prospect directory (falls back to sample data when empty).
   useEffect(() => {
@@ -245,11 +249,12 @@ export default function ScoutLabSearchScreen({ navigation }) {
     };
   }, []);
 
-  // Load the persisted watchlist whenever the screen gains focus.
+  // Load the persisted watchlist + saved searches whenever the screen gains focus.
   const loadWatchlist = useCallback(async () => {
     if (!scoutUid) return;
-    const saved = await getWatchlist(scoutUid);
+    const [saved, searches] = await Promise.all([getWatchlist(scoutUid), getSavedSearches(scoutUid)]);
     setWatchlist(saved.map((w) => ({ ...w, id: w.prospectUid || w.id })));
+    setSavedSearches(searches);
   }, [scoutUid]);
 
   useFocusEffect(
@@ -257,6 +262,43 @@ export default function ScoutLabSearchScreen({ navigation }) {
       loadWatchlist();
     }, [loadWatchlist])
   );
+
+  const currentCriteria = () => ({
+    position: activePosition || null,
+    minGrade: activeGrade || null,
+    region: activeRegion && activeRegion !== 'All Regions' ? activeRegion : null,
+  });
+
+  const handleSaveSearch = useCallback(async () => {
+    if (!scoutUid) return;
+    const c = currentCriteria();
+    if (!c.position && !c.minGrade && !c.region) {
+      Alert.alert('Add a filter', 'Pick at least one filter (position, grade, or region) to save a search.');
+      return;
+    }
+    const name = [c.position, c.region, c.minGrade ? `${c.minGrade}+` : null].filter(Boolean).join(' · ') || 'Saved search';
+    try {
+      await saveSearch(scoutUid, { ...c, name });
+      const searches = await getSavedSearches(scoutUid);
+      setSavedSearches(searches);
+      Alert.alert('Search saved', 'We’ll alert you when new prospects match this search.');
+    } catch (e) {
+      Alert.alert('Error', e.message || 'Could not save the search.');
+    }
+  }, [scoutUid, activePosition, activeGrade, activeRegion]);
+
+  const applySavedSearch = useCallback((s) => {
+    setActivePosition(s.position || null);
+    setActiveGrade(s.minGrade || null);
+    setActiveRegion(s.region || 'All Regions');
+    setShowFilters(true);
+  }, []);
+
+  const handleDeleteSavedSearch = useCallback(async (id) => {
+    if (!scoutUid) return;
+    setSavedSearches((prev) => prev.filter((s) => s.id !== id));
+    deleteSavedSearch(scoutUid, id).catch(() => loadWatchlist());
+  }, [scoutUid, loadWatchlist]);
 
   const handleAddWatchlist = useCallback(
     async (prospect) => {
@@ -331,37 +373,7 @@ export default function ScoutLabSearchScreen({ navigation }) {
         <View style={styles.headerRight} />
       </View>
 
-      {/* Tab bar */}
-      <View style={[styles.tabBar, { borderBottomColor: theme.border, backgroundColor: theme.background }]}>
-        <TouchableOpacity
-          style={[styles.tabBtn, activeTab === 'search' && [styles.tabBtnActive, { borderBottomColor: theme.primary }]]}
-          onPress={() => setActiveTab('search')}
-          activeOpacity={0.8}
-        >
-          <Text style={[styles.tabBtnText, { color: activeTab === 'search' ? theme.primary : theme.textSecondary }]}>
-            Search
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tabBtn, activeTab === 'watchlist' && [styles.tabBtnActive, { borderBottomColor: theme.primary }]]}
-          onPress={() => setActiveTab('watchlist')}
-          activeOpacity={0.8}
-        >
-          <View style={styles.tabBtnInner}>
-            <Text style={[styles.tabBtnText, { color: activeTab === 'watchlist' ? theme.primary : theme.textSecondary }]}>
-              Watchlist
-            </Text>
-            {watchlist.length > 0 && (
-              <View style={[styles.tabBadge, { backgroundColor: theme.primary }]}>
-                <Text style={styles.tabBadgeText}>{watchlist.length}</Text>
-              </View>
-            )}
-          </View>
-        </TouchableOpacity>
-      </View>
-
-      {activeTab === 'search' ? (
-        <ScrollView
+      <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -436,21 +448,44 @@ export default function ScoutLabSearchScreen({ navigation }) {
                 ))}
               </ScrollView>
 
-              {/* Clear filters */}
-              {(activePosition || activeGrade || activeRegion !== 'All Regions') && (
-                <TouchableOpacity
-                  style={styles.clearFiltersBtn}
-                  onPress={() => {
-                    setActivePosition(null);
-                    setActiveGrade(null);
-                    setActiveRegion('All Regions');
-                  }}
-                  activeOpacity={0.75}
-                >
-                  <Ionicons name="close-circle-outline" size={14} color={theme.primary} />
-                  <Text style={[styles.clearFiltersText, { color: theme.primary }]}>Clear Filters</Text>
+              {/* Save search + Clear filters */}
+              <View style={styles.filterActionsRow}>
+                <TouchableOpacity style={styles.clearFiltersBtn} onPress={handleSaveSearch} activeOpacity={0.75}>
+                  <Ionicons name="notifications-outline" size={14} color={theme.primary} />
+                  <Text style={[styles.clearFiltersText, { color: theme.primary }]}>Save Search</Text>
                 </TouchableOpacity>
-              )}
+                {(activePosition || activeGrade || activeRegion !== 'All Regions') && (
+                  <TouchableOpacity
+                    style={styles.clearFiltersBtn}
+                    onPress={() => {
+                      setActivePosition(null);
+                      setActiveGrade(null);
+                      setActiveRegion('All Regions');
+                    }}
+                    activeOpacity={0.75}
+                  >
+                    <Ionicons name="close-circle-outline" size={14} color={theme.textSecondary} />
+                    <Text style={[styles.clearFiltersText, { color: theme.textSecondary }]}>Clear Filters</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          )}
+
+          {/* Saved searches — tap to apply, × to remove (you'll be alerted on new matches) */}
+          {savedSearches.length > 0 && (
+            <View style={styles.savedRow}>
+              {savedSearches.map((s) => (
+                <View key={s.id} style={[styles.savedChip, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                  <TouchableOpacity onPress={() => applySavedSearch(s)} activeOpacity={0.7} style={styles.savedChipMain}>
+                    <Ionicons name="bookmark" size={12} color={theme.primary} />
+                    <Text style={[styles.savedChipText, { color: theme.text }]} numberOfLines={1}>{s.name || 'Saved'}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => handleDeleteSavedSearch(s.id)} hitSlop={{ top: 6, bottom: 6, left: 4, right: 6 }}>
+                    <Ionicons name="close" size={14} color={theme.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+              ))}
             </View>
           )}
 
@@ -488,34 +523,6 @@ export default function ScoutLabSearchScreen({ navigation }) {
 
           <View style={styles.bottomSpacer} />
         </ScrollView>
-      ) : (
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {watchlist.length === 0 ? (
-            <WatchlistEmptyState theme={theme} />
-          ) : (
-            <>
-              <Text style={[styles.watchlistHeader, { color: theme.textSecondary }]}>
-                {watchlist.length} saved prospect{watchlist.length !== 1 ? 's' : ''}
-              </Text>
-              {watchlist.map((prospect) => (
-                <ProspectCard
-                  key={prospect.id}
-                  prospect={prospect}
-                  isWatchlisted={true}
-                  onAddWatchlist={handleAddWatchlist}
-                  onRemoveWatchlist={handleRemoveWatchlist}
-                  theme={theme}
-                  navigation={navigation}
-                />
-              ))}
-            </>
-          )}
-          <View style={styles.bottomSpacer} />
-        </ScrollView>
-      )}
     </SafeAreaView>
   );
 }
@@ -608,6 +615,11 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   clearFiltersText: { fontSize: 12, fontWeight: '600' },
+  filterActionsRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 16 },
+  savedRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
+  savedChip: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 16, borderWidth: 1, paddingLeft: 10, paddingRight: 8, paddingVertical: 6, maxWidth: 200 },
+  savedChipMain: { flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1 },
+  savedChipText: { fontSize: 12, fontWeight: '600' },
   resultsRow: {
     marginBottom: 10,
     marginTop: 4,

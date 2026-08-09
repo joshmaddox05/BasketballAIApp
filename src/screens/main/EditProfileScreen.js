@@ -20,8 +20,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useAppContext } from '../../context/AppContext';
 import { updateUserProfile, getUserProfile } from '../../services/firestoreService';
 import { getTheme } from '../../utils/theme';
-import { auth } from '../../config/firebaseConfig';
-import * as FileSystem from 'expo-file-system/legacy';
+import { uploadProfileImage } from '../../utils/profileImage';
 
 const EditProfileScreen = ({ navigation }) => {
     const { userData, user, isDarkMode, theme: contextTheme, updateUserDataLocally } = useAppContext();
@@ -35,9 +34,25 @@ const EditProfileScreen = ({ navigation }) => {
     // Training preferences
     const [trainingDays, setTrainingDays] = useState(userData?.preferences?.trainingDays || []);
     const [preferredDuration, setPreferredDuration] = useState(userData?.preferences?.preferredDuration || 30);
+    const [gradeLevel, setGradeLevel] = useState(userData?.gradeLevel ?? null);
+    const [coachType, setCoachType] = useState(userData?.coachType || 'org');
+    const [bio, setBio] = useState(userData?.bio || '');
 
+    const isPlayer = !userData?.role || userData?.role === 'player';
+    const isCoach = userData?.role === 'coach';
+    const COACH_TYPES = [
+        { value: 'org', label: 'Organization Coach' },
+        { value: 'trainer', label: 'Skills Trainer' },
+    ];
     const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     const DURATION_OPTIONS = [15, 30, 45, 60, 90];
+    const GRADE_LEVELS = [
+        { value: 9, label: '9th' },
+        { value: 10, label: '10th' },
+        { value: 11, label: '11th' },
+        { value: 12, label: '12th' },
+        { value: 0, label: 'Not HS' },
+    ];
 
     useEffect(() => {
         // Check if any changes have been made
@@ -47,9 +62,12 @@ const EditProfileScreen = ({ navigation }) => {
         const imageChanged = currentImageUri !== (userData?.photoURL || null);
         const daysChanged = JSON.stringify(trainingDays) !== JSON.stringify(userData?.preferences?.trainingDays || []);
         const durationChanged = preferredDuration !== (userData?.preferences?.preferredDuration || 30);
+        const gradeChanged = gradeLevel !== (userData?.gradeLevel ?? null);
+        const coachTypeChanged = coachType !== (userData?.coachType || 'org');
+        const bioChanged = bio !== (userData?.bio || '');
 
-        setHasChanges(nameChanged || imageChanged || daysChanged || durationChanged);
-    }, [displayName, profileImage, trainingDays, preferredDuration, userData]);
+        setHasChanges(nameChanged || imageChanged || daysChanged || durationChanged || gradeChanged || coachTypeChanged || bioChanged);
+    }, [displayName, profileImage, trainingDays, preferredDuration, gradeLevel, coachType, bio, userData]);
 
     const pickImage = async () => {
         try {
@@ -88,57 +106,6 @@ const EditProfileScreen = ({ navigation }) => {
         }
     };
 
-    // Upload profile image using expo-file-system (reliable in React Native/Expo)
-    const uploadProfileImage = async (uid, imageUri) => {
-        try {
-            console.log('Starting image upload...');
-            console.log('Image URI:', imageUri.substring(0, 50) + '...');
-
-            const timestamp = Date.now();
-            const fileName = `profile_${timestamp}.jpg`;
-            const storagePath = `users/${uid}/profile/${fileName}`;
-
-            // Get the current user's ID token for authentication
-            const idToken = await auth.currentUser.getIdToken();
-
-            // Firebase Storage bucket name
-            const bucket = 'basketball-ai-app-db000.firebasestorage.app';
-
-            // Upload URL for Firebase Storage REST API
-            const uploadUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o?uploadType=media&name=${encodeURIComponent(storagePath)}`;
-
-            console.log('Uploading to:', storagePath);
-
-            // Use expo-file-system to upload the file directly
-            const uploadResult = await FileSystem.uploadAsync(uploadUrl, imageUri, {
-                httpMethod: 'POST',
-                uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
-                headers: {
-                    'Authorization': `Bearer ${idToken}`,
-                    'Content-Type': 'image/jpeg',
-                },
-            });
-
-            console.log('Upload response status:', uploadResult.status);
-
-            if (uploadResult.status !== 200) {
-                console.error('Upload failed:', uploadResult.body);
-                throw new Error(`Upload failed: ${uploadResult.status}`);
-            }
-
-            const responseData = JSON.parse(uploadResult.body);
-            console.log('Upload complete, constructing download URL...');
-
-            // Construct the download URL
-            const downloadURL = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodeURIComponent(storagePath)}?alt=media&token=${responseData.downloadTokens}`;
-
-            console.log('Download URL obtained');
-            return downloadURL;
-        } catch (error) {
-            console.error('Error uploading profile image:', error);
-            throw error;
-        }
-    };
 
     const handleSave = async () => {
         if (!displayName.trim()) {
@@ -178,6 +145,17 @@ const EditProfileScreen = ({ navigation }) => {
                     preferredDuration,
                 }
             };
+
+            // Grade level is a player attribute that drives scout discoverability
+            if (isPlayer && gradeLevel != null) {
+                profileUpdate.gradeLevel = gradeLevel;
+            }
+
+            // Coach sub-type (organization vs skills trainer) + public bio
+            if (isCoach) {
+                profileUpdate.coachType = coachType;
+                profileUpdate.bio = bio.trim();
+            }
 
             // Update profile in Firestore
             await updateUserProfile(user.uid, profileUpdate);
@@ -284,6 +262,94 @@ const EditProfileScreen = ({ navigation }) => {
                             maxLength={50}
                         />
                     </View>
+
+                    {/* Grade Level Section (player only — drives recruiting eligibility) */}
+                    {isPlayer && (
+                        <View style={[styles.section, { backgroundColor: theme.card }]}>
+                            <Text style={[styles.sectionTitle, { color: theme.text }]}>Grade Level</Text>
+                            <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
+                                Recruiting eligibility is high-school only (grades 9–12)
+                            </Text>
+                            <View style={styles.durationContainer}>
+                                {GRADE_LEVELS.map((grade) => (
+                                    <TouchableOpacity
+                                        key={grade.value}
+                                        style={[
+                                            styles.durationButton,
+                                            {
+                                                backgroundColor: gradeLevel === grade.value
+                                                    ? theme.primary
+                                                    : theme.backgroundSecondary,
+                                                borderColor: gradeLevel === grade.value
+                                                    ? theme.primary
+                                                    : theme.border
+                                            }
+                                        ]}
+                                        onPress={() => setGradeLevel(grade.value)}
+                                    >
+                                        <Text style={[
+                                            styles.durationText,
+                                            { color: gradeLevel === grade.value ? '#FFF' : theme.text }
+                                        ]}>
+                                            {grade.label}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        </View>
+                    )}
+
+                    {/* Coach Sub-type Section (coach only) */}
+                    {isCoach && (
+                        <View style={[styles.section, { backgroundColor: theme.card }]}>
+                            <Text style={[styles.sectionTitle, { color: theme.text }]}>Coach Type</Text>
+                            <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
+                                Organization coaches run teams; skills trainers develop individuals
+                            </Text>
+                            <View style={styles.durationContainer}>
+                                {COACH_TYPES.map((ct) => (
+                                    <TouchableOpacity
+                                        key={ct.value}
+                                        style={[
+                                            styles.durationButton,
+                                            {
+                                                backgroundColor: coachType === ct.value ? theme.primary : theme.backgroundSecondary,
+                                                borderColor: coachType === ct.value ? theme.primary : theme.border,
+                                            },
+                                        ]}
+                                        onPress={() => setCoachType(ct.value)}
+                                    >
+                                        <Text style={[
+                                            styles.durationText,
+                                            { color: coachType === ct.value ? '#FFF' : theme.text },
+                                        ]}>
+                                            {ct.label}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+
+                            <Text style={[styles.sectionTitle, { color: theme.text, marginTop: 16 }]}>Public Bio</Text>
+                            <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
+                                Shown on your public coach profile in CoachMarket
+                            </Text>
+                            <TextInput
+                                style={[styles.textInput, {
+                                    backgroundColor: theme.backgroundSecondary,
+                                    color: theme.text,
+                                    borderColor: theme.border,
+                                    minHeight: 80,
+                                    textAlignVertical: 'top',
+                                }]}
+                                value={bio}
+                                onChangeText={setBio}
+                                placeholder="Tell athletes about your coaching background…"
+                                placeholderTextColor={theme.textSecondary}
+                                multiline
+                                maxLength={300}
+                            />
+                        </View>
+                    )}
 
                     {/* Training Preferences Section */}
                     <View style={[styles.section, { backgroundColor: theme.card }]}>

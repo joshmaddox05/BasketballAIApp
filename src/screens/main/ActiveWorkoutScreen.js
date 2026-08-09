@@ -11,7 +11,8 @@ import {
   Vibration,
   Dimensions,
   Platform,
-  ScrollView
+  ScrollView,
+  Modal
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,6 +21,8 @@ import { VideoView, useVideoPlayer } from 'expo-video';
 import { useAppContext } from '../../context/AppContext';
 import { hasAccess } from '../../utils/subscription';
 import SubscriptionModal from '../../components/shared/SubscriptionModal';
+import LivePoseTracker from '../../components/workout/LivePoseTracker';
+import { isLiveTrackable } from '../../services/poseTracking';
 import { getTheme } from '../../utils/theme';
 import {
   addWorkoutCompletion,
@@ -81,6 +84,13 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
   const [misses, setMisses] = useState(0);
   const [stepShootingStats, setStepShootingStats] = useState([]); // Track stats for each step
 
+  // Live camera rep tracking (opt-in per step)
+  const [liveTrackingEnabled, setLiveTrackingEnabled] = useState(false);
+  // Per-step live accounting (refs to avoid re-renders on every frame)
+  const liveTrackingRef = useRef({ autoReps: 0, confSum: 0, confCount: 0, used: false });
+  // Workout-level rollup of live tracking, written on completion
+  const liveSummaryRef = useRef({ stepsTracked: 0, totalAutoReps: 0, confSum: 0, confCount: 0 });
+
   // Workout summary data (populated on completion)
   const [summaryData, setSummaryData] = useState(null);
 
@@ -140,7 +150,7 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
     if (!isCustom && !workoutHasAccess) {
       Alert.alert(
         'Workout Locked',
-        `This workout requires a ${workout.requiredTier || 'premium'} subscription.`,
+        `This workout requires a Pro subscription.`,
         [
           {
             text: 'View Plans',
@@ -314,6 +324,13 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
     const totalAttempts = makes + misses;
     const shootingPercentage = totalAttempts > 0 ? Math.round((makes / totalAttempts) * 100) : 0;
 
+    // Live tracking accounting for this step (autoReps vs final reps lets us measure accuracy)
+    const live = liveTrackingRef.current;
+    const usedLiveTracking = live.used;
+    const avgPoseConfidence = live.confCount > 0
+      ? Math.round((live.confSum / live.confCount) * 100) / 100
+      : undefined;
+
     // Record step performance
     const performance = {
       stepIndex: currentStep,
@@ -322,6 +339,12 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
       repsCompleted: currentReps,
       targetReps: targetReps,
       completionPercentage: targetReps > 0 ? Math.round((currentReps / targetReps) * 100) : 100,
+      trackingMode: usedLiveTracking ? 'live' : 'manual',
+      // Add live-tracking stats when the camera counted this step
+      ...(usedLiveTracking && {
+        autoRepsCompleted: Math.min(live.autoReps, targetReps || live.autoReps),
+        avgPoseConfidence
+      }),
       // Add shooting stats if it's a shooting drill
       ...(isShootingDrill && totalAttempts > 0 && {
         makes: makes,
@@ -332,6 +355,16 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
     };
 
     setStepPerformance(prev => [...prev, performance]);
+
+    // Roll this step's live tracking into the workout-level summary, then reset per-step state
+    if (usedLiveTracking) {
+      liveSummaryRef.current.stepsTracked += 1;
+      liveSummaryRef.current.totalAutoReps += performance.autoRepsCompleted;
+      liveSummaryRef.current.confSum += live.confSum;
+      liveSummaryRef.current.confCount += live.confCount;
+    }
+    liveTrackingRef.current = { autoReps: 0, confSum: 0, confCount: 0, used: false };
+    setLiveTrackingEnabled(false);
 
     // Save to step shooting stats array for detailed tracking
     if (isShootingDrill && totalAttempts > 0) {
@@ -425,6 +458,16 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
         completionPercentage: Math.round(avgCompletion),
         caloriesEstimate: caloriesEstimate,
         ...(shootingStatsData && { shootingStats: shootingStatsData }), // Add shooting stats if available
+        // Live camera tracking rollup (only present when at least one step was camera-tracked)
+        ...(liveSummaryRef.current.stepsTracked > 0 && {
+          liveTracking: {
+            stepsTracked: liveSummaryRef.current.stepsTracked,
+            totalAutoReps: liveSummaryRef.current.totalAutoReps,
+            avgConfidence: liveSummaryRef.current.confCount > 0
+              ? Math.round((liveSummaryRef.current.confSum / liveSummaryRef.current.confCount) * 100) / 100
+              : undefined
+          }
+        }),
         completedAt: new Date()
       });
 
@@ -660,6 +703,23 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
     }
   };
 
+  // Live tracker calls this once per rep (auto-detected or manual tap). Reuses the existing
+  // rep handler for free vibration/animation/target-gating, and records auto reps for accounting.
+  const handleLiveRep = (rep) => {
+    if (currentReps >= targetReps) return;
+    handleRepComplete();
+    if (rep && !rep.manual) {
+      liveTrackingRef.current.autoReps += 1;
+      liveTrackingRef.current.used = true;
+    }
+  };
+
+  // Accumulate pose confidence samples for the current step (averaged into the saved data).
+  const handleLiveConfidence = (c) => {
+    liveTrackingRef.current.confSum += c;
+    liveTrackingRef.current.confCount += 1;
+  };
+
   const handleMake = () => {
     setMakes(prev => prev + 1);
     setCurrentReps(prev => prev + 1);
@@ -719,7 +779,7 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
           <Ionicons name="lock-closed" size={100} color="#9C27B0" />
           <Text style={[styles.completedTitle, { color: theme.text }]}>Workout Locked</Text>
           <Text style={[styles.completedSubtitle, { color: theme.textSecondary }]}>
-            This workout requires a {workout.requiredTier || 'premium'} subscription
+            This workout requires a Pro subscription
           </Text>
         </View>
       </SafeAreaView>
@@ -1094,6 +1154,20 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
                     />
                   </TouchableOpacity>
                 </Animated.View>
+
+                {/* Opt-in live camera rep tracking for supported drills */}
+                {isLiveTrackable(currentStepData) && currentReps < targetReps && (
+                  <TouchableOpacity
+                    style={[styles.trackButton, { borderColor: theme.primary }]}
+                    onPress={() => setLiveTrackingEnabled(true)}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="videocam-outline" size={18} color={theme.primary} />
+                    <Text style={[styles.trackButtonText, { color: theme.primary }]}>
+                      Track with camera
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           )
@@ -1181,6 +1255,24 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
           navigation.goBack();
         }}
       />
+
+      {/* Live camera rep tracker (opt-in, full-screen) */}
+      <Modal
+        visible={liveTrackingEnabled}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={() => setLiveTrackingEnabled(false)}
+      >
+        <LivePoseTracker
+          step={currentStepData}
+          currentReps={currentReps}
+          targetReps={targetReps}
+          onRep={handleLiveRep}
+          onConfidenceChange={handleLiveConfidence}
+          onClose={() => setLiveTrackingEnabled(false)}
+          onComplete={handleStepComplete}
+        />
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -1343,6 +1435,20 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 6,
+  },
+  trackButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 22,
+    borderWidth: 1.5,
+  },
+  trackButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 6,
   },
   // Shooting tracker styles
   shootingStatsRow: {

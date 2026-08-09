@@ -15,57 +15,10 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as MediaLibrary from 'expo-media-library';
 import * as Device from 'expo-device';
 import { Svg, Circle, Line, Path } from 'react-native-svg';
+// Shared pose keypoint schema (single source of truth, also used by the live pose tracker).
+import { POSE_POINTS, SKELETON_CONNECTIONS } from '../../services/poseTracking/landmarkSchema';
 
 const { width, height } = Dimensions.get('window');
-
-// Key pose detection points for basketball shooting analysis
-const POSE_POINTS = {
-  // Head
-  nose: { x: 0.5, y: 0.15, visible: true },
-  
-  // Upper body
-  leftShoulder: { x: 0.4, y: 0.25, visible: true },
-  rightShoulder: { x: 0.6, y: 0.25, visible: true },
-  leftElbow: { x: 0.35, y: 0.35, visible: true },
-  rightElbow: { x: 0.65, y: 0.35, visible: true },
-  leftWrist: { x: 0.3, y: 0.45, visible: true },
-  rightWrist: { x: 0.7, y: 0.45, visible: true },
-  
-  // Core
-  leftHip: { x: 0.45, y: 0.55, visible: true },
-  rightHip: { x: 0.55, y: 0.55, visible: true },
-  
-  // Lower body
-  leftKnee: { x: 0.44, y: 0.7, visible: true },
-  rightKnee: { x: 0.56, y: 0.7, visible: true },
-  leftAnkle: { x: 0.43, y: 0.85, visible: true },
-  rightAnkle: { x: 0.57, y: 0.85, visible: true }
-};
-
-// Skeleton connections for drawing
-const SKELETON_CONNECTIONS = [
-  // Head to shoulders
-  ['nose', 'leftShoulder'],
-  ['nose', 'rightShoulder'],
-  
-  // Arms
-  ['leftShoulder', 'leftElbow'],
-  ['leftElbow', 'leftWrist'],
-  ['rightShoulder', 'rightElbow'],
-  ['rightElbow', 'rightWrist'],
-  
-  // Torso
-  ['leftShoulder', 'rightShoulder'],
-  ['leftShoulder', 'leftHip'],
-  ['rightShoulder', 'rightHip'],
-  ['leftHip', 'rightHip'],
-  
-  // Legs
-  ['leftHip', 'leftKnee'],
-  ['leftKnee', 'leftAnkle'],
-  ['rightHip', 'rightKnee'],
-  ['rightKnee', 'rightAnkle']
-];
 
 const AICameraCapture = ({ 
   isVisible, 

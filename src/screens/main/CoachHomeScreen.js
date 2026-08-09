@@ -5,7 +5,8 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAppContext } from '../../context/AppContext';
-import { getLinkedPlayers, getLinkedPlayerSummary } from '../../services/firestoreService';
+import { getLinkedPlayers, getLinkedPlayerSummary, getCoachSessions, getCoachListings } from '../../services/firestoreService';
+import { computeCoachRevenue } from '../../utils/coachRevenue';
 import ModuleGrid from '../../components/features/ModuleGrid';
 import { getModulesForRole } from '../../config/roleModules';
 
@@ -52,21 +53,31 @@ const mapAthlete = (linked, summary) => {
   };
 };
 
-const QUICK_ACTIONS = [
+// Org coaches are team-centric; skills trainers are marketplace-centric.
+const ORG_QUICK_ACTIONS = [
   { id: 'add_athlete', label: 'Add Athlete', icon: 'person-add-outline', color: '#5C6BC0' },
-  { id: 'create_content', label: 'Create Content', icon: 'create-outline', color: '#FF6B00' },
+  { id: 'assign', label: 'Assign', icon: 'clipboard-outline', color: '#FF6B00' },
+  { id: 'sessions', label: 'Sessions', icon: 'calendar-outline', color: '#26A69A' },
+  { id: 'playbook', label: 'Playbook', icon: 'basketball-outline', color: '#8E24AA' },
+];
+
+const TRAINER_QUICK_ACTIONS = [
+  { id: 'create', label: 'Create', icon: 'add-circle-outline', color: '#FF6B00' },
+  { id: 'storefront', label: 'Storefront', icon: 'storefront-outline', color: '#EC4899' },
+  { id: 'withdraw', label: 'Withdraw', icon: 'cash-outline', color: '#26A69A' },
+  { id: 'browse', label: 'Browse', icon: 'compass-outline', color: '#5C6BC0' },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Sub-components
 // ─────────────────────────────────────────────────────────────────────────────
 
-function CoachHeader({ coachName, theme }) {
+function CoachHeader({ coachName, theme, title = 'Coach Dashboard' }) {
   const firstName = coachName?.split(' ')[0] || 'Coach';
   return (
     <View style={[styles.header, { backgroundColor: theme.background, borderBottomColor: theme.border }]}>
       <View style={styles.headerLeft}>
-        <Text style={[styles.screenTitle, { color: theme.text }]}>Coach Dashboard</Text>
+        <Text style={[styles.screenTitle, { color: theme.text }]}>{title}</Text>
         <Text style={[styles.greeting, { color: theme.textSecondary }]}>
           Good morning, {firstName}
         </Text>
@@ -82,18 +93,7 @@ function CoachHeader({ coachName, theme }) {
   );
 }
 
-function StatsStrip({ stats, theme }) {
-  const items = [
-    { label: 'Active Athletes', value: stats.activeAthletes, icon: 'people-outline', color: '#5C6BC0' },
-    { label: 'Sessions / Week', value: stats.sessionsThisWeek, icon: 'calendar-outline', color: '#26A69A' },
-    {
-      label: 'Revenue / Month',
-      value: `$${stats.revenueThisMonth.toLocaleString()}`,
-      icon: 'trending-up-outline',
-      color: '#FF6B00',
-    },
-  ];
-
+function StatsStrip({ items, theme }) {
   return (
     <View style={styles.statsStrip}>
       {items.map((item, index) => (
@@ -116,11 +116,12 @@ function StatsStrip({ stats, theme }) {
   );
 }
 
-function AthleteCard({ athlete, theme }) {
+function AthleteCard({ athlete, theme, onPress }) {
   return (
     <TouchableOpacity
       style={[styles.athleteCard, { backgroundColor: theme.card, borderColor: theme.border }]}
       activeOpacity={0.75}
+      onPress={onPress}
     >
       <View style={[styles.athleteAvatar, { backgroundColor: theme.primary + '20' }]}>
         <Text style={[styles.athleteAvatarText, { color: theme.primary }]}>
@@ -225,10 +226,10 @@ function MarketCard({ market, theme }) {
   );
 }
 
-function QuickActions({ theme, onAction }) {
+function QuickActions({ theme, onAction, actions }) {
   return (
     <View style={styles.quickActionsRow}>
-      {QUICK_ACTIONS.map((action) => (
+      {actions.map((action) => (
         <TouchableOpacity
           key={action.id}
           style={[styles.quickActionBtn, { backgroundColor: action.color + '18', borderColor: action.color + '40' }]}
@@ -254,8 +255,12 @@ export default function CoachHomeScreen({ navigation }) {
   const coachName = userData?.displayName || userData?.name || 'Coach';
   const coachUid = user?.uid;
 
+  const isTrainer = userData?.coachType === 'trainer';
+
   const [loading, setLoading] = useState(true);
   const [athletes, setAthletes] = useState([]);
+  const [sessionsThisWeek, setSessionsThisWeek] = useState(0);
+  const [listings, setListings] = useState([]);
 
   const loadRoster = useCallback(async () => {
     if (!coachUid) {
@@ -264,7 +269,12 @@ export default function CoachHomeScreen({ navigation }) {
     }
     setLoading(true);
     try {
-      const linkedPlayers = await getLinkedPlayers(coachUid);
+      const [linkedPlayers, coachSessions, coachListings] = await Promise.all([
+        getLinkedPlayers(coachUid),
+        getCoachSessions(coachUid),
+        getCoachListings(coachUid),
+      ]);
+      setListings(coachListings);
       const mapped = await Promise.all(
         linkedPlayers.map(async (linked) => {
           const summary = await getLinkedPlayerSummary(linked.uid);
@@ -272,6 +282,14 @@ export default function CoachHomeScreen({ navigation }) {
         })
       );
       setAthletes(mapped);
+      // Sessions scheduled within the next 7 days.
+      const weekOut = Date.now() + 7 * 24 * 60 * 60 * 1000;
+      setSessionsThisWeek(
+        coachSessions.filter((s) => {
+          const d = toDate(s.scheduledAt);
+          return s.status !== 'cancelled' && d && d.getTime() >= Date.now() && d.getTime() <= weekOut;
+        }).length
+      );
     } finally {
       setLoading(false);
     }
@@ -283,18 +301,38 @@ export default function CoachHomeScreen({ navigation }) {
     }, [loadRoster])
   );
 
-  const stats = {
-    activeAthletes: athletes.length,
-    sessionsThisWeek: athletes.reduce((sum, a) => sum + a.recent, 0),
-    revenueThisMonth: 0,
-  };
+  const { totalEarnings, totalSales } = computeCoachRevenue(listings);
+  const liveListings = listings.filter((l) => (l.status || 'live') === 'live').length;
+
+  const orgStats = [
+    { label: 'Active Athletes', value: athletes.length, icon: 'people-outline', color: '#5C6BC0' },
+    { label: 'Sessions / Week', value: sessionsThisWeek, icon: 'calendar-outline', color: '#26A69A' },
+    { label: 'Earnings', value: `$${totalEarnings.toLocaleString()}`, icon: 'trending-up-outline', color: '#FF6B00' },
+  ];
+  const trainerStats = [
+    { label: 'Earnings', value: `$${totalEarnings.toLocaleString()}`, icon: 'trending-up-outline', color: '#FF6B00' },
+    { label: 'Sales', value: totalSales, icon: 'cart-outline', color: '#EC4899' },
+    { label: 'Live Listings', value: liveListings, icon: 'pricetags-outline', color: '#26A69A' },
+  ];
 
   const handleQuickAction = useCallback(
     (actionId) => {
       if (actionId === 'add_athlete') {
         navigation.navigate('LinkAccount', { onLinked: loadRoster });
-      } else if (actionId === 'create_content') {
-        navigation.navigate('BuildWorkout');
+      } else if (actionId === 'sessions') {
+        navigation.navigate('CoachSessions');
+      } else if (actionId === 'playbook') {
+        navigation.navigate('SimCoach');
+      } else if (actionId === 'create') {
+        navigation.navigate('CreateDrill');
+      } else if (actionId === 'storefront' || actionId === 'withdraw') {
+        navigation.navigate('CoachMarketDashboard');
+      } else if (actionId === 'browse') {
+        navigation.navigate('CoachMarket');
+      } else if (actionId === 'market') {
+        navigation.navigate('CoachMarketDashboard');
+      } else if (actionId === 'assign') {
+        navigation.navigate('AssignWorkout');
       }
     },
     [navigation, loadRoster],
@@ -303,54 +341,112 @@ export default function CoachHomeScreen({ navigation }) {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <StatusBar style={isDarkMode ? 'light' : 'dark'} />
-      <CoachHeader coachName={coachName} theme={theme} />
+      <CoachHeader coachName={coachName} theme={theme} title={isTrainer ? 'Trainer Studio' : 'Coach Dashboard'} />
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         {/* Stats Strip */}
-        <StatsStrip stats={stats} theme={theme} />
+        <StatsStrip items={isTrainer ? trainerStats : orgStats} theme={theme} />
 
         {/* Quick Actions */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: theme.text }]}>Quick Actions</Text>
-          <QuickActions theme={theme} onAction={handleQuickAction} />
+          <QuickActions
+            theme={theme}
+            onAction={handleQuickAction}
+            actions={isTrainer ? TRAINER_QUICK_ACTIONS : ORG_QUICK_ACTIONS}
+          />
         </View>
 
         {/* Coach Tools */}
         <View style={styles.section}>
           <ModuleGrid
-            title="Coach Tools"
-            modules={getModulesForRole('coach')}
+            title={isTrainer ? 'Trainer Tools' : 'Coach Tools'}
+            layout="grid"
+            modules={getModulesForRole('coach', userData?.coachType)}
             subscription={userData?.subscription || 'free'}
             theme={theme}
             navigation={navigation}
           />
         </View>
 
-        {/* My Athletes */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>My Athletes</Text>
-            <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.navigate('Athletes')}>
-              <Text style={[styles.seeAllText, { color: theme.primary }]}>See All</Text>
-            </TouchableOpacity>
-          </View>
-          {loading ? (
-            <ActivityIndicator color={theme.primary} style={{ marginTop: 16 }} />
-          ) : athletes.length === 0 ? (
-            <View style={[styles.emptyCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-              <Text style={[styles.emptyCardText, { color: theme.textSecondary }]}>
-                No athletes linked yet. Tap “Add Athlete” to connect with a player's invite code.
-              </Text>
+        {isTrainer ? (
+          /* Recent Listings (trainer) */
+          <View style={styles.section}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>My Listings</Text>
+              <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.navigate('CoachMarketDashboard')}>
+                <Text style={[styles.seeAllText, { color: theme.primary }]}>Manage</Text>
+              </TouchableOpacity>
             </View>
-          ) : (
-            athletes.map(({ athlete }) => (
-              <AthleteCard key={athlete.id} athlete={athlete} theme={theme} />
-            ))
-          )}
-        </View>
+            {loading ? (
+              <ActivityIndicator color={theme.primary} style={{ marginTop: 16 }} />
+            ) : listings.length === 0 ? (
+              <View style={[styles.emptyCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                <Text style={[styles.emptyCardText, { color: theme.textSecondary }]}>
+                  No listings yet. Tap “Create” to publish your first drill or series.
+                </Text>
+              </View>
+            ) : (
+              listings.slice(0, 5).map((l) => (
+                <TouchableOpacity
+                  key={l.id}
+                  style={[styles.listingRow, { backgroundColor: theme.card, borderColor: theme.border }]}
+                  activeOpacity={0.75}
+                  onPress={() =>
+                    (l.status || 'live') === 'live'
+                      ? navigation.navigate('CoachMarketDashboard')
+                      : navigation.navigate('EditDrill', { listing: l })
+                  }
+                >
+                  <View style={styles.listingRowLeft}>
+                    <Text style={[styles.listingRowTitle, { color: theme.text }]} numberOfLines={1}>{l.title}</Text>
+                    <Text style={[styles.listingRowMeta, { color: theme.textSecondary }]}>
+                      ${(l.price || 0).toFixed(2)} · {l.sales || 0} sold
+                    </Text>
+                  </View>
+                  <View style={[styles.listingStatusPill, { backgroundColor: ((l.status || 'live') === 'live' ? '#22C55E' : '#9CA3AF') + '22' }]}>
+                    <Text style={[styles.listingStatusText, { color: (l.status || 'live') === 'live' ? '#22C55E' : '#9CA3AF' }]}>
+                      {(l.status || 'live') === 'live' ? 'Live' : 'Draft'}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))
+            )}
+          </View>
+        ) : (
+          /* My Athletes (org) */
+          <View style={styles.section}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>My Athletes</Text>
+              <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.navigate('Roster')}>
+                <Text style={[styles.seeAllText, { color: theme.primary }]}>See All</Text>
+              </TouchableOpacity>
+            </View>
+            {loading ? (
+              <ActivityIndicator color={theme.primary} style={{ marginTop: 16 }} />
+            ) : athletes.length === 0 ? (
+              <View style={[styles.emptyCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                <Text style={[styles.emptyCardText, { color: theme.textSecondary }]}>
+                  No athletes linked yet. Tap “Add Athlete” to connect with a player's invite code.
+                </Text>
+              </View>
+            ) : (
+              athletes.map(({ athlete }) => (
+                <AthleteCard
+                  key={athlete.id}
+                  athlete={athlete}
+                  theme={theme}
+                  onPress={() =>
+                    navigation.navigate('AssignWorkout', { athlete: { uid: athlete.id, name: athlete.name } })
+                  }
+                />
+              ))
+            )}
+          </View>
+        )}
 
         <View style={styles.bottomPad} />
       </ScrollView>
@@ -716,5 +812,34 @@ const styles = StyleSheet.create({
   emptyCardText: {
     fontSize: 13,
     lineHeight: 19,
+  },
+  listingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+    marginBottom: 10,
+  },
+  listingRowLeft: {
+    flex: 1,
+    marginRight: 10,
+  },
+  listingRowTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  listingRowMeta: {
+    fontSize: 12,
+    marginTop: 3,
+  },
+  listingStatusPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  listingStatusText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
 });

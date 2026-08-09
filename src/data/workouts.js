@@ -2603,9 +2603,10 @@ export const getWorkoutById = (id) => {
 };
 
 export const getWorkoutsBySubscription = (subscription) => {
-  return comprehensiveWorkouts.filter(workout => 
-    workout.requiredSubscription === 'free' || 
-    (subscription === 'premium' && workout.requiredSubscription === 'premium')
+  // Two-tier model: a paid (non-'free') subscription unlocks all workouts.
+  const isPaid = !!subscription && subscription !== 'free';
+  return comprehensiveWorkouts.filter(workout =>
+    workout.requiredSubscription === 'free' || isPaid
   );
 };
 

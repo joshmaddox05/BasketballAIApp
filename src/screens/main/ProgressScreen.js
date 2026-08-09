@@ -716,10 +716,7 @@ const ProgressScreen = ({ navigation }) => {
                             <TouchableOpacity
                                 style={[styles.recommendationButton, { backgroundColor: theme.primary }]}
                                 onPress={() => {
-                                    navigation.navigate('Training', {
-                                        screen: 'TrainingMain',
-                                        params: { filterCategory: recommendations.nextWorkout }
-                                    });
+                                    navigation.navigate('Training', { filterCategory: recommendations.nextWorkout });
                                 }}
                             >
                                 <Text style={styles.recommendationButtonText}>

@@ -13,7 +13,6 @@ import { navigationRef } from './AppNavigator';
 
 // Import your main app screens
 import HomeScreen from '../screens/main/HomeScreen';
-import TrainingScreen from '../screens/main/TrainingScreen';
 import ProgressScreen from '../screens/main/ProgressScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
 import SettingsScreen from '../screens/main/SettingsScreen';
@@ -23,18 +22,14 @@ import CoachHomeScreen from '../screens/main/CoachHomeScreen';
 import ScoutHomeScreen from '../screens/main/ScoutHomeScreen';
 import ParentHomeScreen from '../screens/main/ParentHomeScreen';
 
-// Import DBE screens needed directly in role navigators
-import CoachMarketDashboardScreen from '../screens/main/CoachMarketDashboardScreen';
-import CoachMarketScreen from '../screens/main/CoachMarketScreen';
+// Import DBE screens needed directly in role navigators.
+// (CoachMarket / Sessions / HoopCommunity / Messaging / ScoutReports are now reached
+//  through the Module Hub + shared registry — see SharedStackNavigator.js.)
 import FamilyDashboardScreen from '../screens/main/FamilyDashboardScreen';
-import HoopCommunityScreen from '../screens/main/HoopCommunityScreen';
 
-// Import role-specific management screens
+// Import role-specific management screens (still tab-hosted)
 import CoachAthletesScreen from '../screens/main/CoachAthletesScreen';
-import CoachSessionsScreen from '../screens/main/CoachSessionsScreen';
 import ScoutWatchlistScreen from '../screens/main/ScoutWatchlistScreen';
-import ScoutReportsScreen from '../screens/main/ScoutReportsScreen';
-import MessagingScreen from '../screens/main/MessagingScreen';
 
 // Import legal/support screens (replacing inline placeholders)
 import HelpCenterScreen from '../screens/main/HelpCenterScreen';
@@ -44,29 +39,18 @@ import TermsOfServiceScreen from '../screens/main/TermsOfServiceScreen';
 
 // Import the shared screens utility
 import { addSharedScreensToStack } from './SharedStackNavigator';
-import AllWorkoutsScreen from "../screens/main/AllWorkoutsScreen";
-import TrainingCategoryScreen from "../screens/main/TrainingCategoryScreen";
-import TrainingFiltersScreen from "../screens/main/TrainingFiltersScreen";
 import AllActivitiesScreen from "../screens/main/AllActivitiesScreen";
-import ChallengeDetailScreen from "../screens/main/ChallengeDetailScreen";
 import ActivityDetailScreen from "../screens/main/ActivityDetailScreen";
-import AllChallengesScreen from "../screens/main/AllChallengesScreen";
-import DailyChallengeDetailScreen from "../screens/main/DailyChallengeDetailScreen";
 import EditProfileScreen from "../screens/main/EditProfileScreen";
 import NotificationsScreen from "../screens/main/NotificationsScreen";
 import AchievementsScreen from "../screens/main/AchievementsScreen";
 import AllGoalsScreen from "../screens/main/AllGoalsScreen";
 import ShootingHistoryScreen from "../screens/main/ShootingHistoryScreen";
 import AccountPrivacyScreen from "../screens/main/AccountPrivacyScreen";
-import BrowseWorkoutsScreen from "../screens/main/BrowseWorkoutsScreen";
-import CategoryWorkoutsScreen from "../screens/main/CategoryWorkoutsScreen";
 
 // For nested navigation within tabs
 const HomeStack = createStackNavigator();
-const TrainingStack = createStackNavigator();
 const ProgressStack = createStackNavigator();
-const ChallengesStack = createStackNavigator();
-const CommunityStack = createStackNavigator();
 const ProfileStack = createStackNavigator();
 
 // Home stack navigator
@@ -74,33 +58,15 @@ function HomeStackNavigator() {
     return (
         <HomeStack.Navigator screenOptions={{ headerShown: false }}>
             <HomeStack.Screen name="HomeMain" component={HomeScreen} />
-            {/* Additional Home-specific screens */}
+            {/* Additional Home-specific screens. AllWorkouts + ChallengeDetail now come from the
+                shared registry (they were promoted when the Training/Challenges tabs were folded
+                into modules), so they must NOT be re-registered here or route names collide. */}
             <HomeStack.Screen name="AllActivities" component={AllActivitiesScreen} options={{ headerShown: false }} />
-            <HomeStack.Screen name="AllWorkouts" component={AllWorkoutsScreen} options={{ headerShown: false }} />
-            <HomeStack.Screen name="ChallengeDetail" component={ChallengeDetailScreen} options={{ headerShown: false }} />
             <HomeStack.Screen name="ActivityDetail" component={ActivityDetailScreen} options={{ headerShown: false }} />
 
             {/* Add shared screens to Home stack */}
             {addSharedScreensToStack(HomeStack)}
         </HomeStack.Navigator>
-    );
-}
-
-// Training stack navigator
-function TrainingStackNavigator() {
-    return (
-        <TrainingStack.Navigator screenOptions={{ headerShown: false }}>
-            <TrainingStack.Screen name="TrainingMain" component={TrainingScreen} />
-            {/* Add Training-specific screens */}
-            <TrainingStack.Screen name="TrainingCategory" component={TrainingCategoryScreen} options={{ headerShown: false }} />
-            <TrainingStack.Screen name="TrainingFilters" component={TrainingFiltersScreen} options={{ headerShown: false }} />
-            <TrainingStack.Screen name="AllWorkouts" component={AllWorkoutsScreen} options={{ headerShown: false }} />
-            <TrainingStack.Screen name="BrowseWorkouts" component={BrowseWorkoutsScreen} options={{ headerShown: false }} />
-            <TrainingStack.Screen name="CategoryWorkouts" component={CategoryWorkoutsScreen} options={{ headerShown: false }} />
-
-            {/* Add shared screens to Training stack */}
-            {addSharedScreensToStack(TrainingStack)}
-        </TrainingStack.Navigator>
     );
 }
 
@@ -117,20 +83,6 @@ function ProgressStackNavigator() {
             {/* Add shared screens to Progress stack */}
             {addSharedScreensToStack(ProgressStack)}
         </ProgressStack.Navigator>
-    );
-}
-
-// Challenges stack navigator
-function ChallengesStackNavigator() {
-    return (
-        <ChallengesStack.Navigator screenOptions={{ headerShown: false }}>
-            <ChallengesStack.Screen name="ChallengesMain" component={AllChallengesScreen} />
-            <ChallengesStack.Screen name="ChallengeDetail" component={ChallengeDetailScreen} options={{ headerShown: false }} />
-            <ChallengesStack.Screen name="DailyChallengeDetail" component={DailyChallengeDetailScreen} options={{ headerShown: false }} />
-
-            {/* Add shared screens to Challenges stack */}
-            {addSharedScreensToStack(ChallengesStack)}
-        </ChallengesStack.Navigator>
     );
 }
 
@@ -158,10 +110,9 @@ function ProfileStackNavigator() {
 // Create the tab navigator
 const Tab = createBottomTabNavigator();
 
-// Map route names to tour step IDs for tab icons
+// Map route names to tour step IDs for tab icons. Training & Challenges are no longer tabs
+// (folded into the Blueprint360 / HoopCommunity modules), so only Progress remains tour-linked.
 const TAB_TO_TOUR_STEP = {
-    'Training': 'training-tab',
-    'Challenges': 'challenges-tab',
     'Progress': 'progress-tab',
 };
 
@@ -196,10 +147,6 @@ const TabBarIcon = ({ route, focused, color, size }) => {
     let iconName;
     if (route.name === 'Home') {
         iconName = focused ? 'home' : 'home-outline';
-    } else if (route.name === 'Training') {
-        iconName = focused ? 'basketball' : 'basketball-outline';
-    } else if (route.name === 'Challenges') {
-        iconName = focused ? 'trophy' : 'trophy-outline';
     } else if (route.name === 'Progress') {
         iconName = focused ? 'stats-chart' : 'stats-chart-outline';
     } else if (route.name === 'Profile') {
@@ -301,8 +248,6 @@ function MainNavigatorContent() {
             }}
         >
             <Tab.Screen name="Home" component={HomeStackNavigator} />
-            <Tab.Screen name="Training" component={TrainingStackNavigator} />
-            <Tab.Screen name="Challenges" component={ChallengesStackNavigator} />
             <Tab.Screen name="Progress" component={ProgressStackNavigator} />
             <Tab.Screen name="Profile" component={ProfileStackNavigator} />
         </Tab.Navigator>
@@ -336,30 +281,24 @@ export default function MainNavigator() {
 }
 
 // ─── Coach Navigator ──────────────────────────────────────────────────────────
+// Modules-first shell: Home is the Module Hub; the former Market & Sessions tabs are
+// folded into modules / Home quick-actions (CoachMarketDashboard + CoachSessions are
+// reachable via the shared registry). Slim bar = Home / Athletes / Profile.
 const CoachHomeStack = createStackNavigator();
-const CoachTrainingStack = createStackNavigator();
 const CoachAthletesStack = createStackNavigator();
-const CoachMarketCoachStack = createStackNavigator();
-const CoachSessionsStack = createStackNavigator();
 const CoachProfileStack = createStackNavigator();
+const CoachPlaybookStack = createStackNavigator();
+const CoachMarketStack = createStackNavigator();
+const CoachContentStack = createStackNavigator();
 const CoachTab = createBottomTabNavigator();
 
 function CoachHomeStackNavigator() {
     return (
         <CoachHomeStack.Navigator screenOptions={{ headerShown: false }}>
             <CoachHomeStack.Screen name="CoachHomeMain" component={CoachHomeScreen} />
-            {/* CoachMarketDashboard is registered via shared screens */}
+            {/* CoachMarketDashboard + CoachSessions are registered via shared screens */}
             {addSharedScreensToStack(CoachHomeStack)}
         </CoachHomeStack.Navigator>
-    );
-}
-
-function CoachTrainingStackNavigator() {
-    return (
-        <CoachTrainingStack.Navigator screenOptions={{ headerShown: false }}>
-            <CoachTrainingStack.Screen name="CoachTrainingMain" component={TrainingScreen} />
-            {addSharedScreensToStack(CoachTrainingStack)}
-        </CoachTrainingStack.Navigator>
     );
 }
 
@@ -369,25 +308,6 @@ function CoachAthletesStackNavigator() {
             <CoachAthletesStack.Screen name="CoachAthletesMain" component={CoachAthletesScreen} />
             {addSharedScreensToStack(CoachAthletesStack)}
         </CoachAthletesStack.Navigator>
-    );
-}
-
-function CoachMarketCoachStackNavigator() {
-    return (
-        <CoachMarketCoachStack.Navigator screenOptions={{ headerShown: false }}>
-            <CoachMarketCoachStack.Screen name="CoachMarketDashMain" component={CoachMarketDashboardScreen} />
-            <CoachMarketCoachStack.Screen name="CoachMarketBrowse" component={CoachMarketScreen} options={{ headerShown: false }} />
-            {addSharedScreensToStack(CoachMarketCoachStack)}
-        </CoachMarketCoachStack.Navigator>
-    );
-}
-
-function CoachSessionsStackNavigator() {
-    return (
-        <CoachSessionsStack.Navigator screenOptions={{ headerShown: false }}>
-            <CoachSessionsStack.Screen name="CoachSessionsMain" component={CoachSessionsScreen} />
-            {addSharedScreensToStack(CoachSessionsStack)}
-        </CoachSessionsStack.Navigator>
     );
 }
 
@@ -407,8 +327,35 @@ function CoachProfileStackNavigator() {
     );
 }
 
+// Tab-root stacks that reuse the shared screen registry (no new imports). Each opens
+// straight into a shared screen and can still deep-navigate to the rest.
+function CoachPlaybookStackNavigator() {
+    return (
+        <CoachPlaybookStack.Navigator screenOptions={{ headerShown: false }} initialRouteName="SimCoach">
+            {addSharedScreensToStack(CoachPlaybookStack)}
+        </CoachPlaybookStack.Navigator>
+    );
+}
+
+function CoachMarketStackNavigator() {
+    return (
+        <CoachMarketStack.Navigator screenOptions={{ headerShown: false }} initialRouteName="CoachMarketDashboard">
+            {addSharedScreensToStack(CoachMarketStack)}
+        </CoachMarketStack.Navigator>
+    );
+}
+
+function CoachContentStackNavigator() {
+    return (
+        <CoachContentStack.Navigator screenOptions={{ headerShown: false }} initialRouteName="CreateDrill">
+            {addSharedScreensToStack(CoachContentStack)}
+        </CoachContentStack.Navigator>
+    );
+}
+
 export function CoachMainNavigator() {
-    const { theme } = useAppContext();
+    const { theme, userData } = useAppContext();
+    const isTrainer = userData?.coachType === 'trainer';
     return (
         <TourProvider navigationRef={navigationRef}>
         <CoachTab.Navigator
@@ -416,9 +363,10 @@ export function CoachMainNavigator() {
                 tabBarIcon: ({ focused, color, size }) => {
                     const icons = {
                         CoachHome: focused ? 'home' : 'home-outline',
-                        Athletes: focused ? 'people' : 'people-outline',
-                        CoachMarket: focused ? 'storefront' : 'storefront-outline',
-                        Sessions: focused ? 'calendar' : 'calendar-outline',
+                        Roster: focused ? 'people' : 'people-outline',
+                        Playbook: focused ? 'clipboard' : 'clipboard-outline',
+                        Market: focused ? 'storefront' : 'storefront-outline',
+                        Create: focused ? 'add-circle' : 'add-circle-outline',
                         CoachProfile: focused ? 'person' : 'person-outline',
                     };
                     return <Ionicons name={icons[route.name] || 'ellipse'} size={size} color={color} />;
@@ -430,9 +378,17 @@ export function CoachMainNavigator() {
             })}
         >
             <CoachTab.Screen name="CoachHome" component={CoachHomeStackNavigator} options={{ title: 'Home' }} />
-            <CoachTab.Screen name="Athletes" component={CoachAthletesStackNavigator} options={{ title: 'Athletes' }} />
-            <CoachTab.Screen name="CoachMarket" component={CoachMarketCoachStackNavigator} options={{ title: 'Market' }} />
-            <CoachTab.Screen name="Sessions" component={CoachSessionsStackNavigator} options={{ title: 'Sessions' }} />
+            {isTrainer ? (
+                <>
+                    <CoachTab.Screen name="Market" component={CoachMarketStackNavigator} options={{ title: 'Market' }} />
+                    <CoachTab.Screen name="Create" component={CoachContentStackNavigator} options={{ title: 'Create' }} />
+                </>
+            ) : (
+                <>
+                    <CoachTab.Screen name="Roster" component={CoachAthletesStackNavigator} options={{ title: 'Roster' }} />
+                    <CoachTab.Screen name="Playbook" component={CoachPlaybookStackNavigator} options={{ title: 'Playbook' }} />
+                </>
+            )}
             <CoachTab.Screen name="CoachProfile" component={CoachProfileStackNavigator} options={{ title: 'Profile' }} />
         </CoachTab.Navigator>
         <TourOverlay theme={theme} />
@@ -441,10 +397,11 @@ export function CoachMainNavigator() {
 }
 
 // ─── Scout Navigator ──────────────────────────────────────────────────────────
+// Modules-first shell: Discover is the Module Hub; the former Reports tab folds into
+// the ScoutReports module (in the hub grid) and Messages is reached via the Discover
+// header icon (shared 'Messaging' route). Slim bar = Discover / Watchlist / Profile.
 const ScoutDiscoverStack = createStackNavigator();
 const ScoutWatchlistStack = createStackNavigator();
-const ScoutReportsStack = createStackNavigator();
-const ScoutMessagingStack = createStackNavigator();
 const ScoutProfileStack = createStackNavigator();
 const ScoutTab = createBottomTabNavigator();
 
@@ -452,7 +409,7 @@ function ScoutDiscoverStackNavigator() {
     return (
         <ScoutDiscoverStack.Navigator screenOptions={{ headerShown: false }}>
             <ScoutDiscoverStack.Screen name="ScoutHomeMain" component={ScoutHomeScreen} />
-            {/* ScoutLabSearch is registered via shared screens */}
+            {/* ScoutLabSearch, ScoutReports & Messaging are registered via shared screens */}
             {addSharedScreensToStack(ScoutDiscoverStack)}
         </ScoutDiscoverStack.Navigator>
     );
@@ -464,24 +421,6 @@ function ScoutWatchlistStackNavigator() {
             <ScoutWatchlistStack.Screen name="ScoutWatchlistMain" component={ScoutWatchlistScreen} />
             {addSharedScreensToStack(ScoutWatchlistStack)}
         </ScoutWatchlistStack.Navigator>
-    );
-}
-
-function ScoutReportsStackNavigator() {
-    return (
-        <ScoutReportsStack.Navigator screenOptions={{ headerShown: false }}>
-            <ScoutReportsStack.Screen name="ScoutReportsMain" component={ScoutReportsScreen} />
-            {addSharedScreensToStack(ScoutReportsStack)}
-        </ScoutReportsStack.Navigator>
-    );
-}
-
-function ScoutMessagingStackNavigator() {
-    return (
-        <ScoutMessagingStack.Navigator screenOptions={{ headerShown: false }}>
-            <ScoutMessagingStack.Screen name="ScoutMessagingMain" component={MessagingScreen} />
-            {addSharedScreensToStack(ScoutMessagingStack)}
-        </ScoutMessagingStack.Navigator>
     );
 }
 
@@ -506,8 +445,6 @@ export function ScoutMainNavigator() {
                     const icons = {
                         Discover: focused ? 'search' : 'search-outline',
                         Watchlist: focused ? 'bookmark' : 'bookmark-outline',
-                        Reports: focused ? 'document-text' : 'document-text-outline',
-                        Messages: focused ? 'chatbubbles' : 'chatbubbles-outline',
                         ScoutProfile: focused ? 'person' : 'person-outline',
                     };
                     return <Ionicons name={icons[route.name] || 'ellipse'} size={size} color={color} />;
@@ -520,8 +457,6 @@ export function ScoutMainNavigator() {
         >
             <ScoutTab.Screen name="Discover" component={ScoutDiscoverStackNavigator} />
             <ScoutTab.Screen name="Watchlist" component={ScoutWatchlistStackNavigator} options={{ title: 'Watchlist' }} />
-            <ScoutTab.Screen name="Reports" component={ScoutReportsStackNavigator} options={{ title: 'Reports' }} />
-            <ScoutTab.Screen name="Messages" component={ScoutMessagingStackNavigator} options={{ title: 'Messages' }} />
             <ScoutTab.Screen name="ScoutProfile" component={ScoutProfileStackNavigator} options={{ title: 'Profile' }} />
         </ScoutTab.Navigator>
         <TourOverlay theme={theme} />
@@ -530,10 +465,11 @@ export function ScoutMainNavigator() {
 }
 
 // ─── Parent Navigator ─────────────────────────────────────────────────────────
+// Modules-first shell: Home is the Module Hub; the former Community tab folds into the
+// HoopCommunity module (in the hub grid) and Messages is reached via the Home header
+// icon (shared 'Messaging' route). Slim bar = Home / Progress / Profile.
 const ParentHomeStack = createStackNavigator();
 const ParentProgressStack = createStackNavigator();
-const ParentCommunityStack = createStackNavigator();
-const ParentMessagesStack = createStackNavigator();
 const ParentProfileStack = createStackNavigator();
 const ParentTab = createBottomTabNavigator();
 
@@ -542,6 +478,7 @@ function ParentHomeStackNavigator() {
         <ParentHomeStack.Navigator screenOptions={{ headerShown: false }}>
             <ParentHomeStack.Screen name="ParentHomeMain" component={ParentHomeScreen} />
             <ParentHomeStack.Screen name="FamilyDashboard" component={FamilyDashboardScreen} options={{ headerShown: false }} />
+            {/* HoopCommunity & Messaging are registered via shared screens */}
             {addSharedScreensToStack(ParentHomeStack)}
         </ParentHomeStack.Navigator>
     );
@@ -554,25 +491,6 @@ function ParentProgressStackNavigator() {
             {/* ProgressReport is registered via shared screens */}
             {addSharedScreensToStack(ParentProgressStack)}
         </ParentProgressStack.Navigator>
-    );
-}
-
-function ParentMessagesStackNavigator() {
-    return (
-        <ParentMessagesStack.Navigator screenOptions={{ headerShown: false }}>
-            <ParentMessagesStack.Screen name="ParentMessagesMain" component={MessagingScreen} />
-            {addSharedScreensToStack(ParentMessagesStack)}
-        </ParentMessagesStack.Navigator>
-    );
-}
-
-function ParentCommunityStackNavigator() {
-    return (
-        <ParentCommunityStack.Navigator screenOptions={{ headerShown: false }}>
-            <ParentCommunityStack.Screen name="ParentCommunityMain" component={HoopCommunityScreen} />
-            {/* Mentorship is registered via shared screens */}
-            {addSharedScreensToStack(ParentCommunityStack)}
-        </ParentCommunityStack.Navigator>
     );
 }
 
@@ -597,8 +515,6 @@ export function ParentMainNavigator() {
                     const icons = {
                         ParentHome: focused ? 'home' : 'home-outline',
                         Progress: focused ? 'stats-chart' : 'stats-chart-outline',
-                        Community: focused ? 'people' : 'people-outline',
-                        Messages: focused ? 'chatbubbles' : 'chatbubbles-outline',
                         ParentProfile: focused ? 'person' : 'person-outline',
                     };
                     return <Ionicons name={icons[route.name] || 'ellipse'} size={size} color={color} />;
@@ -611,8 +527,6 @@ export function ParentMainNavigator() {
         >
             <ParentTab.Screen name="ParentHome" component={ParentHomeStackNavigator} options={{ title: 'Home' }} />
             <ParentTab.Screen name="Progress" component={ParentProgressStackNavigator} options={{ title: 'Progress' }} />
-            <ParentTab.Screen name="Community" component={ParentCommunityStackNavigator} />
-            <ParentTab.Screen name="Messages" component={ParentMessagesStackNavigator} options={{ title: 'Messages' }} />
             <ParentTab.Screen name="ParentProfile" component={ParentProfileStackNavigator} options={{ title: 'Profile' }} />
         </ParentTab.Navigator>
         <TourOverlay theme={theme} />

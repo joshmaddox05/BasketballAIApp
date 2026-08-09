@@ -52,23 +52,57 @@ const ROLES = [
   },
 ];
 
+// Coach sub-types (captured only — no behavioral branching yet). Organization
+// coaches get the SimCoach game simulator; skills trainers get IQ-development.
+const COACH_TYPES = [
+  {
+    id: 'org',
+    label: 'Organization Coach',
+    hint: 'Team / school / academy',
+    icon: 'people-outline',
+    focus: 'Run a team or program: build game plans and prepare for opponents.',
+    features: [
+      'Full team roster & progress tracking',
+      'SimCoach™ game simulator (film + opponent prep)',
+      'Game plan builder with assignable scenarios',
+      'Session scheduling & CoachMarket™',
+    ],
+  },
+  {
+    id: 'trainer',
+    label: 'Skills Trainer',
+    hint: 'Independent / skills development',
+    icon: 'barbell-outline',
+    focus: 'Develop individual athletes: assign workouts and build their IQ.',
+    features: [
+      'Individual athlete roster & adherence',
+      'SimCoach™ IQ development (test & train basketball IQ)',
+      'Assign workouts, drills & scenarios',
+      'Session scheduling & CoachMarket™',
+    ],
+  },
+];
+
 export default function RoleSelectionScreen({ navigation }) {
   const { updateUserDataLocally, isDarkMode } = useAppContext();
   const theme = getTheme(isDarkMode);
 
   const [selectedRole, setSelectedRole] = useState('player');
+  const [coachType, setCoachType] = useState('org');
   const [loading, setLoading] = useState(false);
 
   const handleContinue = useCallback(async () => {
     setLoading(true);
     try {
       const user = getCurrentUser();
+      const profileUpdate = { role: selectedRole };
+      if (selectedRole === 'coach') profileUpdate.coachType = coachType;
       if (user) {
-        await updateUserProfile(user.uid, { role: selectedRole });
+        await updateUserProfile(user.uid, profileUpdate);
       }
       // Propagate the role into local context immediately so the correct role
       // navigator renders the moment onboarding completes (no relogin needed).
-      updateUserDataLocally({ role: selectedRole });
+      updateUserDataLocally(profileUpdate);
 
       // Players continue through skill assessment; other roles skip straight to
       // the final welcome step.
@@ -82,7 +116,7 @@ export default function RoleSelectionScreen({ navigation }) {
     } finally {
       setLoading(false);
     }
-  }, [selectedRole, updateUserDataLocally, navigation]);
+  }, [selectedRole, coachType, updateUserDataLocally, navigation]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
@@ -138,6 +172,54 @@ export default function RoleSelectionScreen({ navigation }) {
                       <Text style={[styles.perkText, { color: role.color }]}>{perk}</Text>
                     </View>
                   ))}
+                </View>
+              )}
+
+              {isSelected && role.id === 'coach' && (
+                <View style={styles.coachTypeBlock}>
+                  <Text style={[styles.coachTypeLabel, { color: theme.textSecondary }]}>
+                    What kind of coach are you?
+                  </Text>
+                  <View style={styles.coachTypeRow}>
+                    {COACH_TYPES.map((ct) => {
+                      const ctSelected = coachType === ct.id;
+                      return (
+                        <TouchableOpacity
+                          key={ct.id}
+                          style={[
+                            styles.coachTypeChip,
+                            {
+                              backgroundColor: ctSelected ? role.color + '18' : theme.background,
+                              borderColor: ctSelected ? role.color : theme.border,
+                            },
+                          ]}
+                          onPress={() => setCoachType(ct.id)}
+                          activeOpacity={0.8}
+                        >
+                          <Ionicons name={ct.icon} size={16} color={ctSelected ? role.color : theme.textSecondary} />
+                          <Text style={[styles.coachTypeChipLabel, { color: ctSelected ? role.color : theme.text }]}>
+                            {ct.label}
+                          </Text>
+                          <Text style={[styles.coachTypeChipHint, { color: theme.textSecondary }]}>{ct.hint}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+
+                  {(() => {
+                    const activeType = COACH_TYPES.find((ct) => ct.id === coachType) || COACH_TYPES[0];
+                    return (
+                      <View style={[styles.coachFeaturesPanel, { backgroundColor: role.color + '10', borderColor: role.color + '25' }]}>
+                        <Text style={[styles.coachFeaturesFocus, { color: theme.text }]}>{activeType.focus}</Text>
+                        {activeType.features.map((feature) => (
+                          <View key={feature} style={styles.coachFeatureRow}>
+                            <Ionicons name="checkmark-circle" size={15} color={role.color} />
+                            <Text style={[styles.coachFeatureText, { color: theme.textSecondary }]}>{feature}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    );
+                  })()}
                 </View>
               )}
             </TouchableOpacity>
@@ -218,6 +300,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   perkText: { fontSize: 11, fontWeight: '600' },
+
+  coachTypeBlock: { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)' },
+  coachTypeLabel: { fontSize: 12, fontWeight: '600', marginBottom: 8 },
+  coachTypeRow: { flexDirection: 'row', gap: 8 },
+  coachTypeChip: {
+    flex: 1,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    gap: 3,
+  },
+  coachTypeChipLabel: { fontSize: 13, fontWeight: '700', marginTop: 2 },
+  coachTypeChipHint: { fontSize: 11 },
+  coachFeaturesPanel: { marginTop: 10, borderRadius: 12, borderWidth: 1, padding: 12, gap: 8 },
+  coachFeaturesFocus: { fontSize: 12, fontWeight: '600', lineHeight: 17, marginBottom: 2 },
+  coachFeatureRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  coachFeatureText: { fontSize: 12, lineHeight: 17, flex: 1 },
 
   continueBtn: {
     flexDirection: 'row',

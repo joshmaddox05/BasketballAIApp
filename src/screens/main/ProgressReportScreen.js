@@ -102,7 +102,7 @@ function EmptyHint({ text, theme }) {
 }
 
 export default function ProgressReportScreen({ navigation }) {
-  const { user, theme, isDarkMode } = useAppContext();
+  const { user, theme, isDarkMode, selectedChildUid } = useAppContext();
   const parentUid = user?.uid;
 
   const [loading, setLoading] = useState(true);
@@ -119,7 +119,7 @@ export default function ProgressReportScreen({ navigation }) {
     setLoading(true);
     try {
       const linkedPlayers = await getLinkedPlayers(parentUid);
-      const linked = linkedPlayers[0];
+      const linked = linkedPlayers.find((c) => c.uid === selectedChildUid) || linkedPlayers[0];
       if (!linked) {
         setChild(null);
         return;
@@ -132,7 +132,7 @@ export default function ProgressReportScreen({ navigation }) {
     } finally {
       setLoading(false);
     }
-  }, [parentUid]);
+  }, [parentUid, selectedChildUid]);
 
   useFocusEffect(
     useCallback(() => {

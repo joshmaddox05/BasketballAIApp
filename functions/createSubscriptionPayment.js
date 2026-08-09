@@ -344,10 +344,10 @@ async function handleSubscriptionUpdate(subscription) {
     const priceId = subscription.items.data[0].price.id;
     let tier = 'free';
 
-    // Map price IDs to tiers (these match your stripe.js config)
+    // Two-tier model: any paid price normalizes to 'pro' (matches stripe.js config).
     const priceToTierMap = {
-      'price_1STmgCPTDEZhEg0xiJ70H58F': 'basic',
-      'price_1STmgJPTDEZhEg0xSK0Dsa9d': 'premium',
+      'price_1STmgCPTDEZhEg0xiJ70H58F': 'pro',
+      'price_1STmgJPTDEZhEg0xSK0Dsa9d': 'pro',
       'price_1STmgLPTDEZhEg0xp3Srlc8i': 'pro',
     };
 

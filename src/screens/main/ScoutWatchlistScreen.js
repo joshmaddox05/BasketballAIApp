@@ -4,9 +4,12 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAppContext } from '../../context/AppContext';
-import { getWatchlist, removeWatchlistEntry } from '../../services/firestoreService';
+import { getWatchlist, removeWatchlistEntry, updateWatchlistStatus, WATCHLIST_STATUSES } from '../../services/firestoreService';
 
 const GRADE_COLOR = { 'A+': '#22C55E', 'A': '#22C55E', 'A-': '#22C55E', 'B+': '#FF6B00', 'B': '#F59E0B', 'B-': '#F59E0B', 'C+': '#EF4444', 'C': '#EF4444' };
+const GRADE_LABEL = { 9: '9th', 10: '10th', 11: '11th', 12: '12th' };
+const STATUS_LABEL = { watching: 'Watching', contacted: 'Contacted', offer: 'Offer', committed: 'Committed', pass: 'Pass' };
+const STATUS_COLOR = { watching: '#3B82F6', contacted: '#F59E0B', offer: '#A855F7', committed: '#22C55E', pass: '#EF4444' };
 
 const toDate = (value) => {
   if (!value) return null;
@@ -42,10 +45,10 @@ export default function ScoutWatchlistScreen({ navigation }) {
           id: w.prospectUid || w.id,
           name: w.name || 'Unknown',
           position: w.position || '—',
-          classYear: w.classYear || '—',
+          grade: GRADE_LABEL[w.gradeLevel] || w.classYear || '—',
           region: w.region || '—',
-          evalGrade: w.evalGrade || '—',
-          iqScore: w.iqScore != null ? w.iqScore : '—',
+          evalGrade: w.evaluationScore || w.evalGrade || '—',
+          status: w.status || 'watching',
           addedDate: shortDate(w.savedAt),
           note: w.note || 'No notes added.',
         }))
@@ -66,6 +69,17 @@ export default function ScoutWatchlistScreen({ navigation }) {
       setWatchlist((prev) => prev.filter((p) => p.id !== prospectId));
       removeWatchlistEntry(scoutUid, String(prospectId)).catch((error) => {
         Alert.alert('Error', error.message || 'Could not remove prospect.');
+        loadWatchlist();
+      });
+    },
+    [scoutUid, loadWatchlist]
+  );
+
+  const handleStatus = useCallback(
+    (prospectId, status) => {
+      setWatchlist((prev) => prev.map((p) => (p.id === prospectId ? { ...p, status } : p)));
+      updateWatchlistStatus(scoutUid, prospectId, status).catch((error) => {
+        Alert.alert('Error', error.message || 'Could not update status.');
         loadWatchlist();
       });
     },
@@ -102,7 +116,10 @@ export default function ScoutWatchlistScreen({ navigation }) {
                 </View>
                 <View style={styles.info}>
                   <Text style={[styles.name, { color: theme.text }]}>{p.name}</Text>
-                  <Text style={[styles.meta, { color: theme.textSecondary }]}>{p.position} · Class {p.classYear} · {p.region}</Text>
+                  <Text style={[styles.meta, { color: theme.textSecondary }]}>{p.position} · {p.grade} grade · {p.region}</Text>
+                  <View style={[styles.statusPill, { backgroundColor: (STATUS_COLOR[p.status] || '#888') + '18' }]}>
+                    <Text style={[styles.statusPillText, { color: STATUS_COLOR[p.status] || '#888' }]}>{STATUS_LABEL[p.status] || 'Watching'}</Text>
+                  </View>
                 </View>
                 <View style={[styles.gradeBadge, { backgroundColor: (GRADE_COLOR[p.evalGrade] || '#888') + '22' }]}>
                   <Text style={[styles.gradeText, { color: GRADE_COLOR[p.evalGrade] || '#888' }]}>{p.evalGrade}</Text>
@@ -110,26 +127,28 @@ export default function ScoutWatchlistScreen({ navigation }) {
               </View>
               {selected === p.id && (
                 <View style={[styles.expanded, { borderTopColor: theme.border }]}>
-                  <View style={styles.statsRow}>
-                    <View style={styles.stat}>
-                      <Text style={[styles.statVal, { color: theme.primary }]}>{p.iqScore}</Text>
-                      <Text style={[styles.statLabel, { color: theme.textSecondary }]}>IQ Score</Text>
-                    </View>
-                    <View style={styles.stat}>
-                      <Text style={[styles.statVal, { color: theme.text }]}>{p.classYear}</Text>
-                      <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Class</Text>
-                    </View>
-                    <View style={styles.stat}>
-                      <Text style={[styles.statVal, { color: theme.text }]}>{p.addedDate}</Text>
-                      <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Added</Text>
-                    </View>
+                  <Text style={[styles.statusHeader, { color: theme.textSecondary }]}>Recruiting Status · added {p.addedDate}</Text>
+                  <View style={styles.statusRow}>
+                    {WATCHLIST_STATUSES.map((s) => {
+                      const active = p.status === s;
+                      const c = STATUS_COLOR[s];
+                      return (
+                        <TouchableOpacity
+                          key={s}
+                          style={[styles.statusChip, { borderColor: active ? c : theme.border, backgroundColor: active ? c + '18' : 'transparent' }]}
+                          onPress={() => handleStatus(p.id, s)}
+                        >
+                          <Text style={[styles.statusChipText, { color: active ? c : theme.textSecondary }]}>{STATUS_LABEL[s]}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
                   </View>
                   <View style={[styles.noteBox, { backgroundColor: theme.background }]}>
                     <Text style={[styles.noteLabel, { color: theme.textSecondary }]}>Scout Note</Text>
                     <Text style={[styles.noteText, { color: theme.text }]}>{p.note}</Text>
                   </View>
                   <View style={styles.actionRow}>
-                    <TouchableOpacity style={[styles.actionBtn, { backgroundColor: theme.primary }]} onPress={() => navigation.navigate('ScoutLabProfile', { uid: p.id })}>
+                    <TouchableOpacity style={[styles.actionBtn, { backgroundColor: theme.primary }]} onPress={() => navigation.navigate('ScoutProspectDetail', { prospect: p })}>
                       <Text style={styles.actionBtnText}>View Profile</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={[styles.removeBtn, { borderColor: '#EF444440' }]} onPress={() => handleRemove(p.id)}>
@@ -169,6 +188,12 @@ const styles = StyleSheet.create({
   meta: { fontSize: 12, marginTop: 2 },
   gradeBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
   gradeText: { fontSize: 14, fontWeight: '800' },
+  statusPill: { alignSelf: 'flex-start', marginTop: 4, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
+  statusPillText: { fontSize: 10, fontWeight: '700' },
+  statusHeader: { fontSize: 11, fontWeight: '600', marginBottom: 8 },
+  statusRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  statusChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 14, borderWidth: 1 },
+  statusChipText: { fontSize: 11, fontWeight: '700' },
   expanded: { borderTopWidth: 1, padding: 14, gap: 12 },
   statsRow: { flexDirection: 'row', justifyContent: 'space-around' },
   stat: { alignItems: 'center' },

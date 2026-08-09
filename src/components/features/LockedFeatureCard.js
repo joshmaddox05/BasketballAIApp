@@ -88,7 +88,7 @@ const LockedFeatureCard = ({
                         {!hasAccess && (
                             <View style={[styles.premiumBadge, { backgroundColor: theme.warning }]}>
                                 <Ionicons name="diamond" size={12} color="#FFF" />
-                                <Text style={styles.premiumText}>Premium</Text>
+                                <Text style={styles.premiumText}>Pro</Text>
                             </View>
                         )}
                     </View>

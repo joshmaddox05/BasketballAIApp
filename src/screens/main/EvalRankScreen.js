@@ -209,6 +209,16 @@ export default function EvalRankScreen({ navigation }) {
           <Text style={[styles.outlineBtnText, { color: theme.primary }]}>View Badges</Text>
         </TouchableOpacity>
 
+        {/* Detailed stats / achievements / goals dashboard (the kept Progress tab). */}
+        <TouchableOpacity
+          style={[styles.outlineBtn, { borderColor: theme.primary }]}
+          activeOpacity={0.85}
+          onPress={() => navigation.navigate('Progress')}
+        >
+          <Ionicons name="stats-chart-outline" size={18} color={theme.primary} />
+          <Text style={[styles.outlineBtnText, { color: theme.primary }]}>Full Progress & Stats</Text>
+        </TouchableOpacity>
+
         <View style={styles.bottomSpacer} />
       </ScrollView>
     </SafeAreaView>

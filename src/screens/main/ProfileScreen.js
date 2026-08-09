@@ -91,9 +91,31 @@ const ProfileScreen = ({ navigation }) => {
                     <Text style={[styles.profileName, { color: theme.text }]}>
                         {userData?.displayName || userData?.name || 'User'}
                     </Text>
-                    <Text style={[styles.profileLevel, { color: theme.textSecondary }]}>
-                        {userData?.level ? userData.level.charAt(0).toUpperCase() + userData.level.slice(1) : 'Beginner'} Player
-                    </Text>
+                    {(userData?.role || 'player') === 'scout' ? (
+                        <View style={styles.scoutBadgeRow}>
+                            <View style={[styles.verifiedPill, { backgroundColor: (userData?.scoutVerified ? '#22C55E' : theme.textSecondary) + '18' }]}>
+                                <Ionicons
+                                    name={userData?.scoutVerified ? 'checkmark-circle' : 'time-outline'}
+                                    size={13}
+                                    color={userData?.scoutVerified ? '#22C55E' : theme.textSecondary}
+                                />
+                                <Text style={[styles.verifiedText, { color: userData?.scoutVerified ? '#22C55E' : theme.textSecondary }]}>
+                                    {userData?.scoutVerified ? 'Verified Scout' : 'Verification Pending'}
+                                </Text>
+                            </View>
+                            {userData?.scoutTier ? (
+                                <View style={[styles.tierPill, { borderColor: theme.primary + '50' }]}>
+                                    <Text style={[styles.tierText, { color: theme.primary }]}>{userData.scoutTier}</Text>
+                                </View>
+                            ) : null}
+                        </View>
+                    ) : (
+                        <Text style={[styles.profileLevel, { color: theme.textSecondary }]}>
+                            {(userData?.role || 'player') === 'player'
+                                ? `${userData?.level ? userData.level.charAt(0).toUpperCase() + userData.level.slice(1) : 'Beginner'} Player`
+                                : (userData.role.charAt(0).toUpperCase() + userData.role.slice(1))}
+                        </Text>
+                    )}
 
                     <View style={styles.profileStatsRow}>
                         <View style={styles.profileStat}>
@@ -346,6 +368,28 @@ const styles = StyleSheet.create({
         fontSize: 16,
         marginBottom: 20,
     },
+    scoutBadgeRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 20,
+    },
+    verifiedPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 12,
+    },
+    verifiedText: { fontSize: 12, fontWeight: '700' },
+    tierPill: {
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 12,
+        borderWidth: 1,
+    },
+    tierText: { fontSize: 12, fontWeight: '700' },
     profileStatsRow: {
         flexDirection: 'row',
         alignItems: 'center',

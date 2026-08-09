@@ -22,6 +22,8 @@ import {
   getRecommendationReason,
 } from '../../utils/homeHelpers';
 import { getPersonalizedWorkouts } from '../../services/workoutPersonalizationEngine';
+import { getAthleteAssignments, updateAssignmentStatus, getAthleteSessions, updateSessionStatus } from '../../services/firestoreService';
+import { comprehensiveWorkouts } from '../../data/workouts';
 import ModuleGrid from '../../components/features/ModuleGrid';
 import { getModulesForRole } from '../../config/roleModules';
 
@@ -225,9 +227,11 @@ function DBEHub({ shotDNAProfile, evalRankScore, simCoachIQScore, subscription, 
         </View>
       </View>
 
-      {/* Module cards */}
+      {/* Module hub — the app's primary surface. Training / Progress / Challenges now live
+          inside Blueprint360 / EvalRank / HoopCommunity, so the grid is the full catalog. */}
       <ModuleGrid
-        title="Ecosystem Modules"
+        title="Explore Modules"
+        layout="grid"
         modules={getModulesForRole('player')}
         subscription={subscription}
         theme={theme}
@@ -238,7 +242,7 @@ function DBEHub({ shotDNAProfile, evalRankScore, simCoachIQScore, subscription, 
 }
 
 const dbeStyles = StyleSheet.create({
-  hubSection: { marginBottom: 8 },
+  hubSection: { marginBottom: 8, paddingHorizontal: 20 },
   pipelineCard: { borderRadius: 16, borderWidth: 1, padding: 16, marginBottom: 16 },
   pipelineTitle: { fontSize: 14, fontWeight: '700', marginBottom: 12 },
   pipelineRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around' },
@@ -268,11 +272,109 @@ function EmptyWorkoutsState({ theme, onPress }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// From Your Coach — pending assignments (workouts + IQ scenarios)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function CoachAssignmentsSection({ assignments, theme, onOpen, onComplete }) {
+  if (!assignments || assignments.length === 0) return null;
+  return (
+    <View style={styles.section}>
+      <View style={styles.sectionHeader}>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>From Your Coach</Text>
+      </View>
+      {assignments.map((a) => {
+        const isScenario = a.type === 'scenario';
+        return (
+          <TouchableOpacity
+            key={a.id}
+            style={[styles.assignmentCard, { backgroundColor: theme.card, borderColor: theme.primary + '40' }]}
+            onPress={() => onOpen(a)}
+            activeOpacity={0.85}
+          >
+            <View style={[styles.assignmentIcon, { backgroundColor: theme.primary + '18' }]}>
+              <Ionicons name={isScenario ? 'bulb-outline' : 'barbell-outline'} size={20} color={theme.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.assignmentTitle, { color: theme.text }]} numberOfLines={1}>{a.title}</Text>
+              <Text style={[styles.assignmentMeta, { color: theme.textSecondary }]} numberOfLines={1}>
+                {a.coachName}{a.note ? ` · ${a.note}` : ''}
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => onComplete(a)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              style={[styles.assignmentCheck, { borderColor: theme.primary }]}
+            >
+              <Ionicons name="checkmark" size={16} color={theme.primary} />
+            </TouchableOpacity>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sessions with your coach (athlete side)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const sessionDate = (value) => {
+  if (!value) return null;
+  if (value.toDate) return value.toDate();
+  if (value.seconds) return new Date(value.seconds * 1000);
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? null : d;
+};
+
+function CoachSessionsSection({ sessions, theme, onConfirm }) {
+  if (!sessions || sessions.length === 0) return null;
+  return (
+    <View style={styles.section}>
+      <View style={styles.sectionHeader}>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>Sessions With Your Coach</Text>
+      </View>
+      {sessions.map((s) => {
+        const d = sessionDate(s.scheduledAt);
+        const when = d
+          ? `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} · ${d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`
+          : 'Time TBD';
+        return (
+          <View key={s.id} style={[styles.assignmentCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <View style={[styles.assignmentIcon, { backgroundColor: theme.primary + '18' }]}>
+              <Ionicons name={s.mode === 'virtual' ? 'videocam-outline' : 'basketball-outline'} size={20} color={theme.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.assignmentTitle, { color: theme.text }]} numberOfLines={1}>{s.type}</Text>
+              <Text style={[styles.assignmentMeta, { color: theme.textSecondary }]} numberOfLines={1}>
+                {s.coachName} · {when}
+              </Text>
+            </View>
+            {s.status === 'pending' ? (
+              <TouchableOpacity
+                onPress={() => onConfirm(s)}
+                style={[styles.confirmBtn, { backgroundColor: theme.primary }]}
+              >
+                <Text style={styles.confirmBtnText}>Confirm</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={[styles.sessionStatusPill, { backgroundColor: '#22C55E18' }]}>
+                <Text style={[styles.sessionStatusText, { color: '#22C55E' }]}>{s.status}</Text>
+              </View>
+            )}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Main Screen
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function HomeScreen({ navigation }) {
   const {
+    user,
     userData,
     activities,
     goals,
@@ -288,6 +390,25 @@ export default function HomeScreen({ navigation }) {
   } = useAppContext();
 
   const [refreshing, setRefreshing] = useState(false);
+  const [coachAssignments, setCoachAssignments] = useState([]);
+  const [coachSessions, setCoachSessions] = useState([]);
+
+  const loadCoachAssignments = useCallback(async () => {
+    if (!user?.uid) return;
+    const [items, sessions] = await Promise.all([
+      getAthleteAssignments(user.uid, { status: 'assigned' }),
+      getAthleteSessions(user.uid),
+    ]);
+    setCoachAssignments(items);
+    // Only upcoming, non-cancelled sessions surface on the athlete home.
+    const now = Date.now();
+    setCoachSessions(
+      sessions.filter((s) => {
+        const d = sessionDate(s.scheduledAt);
+        return s.status !== 'cancelled' && s.status !== 'completed' && (!d || d.getTime() >= now);
+      })
+    );
+  }, [user?.uid]);
 
   const userPrefs = userData?.preferences || {};
   const subscription = userData?.subscription || 'free';
@@ -334,8 +455,56 @@ export default function HomeScreen({ navigation }) {
   // Refresh when screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      // lightweight focus-based refresh (no full reload)
-    }, [])
+      loadCoachAssignments();
+    }, [loadCoachAssignments])
+  );
+
+  // Open an assignment: workouts go to WorkoutDetail, scenarios to SimCoach.
+  const handleOpenAssignment = useCallback(
+    (assignment) => {
+      if (assignment.type === 'scenario') {
+        navigation.navigate('SimCoachScenario', {
+          scenario: {
+            refId: assignment.refId,
+            coachName: assignment.coachName,
+            assignmentId: assignment.id,
+            scenario: assignment.scenario || null,
+          },
+        });
+        return;
+      }
+      const workout = comprehensiveWorkouts.find((w) => w.id === assignment.refId);
+      if (workout) {
+        navigation.navigate('WorkoutDetail', { workout });
+      } else {
+        navigation.navigate('Training');
+      }
+    },
+    [navigation]
+  );
+
+  const handleCompleteAssignment = useCallback(
+    async (assignment) => {
+      setCoachAssignments((prev) => prev.filter((a) => a.id !== assignment.id));
+      try {
+        await updateAssignmentStatus(user.uid, assignment.id, 'completed');
+      } catch (_) {
+        loadCoachAssignments();
+      }
+    },
+    [user?.uid, loadCoachAssignments]
+  );
+
+  const handleConfirmSession = useCallback(
+    async (session) => {
+      setCoachSessions((prev) => prev.map((s) => (s.id === session.id ? { ...s, status: 'confirmed' } : s)));
+      try {
+        await updateSessionStatus(session.id, 'confirmed');
+      } catch (_) {
+        loadCoachAssignments();
+      }
+    },
+    [loadCoachAssignments]
   );
 
   // Navigation helpers
@@ -398,6 +567,21 @@ export default function HomeScreen({ navigation }) {
         {nextAction ? (
           <NextActionCard action={nextAction} theme={theme} onPress={handleNextActionPress} />
         ) : null}
+
+        {/* ── From Your Coach (assignments) ── */}
+        <CoachAssignmentsSection
+          assignments={coachAssignments}
+          theme={theme}
+          onOpen={handleOpenAssignment}
+          onComplete={handleCompleteAssignment}
+        />
+
+        {/* ── Sessions with your coach ── */}
+        <CoachSessionsSection
+          sessions={coachSessions}
+          theme={theme}
+          onConfirm={handleConfirmSession}
+        />
 
         {/* ── DBE Ecosystem Hub ── */}
         <DBEHub
@@ -557,6 +741,33 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 17, fontWeight: '700' },
   seeAll: { fontSize: 14, fontWeight: '500' },
   sectionSubtitle: { fontSize: 13, paddingHorizontal: 20, marginBottom: 12 },
+
+  // From Your Coach assignment cards
+  assignmentCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginHorizontal: 20,
+    marginBottom: 10,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1.5,
+  },
+  assignmentIcon: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  assignmentTitle: { fontSize: 15, fontWeight: '700' },
+  assignmentMeta: { fontSize: 12, marginTop: 2 },
+  assignmentCheck: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmBtn: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8 },
+  confirmBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  sessionStatusPill: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
+  sessionStatusText: { fontSize: 11, fontWeight: '700', textTransform: 'capitalize' },
 
   // Recommended cards
   recCard: {

@@ -1,5 +1,5 @@
 // ScoutReportsScreen.js - Scout's scouting reports: list, create, edit
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   SafeAreaView,
   StyleSheet,
@@ -20,6 +20,8 @@ import {
   getScoutingReports,
   saveScoutingReport,
   deleteScoutingReport,
+  getWatchlist,
+  SCOUTING_RUBRIC,
 } from '../../services/firestoreService';
 
 const POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'];
@@ -101,20 +103,57 @@ function ReportCard({ report, theme, onEdit, onDelete }) {
   );
 }
 
-function ReportFormModal({ visible, onClose, onSave, initial, theme }) {
-  const [athleteName, setAthleteName] = useState(initial?.athleteName || '');
-  const [position, setPosition] = useState(initial?.position || 'PG');
+function StarRating({ value = 0, onChange, theme }) {
+  return (
+    <View style={styles.starRow}>
+      {[1, 2, 3, 4, 5].map((n) => (
+        <TouchableOpacity key={n} onPress={() => onChange(n)} hitSlop={{ top: 6, bottom: 6, left: 3, right: 3 }} activeOpacity={0.7}>
+          <Ionicons name={n <= value ? 'star' : 'star-outline'} size={22} color={n <= value ? '#F59E0B' : theme.textSecondary} />
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+}
+
+function ReportFormModal({ visible, onClose, onSave, initial, prospects, presetProspect, theme }) {
+  const lockProspect = !!initial; // editing → prospect is fixed
+  const initialProspect = initial
+    ? { id: initial.prospectUid, name: initial.athleteName, position: initial.position }
+    : presetProspect || null;
+
+  const [selected, setSelected] = useState(initialProspect);
   const [evalGrade, setEvalGrade] = useState(initial?.evalGrade || 'B');
   const [notes, setNotes] = useState(initial?.notes || '');
   const [recommendation, setRecommendation] = useState(initial?.recommendation || 'Watch');
   const [status, setStatus] = useState(initial?.status || 'draft');
+  const [rubric, setRubric] = useState(initial?.rubric || {});
+
+  // Reset the form each time the modal opens.
+  useEffect(() => {
+    if (!visible) return;
+    setSelected(initial ? { id: initial.prospectUid, name: initial.athleteName, position: initial.position } : presetProspect || null);
+    setEvalGrade(initial?.evalGrade || 'B');
+    setNotes(initial?.notes || '');
+    setRecommendation(initial?.recommendation || 'Watch');
+    setStatus(initial?.status || 'draft');
+    setRubric(initial?.rubric || {});
+  }, [visible]);
 
   const handleSave = () => {
-    if (!athleteName.trim()) {
-      Alert.alert('Required', 'Please enter the athlete name.');
+    if (!selected) {
+      Alert.alert('Select a prospect', 'Pick a prospect from your watchlist to report on.');
       return;
     }
-    onSave({ athleteName: athleteName.trim(), position, evalGrade, notes, recommendation, status });
+    onSave({
+      prospectUid: selected.id || selected.uid,
+      athleteName: selected.name || 'Athlete',
+      position: selected.position || '—',
+      evalGrade,
+      recommendation,
+      notes,
+      status,
+      rubric,
+    });
   };
 
   return (
@@ -133,25 +172,64 @@ function ReportFormModal({ visible, onClose, onSave, initial, theme }) {
         </View>
 
         <ScrollView contentContainerStyle={styles.modalScroll}>
-          <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Athlete Name</Text>
-          <TextInput
-            style={[styles.textInput, { backgroundColor: theme.card, borderColor: theme.border, color: theme.text }]}
-            value={athleteName}
-            onChangeText={setAthleteName}
-            placeholder="Full name"
-            placeholderTextColor={theme.textSecondary}
-          />
+          {/* Prospect selector — reports must link to a watchlisted athlete */}
+          <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Prospect</Text>
+          {selected ? (
+            <View style={[styles.selectedProspect, { backgroundColor: theme.card, borderColor: theme.border }]}>
+              <View style={[styles.spAvatar, { backgroundColor: theme.primary + '22' }]}>
+                <Text style={[styles.spAvatarText, { color: theme.primary }]}>
+                  {(selected.name || '?').split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}
+                </Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.spName, { color: theme.text }]}>{selected.name}</Text>
+                <Text style={[styles.spMeta, { color: theme.textSecondary }]}>{selected.position || '—'}</Text>
+              </View>
+              {!lockProspect && (
+                <TouchableOpacity onPress={() => setSelected(null)}>
+                  <Text style={[styles.changeLink, { color: theme.primary }]}>Change</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : prospects.length === 0 ? (
+            <Text style={[styles.emptyPicker, { color: theme.textSecondary }]}>
+              No prospects in your watchlist yet. Add prospects from search to report on them.
+            </Text>
+          ) : (
+            <View style={styles.pickerList}>
+              {prospects.map((p) => (
+                <TouchableOpacity
+                  key={p.id}
+                  style={[styles.pickerItem, { backgroundColor: theme.card, borderColor: theme.border }]}
+                  onPress={() => setSelected(p)}
+                  activeOpacity={0.8}
+                >
+                  <View style={[styles.spAvatar, { backgroundColor: theme.primary + '22' }]}>
+                    <Text style={[styles.spAvatarText, { color: theme.primary }]}>
+                      {(p.name || '?').split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.spName, { color: theme.text }]}>{p.name}</Text>
+                    <Text style={[styles.spMeta, { color: theme.textSecondary }]}>{p.position || '—'}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
 
-          <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Position</Text>
-          <View style={styles.chipRow}>
-            {POSITIONS.map((p) => (
-              <TouchableOpacity
-                key={p}
-                style={[styles.chip, { borderColor: position === p ? theme.primary : theme.border, backgroundColor: position === p ? theme.primary + '18' : 'transparent' }]}
-                onPress={() => setPosition(p)}
+          {/* Standardized rubric */}
+          <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Rubric (1–5)</Text>
+          <View style={[styles.rubricCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            {SCOUTING_RUBRIC.map((dim, i) => (
+              <View
+                key={dim.key}
+                style={[styles.rubricRow, i < SCOUTING_RUBRIC.length - 1 && { borderBottomColor: theme.border, borderBottomWidth: StyleSheet.hairlineWidth }]}
               >
-                <Text style={[styles.chipText, { color: position === p ? theme.primary : theme.textSecondary }]}>{p}</Text>
-              </TouchableOpacity>
+                <Text style={[styles.rubricLabel, { color: theme.text }]}>{dim.label}</Text>
+                <StarRating value={rubric[dim.key] || 0} onChange={(v) => setRubric((r) => ({ ...r, [dim.key]: v }))} theme={theme} />
+              </View>
             ))}
           </View>
 
@@ -215,20 +293,23 @@ function ReportFormModal({ visible, onClose, onSave, initial, theme }) {
   );
 }
 
-export default function ScoutReportsScreen({ navigation }) {
+export default function ScoutReportsScreen({ navigation, route }) {
   const { user, userData, theme, isDarkMode } = useAppContext();
   const scoutUid = user?.uid;
   const subscription = userData?.subscription || 'free';
   const hasAccess = canAccessFeature('scoutLab', subscription);
 
   const [reports, setReports] = useState([]);
+  const [watchlist, setWatchlist] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingReport, setEditingReport] = useState(null);
+  const [presetProspect, setPresetProspect] = useState(null);
 
   const loadReports = useCallback(async () => {
     if (!scoutUid) return;
-    const saved = await getScoutingReports(scoutUid);
+    const [saved, wl] = await Promise.all([getScoutingReports(scoutUid), getWatchlist(scoutUid)]);
     setReports(saved.map((r) => ({ ...r, date: formatReportDate(r.updatedAt || r.createdAt) })));
+    setWatchlist(wl.map((w) => ({ ...w, id: w.prospectUid || w.id })));
   }, [scoutUid]);
 
   useFocusEffect(
@@ -237,8 +318,20 @@ export default function ScoutReportsScreen({ navigation }) {
     }, [hasAccess, loadReports])
   );
 
+  // Opened via "Write Report" from a prospect detail → prefill that prospect.
+  useEffect(() => {
+    const p = route?.params?.prospect;
+    if (p && hasAccess) {
+      setPresetProspect({ id: p.id || p.uid, name: p.name, position: p.position });
+      setEditingReport(null);
+      setModalVisible(true);
+      navigation.setParams({ prospect: undefined });
+    }
+  }, [route?.params?.prospect, hasAccess]);
+
   const handleNew = useCallback(() => {
     setEditingReport(null);
+    setPresetProspect(null);
     setModalVisible(true);
   }, []);
 
@@ -344,9 +437,11 @@ export default function ScoutReportsScreen({ navigation }) {
 
       <ReportFormModal
         visible={modalVisible}
-        onClose={() => { setModalVisible(false); setEditingReport(null); }}
+        onClose={() => { setModalVisible(false); setEditingReport(null); setPresetProspect(null); }}
         onSave={handleSave}
         initial={editingReport}
+        prospects={watchlist}
+        presetProspect={presetProspect}
         theme={theme}
       />
     </SafeAreaView>
@@ -462,4 +557,21 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   chipText: { fontSize: 13, fontWeight: '600' },
+
+  // Prospect picker
+  selectedProspect: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 12, borderWidth: 1, padding: 12 },
+  pickerList: { gap: 8 },
+  pickerItem: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 12, borderWidth: 1, padding: 12 },
+  spAvatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  spAvatarText: { fontSize: 14, fontWeight: '700' },
+  spName: { fontSize: 15, fontWeight: '700' },
+  spMeta: { fontSize: 12, marginTop: 1 },
+  changeLink: { fontSize: 13, fontWeight: '700' },
+  emptyPicker: { fontSize: 13, lineHeight: 19 },
+
+  // Rubric
+  rubricCard: { borderRadius: 12, borderWidth: 1, paddingHorizontal: 14 },
+  rubricRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12 },
+  rubricLabel: { fontSize: 14, fontWeight: '600' },
+  starRow: { flexDirection: 'row', gap: 4 },
 });

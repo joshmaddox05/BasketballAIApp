@@ -7,47 +7,36 @@ import {
   Text,
   TouchableOpacity,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAppContext } from '../../context/AppContext';
 import { canAccessFeature } from '../../utils/subscription';
+import { getAthleteAssignments, getGamePlans } from '../../services/firestoreService';
+import { SIM_COACH_SCENARIOS } from '../../data/simCoachScenarios';
 import LockedFeatureCard from '../../components/features/LockedFeatureCard';
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
-const MOCK_COACH_FILMS = [
-  { id: 'f1', opponent: 'Lakers Academy', date: 'Jun 10', gamePlans: 2, playsExtracted: 14 },
-  { id: 'f2', opponent: 'Clippers Youth', date: 'Jun 5', gamePlans: 1, playsExtracted: 18 },
-];
-
-const MOCK_COACH_GAME_PLANS = [
-  { id: 'gp1', title: 'vs Lakers — Pick & Roll Defense', film: 'Lakers Academy', assignedCount: 4, date: 'Jun 11' },
-  { id: 'gp2', title: 'vs Lakers — Transition Offense', film: 'Lakers Academy', assignedCount: 3, date: 'Jun 11' },
-  { id: 'gp3', title: 'vs Clippers — Zone Offense', film: 'Clippers Youth', assignedCount: 5, date: 'Jun 6' },
-];
-
-const MOCK_ATHLETE_SCENARIOS = [
-  {
-    id: 's1',
-    title: 'vs Lakers — Pick & Roll Defense',
-    coach: 'Coach Davis',
-    category: 'Defense',
-    dueDate: 'Jun 15',
-    status: 'pending',
-    steps: 3,
-  },
-  {
-    id: 's2',
-    title: 'vs Clippers — Zone Offense',
-    coach: 'Coach Davis',
-    category: 'Offense',
-    dueDate: 'Jun 14',
-    status: 'completed',
-    steps: 4,
-  },
-];
-
 const MOCK_IQ = { score: 74, classification: 'Developing', currentXP: 740, nextTierXP: 1000 };
+
+// Map a stored scenario assignment to the card shape the athlete view renders.
+// A coach game-plan assignment carries its scenario embedded; otherwise fall back
+// to the static catalog by refId.
+const mapScenarioAssignment = (a) => {
+  const source = a.scenario || SIM_COACH_SCENARIOS[a.refId] || {};
+  return {
+    id: a.id,
+    refId: a.refId,
+    assignmentId: a.id,
+    coachName: a.coachName || 'Coach',
+    scenario: a.scenario || null,
+    title: a.title || source.title || 'Scenario',
+    category: source.category || 'Tactics',
+    steps: source.playSteps?.length || 3,
+    status: a.status === 'completed' ? 'completed' : 'pending',
+  };
+};
 
 const IQ_CLASSIFICATION = (score) => {
   if (score >= 95) return 'Elite Decision Maker';
@@ -58,8 +47,23 @@ const IQ_CLASSIFICATION = (score) => {
 };
 
 // ─── Coach View ───────────────────────────────────────────────────────────────
-function CoachView({ navigation, theme }) {
+function CoachView({ navigation, theme, coachUid }) {
   const [tab, setTab] = useState('plans');
+  const [plans, setPlans] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!coachUid) { setLoading(false); return; }
+      let active = true;
+      (async () => {
+        setLoading(true);
+        const items = await getGamePlans(coachUid);
+        if (active) { setPlans(items); setLoading(false); }
+      })();
+      return () => { active = false; };
+    }, [coachUid])
+  );
 
   return (
     <View style={{ flex: 1 }}>
@@ -83,64 +87,58 @@ function CoachView({ navigation, theme }) {
           <>
             <TouchableOpacity
               style={[styles.ctaCard, { backgroundColor: theme.primary }]}
-              onPress={() => navigation.navigate('SimCoachFilmLibrary')}
+              onPress={() => navigation.navigate('SimCoachGamePlanBuilder')}
               activeOpacity={0.85}
             >
-              <Ionicons name="videocam-outline" size={22} color="#fff" />
+              <Ionicons name="add-circle-outline" size={22} color="#fff" />
               <View style={{ flex: 1 }}>
-                <Text style={styles.ctaCardTitle}>Upload Film + Create Game Plan</Text>
-                <Text style={styles.ctaCardSub}>Upload opponent film → AI extracts plays → Build your game plan</Text>
+                <Text style={styles.ctaCardTitle}>Create Game Plan</Text>
+                <Text style={styles.ctaCardSub}>Build a scenario (play steps + a tactical question) and assign it to athletes</Text>
               </View>
               <Ionicons name="arrow-forward" size={18} color="#fff" />
             </TouchableOpacity>
 
             <Text style={[styles.sectionTitle, { color: theme.text }]}>Game Plans</Text>
-            {MOCK_COACH_GAME_PLANS.map((gp) => (
-              <View key={gp.id} style={[styles.planCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-                <View style={[styles.planIconWrap, { backgroundColor: theme.primary + '18' }]}>
-                  <Ionicons name="map-outline" size={20} color={theme.primary} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.planTitle, { color: theme.text }]}>{gp.title}</Text>
-                  <Text style={[styles.planMeta, { color: theme.textSecondary }]}>
-                    {gp.film} · Assigned to {gp.assignedCount} athletes · {gp.date}
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
+            {loading ? (
+              <ActivityIndicator color={theme.primary} style={{ marginTop: 16 }} />
+            ) : plans.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="map-outline" size={36} color={theme.textSecondary} />
+                <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+                  No game plans yet. Tap “Create Game Plan” to build one.
+                </Text>
               </View>
-            ))}
+            ) : (
+              plans.map((gp) => (
+                <TouchableOpacity
+                  key={gp.id}
+                  style={[styles.planCard, { backgroundColor: theme.card, borderColor: theme.border }]}
+                  onPress={() => navigation.navigate('SimCoachGamePlanBuilder', { plan: gp })}
+                  activeOpacity={0.8}
+                >
+                  <View style={[styles.planIconWrap, { backgroundColor: theme.primary + '18' }]}>
+                    <Ionicons name="map-outline" size={20} color={theme.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.planTitle, { color: theme.text }]}>{gp.title}</Text>
+                    <Text style={[styles.planMeta, { color: theme.textSecondary }]}>
+                      {gp.category || 'Tactics'} · {gp.playSteps?.length || 0} play steps
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
+                </TouchableOpacity>
+              ))
+            )}
           </>
         ) : (
-          <>
-            <TouchableOpacity
-              style={[styles.ctaCard, { backgroundColor: theme.primary }]}
-              onPress={() => navigation.navigate('SimCoachFilmLibrary')}
-              activeOpacity={0.85}
-            >
-              <Ionicons name="cloud-upload-outline" size={22} color="#fff" />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.ctaCardTitle}>Upload New Film</Text>
-                <Text style={styles.ctaCardSub}>Upload game film for AI play extraction</Text>
-              </View>
-              <Ionicons name="arrow-forward" size={18} color="#fff" />
-            </TouchableOpacity>
-
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>Recent Films</Text>
-            {MOCK_COACH_FILMS.map((f) => (
-              <View key={f.id} style={[styles.planCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-                <View style={[styles.planIconWrap, { backgroundColor: '#3B82F618' }]}>
-                  <Ionicons name="videocam" size={20} color="#3B82F6" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.planTitle, { color: theme.text }]}>{f.opponent}</Text>
-                  <Text style={[styles.planMeta, { color: theme.textSecondary }]}>
-                    {f.playsExtracted} plays · {f.gamePlans} game plans · {f.date}
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
-              </View>
-            ))}
-          </>
+          <View style={styles.emptyState}>
+            <Ionicons name="videocam-outline" size={40} color={theme.textSecondary} />
+            <Text style={[styles.comingSoonTitle, { color: theme.text }]}>Film Library — Coming Soon</Text>
+            <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+              Upload opponent film and let AI extract plays into game plans. For now, build game plans
+              manually from the Game Plans tab.
+            </Text>
+          </View>
         )}
         <View style={{ height: 32 }} />
       </ScrollView>
@@ -149,7 +147,7 @@ function CoachView({ navigation, theme }) {
 }
 
 // ─── Athlete View ─────────────────────────────────────────────────────────────
-function AthleteView({ navigation, theme, iqData }) {
+function AthleteView({ navigation, theme, iqData, scenarios }) {
   const score = iqData.score;
   const classification = IQ_CLASSIFICATION(score);
   const xpPct = Math.min(100, (iqData.currentXP / iqData.nextTierXP) * 100);
@@ -181,7 +179,7 @@ function AthleteView({ navigation, theme, iqData }) {
 
       {/* Assigned Scenarios */}
       <Text style={[styles.sectionTitle, { color: theme.text }]}>My Scenarios</Text>
-      {MOCK_ATHLETE_SCENARIOS.length === 0 ? (
+      {scenarios.length === 0 ? (
         <View style={styles.emptyState}>
           <Ionicons name="map-outline" size={36} color={theme.textSecondary} />
           <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
@@ -189,7 +187,7 @@ function AthleteView({ navigation, theme, iqData }) {
           </Text>
         </View>
       ) : (
-        MOCK_ATHLETE_SCENARIOS.map((s) => {
+        scenarios.map((s) => {
           const isPending = s.status === 'pending';
           return (
             <TouchableOpacity
@@ -205,12 +203,12 @@ function AthleteView({ navigation, theme, iqData }) {
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.scenarioTitle, { color: theme.text }]}>{s.title}</Text>
                   <Text style={[styles.scenarioMeta, { color: theme.textSecondary }]}>
-                    {s.coach} · {s.category} · {s.steps} play steps
+                    {s.coachName} · {s.category} · {s.steps} play steps
                   </Text>
                 </View>
                 <View style={[styles.scenarioStatus, { backgroundColor: isPending ? theme.primary + '18' : '#22C55E18' }]}>
                   <Text style={[styles.scenarioStatusText, { color: isPending ? theme.primary : '#22C55E' }]}>
-                    {isPending ? 'Due ' + s.dueDate : 'Done'}
+                    {isPending ? 'To Do' : 'Done'}
                   </Text>
                 </View>
               </View>
@@ -232,10 +230,24 @@ function AthleteView({ navigation, theme, iqData }) {
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 export default function SimCoachScreen({ navigation }) {
-  const { userData, theme, isDarkMode, simCoachIQScore } = useAppContext();
+  const { user, userData, theme, isDarkMode, simCoachIQScore } = useAppContext();
   const subscription = userData?.subscription || 'free';
   const hasAccess = canAccessFeature('simCoach', subscription);
   const isCoach = userData?.role === 'coach';
+
+  const [scenarios, setScenarios] = useState([]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (isCoach || !user?.uid) return;
+      let active = true;
+      (async () => {
+        const items = await getAthleteAssignments(user.uid, { type: 'scenario' });
+        if (active) setScenarios(items.map(mapScenarioAssignment));
+      })();
+      return () => { active = false; };
+    }, [isCoach, user?.uid])
+  );
 
   const iqRaw = simCoachIQScore;
   const iqData = {
@@ -285,9 +297,9 @@ export default function SimCoachScreen({ navigation }) {
       </View>
 
       {isCoach ? (
-        <CoachView navigation={navigation} theme={theme} />
+        <CoachView navigation={navigation} theme={theme} coachUid={user?.uid} />
       ) : (
-        <AthleteView navigation={navigation} theme={theme} iqData={iqData} />
+        <AthleteView navigation={navigation} theme={theme} iqData={iqData} scenarios={scenarios} />
       )}
     </SafeAreaView>
   );
@@ -390,5 +402,6 @@ const styles = StyleSheet.create({
   startScenarioBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
 
   emptyState: { alignItems: 'center', paddingTop: 40, gap: 10 },
-  emptyText: { fontSize: 13, textAlign: 'center', lineHeight: 19, maxWidth: 260 },
+  emptyText: { fontSize: 13, textAlign: 'center', lineHeight: 19, maxWidth: 280 },
+  comingSoonTitle: { fontSize: 16, fontWeight: '800', marginTop: 4 },
 });

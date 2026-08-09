@@ -49,6 +49,14 @@ export default {
     },
     plugins: [
       [
+        "react-native-vision-camera",
+        {
+          cameraPermissionText: "Allow $(PRODUCT_NAME) to use the camera to count your reps live.",
+          enableMicrophonePermission: false,
+          enableFrameProcessors: true
+        }
+      ],
+      [
         "expo-camera",
         {
           cameraPermission: "Allow $(PRODUCT_NAME) to access your camera to record basketball shots for AI analysis."
@@ -70,7 +78,8 @@ export default {
         }
       ],
       "expo-apple-authentication",
-      "@react-native-google-signin/google-signin"
+      "@react-native-google-signin/google-signin",
+      "./plugins/withPoseModel"
     ],
     extra: {
       eas: {

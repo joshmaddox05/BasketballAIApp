@@ -13,48 +13,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
 import { saveSimCoachResult } from '../../services/firestoreService';
 import { getCurrentUser } from '../../services/authService';
-
-// ─── Mock game plan data ──────────────────────────────────────────────────────
-const MOCK_SCENARIOS = {
-  s1: {
-    title: 'vs Lakers — Pick & Roll Defense',
-    coach: 'Coach Davis',
-    category: 'Defense',
-    playSteps: [
-      'Ball handler initiates pick-and-roll at the top of the key.',
-      'Screen is set by the big man. Help defender drops into the paint.',
-      'Ball handler reads the coverage: ice (force baseline) or drop (mid-range available).',
-    ],
-    question: 'The big man is playing drop coverage. The ball handler can take a mid-range jumper. What is the correct defensive read?',
-    options: [
-      { label: 'A', text: 'Contest the mid-range aggressively — prevent the comfortable pull-up.' },
-      { label: 'B', text: 'Stay in drop and allow the mid-range — protect the paint first.' },
-      { label: 'C', text: 'Switch assignments to confuse the offense.' },
-      { label: 'D', text: 'Double-team the ball handler, leaving the corner open.' },
-    ],
-    correctIndex: 0,
-    explanation: 'Against drop coverage, the ball handler can take an easy mid-range. The correct defensive adjustment is to contest that shot aggressively rather than concede it.',
-  },
-  default: {
-    title: 'Game Plan Scenario',
-    coach: 'Coach Davis',
-    category: 'Offense',
-    playSteps: [
-      'Bring ball up the floor in transition.',
-      'Set up motion offense at the 3-point arc.',
-      'Ball handler reads whether the defense is in zone or man.',
-    ],
-    question: 'The defense rotates into a 2-3 zone as your team sets up. What is the best offensive action?',
-    options: [
-      { label: 'A', text: 'Attack the gaps aggressively off the dribble.' },
-      { label: 'B', text: 'Move the ball quickly around the perimeter to collapse the zone.' },
-      { label: 'C', text: 'Set a back-screen and post up in the lane.' },
-      { label: 'D', text: 'Call timeout and draw up a specific set play.' },
-    ],
-    correctIndex: 1,
-    explanation: 'Against a 2-3 zone, quick ball movement around the perimeter collapses the defense and creates gaps in the short corners and at the high post.',
-  },
-};
+import { getScenarioById } from '../../data/simCoachScenarios';
+import BasketballHalfCourt from '../../components/features/BasketballHalfCourt';
 
 // ─── Court Diagram ────────────────────────────────────────────────────────────
 const OFFENSIVE_POSITIONS = [
@@ -80,8 +40,8 @@ function CourtDiagram({ theme }) {
   return (
     <View style={[styles.courtWrapper, { borderColor: theme.border }]}>
       <View style={[styles.courtInner, { width: W, height: H }]}>
-        <View style={styles.paint} />
-        <View style={styles.centerLine} />
+        {/* Basketball half-court backdrop (SVG) */}
+        <BasketballHalfCourt width={W} height={H} style={styles.courtSvg} />
 
         {OFFENSIVE_POSITIONS.map((p) => (
           <View
@@ -126,9 +86,10 @@ function CourtDiagram({ theme }) {
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 export default function SimCoachScenarioScreen({ navigation, route }) {
   const { theme, isDarkMode } = useAppContext();
-  const scenario = route.params?.scenario || { id: 'default', title: 'Game Plan Scenario' };
-
-  const scenarioData = MOCK_SCENARIOS[scenario.id] || MOCK_SCENARIOS.default;
+  const scenario = route.params?.scenario || {};
+  // A coach game-plan assignment embeds its full scenario payload; otherwise resolve
+  // the static catalog by refId (assignment) or id (legacy card).
+  const scenarioData = scenario.scenario || getScenarioById(scenario.refId || scenario.id);
 
   const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [submitted, setSubmitted] = useState(false);
@@ -141,7 +102,8 @@ export default function SimCoachScenarioScreen({ navigation, route }) {
 
     const isCorrect = selectedAnswer === scenarioData.correctIndex;
     const result = {
-      scenarioId: scenario.id,
+      scenarioId: scenario.refId || scenario.id || scenarioData.id,
+      assignmentId: scenario.assignmentId || null,
       title: scenarioData.title,
       category: scenarioData.category,
       correct: isCorrect,
@@ -189,7 +151,7 @@ export default function SimCoachScenarioScreen({ navigation, route }) {
         </TouchableOpacity>
         <View style={styles.navCenter}>
           <Text style={[styles.navCategory, { color: theme.textSecondary }]} numberOfLines={1}>
-            {scenarioData.coach}
+            {scenario.coachName || 'Game Plan'}
           </Text>
           <Text style={[styles.navTitle, { color: theme.text }]} numberOfLines={1}>
             {scenarioData.title}
@@ -334,29 +296,16 @@ const styles = StyleSheet.create({
 
   courtWrapper: {
     borderRadius: 14,
-    borderWidth: 1,
     padding: 12,
     alignItems: 'center',
-    backgroundColor: '#1B5E2080',
     marginBottom: 14,
   },
   courtInner: {
     position: 'relative',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.3)',
-    borderRadius: 4,
-    backgroundColor: '#2D7A3C',
+    borderRadius: 8,
+    overflow: 'hidden',
   },
-  paint: {
-    position: 'absolute',
-    width: 100,
-    height: 56,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.35)',
-    left: 100,
-    top: 0,
-  },
-  centerLine: { position: 'absolute', left: 0, right: 0, height: 1.5, backgroundColor: 'rgba(255,255,255,0.25)', top: '50%' },
+  courtSvg: { position: 'absolute', top: 0, left: 0 },
   playerToken: { position: 'absolute', width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   offToken: { backgroundColor: '#3B82F6', borderWidth: 1.5, borderColor: '#1D4ED8' },
   defToken: { backgroundColor: '#EF4444', borderWidth: 1.5, borderColor: '#B91C1C' },

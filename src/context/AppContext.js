@@ -14,6 +14,9 @@ import {
   addNotificationResponseListener,
 } from '../services/notificationService';
 
+// Navigation ref for deep-linking notification taps
+import { navigationRef } from '../navigation/AppNavigator';
+
 // Firebase imports
 import { onAuthStateChange, signOutUser, getCurrentUser } from '../services/authService';
 import {
@@ -132,6 +135,7 @@ const AppContext = createContext();
 export const AppProvider = ({ children }) => {
     const [userData, setUserData] = useState(initialUserData);
     const [user, setUser] = useState(null); // Firebase auth user object
+    const [selectedChildUid, setSelectedChildUid] = useState(null); // active child for parent Family Hub
     const [activities, setActivities] = useState(initialActivities);
     const [workouts, setWorkouts] = useState(initialWorkouts);
     const [goals, setGoals] = useState(initialGoals);
@@ -335,6 +339,16 @@ export const AppProvider = ({ children }) => {
         const notificationResponseSub = addNotificationResponseListener((response) => {
             const data = response.notification.request.content.data;
             logger.debug('Notification tapped', { type: data?.type });
+
+            // New-message push → open the thread. convId is the sorted uid pair
+            // joined by '_'; derive the other participant and reuse Messaging's
+            // otherUid direct-open path.
+            if (data?.type === 'message' && data?.convId && user?.uid && navigationRef.current) {
+                const otherUid = data.convId.split('_').find((id) => id !== user.uid);
+                if (otherUid) {
+                    navigationRef.current.navigate('Messaging', { otherUid });
+                }
+            }
         });
 
         return () => {
@@ -891,6 +905,9 @@ export const AppProvider = ({ children }) => {
             dismissMilestone,
             refreshAIStats,
             updateUserDataLocally,
+            // Parent Family Hub — active child selection (shared across parent screens)
+            selectedChildUid,
+            setSelectedChildUid,
             // DBE module state
             shotDNAProfile,
             setShotDNAProfile,

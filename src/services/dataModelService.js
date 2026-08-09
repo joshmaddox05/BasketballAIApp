@@ -34,6 +34,7 @@ export const createUserProfile = async (uid, userData) => {
       ...userData,
       role: userData.role || 'player', // player, coach, parent, scout
       level: userData.level || 'beginner',
+      gradeLevel: userData.gradeLevel ?? null, // 9–12 = high school (scout-discoverable), 0 = not HS, null = unset
       preferences: {
         theme: 'auto',
         notifications: true,

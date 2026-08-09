@@ -653,7 +653,7 @@ const ChallengeDetailScreen = ({ route, navigation }) => {
                     </Text>
                     <TouchableOpacity
                         style={[styles.backToHomeButton, { backgroundColor: theme.primary }]}
-                        onPress={() => navigation.navigate('Challenges', { screen: 'ChallengesMain' })}
+                        onPress={() => navigation.navigate('Challenges')}
                     >
                         <Text style={styles.backToHomeButtonText}>Back to Challenges</Text>
                     </TouchableOpacity>
