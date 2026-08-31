@@ -18,6 +18,7 @@ import i18n from '../../i18n/i18n';
 import { getTheme } from '../../utils/theme';
 import { getPriceId } from '../../config/stripe';
 import { useSubscriptionPayment, processSubscriptionPayment, updateSubscription } from '../../services/stripePaymentService';
+import { useToast } from '../dbe';
 
 const { width } = Dimensions.get('window');
 
@@ -25,6 +26,7 @@ const SubscriptionModal = ({ visible, onClose, onUpgrade }) => {
     const { userData, theme: contextTheme, isDarkMode } = useAppContext();
     const { initializePaymentSheet, openPaymentSheet } = useSubscriptionPayment();
     const [processingPayment, setProcessingPayment] = useState(false);
+    const showToast = useToast();
 
     // Fallback to default theme if context theme is undefined
     const theme = contextTheme || getTheme(isDarkMode || false);
@@ -80,7 +82,7 @@ const SubscriptionModal = ({ visible, onClose, onUpgrade }) => {
                                 setProcessingPayment(false);
 
                                 if (result.success) {
-                                    Alert.alert('Success', result.message);
+                                    showToast(result.message);
                                     if (onUpgrade) await onUpgrade('free');
                                     onClose();
                                 } else {

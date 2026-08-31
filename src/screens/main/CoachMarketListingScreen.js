@@ -133,7 +133,7 @@ const CoachMarketListingScreen = ({ navigation, route }) => {
 
   const bg = theme?.background || '#0D0D0D';
   const card = theme?.card || '#1A1A1A';
-  const primary = theme?.primary || '#FF6B00';
+  const primary = theme?.primary || '#8A1C22';
   const textPrimary = theme?.text || '#FFFFFF';
   const textSecondary = theme?.textSecondary || '#AAAAAA';
   const border = theme?.border || '#2A2A2A';
@@ -194,7 +194,7 @@ const CoachMarketListingScreen = ({ navigation, route }) => {
                 activeOpacity={0.85}
                 onPress={() => (canWatch && drillsWithVideo[0] ? playVideo(drillsWithVideo[0].videoUrl) : handlePreview())}
               >
-                <View style={[styles.playCircle, { backgroundColor: 'rgba(255,107,0,0.92)' }]}>
+                <View style={[styles.playCircle, { backgroundColor: 'rgba(138, 28, 34,0.92)' }]}>
                   <Ionicons name={canWatch ? 'play' : 'lock-closed'} size={30} color="#FFF" style={{ marginLeft: canWatch ? 4 : 0 }} />
                 </View>
                 {!canWatch && (
@@ -467,7 +467,7 @@ const styles = StyleSheet.create({
     borderRadius: 36,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#FF6B00',
+    shadowColor: '#8A1C22',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.6,
     shadowRadius: 16,

@@ -1,12 +1,26 @@
-// ScoutHomeScreen.js - Scout/Recruiter home dashboard
+// ScoutHomeScreen.js - Scout board (design 14a: "new since you last looked").
+// Presentational redesign only — data loading unchanged. Motion intent: scout —
+// ONLY the new/changed rows animate in; everything else renders static.
 import React, { useState, useCallback } from 'react';
 import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAppContext } from '../../context/AppContext';
-import ModuleGrid from '../../components/features/ModuleGrid';
+import { TYPE, SHAPE } from '../../utils/typography';
+import {
+  Entrance,
+  Shimmer,
+  AttentionDot,
+  ScreenHeader,
+  HeaderIconButton,
+  SectionLabel,
+  Avatar,
+  Row,
+  BarFill,
+} from '../../components/dbe';
 import { getModulesForRole } from '../../config/roleModules';
+import { canAccessFeature } from '../../utils/subscription';
 import {
   getWatchlist,
   getScoutingReports,
@@ -30,21 +44,38 @@ const shortDate = (value) => {
 
 const GRADE_LABEL = { 9: '9th', 10: '10th', 11: '11th', 12: '12th' };
 
-const evalColorFor = (score, theme) => {
-  const g = (score || '').toUpperCase();
-  if (g.startsWith('A')) return '#22C55E';
-  if (g.startsWith('B')) return theme.primary;
-  if (g.startsWith('C')) return '#F59E0B';
-  return theme.textSecondary;
+// Grade → color, remapped to the burgundy palette (README 14c note):
+// A→accentText, B→accentText, C→steel, else textDim.
+export const evalColorFor = (score, theme) => {
+  const g = String(score || '').toUpperCase();
+  if (g.startsWith('A')) return theme.accentText;
+  if (g.startsWith('B')) return theme.accentText;
+  if (g.startsWith('C')) return theme.steel;
+  return theme.textDim;
 };
+
+// Matching badge fill for the grade color.
+export const evalFillFor = (score, theme) => {
+  const g = String(score || '').toUpperCase();
+  if (g.startsWith('A') || g.startsWith('B')) return theme.badgeFill;
+  return theme.steelFill;
+};
+
+const initialsOf = (name) =>
+  (name || '?')
+    .split(' ')
+    .map((n) => n[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase() || '?';
 
 const mapWatchUpdate = (w) => ({
   id: w.prospectUid || w.id,
   prospectName: w.name || 'Prospect',
-  update: `${w.position || '—'} · ${w.region || '—'} · EvalRank ${w.evalGrade || '—'}`,
-  time: shortDate(w.savedAt),
-  icon: 'bookmark-outline',
-  type: 'watch',
+  update: [w.position, w.region, shortDate(w.savedAt)].filter(Boolean).join(' · '),
+  evalGrade: w.evalGrade || '—',
+  raw: w,
 });
 
 const mapReport = (r) => ({
@@ -56,105 +87,30 @@ const mapReport = (r) => ({
   status: r.status === 'submitted' ? 'Final' : 'Draft',
 });
 
-// ─── Prospect Row (compact, scales for long lists) ─────────────────────────────
+// Grade → trending-bar fill (presentational encoding of the existing grade only).
+const gradePct = (score) => {
+  const g = String(score || '').toUpperCase();
+  if (g.startsWith('A')) return 0.86;
+  if (g.startsWith('B')) return 0.68;
+  if (g.startsWith('C')) return 0.5;
+  return 0.34;
+};
 
-function ProspectRow({ prospect, theme, onPress }) {
-  const gradeLabel = GRADE_LABEL[prospect.gradeLevel] || '—';
-  const evalScore = prospect.evaluationScore || prospect.evalGrade || '—';
-  const evalColor = evalColorFor(evalScore, theme);
-  const initials =
-    (prospect.name || '?')
-      .split(' ')
-      .map((n) => n[0])
-      .filter(Boolean)
-      .slice(0, 2)
-      .join('')
-      .toUpperCase() || '?';
-  const meta = [prospect.position, `${gradeLabel} grade`, prospect.region].filter((x) => x && x !== '—').join(' · ');
+// ─── Grade badge ──────────────────────────────────────────────────────────────
 
+function GradeBadge({ grade, theme }) {
   return (
-    <TouchableOpacity
-      style={[styles.prospectRow, { backgroundColor: theme.card, borderColor: theme.border }]}
-      onPress={onPress}
-      activeOpacity={0.8}
+    <View
+      style={{
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: SHAPE.radiusBadge,
+        backgroundColor: evalFillFor(grade, theme),
+      }}
     >
-      <View style={[styles.rowAvatar, { backgroundColor: theme.primary + '22' }]}>
-        <Text style={[styles.rowAvatarText, { color: theme.primary }]}>{initials}</Text>
-      </View>
-      <View style={styles.rowInfo}>
-        <Text style={[styles.rowName, { color: theme.text }]} numberOfLines={1}>
-          {prospect.name || 'Prospect'}
-        </Text>
-        <Text style={[styles.rowMeta, { color: theme.textSecondary }]} numberOfLines={1}>
-          {meta || '—'}
-        </Text>
-      </View>
-      <View style={[styles.rowBadge, { backgroundColor: evalColor + '22' }]}>
-        <Text style={[styles.rowBadgeText, { color: evalColor }]}>{evalScore}</Text>
-      </View>
-      <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
-    </TouchableOpacity>
-  );
-}
-
-// ─── Watchlist Update Item ────────────────────────────────────────────────────
-
-function WatchlistUpdateItem({ item, theme }) {
-  const accentColor =
-    item.type === 'performance'
-      ? theme.primary
-      : item.type === 'rank'
-      ? '#4CAF50'
-      : '#4A9EFF';
-
-  return (
-    <View style={[styles.updateItem, { borderBottomColor: theme.border }]}>
-      <View style={[styles.updateIcon, { backgroundColor: accentColor + '18' }]}>
-        <Ionicons name={item.icon} size={16} color={accentColor} />
-      </View>
-      <View style={styles.updateContent}>
-        <Text style={[styles.updateProspect, { color: theme.text }]}>{item.prospectName}</Text>
-        <Text style={[styles.updateText, { color: theme.textSecondary }]} numberOfLines={2}>
-          {item.update}
-        </Text>
-      </View>
-      <Text style={[styles.updateTime, { color: theme.textSecondary }]}>{item.time}</Text>
-    </View>
-  );
-}
-
-// ─── Report Card ──────────────────────────────────────────────────────────────
-
-function ReportCard({ report, theme, onDownload }) {
-  const isDraft = report.status === 'Draft';
-  const statusColor = isDraft ? '#FFA500' : '#4CAF50';
-
-  return (
-    <View style={[styles.reportCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-      <View style={styles.reportCardLeft}>
-        <View style={[styles.reportIcon, { backgroundColor: theme.primary + '18' }]}>
-          <Ionicons name="document-text-outline" size={20} color={theme.primary} />
-        </View>
-        <View style={styles.reportMeta}>
-          <Text style={[styles.reportTitle, { color: theme.text }]} numberOfLines={2}>
-            {report.title}
-          </Text>
-          <View style={styles.reportTagRow}>
-            <View style={[styles.statusBadge, { backgroundColor: statusColor + '22', borderColor: statusColor }]}>
-              <Text style={[styles.statusText, { color: statusColor }]}>{report.status}</Text>
-            </View>
-            <Text style={[styles.reportDate, { color: theme.textSecondary }]}>{report.date}</Text>
-            <Text style={[styles.reportPages, { color: theme.textSecondary }]}>· {report.pages}pp</Text>
-          </View>
-        </View>
-      </View>
-      <TouchableOpacity
-        style={[styles.downloadBtn, { backgroundColor: theme.primary + '18' }]}
-        onPress={onDownload}
-        activeOpacity={0.7}
-      >
-        <Ionicons name="download-outline" size={18} color={theme.primary} />
-      </TouchableOpacity>
+      <Text style={{ fontFamily: TYPE.buttonPrimary.fontFamily, fontSize: 11, color: evalColorFor(grade, theme) }}>
+        {grade}
+      </Text>
     </View>
   );
 }
@@ -171,6 +127,7 @@ export default function ScoutHomeScreen({ navigation }) {
   const [watchlist, setWatchlist] = useState([]);
   const [reports, setReports] = useState([]);
   const [trendingProspects, setTrendingProspects] = useState([]);
+  const [prospectCount, setProspectCount] = useState(0);
 
   const loadDashboard = useCallback(async () => {
     if (!scoutUid) return;
@@ -182,6 +139,7 @@ export default function ScoutHomeScreen({ navigation }) {
     setWatchlist(savedWatchlist);
     setReports(savedReports.map(mapReport));
     setTrendingProspects((prospects || []).slice(0, 6));
+    setProspectCount((prospects || []).length);
   }, [scoutUid]);
 
   useFocusEffect(
@@ -190,141 +148,194 @@ export default function ScoutHomeScreen({ navigation }) {
     }, [loadDashboard])
   );
 
-  const stats = {
-    prospectsSaved: watchlist.length,
-    reportsWritten: reports.length,
-    activeWatches: watchlist.length,
-  };
-  const watchlistUpdates = watchlist.slice(0, 3).map(mapWatchUpdate);
+  // TODO(product): the "new since last visit" diff needs a per-scout
+  // `lastVisitedAt` marker (written on dashboard focus) to be meaningful. Until
+  // that field exists we order by savedAt descending and treat the newest 3 as
+  // "new" — the pulsing dot is a placeholder for the real last-visit diff.
+  // (No new Firestore writes in this redesign.)
+  const sortedWatchlist = [...watchlist].sort((a, b) => {
+    const da = toDate(a.savedAt)?.getTime() || 0;
+    const db = toDate(b.savedAt)?.getTime() || 0;
+    return db - da;
+  });
+  const watchlistUpdates = sortedWatchlist.slice(0, 3).map(mapWatchUpdate);
+  const newCount = watchlistUpdates.length;
+  const draftCount = reports.filter((r) => r.status === 'Draft').length;
 
   const handleProspectPress = useCallback((prospect) => {
     navigation.navigate('ScoutProspectDetail', { prospect });
   }, [navigation]);
 
-  const handleDownloadReport = useCallback((report) => {
-    navigation.navigate('ScoutReports');
-  }, [navigation]);
-
-  const bgColor = isDarkMode ? '#0F0F0F' : '#F5F5F5';
-  const sectionBg = isDarkMode ? '#1A1A1A' : '#FFFFFF';
+  const subscription = userData?.subscription || 'free';
+  const modules = getModulesForRole('scout');
+  const moduleSub = (mod) => {
+    if (mod.key === 'ScoutLabSearch') return `${prospectCount} consented profiles`;
+    if (mod.key === 'ScoutReports') return draftCount === 1 ? '1 draft open' : `${draftCount} drafts open`;
+    return mod.description;
+  };
+  const handleModulePress = (mod) => {
+    const unlocked = canAccessFeature(mod.feature, subscription);
+    navigation.navigate(unlocked ? mod.key : 'Subscription');
+  };
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: bgColor }]}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <StatusBar style={isDarkMode ? 'light' : 'dark'} />
+
+      <ScreenHeader
+        title="Scout Board"
+        subtitle={`Welcome back, ${firstName}`}
+        right={
+          <>
+            <HeaderIconButton icon="chatbubble-outline" onPress={() => navigation.navigate('Messaging')} />
+            <HeaderIconButton icon="notifications-outline" badge onPress={() => navigation.navigate('Notifications')} />
+          </>
+        }
+      />
+
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={[styles.screenTitle, { color: theme.text }]}>Scout Dashboard</Text>
-            <Text style={[styles.greeting, { color: theme.textSecondary }]}>
-              Welcome back, {firstName}
-            </Text>
+        {/* Stats — static (scout motion: only new rows animate) */}
+        <View style={styles.statsRow}>
+          <View style={[styles.statTile, { backgroundColor: theme.surface }]}>
+            <Text style={[TYPE.statNumber, { color: theme.text }]}>{watchlist.length}</Text>
+            <Text style={[TYPE.statCaption, { color: theme.textDim, marginTop: 5 }]}>Watching</Text>
           </View>
-          <View style={styles.headerActions}>
-            <TouchableOpacity
-              style={[styles.notifBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
-              onPress={() => navigation.navigate('Messaging')}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="chatbubbles-outline" size={22} color={theme.text} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.notifBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
-              onPress={() => navigation.navigate('Notifications')}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="notifications-outline" size={22} color={theme.text} />
-            </TouchableOpacity>
+          <View style={[styles.statTile, { backgroundColor: theme.surface }]}>
+            <Text style={[TYPE.statNumber, { color: theme.text }]}>{reports.length}</Text>
+            <Text style={[TYPE.statCaption, { color: theme.textDim, marginTop: 5 }]}>Reports</Text>
+          </View>
+          <View
+            style={[
+              styles.statTile,
+              { backgroundColor: theme.attentionFill, borderWidth: 1, borderColor: theme.attentionBorder },
+            ]}
+          >
+            <Entrance variant="count" delay={500}>
+              <Text style={[TYPE.statNumber, { color: theme.accentText }]}>{newCount}</Text>
+            </Entrance>
+            <Text style={[TYPE.statCaption, { color: theme.accentText, marginTop: 5 }]}>New</Text>
           </View>
         </View>
 
-        {/* Stats Strip */}
-        <View style={[styles.statsStrip, { backgroundColor: sectionBg, borderColor: theme.border }]}>
-          <View style={styles.statItem}>
-            <Text style={[styles.statNumber, { color: theme.primary }]}>{stats.prospectsSaved}</Text>
-            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Saved</Text>
-          </View>
-          <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
-          <View style={styles.statItem}>
-            <Text style={[styles.statNumber, { color: theme.primary }]}>{stats.reportsWritten}</Text>
-            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Reports</Text>
-          </View>
-          <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
-          <View style={styles.statItem}>
-            <Text style={[styles.statNumber, { color: theme.primary }]}>{stats.activeWatches}</Text>
-            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Watching</Text>
-          </View>
-        </View>
-
-        {/* Scout Tools — Module Hub is the primary surface */}
-        <View style={styles.section}>
-          <ModuleGrid
-            title="Scout Tools"
-            layout="grid"
-            modules={getModulesForRole('scout')}
-            subscription={userData?.subscription || 'free'}
-            theme={theme}
-            navigation={navigation}
-          />
-        </View>
-
-        {/* Trending Prospects */}
-        {trendingProspects.length > 0 && (
+        {/* New on the watchlist — the only rows that animate in */}
+        {watchlistUpdates.length > 0 && (
           <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>Prospects</Text>
-              <TouchableOpacity onPress={() => navigation.navigate('ScoutLabSearch')} activeOpacity={0.7}>
-                <Text style={[styles.seeAll, { color: theme.primary }]}>See All</Text>
-              </TouchableOpacity>
-            </View>
-            {trendingProspects.map((prospect) => (
-              <ProspectRow
-                key={prospect.id}
-                prospect={prospect}
-                theme={theme}
-                onPress={() => handleProspectPress(prospect)}
-              />
+            <SectionLabel action="Watchlist" onAction={() => navigation.navigate('ScoutLabSearch')}>
+              New on your watchlist
+            </SectionLabel>
+            {watchlistUpdates.map((item, i) => (
+              <Entrance key={item.id} variant="slideIn" delay={200 + i * 120} style={i > 0 ? { marginTop: 8 } : null}>
+                <Row
+                  onPress={() => handleProspectPress(item.raw)}
+                  leading={
+                    <View>
+                      <Avatar initials={initialsOf(item.prospectName)} tone="steel" />
+                      <AttentionDot
+                        size={11}
+                        color={theme.primary}
+                        haloColor={theme.pulseDot}
+                        borderColor={theme.surface}
+                        delay={i * 500}
+                        style={styles.newDot}
+                      />
+                    </View>
+                  }
+                  title={item.prospectName}
+                  meta={item.update}
+                  trailing={<GradeBadge grade={item.evalGrade} theme={theme} />}
+                />
+              </Entrance>
             ))}
           </View>
         )}
 
-        {/* Reports folds into the ScoutReports module (in the hub grid above) and the
-            Watchlist keeps its own slim tab — Discover stays focused on finding prospects. */}
-
-        {/* Quick Actions */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Quick Actions</Text>
-          <View style={styles.quickActionsRow}>
-            <TouchableOpacity
-              style={[styles.quickActionBtn, { backgroundColor: theme.primary }]}
-              onPress={() => navigation.navigate('ScoutLabSearch')}
-              activeOpacity={0.85}
-            >
-              <Ionicons name="search-outline" size={20} color="#FFFFFF" />
-              <Text style={styles.quickActionText}>Search Prospects</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.quickActionBtn, { backgroundColor: theme.card, borderColor: theme.border, borderWidth: 1 }]}
-              onPress={() => navigation.navigate('ScoutReports')}
-              activeOpacity={0.85}
-            >
-              <Ionicons name="create-outline" size={20} color={theme.primary} />
-              <Text style={[styles.quickActionText, { color: theme.primary }]}>Write Report</Text>
-            </TouchableOpacity>
+        {/* Trending prospects — static grid */}
+        {trendingProspects.length > 0 && (
+          <View style={styles.section}>
+            <SectionLabel action="See all" onAction={() => navigation.navigate('ScoutLabSearch')}>
+              Trending in your regions
+            </SectionLabel>
+            <View style={styles.grid}>
+              {trendingProspects.slice(0, 4).map((prospect) => {
+                const grade = prospect.evaluationScore || prospect.evalGrade || '—';
+                const meta = [
+                  prospect.position,
+                  GRADE_LABEL[prospect.gradeLevel],
+                  prospect.region,
+                ]
+                  .filter(Boolean)
+                  .join(' · ');
+                return (
+                  <TouchableOpacity
+                    key={prospect.id}
+                    style={[styles.trendCell, { backgroundColor: theme.surface }]}
+                    activeOpacity={0.8}
+                    onPress={() => handleProspectPress(prospect)}
+                  >
+                    <Text numberOfLines={1} style={[styles.trendName, { color: theme.text }]}>
+                      {prospect.name || 'Prospect'}
+                    </Text>
+                    <Text numberOfLines={1} style={[styles.trendMeta, { color: theme.textDim }]}>
+                      {meta || '—'}
+                    </Text>
+                    <BarFill
+                      pct={gradePct(grade)}
+                      color={evalColorFor(grade, theme)}
+                      trackColor={theme.track}
+                      height={3}
+                      style={{ marginTop: 9 }}
+                    />
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </View>
-          <TouchableOpacity
-            style={[styles.watchlistBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
-            onPress={() => navigation.navigate('ScoutLabSearch')}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="bookmark-outline" size={20} color={theme.primary} />
-            <Text style={[styles.watchlistBtnText, { color: theme.text }]}>View Watchlist</Text>
-            <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
-          </TouchableOpacity>
+        )}
+
+        {/* Your tools — module grid; hero gradient tile for Prospect Search */}
+        <View style={styles.section}>
+          <SectionLabel>Your tools</SectionLabel>
+          <View style={styles.grid}>
+            {modules.map((mod, i) =>
+              i === 0 ? (
+                <TouchableOpacity
+                  key={mod.key}
+                  style={styles.toolCellWrap}
+                  activeOpacity={0.85}
+                  onPress={() => handleModulePress(mod)}
+                >
+                  <LinearGradient
+                    colors={theme.heroGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.toolCellHero}
+                  >
+                    <Shimmer color={theme.shimmer} />
+                    <Text style={[TYPE.cardTitle, { color: '#FFFFFF' }]}>{mod.label}</Text>
+                    <Text style={[TYPE.cardBody, styles.toolSub, { color: 'rgba(255,255,255,0.72)' }]}>
+                      {moduleSub(mod)}
+                    </Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  key={mod.key}
+                  style={[styles.toolCell, { backgroundColor: theme.surface }]}
+                  activeOpacity={0.85}
+                  onPress={() => handleModulePress(mod)}
+                >
+                  <Text style={[TYPE.cardTitle, { color: theme.text }]}>{mod.label}</Text>
+                  <Text numberOfLines={2} style={[TYPE.cardBody, styles.toolSub, { color: theme.textDim }]}>
+                    {moduleSub(mod)}
+                  </Text>
+                </TouchableOpacity>
+              )
+            )}
+          </View>
         </View>
 
         <View style={styles.bottomPad} />
@@ -343,294 +354,70 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingHorizontal: SHAPE.screenPadding,
+    paddingTop: 14,
   },
 
-  // Header
-  header: {
+  statsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 20,
+    gap: SHAPE.cardGap,
   },
-  screenTitle: {
-    fontSize: 26,
-    fontWeight: '700',
-    letterSpacing: -0.5,
-  },
-  greeting: {
-    fontSize: 14,
-    marginTop: 2,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  notifBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-  },
-
-  // Stats Strip
-  statsStrip: {
-    flexDirection: 'row',
-    borderRadius: 14,
-    borderWidth: 1,
-    paddingVertical: 16,
-    marginBottom: 24,
-  },
-  statItem: {
+  statTile: {
     flex: 1,
-    alignItems: 'center',
-  },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: '700',
-  },
-  statLabel: {
-    fontSize: 12,
-    marginTop: 2,
-    fontWeight: '500',
-  },
-  statDivider: {
-    width: 1,
-    marginVertical: 4,
+    borderRadius: SHAPE.radiusCard,
+    padding: SHAPE.cardPadding,
   },
 
-  // Section
   section: {
-    marginBottom: 24,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  seeAll: {
-    fontSize: 14,
-    fontWeight: '600',
+    marginTop: SHAPE.sectionGap,
   },
 
-  // Prospect Card
-  prospectRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    marginBottom: 8,
+  newDot: {
+    position: 'absolute',
+    bottom: -1,
+    right: -1,
   },
-  rowAvatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  rowAvatarText: { fontSize: 14, fontWeight: '700' },
-  rowInfo: { flex: 1 },
-  rowName: { fontSize: 15, fontWeight: '700' },
-  rowMeta: { fontSize: 12, marginTop: 2 },
-  rowBadge: { paddingHorizontal: 9, paddingVertical: 3, borderRadius: 8 },
-  rowBadgeText: { fontSize: 13, fontWeight: '800' },
-  prospectCard: {
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 14,
-    marginBottom: 10,
-  },
-  prospectCardTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  prospectAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-  },
-  prospectInfo: {
-    flex: 1,
-    marginRight: 10,
-  },
-  prospectName: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  prospectSchool: {
-    fontSize: 12,
-    marginTop: 1,
-  },
-  gradeBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  gradeText: {
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  prospectCardBottom: {
+
+  grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: SHAPE.gridGap,
   },
-  prospectTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
+  trendCell: {
+    flexBasis: '47%',
+    flexGrow: 1,
+    borderRadius: SHAPE.radiusCard,
+    padding: SHAPE.cardPadding,
   },
-  prospectTagText: {
-    fontSize: 12,
+  trendName: {
+    fontFamily: TYPE.cardTitle.fontFamily,
+    fontSize: 12.5,
+  },
+  trendMeta: {
+    fontFamily: TYPE.rowMeta.fontFamily,
+    fontSize: 10,
+    marginTop: 3,
   },
 
-  // Watchlist Updates
-  updatesContainer: {
-    borderRadius: 12,
-    borderWidth: 1,
+  toolCellWrap: {
+    flexBasis: '47%',
+    flexGrow: 1,
+  },
+  toolCellHero: {
+    borderRadius: SHAPE.radiusCard,
+    padding: 13,
     overflow: 'hidden',
+    minHeight: 72,
   },
-  emptyInline: {
-    fontSize: 13,
-    padding: 16,
-    lineHeight: 19,
+  toolCell: {
+    flexBasis: '47%',
+    flexGrow: 1,
+    borderRadius: SHAPE.radiusCard,
+    padding: 13,
+    minHeight: 72,
   },
-  updateItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
-    borderBottomWidth: 1,
-  },
-  updateIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  updateContent: {
-    flex: 1,
-    marginRight: 8,
-  },
-  updateProspect: {
-    fontSize: 13,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  updateText: {
-    fontSize: 12,
-    lineHeight: 16,
-  },
-  updateTime: {
-    fontSize: 11,
-  },
-
-  // Report Card
-  reportCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 14,
-    marginBottom: 10,
-  },
-  reportCardLeft: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  reportIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  reportMeta: {
-    flex: 1,
-  },
-  reportTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 6,
-    lineHeight: 18,
-  },
-  reportTagRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  statusBadge: {
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 5,
-    borderWidth: 1,
-  },
-  statusText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  reportDate: {
-    fontSize: 11,
-  },
-  reportPages: {
-    fontSize: 11,
-  },
-  downloadBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 8,
-  },
-
-  // Quick Actions
-  quickActionsRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 10,
-  },
-  quickActionBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 12,
-  },
-  quickActionText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  watchlistBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  watchlistBtnText: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '600',
+  toolSub: {
+    marginTop: 4,
   },
 
   bottomPad: {

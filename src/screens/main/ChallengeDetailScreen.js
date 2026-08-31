@@ -1,6 +1,7 @@
 // ChallengeDetailScreen.js
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
+    Animated,
     StyleSheet,
     Text,
     View,
@@ -16,6 +17,8 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
 import { getTheme } from '../../utils/theme';
+import { Entrance, PulseHalo, PrimaryButton } from '../../components/dbe';
+import { TYPE, SHAPE, MOTION } from '../../utils/typography';
 import {
     getChallenge,
     getUserChallengeProgress,
@@ -154,6 +157,56 @@ const MOCK_CHALLENGES = [
     },
 ];
 
+function ChallengeCompleteOverlay({ data, theme, onDismiss }) {
+    const scrim = useRef(new Animated.Value(0)).current;
+    useEffect(() => {
+        Animated.timing(scrim, {
+            toValue: 1,
+            duration: MOTION.quick,
+            easing: MOTION.easeOut,
+            useNativeDriver: true,
+        }).start();
+    }, []);
+    if (!data) return null;
+    return (
+        <Animated.View style={[StyleSheet.absoluteFill, styles.completionScrim, { backgroundColor: theme.scrim, opacity: scrim }]}>
+            <View style={[styles.completionCard, { backgroundColor: theme.surface }]}>
+                <Entrance variant="pop">
+                    <View style={styles.completionBadgeWrap}>
+                        <PulseHalo color={theme.glowFill} borderRadius={SHAPE.radiusPill} />
+                        <View style={[styles.completionBadge, { backgroundColor: theme.badgeFill }]}>
+                            <Ionicons name="trophy" size={32} color={theme.accentText} />
+                        </View>
+                    </View>
+                </Entrance>
+                <Entrance variant="up" delay={120}>
+                    <Text style={[TYPE.tooltipTitle, styles.completionTitle, { color: theme.text }]}>
+                        Challenge Complete
+                    </Text>
+                </Entrance>
+                <Entrance variant="up" delay={200}>
+                    <Text style={[TYPE.statNumber, styles.completionScore, { color: theme.accentText }]}>
+                        {data.totalScore}
+                    </Text>
+                    <Text style={[TYPE.tooltipBody, styles.completionSub, { color: theme.textMuted }]}>
+                        {`You've completed "${data.challengeTitle}"`}
+                    </Text>
+                </Entrance>
+                {data.note ? (
+                    <Entrance variant="up" delay={280}>
+                        <Text style={[TYPE.tooltipBody, styles.completionSub, { color: theme.textMuted }]}>
+                            {data.note.trim()}
+                        </Text>
+                    </Entrance>
+                ) : null}
+                <Entrance variant="chipPop" delay={360} style={styles.completionAction}>
+                    <PrimaryButton label="Awesome!" onPress={onDismiss} />
+                </Entrance>
+            </View>
+        </Animated.View>
+    );
+}
+
 const ChallengeDetailScreen = ({ route, navigation }) => {
     const routeParams = route?.params || {};
     const challengeId = routeParams.id || routeParams.challengeId || 'challenge_1';
@@ -169,6 +222,9 @@ const ChallengeDetailScreen = ({ route, navigation }) => {
     const [userRank, setUserRank] = useState(null);
     const [opponentProgress, setOpponentProgress] = useState(null);
     const [selectedDay, setSelectedDay] = useState(1);
+    // Rare, highest-emotion moment in HoopCommunity — staged in-screen rather than
+    // concatenated into an OS alert.
+    const [completion, setCompletion] = useState(null);
     const [completingExercise, setCompletingExercise] = useState(null);
     const [showOpponentSelector, setShowOpponentSelector] = useState(false);
     const [sendingInvite, setSendingInvite] = useState(false);
@@ -455,11 +511,11 @@ const ChallengeDetailScreen = ({ route, navigation }) => {
                         }
                     }
 
-                    Alert.alert(
-                        '🎉 Challenge Complete!',
-                        `Congratulations! You've completed "${challenge.title}" with a total score of ${result.totalScore}!${winnerMessage}`,
-                        [{ text: 'Awesome!' }]
-                    );
+                    setCompletion({
+                        challengeTitle: challenge.title,
+                        totalScore: result.totalScore,
+                        note: winnerMessage,
+                    });
                 } else {
                     Alert.alert(
                         '🏀 Day Completed!',
@@ -566,11 +622,11 @@ const ChallengeDetailScreen = ({ route, navigation }) => {
                 // Check if challenge is complete
                 if (result.completedDays.length >= challenge.days.length) {
                     await completeChallenge(user.uid, challengeId, challenge.rewards);
-                    Alert.alert(
-                        '🎉 Challenge Complete!',
-                        `Congratulations! You've completed "${challenge.title}" with a total score of ${result.totalScore}!`,
-                        [{ text: 'Awesome!' }]
-                    );
+                    setCompletion({
+                        challengeTitle: challenge.title,
+                        totalScore: result.totalScore,
+                        note: '',
+                    });
                 } else {
                     Alert.alert(
                         'Day Completed!',
@@ -1066,6 +1122,10 @@ const ChallengeDetailScreen = ({ route, navigation }) => {
                     </View>
                 </View>
             )}
+
+            {completion ? (
+                <ChallengeCompleteOverlay data={completion} theme={theme} onDismiss={() => setCompletion(null)} />
+            ) : null}
         </SafeAreaView>
     );
 };
@@ -1074,6 +1134,14 @@ const styles = StyleSheet.create({
     safeArea: {
         flex: 1,
     },
+    completionScrim: { alignItems: 'center', justifyContent: 'center', padding: SHAPE.screenPadding, zIndex: 10 },
+    completionCard: { width: '100%', maxWidth: 340, borderRadius: SHAPE.radiusHero, padding: 24, alignItems: 'center' },
+    completionBadgeWrap: { position: 'relative', width: 72, height: 72, marginBottom: 16 },
+    completionBadge: { width: 72, height: 72, borderRadius: SHAPE.radiusPill, alignItems: 'center', justifyContent: 'center' },
+    completionTitle: { textAlign: 'center' },
+    completionScore: { textAlign: 'center', marginTop: 12 },
+    completionSub: { textAlign: 'center', marginTop: 6 },
+    completionAction: { alignSelf: 'stretch', marginTop: 20 },
     loadingContainer: {
         flex: 1,
         justifyContent: 'center',

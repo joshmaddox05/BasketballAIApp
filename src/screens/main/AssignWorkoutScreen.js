@@ -1,4 +1,6 @@
-// AssignWorkoutScreen.js - Coach assigns a workout or SimCoach scenario to a linked athlete.
+// AssignWorkoutScreen.js - Coach assigns a workout or SimCoach scenario to a
+// linked athlete (13e redesign). Presentation only: the selection model stays
+// single-athlete because assignToAthlete() writes one assignment per call.
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   SafeAreaView,
@@ -8,15 +10,87 @@ import {
   TouchableOpacity,
   ScrollView,
   TextInput,
-  ActivityIndicator,
   Alert,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAppContext } from '../../context/AppContext';
 import { getLinkedPlayers, assignToAthlete } from '../../services/firestoreService';
 import { comprehensiveWorkouts } from '../../data/workouts';
 import { SIM_COACH_SCENARIO_LIST } from '../../data/simCoachScenarios';
+import { TYPE, SHAPE, FONTS } from '../../utils/typography';
+import {
+  Entrance,
+  Shimmer,
+  ScreenHeader,
+  SectionLabel,
+  Avatar,
+  EmptyState,
+  LoadingState,
+} from '../../components/dbe';
+
+const initialsOf = (name) =>
+  (name || 'A')
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sub-components
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Checkbox square: filled burgundy with a check when selected, hairline when not. */
+function CheckBox({ checked, theme }) {
+  return (
+    <View
+      style={[
+        styles.checkbox,
+        checked
+          ? { backgroundColor: theme.primary }
+          : { borderWidth: 1.5, borderColor: theme.hairline },
+      ]}
+    >
+      {checked ? <Ionicons name="checkmark" size={13} color="#FFFFFF" /> : null}
+    </View>
+  );
+}
+
+function SelectRow({ checked, theme, delay, onPress, leading, title, meta }) {
+  return (
+    <Entrance variant="cellIn" delay={delay}>
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onPress={onPress}
+        style={[
+          styles.selectRow,
+          checked
+            ? { backgroundColor: theme.attentionFill, borderWidth: 1, borderColor: theme.attentionBorder }
+            : { borderWidth: 1, borderColor: 'transparent' },
+        ]}
+      >
+        <CheckBox checked={checked} theme={theme} />
+        {leading}
+        <View style={{ flex: 1 }}>
+          <Text numberOfLines={1} style={[styles.selectTitle, { color: theme.text }]}>
+            {title}
+          </Text>
+          {meta ? (
+            <Text numberOfLines={1} style={[styles.selectMeta, { color: theme.textDim }]}>
+              {meta}
+            </Text>
+          ) : null}
+        </View>
+      </TouchableOpacity>
+    </Entrance>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Screen
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function AssignWorkoutScreen({ navigation, route }) {
   const { user, userData, theme, isDarkMode } = useAppContext();
@@ -47,30 +121,42 @@ export default function AssignWorkoutScreen({ navigation, route }) {
 
   const items =
     assignType === 'workout'
-      ? comprehensiveWorkouts.map((w) => ({ id: w.id, title: w.title, meta: w.category || w.difficulty }))
-      : SIM_COACH_SCENARIO_LIST.map((s) => ({ id: s.id, title: s.title, meta: `${s.category} · ${s.steps} steps` }));
+      ? comprehensiveWorkouts.map((w) => ({
+          id: w.id,
+          title: w.title,
+          meta: w.category || w.difficulty,
+          // Hero facts (13e): duration · drill count · level, all from the local library.
+          facts: [w.duration, w.steps?.length ? `${w.steps.length} drills` : null, w.level].filter(Boolean),
+        }))
+      : SIM_COACH_SCENARIO_LIST.map((s) => ({
+          id: s.id,
+          title: s.title,
+          meta: `${s.category} · ${s.steps} steps`,
+          facts: [s.category, `${s.steps} steps`].filter(Boolean),
+        }));
 
+  const chosen = items.find((i) => i.id === selectedItemId) || null;
   const canSubmit = selectedAthleteUid && selectedItemId && !submitting;
 
   const handleAssign = useCallback(async () => {
     if (!canSubmit) return;
     setSubmitting(true);
     try {
-      const chosen = items.find((i) => i.id === selectedItemId);
+      const picked = items.find((i) => i.id === selectedItemId);
       const athlete = athletes.find((a) => a.uid === selectedAthleteUid);
       await assignToAthlete(
         selectedAthleteUid,
         { uid: coachUid, displayName: coachName },
         {
           type: assignType,
-          title: chosen?.title || (assignType === 'workout' ? 'Workout' : 'Scenario'),
+          title: picked?.title || (assignType === 'workout' ? 'Workout' : 'Scenario'),
           refId: selectedItemId,
           note: note.trim(),
         }
       );
       Alert.alert(
         'Assigned',
-        `Sent "${chosen?.title}" to ${athlete?.name || 'your athlete'}.`,
+        `Sent "${picked?.title}" to ${athlete?.name || 'your athlete'}.`,
         [{ text: 'Done', onPress: () => navigation.goBack() }]
       );
     } catch (err) {
@@ -80,122 +166,155 @@ export default function AssignWorkoutScreen({ navigation, route }) {
     }
   }, [canSubmit, items, athletes, selectedItemId, selectedAthleteUid, assignType, note, coachUid, coachName, navigation]);
 
+  const athleteName = athletes.find((a) => a.uid === selectedAthleteUid)?.name;
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <StatusBar style={isDarkMode ? 'light' : 'dark'} />
 
-      <View style={[styles.header, { borderBottomColor: theme.border }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={24} color={theme.text} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>Assign Work</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title="Assign Workout" onBack={() => navigation.goBack()} />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* Athlete picker */}
-        {!preAthlete && (
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>Athlete</Text>
-            {loadingRoster ? (
-              <ActivityIndicator color={theme.primary} style={{ marginTop: 12 }} />
-            ) : athletes.length === 0 ? (
-              <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-                No linked athletes yet. Add an athlete first.
+        {/* Selected item hero */}
+        <Entrance variant="cardIn">
+          {chosen ? (
+            <LinearGradient
+              colors={theme.heroGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.hero}
+            >
+              <Text style={styles.heroLabel}>
+                {assignType === 'workout' ? 'SELECTED WORKOUT' : 'SELECTED SCENARIO'}
               </Text>
-            ) : (
-              athletes.map((a) => {
-                const selected = selectedAthleteUid === a.uid;
-                return (
-                  <TouchableOpacity
-                    key={a.uid}
-                    style={[
-                      styles.rowCard,
-                      { backgroundColor: theme.card, borderColor: selected ? theme.primary : theme.border },
-                    ]}
-                    onPress={() => setSelectedAthleteUid(a.uid)}
-                    activeOpacity={0.8}
-                  >
-                    <View style={[styles.avatar, { backgroundColor: theme.primary + '20' }]}>
-                      <Text style={[styles.avatarText, { color: theme.primary }]}>
-                        {(a.name || 'A').split(' ').map((n) => n[0]).join('').slice(0, 2)}
-                      </Text>
-                    </View>
-                    <Text style={[styles.rowTitle, { color: theme.text }]}>{a.name || 'Athlete'}</Text>
-                    {selected && <Ionicons name="checkmark-circle" size={20} color={theme.primary} />}
-                  </TouchableOpacity>
-                );
-              })
-            )}
-          </View>
-        )}
+              <Text numberOfLines={2} style={styles.heroTitle}>
+                {chosen.title}
+              </Text>
+              <View style={styles.heroFacts}>
+                {chosen.facts.map((f) => (
+                  <Text key={f} style={styles.heroFact}>
+                    {f}
+                  </Text>
+                ))}
+              </View>
+            </LinearGradient>
+          ) : (
+            <View style={[styles.hero, { backgroundColor: theme.surface }]}>
+              <Text style={[styles.heroLabel, { color: theme.textDim }]}>
+                {assignType === 'workout' ? 'SELECTED WORKOUT' : 'SELECTED SCENARIO'}
+              </Text>
+              <Text style={[styles.heroTitle, { color: theme.textMuted }]}>Nothing picked yet</Text>
+              <View style={styles.heroFacts}>
+                <Text style={[styles.heroFact, { color: theme.textDim }]}>
+                  Choose one below
+                </Text>
+              </View>
+            </View>
+          )}
+        </Entrance>
 
         {/* Type toggle */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>What to assign</Text>
+        <View style={{ marginTop: SHAPE.sectionGap }}>
+          <SectionLabel>What to assign</SectionLabel>
           <View style={styles.typeRow}>
             {[
               { id: 'workout', label: 'Workout', icon: 'barbell-outline' },
               { id: 'scenario', label: 'IQ Scenario', icon: 'bulb-outline' },
             ].map((t) => {
-              const selected = assignType === t.id;
+              const active = assignType === t.id;
               return (
                 <TouchableOpacity
                   key={t.id}
-                  style={[
-                    styles.typeChip,
-                    { backgroundColor: selected ? theme.primary + '18' : theme.card, borderColor: selected ? theme.primary : theme.border },
-                  ]}
+                  activeOpacity={0.85}
                   onPress={() => {
                     setAssignType(t.id);
                     setSelectedItemId(null);
                   }}
-                  activeOpacity={0.8}
+                  style={[
+                    styles.typeChip,
+                    active
+                      ? { backgroundColor: theme.primary }
+                      : { backgroundColor: theme.surface },
+                  ]}
                 >
-                  <Ionicons name={t.icon} size={18} color={selected ? theme.primary : theme.textSecondary} />
-                  <Text style={[styles.typeChipText, { color: selected ? theme.primary : theme.text }]}>{t.label}</Text>
+                  <Ionicons name={t.icon} size={16} color={active ? '#FFFFFF' : theme.steel} />
+                  <Text
+                    style={[styles.typeChipText, { color: active ? '#FFFFFF' : theme.textMuted }]}
+                  >
+                    {t.label}
+                  </Text>
                 </TouchableOpacity>
               );
             })}
           </View>
         </View>
 
+        {/* Athlete picker */}
+        {!preAthlete && (
+          <View style={{ marginTop: SHAPE.sectionGap }}>
+            <SectionLabel action={selectedAthleteUid ? '1 selected' : undefined}>
+              Assign to
+            </SectionLabel>
+            {loadingRoster ? (
+              <LoadingState style={styles.inlineLoading} />
+            ) : athletes.length === 0 ? (
+              <EmptyState
+                icon="person-add-outline"
+                title="No linked athletes"
+                sub="Add an athlete with their invite code before assigning work."
+                ctaLabel="Add athlete"
+                onPress={() => navigation.navigate('LinkAccount')}
+              />
+            ) : (
+              athletes.map((a, i) => (
+                <SelectRow
+                  key={a.uid}
+                  checked={selectedAthleteUid === a.uid}
+                  theme={theme}
+                  delay={50 + i * 80}
+                  onPress={() => setSelectedAthleteUid(a.uid)}
+                  leading={
+                    <Avatar
+                      initials={initialsOf(a.name)}
+                      size={30}
+                      tone={selectedAthleteUid === a.uid ? 'accent' : 'steel'}
+                    />
+                  }
+                  title={a.name || 'Athlete'}
+                  meta={[a.position, typeof a.level === 'number' ? `Level ${a.level}` : null]
+                    .filter(Boolean)
+                    .join(' · ')}
+                />
+              ))
+            )}
+          </View>
+        )}
+
         {/* Item picker */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>
-            {assignType === 'workout' ? 'Choose a workout' : 'Choose a scenario'}
-          </Text>
-          {items.map((item) => {
-            const selected = selectedItemId === item.id;
-            return (
-              <TouchableOpacity
-                key={item.id}
-                style={[
-                  styles.rowCard,
-                  { backgroundColor: theme.card, borderColor: selected ? theme.primary : theme.border },
-                ]}
-                onPress={() => setSelectedItemId(item.id)}
-                activeOpacity={0.8}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.rowTitle, { color: theme.text }]}>{item.title}</Text>
-                  {!!item.meta && <Text style={[styles.rowMeta, { color: theme.textSecondary }]}>{item.meta}</Text>}
-                </View>
-                {selected && <Ionicons name="checkmark-circle" size={20} color={theme.primary} />}
-              </TouchableOpacity>
-            );
-          })}
+        <View style={{ marginTop: SHAPE.sectionGap }}>
+          <SectionLabel>{assignType === 'workout' ? 'Workouts' : 'Scenarios'}</SectionLabel>
+          {items.map((item, i) => (
+            <SelectRow
+              key={item.id}
+              checked={selectedItemId === item.id}
+              theme={theme}
+              delay={50 + Math.min(i, 8) * 60}
+              onPress={() => setSelectedItemId(item.id)}
+              title={item.title}
+              meta={item.meta}
+            />
+          ))}
         </View>
 
         {/* Note */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Note (optional)</Text>
+        <View style={{ marginTop: SHAPE.sectionGap }}>
+          <SectionLabel>Note (optional)</SectionLabel>
           <TextInput
-            style={[styles.noteInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]}
+            style={[styles.noteInput, { backgroundColor: theme.surface, color: theme.text }]}
             value={note}
             onChangeText={setNote}
             placeholder="Add a message for your athlete…"
-            placeholderTextColor={theme.textSecondary}
+            placeholderTextColor={theme.textDim}
             multiline
             maxLength={200}
           />
@@ -204,18 +323,34 @@ export default function AssignWorkoutScreen({ navigation, route }) {
         <View style={{ height: 24 }} />
       </ScrollView>
 
-      <View style={[styles.footer, { borderTopColor: theme.border, backgroundColor: theme.background }]}>
+      <View style={[styles.footer, { borderTopColor: theme.hairline, backgroundColor: theme.background }]}>
         <TouchableOpacity
-          style={[styles.assignBtn, { backgroundColor: canSubmit ? theme.primary : theme.border }]}
           onPress={handleAssign}
           disabled={!canSubmit}
           activeOpacity={0.85}
+          style={[
+            styles.assignBtn,
+            { backgroundColor: canSubmit ? theme.primary : theme.buttonDisabled || theme.surface },
+          ]}
         >
-          {submitting ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.assignBtnText}>Assign</Text>
-          )}
+          {canSubmit ? <Shimmer color="rgba(255,255,255,0.22)" bandWidth={60} duration={3200} /> : null}
+          <Text
+            style={[
+              styles.assignBtnText,
+              { color: canSubmit ? '#FFFFFF' : theme.textDim },
+            ]}
+          >
+            {submitting
+              ? 'Assigning…'
+              : athleteName
+              ? `Assign to ${athleteName.split(' ')[0]}`
+              : 'Assign'}
+          </Text>
+          <Ionicons
+            name="arrow-forward"
+            size={16}
+            color={canSubmit ? '#FFFFFF' : theme.textDim}
+          />
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -224,54 +359,82 @@ export default function AssignWorkoutScreen({ navigation, route }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
+  scroll: { paddingHorizontal: SHAPE.screenPadding, paddingTop: 10 },
+  inlineLoading: { flex: 0, paddingVertical: 24 },
+
+  // Hero
+  hero: { borderRadius: SHAPE.radiusHero, padding: 15, overflow: 'hidden' },
+  heroLabel: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 9.5,
+    letterSpacing: 1.5,
+    color: 'rgba(255,255,255,0.65)',
   },
-  backBtn: { padding: 2 },
-  headerTitle: { fontSize: 18, fontWeight: '700' },
-  scroll: { padding: 16 },
-  section: { marginBottom: 22 },
-  sectionTitle: { fontSize: 15, fontWeight: '700', marginBottom: 10 },
-  emptyText: { fontSize: 13, lineHeight: 19 },
-  rowCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    padding: 12,
-    marginBottom: 8,
+  heroTitle: {
+    fontFamily: FONTS.heading,
+    fontSize: 18,
+    lineHeight: 21,
+    color: '#FFFFFF',
+    marginTop: 5,
   },
-  avatar: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 13, fontWeight: '800' },
-  rowTitle: { fontSize: 14, fontWeight: '600', flexShrink: 1 },
-  rowMeta: { fontSize: 12, marginTop: 2 },
-  typeRow: { flexDirection: 'row', gap: 10 },
+  heroFacts: { flexDirection: 'row', gap: 14, marginTop: 9 },
+  heroFact: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.8)',
+  },
+
+  // Type toggle
+  typeRow: { flexDirection: 'row', gap: SHAPE.cardGap },
   typeChip: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1.5,
+    gap: 7,
+    paddingVertical: 11,
+    borderRadius: SHAPE.radiusTile,
   },
-  typeChipText: { fontSize: 14, fontWeight: '700' },
+  typeChipText: { fontFamily: FONTS.bodyBold, fontSize: 12.5 },
+
+  // Select rows
+  selectRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    borderRadius: SHAPE.radiusTile,
+    marginBottom: 8,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectTitle: { fontFamily: FONTS.bodyBold, fontSize: 12.5 },
+  selectMeta: { fontFamily: FONTS.body, fontSize: 10.5, marginTop: 2 },
+
   noteInput: {
-    borderRadius: 12,
-    borderWidth: 1,
+    borderRadius: SHAPE.radiusTile,
     padding: 12,
-    fontSize: 14,
+    fontFamily: FONTS.body,
+    fontSize: 13,
     minHeight: 72,
     textAlignVertical: 'top',
   },
-  footer: { padding: 16, borderTopWidth: 1 },
-  assignBtn: { paddingVertical: 15, borderRadius: 14, alignItems: 'center' },
-  assignBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+
+  footer: { paddingHorizontal: SHAPE.screenPadding, paddingVertical: 12, borderTopWidth: 1 },
+  assignBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 15,
+    borderRadius: SHAPE.radiusTile,
+    overflow: 'hidden',
+  },
+  assignBtnText: { fontFamily: FONTS.bodyExtraBold, fontSize: 14.5 },
 });

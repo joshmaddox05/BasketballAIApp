@@ -1,33 +1,32 @@
-// TourTooltip.js - Tooltip bubble with arrow and dynamic positioning
-import React, { useState, useEffect } from 'react';
+// TourTooltip.js - DBE-styled tour card (design handoff 14h/14i)
+// surface2 card, radius 18, big soft shadow, rotated-square tail.
+// Row order: step counter + voice toggle + Skip / title / body /
+// progress dots + buttons (Got it on tab steps, Back+Next on content steps).
+// Positioning mechanics (top/bottom flip + clamping) are unchanged.
+import React, { useState } from 'react';
 import {
     View,
     Text,
     StyleSheet,
     Dimensions,
-    Animated
+    TouchableOpacity
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useAppContext } from '../../context/AppContext';
+import { useTour } from './TourProvider';
+import { Entrance, PrimaryButton, OutlineButton } from '../dbe';
+import { TYPE, FONTS } from '../../utils/typography';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const TOOLTIP_MARGIN = 20;
-const ARROW_SIZE = 10;
+const TAIL_SIZE = 16;
+const TAIL_OFFSET = TAIL_SIZE / 2; // how far the rotated square pokes out
 const TOOLTIP_MAX_WIDTH = SCREEN_WIDTH - (TOOLTIP_MARGIN * 2);
 
-const TourTooltip = ({ step, stepIndex, totalSteps, targetMeasurement, theme }) => {
+const TourTooltip = ({ step, stepIndex, totalSteps, targetMeasurement, theme, onSkip }) => {
     const [tooltipHeight, setTooltipHeight] = useState(0);
-    const fadeAnim = React.useRef(new Animated.Value(0)).current;
-
-    useEffect(() => {
-        // Reset and animate when step changes
-        fadeAnim.setValue(0);
-        Animated.timing(fadeAnim, {
-            toValue: 1,
-            duration: 300,
-            delay: 150,
-            useNativeDriver: true,
-        }).start();
-    }, [stepIndex, fadeAnim]);
+    const { voiceMuted, toggleVoiceMuted } = useAppContext();
+    const { goToNextStep, goToPreviousStep, isTransitioning } = useTour();
 
     if (!step || !targetMeasurement) {
         return null;
@@ -36,15 +35,15 @@ const TourTooltip = ({ step, stepIndex, totalSteps, targetMeasurement, theme }) 
     const { title, description, tooltipPosition: preferredPosition } = step;
     const { x: targetX, y: targetY, width: targetWidth, height: targetHeight } = targetMeasurement;
 
-    // Calculate tooltip position
+    // Calculate tooltip position (mechanics unchanged from the pre-restyle version)
     const calculatePosition = () => {
         let position = preferredPosition || 'bottom';
 
         // Check if there's enough space above/below
         const spaceAbove = targetY;
         const spaceBelow = SCREEN_HEIGHT - (targetY + targetHeight);
-        const estimatedHeight = tooltipHeight || 120;
-        const needed = estimatedHeight + ARROW_SIZE + TOOLTIP_MARGIN;
+        const estimatedHeight = tooltipHeight || 150;
+        const needed = estimatedHeight + TAIL_OFFSET + TOOLTIP_MARGIN;
 
         if (position === 'top' && spaceAbove < needed) {
             position = 'bottom';
@@ -61,57 +60,36 @@ const TourTooltip = ({ step, stepIndex, totalSteps, targetMeasurement, theme }) 
         // Calculate Y position
         let tooltipY;
         if (position === 'top') {
-            tooltipY = targetY - estimatedHeight - ARROW_SIZE - 8;
+            tooltipY = targetY - estimatedHeight - TAIL_OFFSET - 8;
         } else {
-            tooltipY = targetY + targetHeight + ARROW_SIZE + 8;
+            tooltipY = targetY + targetHeight + TAIL_OFFSET + 8;
         }
 
         // Clamp Y so tooltip stays within safe screen bounds:
-        // - Top: below the Skip Tour / step counter buttons (~110px from top)
+        // - Top: below the status bar area
         // - Bottom: above the tab bar (~90px from bottom)
-        const safeTop = 110;
+        const safeTop = 70;
         const safeBottom = SCREEN_HEIGHT - estimatedHeight - 90;
         tooltipY = Math.max(safeTop, Math.min(tooltipY, safeBottom));
 
-        // Calculate arrow X position relative to tooltip
-        const arrowX = targetX + (targetWidth / 2) - tooltipX - (ARROW_SIZE / 2);
-
-        return { tooltipX, tooltipY, position, arrowX };
+        return { tooltipX, tooltipY, position };
     };
 
-    const { tooltipX, tooltipY, position, arrowX } = calculatePosition();
+    const { tooltipX, tooltipY, position } = calculatePosition();
 
-    const cardColor = theme?.card || '#1E1E1E';
-    const textColor = theme?.text || '#FFFFFF';
-    const textSecondaryColor = theme?.textSecondary || '#B8B8B8';
-    const primaryColor = theme?.primary || '#FF6B00';
+    const surface2 = theme?.surface2 || '#242427';
+    const textColor = theme?.text || '#E9E9ED';
+    const mutedColor = theme?.textMuted || '#B4B4BB';
+    const dimColor = theme?.textDim || '#7C7C86';
+    const steelColor = theme?.steel || '#9AA0AC';
+    const accentText = theme?.accentText || '#D4707A';
+    const trackColor = theme?.track || 'rgba(233, 233, 237, 0.10)';
 
-    const isLastStep = stepIndex === totalSteps - 1;
     const isTabStep = step?.isTabStep === true;
 
-    // Determine the tap hint text
-    const getTapHintText = () => {
-        if (isLastStep) return 'Tap to finish';
-        if (isTabStep) return 'Tap the tab to continue';
-        return 'Tap to continue';
-    };
-
     return (
-        <Animated.View
-            style={[
-                styles.container,
-                {
-                    left: tooltipX,
-                    top: tooltipY,
-                    opacity: fadeAnim,
-                    transform: [{
-                        translateY: fadeAnim.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [position === 'top' ? 10 : -10, 0],
-                        })
-                    }]
-                }
-            ]}
+        <View
+            style={[styles.container, { left: tooltipX, top: tooltipY }]}
             onLayout={(event) => {
                 const { height } = event.nativeEvent.layout;
                 if (height !== tooltipHeight) {
@@ -119,55 +97,100 @@ const TourTooltip = ({ step, stepIndex, totalSteps, targetMeasurement, theme }) 
                 }
             }}
         >
-            {/* Arrow pointing up (when tooltip is below target) */}
-            {position === 'bottom' && (
-                <View
-                    style={[
-                        styles.arrowUp,
-                        {
-                            left: Math.max(20, Math.min(arrowX, TOOLTIP_MAX_WIDTH - 40)),
-                            borderBottomColor: cardColor,
-                        }
-                    ]}
-                />
-            )}
-
-            {/* Tooltip content */}
-            <View style={[styles.tooltip, { backgroundColor: cardColor }]}>
-                <View style={styles.header}>
-                    <View style={[styles.iconContainer, { backgroundColor: primaryColor + '20' }]}>
-                        <Ionicons name="basketball" size={20} color={primaryColor} />
-                    </View>
-                    <Text style={[styles.title, { color: textColor }]}>{title}</Text>
-                </View>
-
-                <Text style={[styles.description, { color: textSecondaryColor }]}>
-                    {description}
-                </Text>
-
-                <View style={styles.footer}>
-                    <View style={[styles.tapHint, { backgroundColor: primaryColor + '15' }]}>
-                        <Ionicons name="finger-print-outline" size={16} color={primaryColor} />
-                        <Text style={[styles.tapHintText, { color: primaryColor }]}>
-                            {getTapHintText()}
+            {/* Re-keyed per step so the pop entrance replays on each step change */}
+            <Entrance variant="pop" key={stepIndex}>
+                <View style={[styles.card, { backgroundColor: surface2 }]}>
+                    {/* Row 1: step counter + voice toggle + Skip */}
+                    <View style={styles.headerRow}>
+                        <Text style={[TYPE.tooltipStep, { color: accentText }]}>
+                            {`STEP ${stepIndex + 1} OF ${totalSteps}`}
                         </Text>
+                        <View style={styles.headerActions}>
+                            <TouchableOpacity
+                                onPress={toggleVoiceMuted}
+                                hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+                                accessibilityLabel={voiceMuted ? 'Unmute tour voice' : 'Mute tour voice'}
+                            >
+                                <Ionicons
+                                    name={voiceMuted ? 'volume-mute-outline' : 'volume-medium-outline'}
+                                    size={15}
+                                    color={voiceMuted ? dimColor : steelColor}
+                                />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={onSkip}
+                                hitSlop={{ top: 10, bottom: 10, left: 8, right: 10 }}
+                                accessibilityLabel="Skip tour"
+                            >
+                                <Text style={[styles.skipText, { color: dimColor }]}>Skip</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
+                    {/* Row 2: title */}
+                    <Text style={[TYPE.tooltipTitle, styles.title, { color: textColor }]}>
+                        {title}
+                    </Text>
+
+                    {/* Row 3: body */}
+                    <Text style={[TYPE.tooltipBody, styles.body, { color: mutedColor }]}>
+                        {description}
+                    </Text>
+
+                    {/* Row 4: progress dots left, buttons right */}
+                    <View style={styles.footerRow}>
+                        <View style={styles.dots}>
+                            {Array.from({ length: totalSteps }).map((_, i) => (
+                                <View
+                                    key={i}
+                                    style={[
+                                        styles.dot,
+                                        i === stepIndex
+                                            ? { width: 16, backgroundColor: accentText }
+                                            : { width: 5, backgroundColor: trackColor },
+                                    ]}
+                                />
+                            ))}
+                        </View>
+                        {isTabStep ? (
+                            <PrimaryButton
+                                label="Got it"
+                                onPress={goToNextStep}
+                                disabled={isTransitioning}
+                                style={styles.btnPrimary}
+                            />
+                        ) : (
+                            <View style={styles.btnRow}>
+                                {stepIndex > 0 && (
+                                    <OutlineButton
+                                        label="Back"
+                                        onPress={goToPreviousStep}
+                                        style={styles.btnOutline}
+                                    />
+                                )}
+                                <PrimaryButton
+                                    label="Next"
+                                    onPress={goToNextStep}
+                                    disabled={isTransitioning}
+                                    style={styles.btnPrimary}
+                                />
+                            </View>
+                        )}
                     </View>
                 </View>
-            </View>
 
-            {/* Arrow pointing down (when tooltip is above target) */}
-            {position === 'top' && (
+                {/* Tail: rotated square in surface2. Bottom-center when the
+                    tooltip sits above the target; 38px from the left when below. */}
                 <View
                     style={[
-                        styles.arrowDown,
-                        {
-                            left: Math.max(20, Math.min(arrowX, TOOLTIP_MAX_WIDTH - 40)),
-                            borderTopColor: cardColor,
-                        }
+                        styles.tail,
+                        { backgroundColor: surface2 },
+                        position === 'top' ? styles.tailBottom : styles.tailTop,
                     ]}
+                    pointerEvents="none"
                 />
-            )}
-        </Animated.View>
+            </Entrance>
+        </View>
     );
 };
 
@@ -177,75 +200,79 @@ const styles = StyleSheet.create({
         width: TOOLTIP_MAX_WIDTH,
         zIndex: 1000,
     },
-    tooltip: {
-        borderRadius: 16,
-        padding: 20,
+    card: {
+        borderRadius: 18,
+        padding: 16,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 8,
+        shadowOffset: { width: 0, height: 18 },
+        shadowOpacity: 0.5,
+        shadowRadius: 20,
+        elevation: 12,
     },
-    header: {
+    headerRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 12,
+        justifyContent: 'space-between',
     },
-    iconContainer: {
-        width: 36,
-        height: 36,
-        borderRadius: 10,
-        justifyContent: 'center',
+    headerActions: {
+        flexDirection: 'row',
         alignItems: 'center',
-        marginRight: 12,
+        gap: 9,
+    },
+    skipText: {
+        fontFamily: FONTS.bodySemiBold,
+        fontSize: 10.5,
     },
     title: {
-        fontSize: 18,
-        fontWeight: '700',
-        flex: 1,
+        marginTop: 9,
     },
-    description: {
-        fontSize: 15,
-        lineHeight: 22,
-        marginBottom: 16,
+    body: {
+        marginTop: 5,
     },
-    footer: {
-        flexDirection: 'row',
-        justifyContent: 'flex-end',
-    },
-    tapHint: {
+    footerRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: 20,
-        gap: 6,
+        justifyContent: 'space-between',
+        marginTop: 14,
     },
-    tapHintText: {
-        fontSize: 13,
-        fontWeight: '600',
+    dots: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
     },
-    arrowUp: {
+    dot: {
+        height: 5,
+        borderRadius: 3,
+    },
+    btnRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    btnPrimary: {
+        paddingVertical: 9,
+        paddingHorizontal: 18,
+        borderRadius: 12,
+    },
+    btnOutline: {
+        paddingVertical: 9,
+        paddingHorizontal: 14,
+        borderRadius: 12,
+    },
+    tail: {
         position: 'absolute',
-        top: -ARROW_SIZE,
-        width: 0,
-        height: 0,
-        borderLeftWidth: ARROW_SIZE,
-        borderRightWidth: ARROW_SIZE,
-        borderBottomWidth: ARROW_SIZE,
-        borderLeftColor: 'transparent',
-        borderRightColor: 'transparent',
+        width: TAIL_SIZE,
+        height: TAIL_SIZE,
+        transform: [{ rotate: '45deg' }],
     },
-    arrowDown: {
-        position: 'absolute',
-        bottom: -ARROW_SIZE,
-        width: 0,
-        height: 0,
-        borderLeftWidth: ARROW_SIZE,
-        borderRightWidth: ARROW_SIZE,
-        borderTopWidth: ARROW_SIZE,
-        borderLeftColor: 'transparent',
-        borderRightColor: 'transparent',
+    tailBottom: {
+        bottom: -TAIL_OFFSET,
+        left: '50%',
+        marginLeft: -TAIL_OFFSET,
+    },
+    tailTop: {
+        top: -TAIL_OFFSET,
+        left: 38,
     },
 });
 

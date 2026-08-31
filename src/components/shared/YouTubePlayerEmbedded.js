@@ -228,7 +228,7 @@ const YouTubePlayerEmbedded = ({
     <View style={styles.container}>
       {isLoading && (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#FF6B35" />
+          <ActivityIndicator size="large" color="#8A1C22" />
         </View>
       )}
       

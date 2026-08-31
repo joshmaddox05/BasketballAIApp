@@ -1,13 +1,17 @@
-// ScoutProspectDetailScreen.js - Scout-facing view of a prospect (distinct from
-// the player's own ScoutLabProfile). Shows ONLY the compliant public summary;
-// deeper data + contact require a parent-authorized, tier-gated access request
-// (wired in Phase 2). High-school prospects only.
+// ScoutProspectDetailScreen.js - Scout-facing view of a prospect (design 14c —
+// distinct from the player's own ScoutLabProfile). Shows ONLY the compliant
+// public summary; deeper data + contact require a parent-authorized, tier-gated
+// access request. High-school prospects only. Presentational redesign — the
+// watchlist toggle, access-request flow and tier gating are unchanged.
 import React, { useState, useCallback } from 'react';
 import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAppContext } from '../../context/AppContext';
+import { TYPE, SHAPE } from '../../utils/typography';
+import { RingProgress, ScreenHeader, PrimaryButton } from '../../components/dbe';
+import { evalColorFor } from './ScoutHomeScreen';
 import {
   getWatchlist,
   saveWatchlistEntry,
@@ -20,12 +24,18 @@ import { canAccessFeature } from '../../utils/subscription';
 
 const GRADE_LABEL = { 9: '9th', 10: '10th', 11: '11th', 12: '12th' };
 
-const gradeColorFor = (grade, theme) => {
-  const g = (grade || '').toUpperCase();
-  if (g.startsWith('A')) return '#22C55E';
-  if (g.startsWith('B')) return theme.primary;
-  if (g.startsWith('C')) return '#F59E0B';
-  return theme.textSecondary;
+// Grade → ring fill (presentational encoding of the existing grade only).
+const gradeProgress = (score) => {
+  const n = Number(score);
+  if (!isNaN(n) && n > 0) return Math.min(1, n / 100);
+  const g = String(score || '').toUpperCase().replace('−', '-');
+  const map = {
+    'A+': 0.97, A: 0.92, 'A-': 0.85,
+    'B+': 0.78, B: 0.7, 'B-': 0.62,
+    'C+': 0.55, C: 0.5, 'C-': 0.45,
+    D: 0.35,
+  };
+  return map[g] || 0.3;
 };
 
 // Deeper data, unlocked only after parent approval; each row is further gated by
@@ -40,6 +50,14 @@ const DEEP_SECTIONS = [
   { key: 'ach', icon: 'trophy-outline', label: 'Achievements', feature: null,
     value: (s) => `${(s?.achievements || []).length} earned` },
 ];
+
+// Consent banner content per access status.
+const CONSENT_BANNER = {
+  approved: { icon: 'checkmark', text: 'Guardian approved access' },
+  pending: { icon: 'time-outline', text: 'Awaiting guardian approval' },
+  denied: { icon: 'close', text: 'Guardian declined your request' },
+  none: { icon: 'lock-closed-outline', text: 'Guardian approval required for full data' },
+};
 
 export default function ScoutProspectDetailScreen({ navigation, route }) {
   const { user, userData, theme, isDarkMode } = useAppContext();
@@ -103,170 +121,280 @@ export default function ScoutProspectDetailScreen({ navigation, route }) {
   }, [scoutUid, prospectId, busy, prospect, subscription]);
 
   const name = prospect.name || 'Prospect';
-  const initials = name.split(' ').map((n) => n[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || '?';
   const gradeLabel = GRADE_LABEL[prospect.gradeLevel] || '—';
   const evalScore = prospect.evaluationScore || prospect.evalGrade || '—';
-  const evalColor = gradeColorFor(evalScore, theme);
   const attributes = Array.isArray(prospect.mainAttributes) ? prospect.mainAttributes : [];
+  const meta = [
+    prospect.position || '—',
+    `${gradeLabel} grade`,
+    prospect.region || prospect.city,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  const banner = CONSENT_BANNER[accessStatus] || CONSENT_BANNER.none;
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <StatusBar style={isDarkMode ? 'light' : 'dark'} />
-      <View style={[styles.header, { borderBottomColor: theme.border }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color={theme.text} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>Prospect</Text>
-        <TouchableOpacity onPress={toggleWatchlist} disabled={busy}>
-          <Ionicons name={saved ? 'bookmark' : 'bookmark-outline'} size={22} color={theme.primary} />
-        </TouchableOpacity>
-      </View>
+
+      <ScreenHeader
+        title="Prospect"
+        onBack={() => navigation.goBack()}
+        style={{ borderBottomWidth: 0 }}
+        right={
+          <TouchableOpacity
+            onPress={toggleWatchlist}
+            disabled={busy}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            style={styles.bookmarkBtn}
+          >
+            <Ionicons
+              name={saved ? 'bookmark' : 'bookmark-outline'}
+              size={18}
+              color={saved ? theme.accentText : theme.text}
+            />
+          </TouchableOpacity>
+        }
+      />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* Public summary card */}
-        <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <View style={styles.idRow}>
-            <View style={[styles.avatar, { backgroundColor: theme.primary + '22' }]}>
-              <Text style={[styles.avatarText, { color: theme.primary }]}>{initials}</Text>
+        {/* Hero: eval ring + identity */}
+        <View style={styles.hero}>
+          <RingProgress
+            size={76}
+            strokeWidth={5}
+            progress={gradeProgress(evalScore)}
+            color={evalColorFor(evalScore, theme)}
+            trackColor={theme.track}
+            delay={300}
+          >
+            <View style={styles.ringCenter}>
+              <Text style={[styles.ringGrade, { color: theme.text }]}>{evalScore}</Text>
+              <Text style={[styles.ringCaption, { color: theme.textDim }]}>EVALRANK</Text>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.name, { color: theme.text }]}>{name}</Text>
-              <Text style={[styles.meta, { color: theme.textSecondary }]}>
-                {(prospect.position || '—')} · {gradeLabel} grade{prospect.height ? ` · ${prospect.height}` : ''}
-              </Text>
-            </View>
-            <View style={[styles.gradeBadge, { backgroundColor: evalColor + '22' }]}>
-              <Text style={[styles.gradeText, { color: evalColor }]}>{evalScore}</Text>
+          </RingProgress>
+          <View style={styles.heroInfo}>
+            <Text style={[styles.heroName, { color: theme.text }]} numberOfLines={2}>{name}</Text>
+            <Text style={[styles.heroMeta, { color: theme.textDim }]} numberOfLines={1}>{meta}</Text>
+            <View style={styles.heroChips}>
+              {prospect.height ? (
+                <View style={[styles.smallChip, { backgroundColor: theme.steelFill }]}>
+                  <Text style={[styles.smallChipText, { color: theme.steel }]}>{prospect.height}</Text>
+                </View>
+              ) : null}
+              {prospect.archetype ? (
+                <View style={[styles.smallChip, { backgroundColor: theme.badgeFill }]}>
+                  <Text style={[styles.smallChipText, { color: theme.accentText }]}>{prospect.archetype}</Text>
+                </View>
+              ) : null}
             </View>
           </View>
-          {prospect.archetype ? (
-            <View style={[styles.archetypeRow, { borderTopColor: theme.border }]}>
-              <Ionicons name="finger-print-outline" size={16} color={theme.primary} />
-              <Text style={[styles.archetypeText, { color: theme.text }]}>{prospect.archetype}</Text>
-            </View>
-          ) : null}
         </View>
 
-        {/* Main attributes (public) */}
+        {/* Consent status banner */}
+        <View style={[styles.consentBanner, { backgroundColor: theme.steelFill }]}>
+          <Ionicons name={banner.icon} size={15} color={theme.steel} />
+          <Text style={[styles.consentText, { color: theme.textMuted }]}>{banner.text}</Text>
+        </View>
+
+        {/* Key attributes (public) */}
         {attributes.length > 0 && (
-          <>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>Key Attributes</Text>
+          <View style={styles.section}>
+            <Text style={[TYPE.sectionLabel, styles.sectionLabel, { color: theme.textDim }]}>
+              Key attributes
+            </Text>
             <View style={styles.attrRow}>
               {attributes.slice(0, 6).map((a) => (
-                <View key={a} style={[styles.attrChip, { backgroundColor: theme.primary + '15', borderColor: theme.primary + '30' }]}>
-                  <Text style={[styles.attrText, { color: theme.primary }]}>{a}</Text>
+                <View key={a} style={[styles.attrChip, { backgroundColor: theme.badgeFill }]}>
+                  <Text style={[styles.attrText, { color: theme.accentText }]}>{a}</Text>
                 </View>
               ))}
             </View>
-          </>
+          </View>
         )}
 
-        {/* Full Evaluation — gated by parent approval + scout tier */}
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>Full Evaluation</Text>
-        <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          {DEEP_SECTIONS.map((s, i) => {
-            const approved = accessStatus === 'approved';
-            const tierOk = !s.feature || canAccessFeature(s.feature, subscription);
-            const unlocked = approved && tierOk;
-            return (
-              <View key={s.key} style={[styles.lockedRow, i < DEEP_SECTIONS.length - 1 && { borderBottomColor: theme.border, borderBottomWidth: StyleSheet.hairlineWidth }]}>
-                <Ionicons name={s.icon} size={18} color={unlocked ? theme.primary : theme.textSecondary} />
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.lockedLabel, { color: theme.text }]}>{s.label}</Text>
-                  {unlocked && <Text style={[styles.deepValue, { color: theme.textSecondary }]}>{s.value(summary)}</Text>}
-                </View>
-                {unlocked ? (
-                  <Ionicons name="checkmark-circle" size={16} color="#22C55E" />
-                ) : approved ? (
-                  <Ionicons name="diamond-outline" size={15} color={theme.primary} />
-                ) : (
-                  <Ionicons name="lock-closed" size={15} color={theme.textSecondary} />
-                )}
-              </View>
-            );
-          })}
-          <Text style={[styles.lockedHint, { color: theme.textSecondary }]}>
-            {accessStatus === 'approved'
-              ? 'Access granted by the athlete’s guardian. Locked items require a higher subscription tier.'
-              : accessStatus === 'pending'
-              ? 'Access requested — awaiting parent/guardian approval.'
-              : accessStatus === 'denied'
-              ? 'The guardian declined your access request.'
-              : 'Request access to unlock (parent-authorized; depth by your subscription tier).'}
+        {/* Full evaluation — gated by parent approval + scout tier */}
+        <View style={styles.section}>
+          <Text style={[TYPE.sectionLabel, styles.sectionLabel, { color: theme.textDim }]}>
+            Full evaluation
           </Text>
+          <View style={[styles.card, { backgroundColor: theme.surface }]}>
+            {DEEP_SECTIONS.map((s, i) => {
+              const approved = accessStatus === 'approved';
+              const tierOk = !s.feature || canAccessFeature(s.feature, subscription);
+              const unlocked = approved && tierOk;
+              return (
+                <View
+                  key={s.key}
+                  style={[
+                    styles.deepRow,
+                    i < DEEP_SECTIONS.length - 1 && {
+                      borderBottomColor: theme.hairline,
+                      borderBottomWidth: StyleSheet.hairlineWidth,
+                    },
+                  ]}
+                >
+                  <Ionicons name={s.icon} size={17} color={unlocked ? theme.accentText : theme.textDim} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[TYPE.rowTitle, { color: theme.text }]}>{s.label}</Text>
+                    {unlocked && (
+                      <Text style={[TYPE.rowMeta, { color: theme.textDim }]}>{s.value(summary)}</Text>
+                    )}
+                  </View>
+                  {unlocked ? (
+                    <Ionicons name="checkmark-circle" size={15} color={theme.accentText} />
+                  ) : approved ? (
+                    <Ionicons name="diamond-outline" size={14} color={theme.accentText} />
+                  ) : (
+                    <Ionicons name="lock-closed" size={14} color={theme.textDim} />
+                  )}
+                </View>
+              );
+            })}
+          </View>
         </View>
 
-        {/* Actions */}
+        {/* Access CTA */}
         {accessStatus === 'approved' ? (
-          <TouchableOpacity
-            style={[styles.primaryBtn, { backgroundColor: theme.primary }]}
+          <PrimaryButton
+            label="View full athlete profile"
+            icon="person-circle-outline"
+            style={styles.accessBtn}
             onPress={() => navigation.navigate('ScoutLabProfile', { prospect, profile: summary?.profile })}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="person-circle-outline" size={18} color="#fff" />
-            <Text style={styles.primaryBtnText}>View Full Athlete Profile</Text>
-          </TouchableOpacity>
+          />
         ) : (
-          <TouchableOpacity
-            style={[styles.primaryBtn, { backgroundColor: accessStatus === 'pending' ? theme.textSecondary : theme.primary }]}
-            onPress={requestAccess}
+          <PrimaryButton
+            label={
+              accessStatus === 'pending'
+                ? 'Access pending'
+                : accessStatus === 'denied'
+                ? 'Request again'
+                : 'Request access'
+            }
+            icon={accessStatus === 'pending' ? 'time-outline' : 'lock-open-outline'}
             disabled={busy || accessStatus === 'pending'}
-            activeOpacity={0.85}
-          >
-            <Ionicons name={accessStatus === 'pending' ? 'time-outline' : 'lock-open-outline'} size={18} color="#fff" />
-            <Text style={styles.primaryBtnText}>
-              {accessStatus === 'pending' ? 'Access Pending' : accessStatus === 'denied' ? 'Request Again' : 'Request Access'}
-            </Text>
-          </TouchableOpacity>
+            style={styles.accessBtn}
+            onPress={requestAccess}
+          />
         )}
-        <View style={styles.actionRow}>
-          <TouchableOpacity style={[styles.secondaryBtn, { borderColor: theme.border }]} onPress={toggleWatchlist} disabled={busy} activeOpacity={0.85}>
-            <Ionicons name={saved ? 'bookmark' : 'bookmark-outline'} size={16} color={theme.primary} />
-            <Text style={[styles.secondaryBtnText, { color: theme.primary }]}>{saved ? 'Saved' : 'Watchlist'}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.secondaryBtn, { borderColor: theme.border }]}
-            onPress={() => navigation.navigate('ScoutReports', { prospect })}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="create-outline" size={16} color={theme.primary} />
-            <Text style={[styles.secondaryBtnText, { color: theme.primary }]}>Write Report</Text>
-          </TouchableOpacity>
-        </View>
 
-        <View style={{ height: 32 }} />
+        <View style={{ height: 20 }} />
       </ScrollView>
+
+      {/* Fixed footer: watchlist toggle + write report */}
+      <View style={styles.footer}>
+        <TouchableOpacity
+          style={[styles.footerIconBtn, { borderColor: theme.hairline }]}
+          onPress={toggleWatchlist}
+          disabled={busy}
+          activeOpacity={0.8}
+        >
+          <Ionicons
+            name={saved ? 'bookmark' : 'bookmark-outline'}
+            size={18}
+            color={saved ? theme.accentText : theme.text}
+          />
+        </TouchableOpacity>
+        <PrimaryButton
+          label="Write report"
+          style={{ flex: 1 }}
+          onPress={() => navigation.navigate('ScoutReports', { prospect })}
+        />
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1 },
-  backBtn: { padding: 4 },
-  headerTitle: { fontSize: 18, fontWeight: '700' },
-  scroll: { padding: 16 },
-  card: { borderRadius: 14, borderWidth: 1, padding: 16, marginBottom: 4 },
-  idRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  avatar: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 18, fontWeight: '700' },
-  name: { fontSize: 17, fontWeight: '800' },
-  meta: { fontSize: 13, marginTop: 2 },
-  gradeBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
-  gradeText: { fontSize: 15, fontWeight: '800' },
-  archetypeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, paddingTop: 12, borderTopWidth: 1 },
-  archetypeText: { fontSize: 13, fontWeight: '600' },
-  sectionTitle: { fontSize: 16, fontWeight: '700', marginTop: 16, marginBottom: 10 },
-  attrRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  attrChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1 },
-  attrText: { fontSize: 12, fontWeight: '600', textTransform: 'capitalize' },
-  lockedRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12 },
-  lockedLabel: { fontSize: 14 },
-  deepValue: { fontSize: 12, marginTop: 2 },
-  lockedHint: { fontSize: 12, lineHeight: 17, marginTop: 10 },
-  primaryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 15, borderRadius: 14, marginTop: 20 },
-  primaryBtnText: { color: '#fff', fontSize: 15, fontWeight: '800' },
-  actionRow: { flexDirection: 'row', gap: 10, marginTop: 10 },
-  secondaryBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: 12, borderWidth: 1 },
-  secondaryBtnText: { fontSize: 13, fontWeight: '700' },
+  bookmarkBtn: {
+    width: SHAPE.iconButton,
+    height: SHAPE.iconButton,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  scroll: {
+    paddingHorizontal: SHAPE.screenPadding,
+    paddingTop: 4,
+  },
+
+  hero: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  ringCenter: { alignItems: 'center', justifyContent: 'center' },
+  ringGrade: { fontFamily: TYPE.screenTitle.fontFamily, fontSize: 19, lineHeight: 19 },
+  ringCaption: {
+    fontFamily: TYPE.statCaption.fontFamily,
+    fontSize: 7.5,
+    letterSpacing: 0.8,
+    marginTop: 2,
+  },
+  heroInfo: { flex: 1 },
+  heroName: { fontFamily: TYPE.screenTitle.fontFamily, fontSize: 21, lineHeight: 23 },
+  heroMeta: { fontFamily: TYPE.greeting.fontFamily, fontSize: 11.5, marginTop: 4 },
+  heroChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
+  smallChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: SHAPE.radiusBadge,
+  },
+  smallChipText: { fontFamily: TYPE.chip.fontFamily, fontSize: 9.5 },
+
+  consentBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    marginTop: 14,
+    borderRadius: SHAPE.radiusTile,
+    paddingHorizontal: 13,
+    paddingVertical: 11,
+  },
+  consentText: {
+    flex: 1,
+    fontFamily: TYPE.greeting.fontFamily,
+    fontSize: 10.5,
+    lineHeight: 15,
+  },
+
+  section: { marginTop: 16 },
+  sectionLabel: { marginBottom: SHAPE.labelGap },
+
+  attrRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  attrChip: {
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: SHAPE.radiusPill,
+  },
+  attrText: { fontFamily: TYPE.chip.fontFamily, fontSize: 9.5, textTransform: 'capitalize' },
+
+  card: {
+    borderRadius: SHAPE.radiusCard,
+    paddingHorizontal: 13,
+  },
+  deepRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 12,
+  },
+
+  accessBtn: { marginTop: 18 },
+
+  footer: {
+    flexDirection: 'row',
+    gap: SHAPE.cardGap,
+    paddingHorizontal: SHAPE.screenPadding,
+    paddingBottom: 8,
+    paddingTop: 6,
+  },
+  footerIconBtn: {
+    width: 52,
+    borderWidth: 1,
+    borderRadius: SHAPE.radiusTile,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

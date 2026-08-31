@@ -16,9 +16,14 @@ import {
   serverTimestamp,
   increment,
   arrayUnion,
-  arrayRemove
+  arrayRemove,
+  collectionGroup
 } from 'firebase/firestore';
 import { db } from '../config/firebaseConfig';
+// Storage cleanup for film deletion/retention (spec §6) — deleting the video
+// object is what actually revokes access to footage, since playback uses a
+// rules-bypassing download-token URL. See deleteFilm below.
+import { deleteFile } from './storageService';
 import { ACHIEVEMENTS, getLevelFromXP } from '../data/achievements';
 
 /**
@@ -4002,8 +4007,25 @@ export const deleteGamePlan = async (coachUid, planId) => {
 
 /**
  * Save uploaded film metadata for a coach.
+ *
+ * `processingStatus` tracks where a film sits in the SimCoach Coach film-to-
+ * intelligence pipeline (see docs/SIMCOACH_COACH_TECHNICAL_SPEC.md §5):
+ * 'uploaded' (raw video only) -> 'tagging' (events being tagged) ->
+ * 'tagged' (tagging complete) -> 'analyzed' (opponent model built from it).
+ * `taggedEventIds` accumulates as filmEvents are saved against this film
+ * (see saveFilmEvent below) so a film doc always knows its own event set
+ * without a query.
+ *
+ * The governance fields (ownerUid, authorizedBy, retentionPolicy,
+ * sharableForModelTraining, accessScope) exist so every future consumer of
+ * this film (opponent-model aggregation, any third-party CV vendor
+ * integration) has a single place to check rights before touching it.
+ * sharableForModelTraining defaults hard to false — per spec §6, opponent
+ * film from one org is never implicitly usable to train models shared
+ * across other DBE customers.
+ *
  * @param {string} coachUid
- * @param {Object} meta - { opponentName, note, videoUrl, storagePath, durationSec? }
+ * @param {Object} meta - { opponentName, note, videoUrl, storagePath, durationSec?, authorizedBy?, retentionPolicy?, accessScope? }
  * @returns {Promise<string>} the film id
  */
 export const saveFilm = async (coachUid, meta) => {
@@ -4014,7 +4036,18 @@ export const saveFilm = async (coachUid, meta) => {
       videoUrl: meta.videoUrl || '',
       storagePath: meta.storagePath || '',
       durationSec: typeof meta.durationSec === 'number' ? meta.durationSec : null,
+      // Legacy field, kept for back-compat — no current screen reads it.
       status: 'uploaded',
+      processingStatus: 'uploaded',
+      taggedEventIds: [],
+      opponentModelId: null,
+      // Governance (spec §6) — ownership stays with the uploader; sharing/
+      // training defaults are always opt-in, never implicit.
+      ownerUid: coachUid,
+      authorizedBy: meta.authorizedBy || coachUid,
+      retentionPolicy: meta.retentionPolicy || { expiresAt: null, autoDelete: false },
+      sharableForModelTraining: false,
+      accessScope: meta.accessScope || { orgId: null, allowedUids: [coachUid] },
       createdAt: serverTimestamp(),
     });
     return ref.id;
@@ -4036,13 +4069,753 @@ export const getFilms = async (coachUid) => {
   }
 };
 
+/**
+ * Delete a film: the video in Storage, its tagged filmEvents, then the doc.
+ *
+ * The old implementation deleted only the Firestore doc and left the video
+ * orphaned in Storage forever ("best-effort cleanup is a follow-up"). For the
+ * governance model in spec §6 that was the whole ballgame backwards: the video
+ * is the sensitive artifact, and because playback uses a `?token=` download URL
+ * that bypasses Storage rules by design, deleting the Storage object is the
+ * ONLY action that genuinely revokes access to footage. A deleted doc with a
+ * live video behind a still-valid token URL is not deletion in any sense a
+ * coach, parent, or club would recognize.
+ *
+ * Order is deliberate — Storage, then events, then the doc last. The doc is the
+ * only record of `storagePath`, so if it went first and a later step failed,
+ * the video would be permanently unreachable for cleanup. This way a partial
+ * failure leaves a retryable doc rather than an untraceable orphan.
+ *
+ * Storage deletion is best-effort by design: a film uploaded before
+ * `storagePath` was recorded, or one whose object was already removed, must
+ * still be deletable rather than wedging the film in place forever.
+ *
+ * @param {string} coachUid
+ * @param {string} filmId
+ */
 export const deleteFilm = async (coachUid, filmId) => {
   try {
+    const snap = await getDoc(doc(db, 'users', coachUid, 'films', filmId));
+    const storagePath = snap.exists() ? snap.data().storagePath : null;
+
+    if (storagePath) {
+      try {
+        await deleteFile(storagePath);
+      } catch (storageError) {
+        // Already-deleted or never-uploaded objects shouldn't block the rest.
+        console.warn(`Film ${filmId}: storage object cleanup failed (continuing):`, storageError?.code || storageError);
+      }
+    }
+
+    const events = await getDocs(
+      query(collection(db, 'users', coachUid, 'filmEvents'), where('filmId', '==', filmId))
+    );
+    await Promise.all(events.docs.map((d) => deleteDoc(d.ref)));
+
     await deleteDoc(doc(db, 'users', coachUid, 'films', filmId));
-    // Note: the Storage object is left in place (best-effort cleanup is a follow-up).
   } catch (error) {
     console.error('Error deleting film:', error);
     throw error;
+  }
+};
+
+/**
+ * Set a film's retention policy (spec §6) — the field existed from Phase 0 but
+ * had no writer, so every film sat on the `{ expiresAt: null, autoDelete: false }`
+ * default and the retention job would never have had anything to act on.
+ *
+ * `expiresAt` is stored as a plain epoch-millis number rather than a Timestamp
+ * so the scheduled function can compare it without a type dance, and so a null
+ * ("keep indefinitely") is unambiguous.
+ *
+ * @param {string} coachUid
+ * @param {string} filmId
+ * @param {Object} policy - { expiresAt: number|null (epoch ms), autoDelete: boolean }
+ */
+export const setFilmRetention = async (coachUid, filmId, policy) => {
+  try {
+    await updateDoc(doc(db, 'users', coachUid, 'films', filmId), {
+      retentionPolicy: {
+        expiresAt: typeof policy?.expiresAt === 'number' ? policy.expiresAt : null,
+        autoDelete: !!policy?.autoDelete,
+      },
+    });
+  } catch (error) {
+    console.error('Error setting film retention:', error);
+    throw error;
+  }
+};
+
+// ==================== COACH: Film Events (SimCoach Coach — opponent-intelligence tagging) ====================
+// A tagged basketball action from a coach's film — the atomic unit the whole
+// SimCoach Coach opponent-intelligence pipeline aggregates from (see
+// docs/SIMCOACH_COACH_TECHNICAL_SPEC.md §4-§5: Opponent Model tendencies are
+// distributions computed over these events, never a single prediction).
+// Phase 1 ships extractionMethod 'manual' only — a coach or DBE analyst tags
+// while scrubbing film they've already uploaded. 'automated'/'hybrid' plug
+// into this exact same shape later without changing anything downstream.
+
+/**
+ * Tag one basketball event against a film.
+ * @param {string} coachUid
+ * @param {string} filmId
+ * @param {Object} event - {
+ *   timestampSec, possessionId?, offenseTeam?, actionType, personnel?: [],
+ *   coverage?, situation?: {scoreDiff?, timeRemaining?, quarter?}, outcome?,
+ *   extractionMethod?: 'automated'|'manual'|'hybrid', confidence?
+ * }
+ * @returns {Promise<string>} the filmEvent id
+ */
+export const saveFilmEvent = async (coachUid, filmId, event) => {
+  try {
+    if (!filmId) throw new Error('Missing filmId.');
+    const data = removeUndefined({
+      filmId,
+      timestampSec: typeof event.timestampSec === 'number' ? event.timestampSec : 0,
+      possessionId: event.possessionId || null,
+      offenseTeam: event.offenseTeam || 'opponent',
+      actionType: event.actionType || 'other',
+      personnel: Array.isArray(event.personnel) ? event.personnel : [],
+      coverage: event.coverage || null,
+      situation: event.situation || {},
+      outcome: event.outcome || null,
+      extractionMethod: event.extractionMethod || 'manual',
+      confidence: typeof event.confidence === 'number' ? event.confidence : null,
+      createdAt: serverTimestamp(),
+    });
+    const ref = await addDoc(collection(db, 'users', coachUid, 'filmEvents'), data);
+
+    // Keep the parent film doc's own event list/status in sync so the Film
+    // Library list can show tagging progress without a second query.
+    await updateDoc(doc(db, 'users', coachUid, 'films', filmId), {
+      taggedEventIds: arrayUnion(ref.id),
+      processingStatus: 'tagging',
+    });
+
+    return ref.id;
+  } catch (error) {
+    console.error('Error saving film event:', error);
+    throw error;
+  }
+};
+
+/**
+ * Read all tagged events for a film, ordered by timestamp within the film.
+ * @param {string} coachUid
+ * @param {string} filmId
+ * @returns {Promise<Array>}
+ */
+export const getFilmEvents = async (coachUid, filmId) => {
+  try {
+    const snapshot = await getDocs(
+      query(collection(db, 'users', coachUid, 'filmEvents'), where('filmId', '==', filmId))
+    );
+    const items = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+    items.sort((a, b) => (a.timestampSec || 0) - (b.timestampSec || 0));
+    return items;
+  } catch (error) {
+    console.error('Error fetching film events:', error);
+    return [];
+  }
+};
+
+export const deleteFilmEvent = async (coachUid, filmId, eventId) => {
+  try {
+    await deleteDoc(doc(db, 'users', coachUid, 'filmEvents', eventId));
+    await updateDoc(doc(db, 'users', coachUid, 'films', filmId), {
+      taggedEventIds: arrayRemove(eventId),
+    });
+  } catch (error) {
+    console.error('Error deleting film event:', error);
+    throw error;
+  }
+};
+
+/**
+ * Mark a film's tagging pass complete (coach is done tagging for now, whether
+ * or not every event turned out to be taggable). Distinct from
+ * processingStatus 'analyzed', which is set once an opponentModel has been
+ * aggregated from this film's events (Phase 2 — not implemented yet).
+ * @param {string} coachUid
+ * @param {string} filmId
+ */
+export const markFilmTaggingComplete = async (coachUid, filmId) => {
+  try {
+    await updateDoc(doc(db, 'users', coachUid, 'films', filmId), {
+      processingStatus: 'tagged',
+    });
+  } catch (error) {
+    console.error('Error marking film tagging complete:', error);
+    throw error;
+  }
+};
+
+// ==================== COACH: Opponent Models (SimCoach Coach Phase 2) ====================
+// The bridge between Phase 1 (tagging) and the rest of Phase 2 (tactical
+// modeling / what-if / simulation). Turns a coach's tagged filmEvents into a
+// versioned Opponent Model: tendency DISTRIBUTIONS conditioned on the
+// coverage the offense faced — never a single predicted action, per the
+// spec's "probabilistic, not deterministic" principle. Everything downstream
+// in Phase 2 reads from opponentModels, never from raw filmEvents directly.
+
+const round2 = (n) => Math.round(n * 100) / 100;
+
+const slugifyOpponentName = (name) =>
+  (name || 'opponent').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'opponent';
+
+// extractionMethod trust weights for the confidence formula below. Manual
+// tagging is fully trusted in Phase 1 (it's a human watching the film);
+// automated/hybrid weights are placeholders until that pathway exists and
+// its accuracy can be measured against manual tags (spec §4.4 — the
+// extraction method is swappable, and confidence should reflect how much a
+// given method is actually trusted, not just that data exists for it).
+const EXTRACTION_METHOD_TRUST = { manual: 1.0, hybrid: 0.85, automated: 0.6 };
+
+/**
+ * First-cut opponent-model confidence formula (spec §4.3/§9 flagged this as
+ * needing an actual design pass rather than just a declared field — this is
+ * that pass). Deliberately simple and documented so it's easy to recalibrate
+ * once real coach feedback exists on whether it "feels right":
+ *   - sampleFactor: more tagged events = more confidence, saturating at 30
+ *   - filmFactor: more distinct games analyzed = more confidence, saturating at 3
+ *   - methodFactor: average trust of however each event was extracted
+ * Weighted 50/30/20 toward sample size mattering most, since a handful of
+ * events from many games is still a thin sample.
+ * @param {Array} events - the filmEvents contributing to this model
+ * @param {number} filmCount - distinct films contributing
+ * @returns {number} 0-100
+ */
+const computeOpponentModelConfidence = (events, filmCount) => {
+  if (!events.length) return 0;
+  const sampleFactor = Math.min(1, events.length / 30);
+  const filmFactor = Math.min(1, filmCount / 3);
+  const methodFactor =
+    events.reduce((sum, e) => sum + (EXTRACTION_METHOD_TRUST[e.extractionMethod] ?? 0.5), 0) / events.length;
+  return Math.round((sampleFactor * 0.5 + filmFactor * 0.3 + methodFactor * 0.2) * 100);
+};
+
+// Turn a { key: rawCount } map into a { key: probability } map (0-1, rounded
+// to 2 decimals). Empty input returns an empty map rather than dividing by 0.
+const countsToProbabilities = (counts) => {
+  const total = Object.values(counts).reduce((a, b) => a + b, 0);
+  if (!total) return {};
+  return Object.fromEntries(Object.entries(counts).map(([k, v]) => [k, round2(v / total)]));
+};
+
+/**
+ * Aggregate every filmEvent tagged against a coach's film for one opponent
+ * into a versioned opponentModels doc. Safe to re-run any time new film is
+ * tagged — this is a full recompute from current events, not an incremental
+ * update, so the model always reflects exactly what's tagged right now.
+ * @param {string} coachUid
+ * @param {string} opponentName - matched against films.opponentName
+ * @returns {Promise<Object>} the generated opponent model, with its id
+ */
+/**
+ * Fetch every tagged filmEvent across all of a coach's films for one
+ * opponent — the raw material both generateOpponentModel (full aggregate)
+ * and the What-If Lab's situation filtering (Layer 6) build on. Pulled out
+ * as its own function so both call sites share one source of truth instead
+ * of two copies of the films→filmEvents fetch drifting apart.
+ * @param {string} coachUid
+ * @param {string} opponentName - matched against films.opponentName
+ * @returns {Promise<{events: Array, filmIds: Array<string>}>}
+ */
+export const getOpponentFilmEvents = async (coachUid, opponentName) => {
+  const filmsSnap = await getDocs(
+    query(collection(db, 'users', coachUid, 'films'), where('opponentName', '==', opponentName))
+  );
+  const filmIds = filmsSnap.docs.map((d) => d.id);
+  const eventLists = await Promise.all(filmIds.map((filmId) => getFilmEvents(coachUid, filmId)));
+  return { events: eventLists.flat(), filmIds };
+};
+
+// Best-effort bucketing of the freeform `situation.quarter` string coaches
+// type in the tagging UI (placeholder is "e.g. 3rd" — not a fixed vocabulary
+// like coverage/actionType). This is normalization for grouping, not
+// invention: unrecognized text becomes 'Other' rather than being guessed at.
+// timeRemaining is NOT similarly bucketed — free-text clock values ("6:42",
+// "2 min left", etc.) can't be turned into a reliable "late game" threshold
+// without parsing that would manufacture precision the raw data doesn't
+// support (same reasoning as recentOutcomes staying unparsed — see spec §9).
+export const normalizeQuarter = (raw) => {
+  const s = (raw || '').toLowerCase().trim();
+  if (!s) return null;
+  if (/\bot\b|overtime/.test(s)) return 'OT';
+  if (/(^|\D)1(st)?(\D|$)/.test(s) || /first/.test(s)) return 'Q1';
+  if (/(^|\D)2(nd)?(\D|$)/.test(s) || /second/.test(s)) return 'Q2';
+  if (/(^|\D)3(rd)?(\D|$)/.test(s) || /third/.test(s)) return 'Q3';
+  if (/(^|\D)4(th)?(\D|$)/.test(s) || /fourth/.test(s)) return 'Q4';
+  return 'Other';
+};
+
+const QUARTER_ORDER = ['Q1', 'Q2', 'Q3', 'Q4', 'OT', 'Other'];
+
+// Distinct normalized quarter buckets actually present among events run
+// against a given coverage — what the What-If Lab offers as filter chips
+// (only situations there's real tagged evidence for, never a fixed list
+// that might be empty).
+export const getQuartersForCoverage = (events, coverage) => {
+  const present = new Set();
+  events.forEach((e) => {
+    if ((e.coverage || 'any') !== coverage) return;
+    const q = normalizeQuarter(e.situation?.quarter);
+    if (q) present.add(q);
+  });
+  return QUARTER_ORDER.filter((q) => present.has(q));
+};
+
+/**
+ * Layer 6 (Scenario Simulation): the same coverage-conditioned tendency
+ * calculation generateOpponentModel does for the general report, but
+ * further filtered to one situation (currently: quarter) and computed
+ * on-demand from raw events rather than the pre-aggregated model — so the
+ * What-If Lab can ask "what do they do on THIS coverage in THIS quarter"
+ * without a new persisted collection.
+ * @param {Array} events
+ * @param {Object} filter - { coverage, quarter? }
+ * @returns {{distribution: Object, sampleSize: number}}
+ */
+export const computeSituationTendency = (events, { coverage, quarter } = {}) => {
+  const filtered = events.filter((e) => {
+    if ((e.coverage || 'any') !== coverage) return false;
+    if (quarter && normalizeQuarter(e.situation?.quarter) !== quarter) return false;
+    return true;
+  });
+  const counts = {};
+  filtered.forEach((e) => {
+    const action = e.actionType || 'other';
+    counts[action] = (counts[action] || 0) + 1;
+  });
+  return { distribution: countsToProbabilities(counts), sampleSize: filtered.length };
+};
+
+export const generateOpponentModel = async (coachUid, opponentName) => {
+  try {
+    const { events, filmIds } = await getOpponentFilmEvents(coachUid, opponentName);
+
+    // tendencies: coverage faced -> distribution over the actions run against
+    // it ('any' buckets events with no coverage tagged). actionFrequency is
+    // the unconditioned distribution, for the general scouting report.
+    // personnelTendencies: per player, which actions they were tagged in.
+    const tendencyCounts = {};
+    const actionCounts = {};
+    const personnelCounts = {};
+
+    events.forEach((e) => {
+      const coverageKey = e.coverage || 'any';
+      const action = e.actionType || 'other';
+
+      tendencyCounts[coverageKey] = tendencyCounts[coverageKey] || {};
+      tendencyCounts[coverageKey][action] = (tendencyCounts[coverageKey][action] || 0) + 1;
+
+      actionCounts[action] = (actionCounts[action] || 0) + 1;
+
+      (e.personnel || []).forEach((p) => {
+        personnelCounts[p] = personnelCounts[p] || {};
+        personnelCounts[p][action] = (personnelCounts[p][action] || 0) + 1;
+      });
+    });
+
+    const tendencies = Object.fromEntries(
+      Object.entries(tendencyCounts).map(([coverageKey, counts]) => [coverageKey, countsToProbabilities(counts)])
+    );
+    // How many tagged events actually back each coverage bucket above — the
+    // UI needs this to show "based on N tagged possessions," since
+    // `tendencies` itself only holds probabilities, not counts.
+    const tendencySampleSizes = Object.fromEntries(
+      Object.entries(tendencyCounts).map(([coverageKey, counts]) => [
+        coverageKey,
+        Object.values(counts).reduce((a, b) => a + b, 0),
+      ])
+    );
+    const personnelTendencies = Object.fromEntries(
+      Object.entries(personnelCounts).map(([player, counts]) => [player, countsToProbabilities(counts)])
+    );
+
+    const modelId = slugifyOpponentName(opponentName);
+    const data = removeUndefined({
+      opponentName,
+      sourceFilmIds: filmIds,
+      tendencies,
+      tendencySampleSizes,
+      actionFrequency: countsToProbabilities(actionCounts),
+      personnelTendencies,
+      // Raw outcome notes are kept alongside the counted distributions rather
+      // than parsed into a synthetic made/missed stat — outcome is coach
+      // free text (see filmEvents), and guessing at its meaning via keyword
+      // matching would manufacture false precision. The coach reads these.
+      recentOutcomes: events.slice(-15).map((e) => e.outcome).filter(Boolean),
+      sampleSize: events.length,
+      confidenceLevel: computeOpponentModelConfidence(events, filmIds.length),
+      lastUpdatedFromFilm: serverTimestamp(),
+      version: increment(1),
+    });
+
+    await setDoc(doc(db, 'users', coachUid, 'opponentModels', modelId), data, { merge: true });
+
+    // Mark every contributing film as analyzed and point it at this model.
+    await Promise.all(
+      filmIds.map((filmId) =>
+        updateDoc(doc(db, 'users', coachUid, 'films', filmId), {
+          processingStatus: 'analyzed',
+          opponentModelId: modelId,
+        })
+      )
+    );
+
+    const snap = await getDoc(doc(db, 'users', coachUid, 'opponentModels', modelId));
+    return { id: snap.id, ...snap.data() };
+  } catch (error) {
+    console.error('Error generating opponent model:', error);
+    throw error;
+  }
+};
+
+export const getOpponentModel = async (coachUid, opponentModelId) => {
+  try {
+    const snap = await getDoc(doc(db, 'users', coachUid, 'opponentModels', opponentModelId));
+    return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+  } catch (error) {
+    console.error('Error fetching opponent model:', error);
+    return null;
+  }
+};
+
+export const getOpponentModels = async (coachUid) => {
+  try {
+    const snapshot = await getDocs(collection(db, 'users', coachUid, 'opponentModels'));
+    const items = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+    items.sort((a, b) => (b.sampleSize || 0) - (a.sampleSize || 0));
+    return items;
+  } catch (error) {
+    console.error('Error fetching opponent models:', error);
+    return [];
+  }
+};
+
+// ==================== COACH: Simulation Runs (What-If Lab — Layers 4/6/7) ====================
+// V1 fidelity is 'outcome' simulation (spec §3 item 4, §6): given a coverage
+// the coach is considering, what does the opponent model say they tend to do
+// against it. A "what-if" is just a run with chosen variables; a "strategy
+// comparison" (Layer 7, not yet built a dedicated UI for) is two runs read
+// side by side via comparedAgainstRunId — no separate data model needed.
+
+/**
+ * Persist a what-if simulation result. The outcome distribution itself is
+ * computed client-side from an already-loaded opponentModel (it's just a
+ * slice of `tendencies`) — this just records the run so it can be reviewed,
+ * linked from a practice priority, or later compared against another run.
+ * @param {string} coachUid
+ * @param {Object} run - {
+ *   opponentModelId, opponentName, variables: { coverage, ... },
+ *   fidelityLevel?: 'outcome'|'sequence'|'possession'|'interactive',
+ *   outcomeDistribution: { [actionType]: probability }, sampleSize,
+ *   comparedAgainstRunId?
+ * }
+ * @returns {Promise<string>} the simulationRun id
+ */
+export const saveSimulationRun = async (coachUid, run) => {
+  try {
+    const ref = await addDoc(collection(db, 'users', coachUid, 'simulationRuns'), removeUndefined({
+      opponentModelId: run.opponentModelId,
+      opponentName: run.opponentName || null,
+      variables: run.variables || {},
+      fidelityLevel: run.fidelityLevel || 'outcome',
+      outcomeDistribution: run.outcomeDistribution || {},
+      sampleSize: typeof run.sampleSize === 'number' ? run.sampleSize : 0,
+      comparedAgainstRunId: run.comparedAgainstRunId || null,
+      createdAt: serverTimestamp(),
+    }));
+    return ref.id;
+  } catch (error) {
+    console.error('Error saving simulation run:', error);
+    throw error;
+  }
+};
+
+export const getSimulationRuns = async (coachUid, opponentModelId) => {
+  try {
+    const snapshot = await getDocs(
+      query(collection(db, 'users', coachUid, 'simulationRuns'), where('opponentModelId', '==', opponentModelId))
+    );
+    const items = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+    items.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+    return items;
+  } catch (error) {
+    console.error('Error fetching simulation runs:', error);
+    return [];
+  }
+};
+
+/**
+ * Layer 7 (Strategy Comparison): record that one saved simulationRun was
+ * compared against another — the field already existed in the schema
+ * (§5) with no writer. One-directional by design (baseline.comparedAgainstRunId
+ * points at the run it was compared to), matching the schema's singular field.
+ * @param {string} coachUid
+ * @param {string} runId - the run being marked as having a comparison
+ * @param {string} comparedAgainstRunId - the run it was compared against
+ */
+export const linkComparedSimulationRuns = async (coachUid, runId, comparedAgainstRunId) => {
+  try {
+    await updateDoc(doc(db, 'users', coachUid, 'simulationRuns', runId), {
+      comparedAgainstRunId,
+    });
+  } catch (error) {
+    console.error('Error linking compared simulation runs:', error);
+    throw error;
+  }
+};
+
+// ==================== COACH: Practice Priorities (Layers 8-9: Game-Prep Feedback / Practice Integration) ====================
+// A vulnerability the coach flagged from a simulation run, meant to close the
+// loop into practice. linkedBlueprintDrillIds exists in the schema per spec
+// §5 but isn't wired to Blueprint360's drill picker yet — that UI is a
+// follow-up; for now a priority is a coach-readable flag, not yet a
+// scheduled drill.
+
+/**
+ * @param {string} coachUid
+ * @param {Object} priority - { sourceRunId, opponentModelId, opponentName, vulnerability, recommendedFocus? }
+ * @returns {Promise<string>} the practicePriority id
+ */
+export const savePracticePriority = async (coachUid, priority) => {
+  try {
+    const ref = await addDoc(collection(db, 'users', coachUid, 'practicePriorities'), removeUndefined({
+      sourceRunId: priority.sourceRunId || null,
+      opponentModelId: priority.opponentModelId,
+      opponentName: priority.opponentName || null,
+      vulnerability: priority.vulnerability || '',
+      recommendedFocus: priority.recommendedFocus || '',
+      linkedBlueprintDrillIds: [],
+      createdAt: serverTimestamp(),
+    }));
+    return ref.id;
+  } catch (error) {
+    console.error('Error saving practice priority:', error);
+    throw error;
+  }
+};
+
+export const getPracticePriorities = async (coachUid, opponentModelId) => {
+  try {
+    const snapshot = await getDocs(
+      query(collection(db, 'users', coachUid, 'practicePriorities'), where('opponentModelId', '==', opponentModelId))
+    );
+    const items = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+    items.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+    return items;
+  } catch (error) {
+    console.error('Error fetching practice priorities:', error);
+    return [];
+  }
+};
+
+/**
+ * Layer 9 (Practice Integration): link a practicePriority to real practice
+ * content the coach can actually assign. NOTE ON NAMING: the schema field
+ * (§5) is called linkedBlueprintDrillIds because the source spec envisioned
+ * linking to a "Blueprint360 drill" — but Blueprint360Screen/PlanDetailScreen
+ * render entirely from mock data today (no real drill collection exists),
+ * and the separate "CreateDrillScreen" actually writes CoachMarket listings,
+ * not Blueprint content. The `workouts` (global catalog) / `customWorkouts`
+ * (per-coach) collections are the real, already-functioning practice-content
+ * system in this app (consumed by AssignWorkoutScreen's assignToAthlete
+ * flow) — so that's what this links to. Revisit the field name once
+ * Blueprint360 has a real backing data model of its own.
+ * @param {string} coachUid
+ * @param {string} priorityId
+ * @param {Array<string>} workoutIds - ids from `workouts` and/or the coach's `customWorkouts`
+ */
+export const linkWorkoutsToPracticePriority = async (coachUid, priorityId, workoutIds) => {
+  try {
+    if (!workoutIds?.length) return;
+    await updateDoc(doc(db, 'users', coachUid, 'practicePriorities', priorityId), {
+      linkedBlueprintDrillIds: arrayUnion(...workoutIds),
+    });
+  } catch (error) {
+    console.error('Error linking workouts to practice priority:', error);
+    throw error;
+  }
+};
+
+// ==================== COACH: Simulation Sessions (Team Simulation Collaboration & Communication — SimCoach Coach Phase 3) ====================
+// See docs/SIMCOACH_COACH_TECHNICAL_SPEC.md §3.5/§8. V1 scope is PLAYER
+// participants only — Kassoum's review also describes Assistant Coach and
+// Analyst/Staff participants, but this app has no existing mechanism for one
+// coach to link another coach as staff. The only real relationship
+// primitive here (connections/linkedPlayers, generateInviteCode/
+// redeemInviteCode below) is strictly player<->role-holder: a player
+// generates the code, a coach/parent redeems it against THAT player. There's
+// no coach-to-coach equivalent. Building a fake "invite staff" flow with no
+// real linking underneath would repeat the mistake already caught and
+// avoided in the Blueprint360 drill-linking work — so staff participation
+// stays deferred until a coach-to-coach linking primitive exists (a real,
+// separate prerequisite, not scoped here). Player participants ARE fully
+// real: this reuses the exact getLinkedPlayers() roster Your-Team Model
+// already shows.
+//
+// `participants` is stored as a MAP keyed by uid, not an array of {uid,...}
+// objects — deliberately, so Firestore security rules can check membership
+// with a cheap `request.auth.uid in resource.data.participants` instead of
+// needing to scan an array for a matching sub-field, which rules can't do
+// efficiently. See firestore.rules' simulationSessions block for the read
+// rule this shape enables — the first non-owner-access pattern in this app
+// outside the existing connections/linkedPlayers/assignments precedent.
+
+/**
+ * @param {string} coachUid
+ * @param {Object} session - { opponentModelId, opponentName, title, baseSimulationRunId, playerUids: [],
+ *   scenario?: { coverage, quarter, distribution, sampleSize } }
+ * @returns {Promise<string>} the new session id
+ */
+export const createSimulationSession = async (coachUid, session) => {
+  try {
+    const playerUids = session.playerUids || [];
+    const participants = {};
+    playerUids.forEach((uid) => {
+      participants[uid] = {
+        role: 'player',
+        canPropose: false,
+        canRespond: true,
+        canView: true,
+      };
+    });
+    const ref = await addDoc(collection(db, 'users', coachUid, 'simulationSessions'), removeUndefined({
+      opponentModelId: session.opponentModelId,
+      opponentName: session.opponentName || null,
+      title: session.title || 'Shared Simulation',
+      createdBy: coachUid,
+      participants,
+      // Denormalized alongside `participants` purely so getSharedSimulationSessions
+      // can query it: `participants` is a map keyed by uid, which is cheap for
+      // rules (`uid in resource.data.participants`) but NOT queryable across a
+      // collectionGroup — Firestore can't index an arbitrary per-user dynamic
+      // field path (`participants.<uid>`) for every possible uid. A plain array
+      // field supports `array-contains`, which Firestore CAN index normally.
+      participantUids: playerUids,
+      baseSimulationRunId: session.baseSimulationRunId || null,
+      latestRunId: session.baseSimulationRunId || null,
+      // Snapshot of the run being shared, copied onto the session itself
+      // rather than left for participants to fetch from `simulationRuns` —
+      // that collection is owner-only (isOwner(uid)), same as every other
+      // SimCoach collection, so a participant has no read path to it. The
+      // session doc is the one place rules already grant them read access,
+      // so this is the only way they can see what they're responding to.
+      scenario: session.scenario || null,
+      status: 'open',
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }));
+    return ref.id;
+  } catch (error) {
+    console.error('Error creating simulation session:', error);
+    throw error;
+  }
+};
+
+export const getCoachSimulationSessions = async (coachUid, opponentModelId) => {
+  try {
+    const q = opponentModelId
+      ? query(collection(db, 'users', coachUid, 'simulationSessions'), where('opponentModelId', '==', opponentModelId))
+      : collection(db, 'users', coachUid, 'simulationSessions');
+    const snapshot = await getDocs(q);
+    const items = snapshot.docs.map((d) => ({ id: d.id, coachUid, ...d.data() }));
+    items.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+    return items;
+  } catch (error) {
+    console.error('Error fetching coach simulation sessions:', error);
+    return [];
+  }
+};
+
+// Sessions shared with a participant, across every coach who's shared one
+// with them — sessions live under each coach's own
+// users/{coachUid}/simulationSessions, never the participant's, so this has
+// to be a collectionGroup query. Queries the denormalized `participantUids`
+// array (see createSimulationSession) rather than the `participants` map:
+// Firestore can't index an arbitrary per-user dynamic field path
+// (`participants.<uid>`) across a collectionGroup, but `array-contains` on
+// a plain array field indexes normally.
+export const getSharedSimulationSessions = async (participantUid) => {
+  try {
+    const q = query(
+      collectionGroup(db, 'simulationSessions'),
+      where('participantUids', 'array-contains', participantUid)
+    );
+    const snapshot = await getDocs(q);
+    const items = snapshot.docs.map((d) => ({
+      id: d.id,
+      coachUid: d.ref.parent.parent.id,
+      ...d.data(),
+    }));
+    items.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+    return items;
+  } catch (error) {
+    console.error('Error fetching shared simulation sessions:', error);
+    return [];
+  }
+};
+
+export const getSimulationSession = async (coachUid, sessionId) => {
+  try {
+    const snap = await getDoc(doc(db, 'users', coachUid, 'simulationSessions', sessionId));
+    return snap.exists() ? { id: snap.id, coachUid, ...snap.data() } : null;
+  } catch (error) {
+    console.error('Error fetching simulation session:', error);
+    return null;
+  }
+};
+
+export const closeSimulationSession = async (coachUid, sessionId) => {
+  try {
+    await updateDoc(doc(db, 'users', coachUid, 'simulationSessions', sessionId), {
+      status: 'closed',
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error('Error closing simulation session:', error);
+    throw error;
+  }
+};
+
+/**
+ * A player's submitted decision inside a shared session (or, later, a
+ * staff proposal — `type`/`role` already support that, only the linking
+ * mechanism to actually add a staff participant is missing).
+ * @param {string} coachUid
+ * @param {string} sessionId
+ * @param {Object} response - { submittedBy, submittedByName, role, type, scenarioRef, response, comparedToCoachIntent }
+ */
+export const submitSessionResponse = async (coachUid, sessionId, response) => {
+  try {
+    const ref = await addDoc(collection(db, 'users', coachUid, 'simulationSessions', sessionId, 'responses'), removeUndefined({
+      submittedBy: response.submittedBy,
+      submittedByName: response.submittedByName || null,
+      role: response.role || 'player',
+      type: response.type || 'decision',
+      scenarioRef: response.scenarioRef || null,
+      response: response.response || {},
+      comparedToCoachIntent: response.comparedToCoachIntent || null,
+      createdAt: serverTimestamp(),
+    }));
+    return ref.id;
+  } catch (error) {
+    console.error('Error submitting session response:', error);
+    throw error;
+  }
+};
+
+export const getSessionResponses = async (coachUid, sessionId) => {
+  try {
+    const snapshot = await getDocs(collection(db, 'users', coachUid, 'simulationSessions', sessionId, 'responses'));
+    const items = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+    items.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+    return items;
+  } catch (error) {
+    console.error('Error fetching session responses:', error);
+    return [];
   }
 };
 

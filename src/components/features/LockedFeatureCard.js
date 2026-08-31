@@ -30,7 +30,7 @@ const LockedFeatureCard = ({
     displayName,
     description,
     icon = 'lock-closed',
-    colors = ['#FF6B00', '#FF8E53'],
+    colors = ['#8A1C22', '#4C0F14'],
     customMessage
 }) => {
     const { userData, theme, navigation } = useAppContext();

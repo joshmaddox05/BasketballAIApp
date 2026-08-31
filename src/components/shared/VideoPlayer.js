@@ -152,8 +152,8 @@ const VideoPlayer = ({
             style={styles.controlButton}
             onPress={() => setShowPlayerModal(true)}
           >
-            <Ionicons name="play-circle-outline" size={20} color="#FF6B35" />
-            <Text style={[styles.controlText, { color: '#FF6B35' }]}>Play in App</Text>
+            <Ionicons name="play-circle-outline" size={20} color="#8A1C22" />
+            <Text style={[styles.controlText, { color: '#8A1C22' }]}>Play in App</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
@@ -337,7 +337,7 @@ const styles = StyleSheet.create({
     color: '#999',
   },
   levelText: {
-    color: '#FF6B00',
+    color: '#8A1C22',
     fontWeight: '500',
   },
   metaDot: {
@@ -441,7 +441,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   primaryButton: {
-    backgroundColor: '#FF6B00',
+    backgroundColor: '#8A1C22',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

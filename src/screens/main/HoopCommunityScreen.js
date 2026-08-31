@@ -1,15 +1,25 @@
-// HoopCommunityScreen.js
-import React, { useState, useCallback } from 'react';
-import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, ScrollView, TextInput } from 'react-native';
+// HoopCommunityScreen.js — 12c: feed with live ticker (burgundy athletic system)
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import {
+  SafeAreaView,
+  StyleSheet,
+  View,
+  Text,
+  TouchableOpacity,
+  ScrollView,
+  Animated,
+  Easing,
+} from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
-import { canAccessFeature } from '../../utils/subscription';
+import { Entrance, Avatar, EmptyState } from '../../components/dbe';
+import { TYPE, SHAPE, FONTS } from '../../utils/typography';
 
 const MOCK_POSTS = [
   {
     id: '1',
-    user: { name: 'DaShawn Brooks', initials: 'DB', color: '#E05A00' },
+    user: { name: 'DaShawn Brooks', initials: 'DB' },
     timeAgo: '12 min ago',
     text: 'Just unlocked the "Sharp Shooter" achievement! 500 made threes logged in the app. Consistency is everything — been grinding this for 3 months straight.',
     likes: 41,
@@ -67,7 +77,7 @@ const MOCK_POSTS = [
 const TRENDING_POSTS = [
   {
     id: 't1',
-    user: { name: 'Coach Rivera', initials: 'CR', color: '#FF6B00' },
+    user: { name: 'Coach Rivera', initials: 'CR' },
     timeAgo: '2 hrs ago',
     text: 'Pro tip: most players skip the catch-and-shoot reps because there\'s no dribble involved. Those are the shots you actually take in games. Add 50 spot-up catches to every session.',
     likes: 214,
@@ -126,14 +136,72 @@ const FOLLOWING_POSTS = [
 ];
 
 const POST_TYPE_CONFIG = {
-  achievement: { icon: 'trophy', color: '#FF6B00', label: 'Achievement' },
-  workout: { icon: 'barbell', color: '#0284C7', label: 'Workout' },
-  challenge: { icon: 'ribbon', color: '#059669', label: 'Challenge' },
-  tip: { icon: 'bulb', color: '#8B5CF6', label: 'Tip' },
-  milestone: { icon: 'star', color: '#DC2626', label: 'Milestone' },
+  achievement: { icon: 'trophy-outline', label: 'Achievement' },
+  workout: { icon: 'barbell-outline', label: 'Workout' },
+  challenge: { icon: 'ribbon-outline', label: 'Challenge' },
+  tip: { icon: 'bulb-outline', label: 'Tip' },
+  milestone: { icon: 'star-outline', label: 'Milestone' },
 };
 
 const TABS = ['Feed', 'Trending', 'Following'];
+
+// Short first-name + last-initial form for the ticker (mock 12c: "Marcus R.").
+const shortName = (name) => {
+  const parts = String(name || '').trim().split(/\s+/);
+  return parts.length > 1 ? `${parts[0]} ${parts[1][0]}.` : parts[0] || '';
+};
+
+/**
+ * Ticker — horizontal auto-scrolling strip (mock baiDrift, 22s linear loop).
+ * Content is duplicated so the translateX loop reads as continuous.
+ */
+function Ticker({ items, theme }) {
+  const x = useRef(new Animated.Value(0)).current;
+  const [w, setW] = useState(0);
+
+  useEffect(() => {
+    if (!w) return;
+    x.setValue(0);
+    const loop = Animated.loop(
+      Animated.timing(x, {
+        toValue: -w,
+        duration: Math.max(12000, w * 26),
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [w]);
+
+  if (!items.length) return null;
+
+  const strip = (measure) => (
+    <View
+      style={styles.tickerStrip}
+      onLayout={measure ? (e) => setW(e.nativeEvent.layout.width) : undefined}
+    >
+      {items.map((t, i) => (
+        <Text
+          key={`${measure ? 'a' : 'b'}-${i}`}
+          numberOfLines={1}
+          style={[styles.tickerText, { color: i % 2 === 0 ? theme.steel : theme.textDim }]}
+        >
+          {t}
+        </Text>
+      ))}
+    </View>
+  );
+
+  return (
+    <View style={[styles.tickerWrap, { borderBottomColor: theme.hairline }]}>
+      <Animated.View style={{ flexDirection: 'row', transform: [{ translateX: x }] }}>
+        {strip(true)}
+        {strip(false)}
+      </Animated.View>
+    </View>
+  );
+}
 
 const HoopCommunityScreen = ({ navigation }) => {
   const { userData, theme, isDarkMode } = useAppContext();
@@ -152,101 +220,113 @@ const HoopCommunityScreen = ({ navigation }) => {
     setLikedPosts(prev => ({ ...prev, [postId]: !prev[postId] }));
   }, []);
 
-  const getInitials = (name) =>
-    name
-      .split(' ')
-      .map(n => n[0])
-      .join('')
-      .toUpperCase();
+  const posts = getPostsForTab();
 
-  const renderPostCard = (post) => {
+  // Ticker copy is derived from the badged/most-engaged posts already in the feed.
+  const tickerItems = useMemo(
+    () =>
+      MOCK_POSTS.slice(0, 3).map((p) => {
+        const label = p.badge || (POST_TYPE_CONFIG[p.type] || POST_TYPE_CONFIG.workout).label;
+        return `${shortName(p.user.name)} · ${label}`;
+      }),
+    [],
+  );
+
+  const renderPostCard = (post, index) => {
     const isLiked = likedPosts[post.id] ?? post.isLiked;
     const likeCount = isLiked !== post.isLiked
       ? isLiked ? post.likes + 1 : post.likes - 1
       : post.likes;
     const typeConfig = POST_TYPE_CONFIG[post.type] || POST_TYPE_CONFIG.workout;
+    const badgeLabel = post.badge || typeConfig.label;
 
     return (
-      <View
+      <Entrance
         key={post.id}
-        style={[styles.postCard, { backgroundColor: theme.card || '#1C1C1E', borderColor: theme.border || '#2C2C2E' }]}
+        variant="cardIn"
+        delay={50 + index * 130}
+        style={[styles.postCard, { backgroundColor: theme.surface }]}
       >
         {/* Card header */}
         <View style={styles.postHeader}>
-          <View style={[styles.avatar, { backgroundColor: post.user.color }]}>
-            <Text style={styles.avatarText}>{post.user.initials}</Text>
-          </View>
+          <Avatar
+            size={36}
+            tone={post.badge ? 'accent' : 'steel'}
+            initials={post.user.initials}
+          />
           <View style={styles.postMeta}>
-            <Text style={[styles.postUserName, { color: theme.text || '#FFFFFF' }]}>{post.user.name}</Text>
-            <View style={styles.postSubMeta}>
-              <View style={[styles.typeTag, { backgroundColor: typeConfig.color + '22' }]}>
-                <Ionicons name={typeConfig.icon + '-outline'} size={11} color={typeConfig.color} />
-                <Text style={[styles.typeTagText, { color: typeConfig.color }]}>{typeConfig.label}</Text>
-              </View>
-              <Text style={[styles.timeAgo, { color: theme.textSecondary || '#8E8E93' }]}>{post.timeAgo}</Text>
-            </View>
+            <Text style={[TYPE.rowTitle, { color: theme.text, fontSize: 13 }]}>{post.user.name}</Text>
+            <Text style={[styles.timeAgo, { color: theme.textDim }]}>
+              {post.timeAgo}
+              {post.badge ? '' : ` · ${typeConfig.label}`}
+            </Text>
           </View>
-          <TouchableOpacity hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="ellipsis-horizontal" size={20} color={theme.textSecondary || '#8E8E93'} />
-          </TouchableOpacity>
+          {post.badge ? (
+            <Entrance variant="chipPop" delay={300 + index * 130}>
+              <View style={[styles.badgePill, { backgroundColor: theme.badgeFill }]}>
+                <Ionicons name={typeConfig.icon} size={11} color={theme.accentText} />
+                <Text style={[styles.badgePillText, { color: theme.accentText }]}>
+                  {badgeLabel.toUpperCase()}
+                </Text>
+              </View>
+            </Entrance>
+          ) : null}
         </View>
 
-        {/* Badge pill for achievements/challenges */}
-        {post.badge && (
-          <View style={[styles.badgePill, { backgroundColor: '#FF6B00' + '22' }]}>
-            <Ionicons name="trophy" size={13} color="#FF6B00" />
-            <Text style={styles.badgePillText}>{post.badge}</Text>
-          </View>
-        )}
-
         {/* Post text */}
-        <Text style={[styles.postText, { color: theme.text || '#FFFFFF' }]}>{post.text}</Text>
+        <Text style={[styles.postText, { color: theme.textMuted }]}>{post.text}</Text>
 
         {/* Actions row */}
-        <View style={[styles.actionsRow, { borderTopColor: theme.border || '#2C2C2E' }]}>
+        <View style={[styles.actionsRow, { borderTopColor: theme.hairline }]}>
           <TouchableOpacity style={styles.actionBtn} onPress={() => handleLike(post.id)}>
             <Ionicons
               name={isLiked ? 'heart' : 'heart-outline'}
-              size={20}
-              color={isLiked ? '#FF3B30' : theme.textSecondary || '#8E8E93'}
+              size={15}
+              color={isLiked ? theme.primary : theme.textDim}
             />
-            <Text style={[styles.actionCount, { color: isLiked ? '#FF3B30' : theme.textSecondary || '#8E8E93' }]}>
+            <Text style={[styles.actionCount, { color: isLiked ? theme.accentText : theme.textDim }]}>
               {likeCount}
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.actionBtn}>
-            <Ionicons name="chatbubble-outline" size={19} color={theme.textSecondary || '#8E8E93'} />
-            <Text style={[styles.actionCount, { color: theme.textSecondary || '#8E8E93' }]}>{post.comments}</Text>
+            <Ionicons name="chatbubble-outline" size={15} color={theme.textDim} />
+            <Text style={[styles.actionCount, { color: theme.textDim }]}>{post.comments}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.actionBtn}>
-            <Ionicons name="share-social-outline" size={20} color={theme.textSecondary || '#8E8E93'} />
+            <Ionicons name="share-social-outline" size={15} color={theme.textDim} />
           </TouchableOpacity>
         </View>
-      </View>
+      </Entrance>
     );
   };
 
-  const posts = getPostsForTab();
-
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background || '#000000' }]}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <StatusBar style={isDarkMode ? 'light' : 'dark'} />
 
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: theme.background || '#000000', borderBottomColor: theme.border || '#2C2C2E' }]}>
-        <Text style={[styles.headerTitle, { color: theme.text || '#FFFFFF' }]}>
-          HoopCommunity<Text style={[styles.trademark, { color: theme.textSecondary || '#8E8E93' }]}>™</Text>
-        </Text>
-        <TouchableOpacity style={[styles.notifBtn, { backgroundColor: theme.card || '#1C1C1E' }]}>
-          <Ionicons name="notifications-outline" size={22} color={theme.text || '#FFFFFF'} />
-          <View style={styles.notifDot} />
+      <View style={styles.header}>
+        <View style={{ flex: 1 }}>
+          <Text style={[TYPE.screenTitle, { color: theme.text }]}>HoopCommunity™</Text>
+          <Text style={[TYPE.greeting, { color: theme.textDim }]}>
+            {posts.length} post{posts.length === 1 ? '' : 's'} in {activeTab.toLowerCase()}
+          </Text>
+        </View>
+        <TouchableOpacity
+          style={[styles.postBtn, { backgroundColor: theme.primary }]}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="add" size={18} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
 
+      {/* Live ticker */}
+      <Ticker items={tickerItems} theme={theme} />
+
       {/* Sub-tab row */}
-      <View style={[styles.tabRow, { backgroundColor: theme.background || '#000000', borderBottomColor: theme.border || '#2C2C2E' }]}>
+      <View style={[styles.tabRow, { borderBottomColor: theme.hairline }]}>
         {TABS.map(tab => {
           const isActive = activeTab === tab;
           return (
@@ -254,11 +334,17 @@ const HoopCommunityScreen = ({ navigation }) => {
               key={tab}
               style={styles.tabItem}
               onPress={() => setActiveTab(tab)}
+              activeOpacity={0.8}
             >
-              <Text style={[styles.tabLabel, { color: isActive ? '#FF6B00' : theme.textSecondary || '#8E8E93' }]}>
+              <Text
+                style={[
+                  isActive ? styles.tabLabelActive : styles.tabLabel,
+                  { color: isActive ? theme.text : theme.textDim },
+                ]}
+              >
                 {tab}
               </Text>
-              {isActive && <View style={styles.tabUnderline} />}
+              {isActive && <View style={[styles.tabUnderline, { backgroundColor: theme.primary }]} />}
             </TouchableOpacity>
           );
         })}
@@ -272,33 +358,31 @@ const HoopCommunityScreen = ({ navigation }) => {
       >
         {/* Challenges live inside HoopCommunity now that the Challenges tab was folded in. */}
         <TouchableOpacity
-          style={[styles.challengeBanner, { backgroundColor: theme.card || '#1C1C1E', borderColor: theme.border || '#2C2C2E' }]}
+          style={[styles.challengeBanner, { backgroundColor: theme.surface }]}
           activeOpacity={0.85}
           onPress={() => navigation.navigate('Challenges')}
         >
-          <View style={[styles.challengeIcon, { backgroundColor: '#FF6B0022' }]}>
-            <Ionicons name="trophy" size={22} color="#FF6B00" />
+          <View style={[styles.challengeIcon, { backgroundColor: theme.badgeFill }]}>
+            <Ionicons name="trophy-outline" size={18} color={theme.accentText} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.challengeTitle, { color: theme.text || '#FFFFFF' }]}>Challenges</Text>
-            <Text style={[styles.challengeSub, { color: theme.textSecondary || '#8E8E93' }]}>
-              Compete solo, head-to-head, or in groups
-            </Text>
+            <Text style={[TYPE.rowTitle, { color: theme.text }]}>Challenges</Text>
+            <Text style={[TYPE.rowMeta, { color: theme.textDim }]}>Solo, head-to-head, groups</Text>
           </View>
-          <Ionicons name="chevron-forward" size={20} color={theme.textSecondary || '#8E8E93'} />
+          <Ionicons name="chevron-forward" size={15} color={theme.textDim} />
         </TouchableOpacity>
-        {posts.map(post => renderPostCard(post))}
+
+        {posts.length > 0 ? (
+          posts.map((post, i) => renderPostCard(post, i))
+        ) : (
+          <EmptyState
+            icon="people-outline"
+            title="Nothing here yet"
+            sub="Follow hoopers to fill this feed."
+          />
+        )}
         <View style={styles.bottomPad} />
       </ScrollView>
-
-      {/* FAB */}
-      <TouchableOpacity
-        style={styles.fab}
-        activeOpacity={0.85}
-      >
-        <Ionicons name="add" size={26} color="#FFFFFF" />
-        <Text style={styles.fabLabel}>Post Achievement</Text>
-      </TouchableOpacity>
     </SafeAreaView>
   );
 };
@@ -309,201 +393,136 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: SHAPE.screenPadding,
+    paddingTop: 10,
+    paddingBottom: 6,
   },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    letterSpacing: -0.3,
-  },
-  trademark: {
-    fontSize: 14,
-    fontWeight: '400',
-  },
-  notifBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    justifyContent: 'center',
+  postBtn: {
+    width: SHAPE.iconButton,
+    height: SHAPE.iconButton,
+    borderRadius: SHAPE.iconButton / 2,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  notifDot: {
-    position: 'absolute',
-    top: 7,
-    right: 7,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#FF6B00',
-    borderWidth: 1.5,
-    borderColor: '#1C1C1E',
+  tickerWrap: {
+    paddingBottom: 8,
+    overflow: 'hidden',
+    borderBottomWidth: 1,
+  },
+  tickerStrip: {
+    flexDirection: 'row',
+    gap: 22,
+    paddingHorizontal: SHAPE.screenPadding,
+  },
+  tickerText: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 11,
   },
   tabRow: {
     flexDirection: 'row',
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 20,
+    paddingHorizontal: SHAPE.screenPadding,
+    paddingTop: 11,
+    borderBottomWidth: 1,
   },
   tabItem: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 12,
-    position: 'relative',
+    paddingBottom: 9,
   },
   tabLabel: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 12.5,
+  },
+  tabLabelActive: {
+    fontFamily: FONTS.bodyExtraBold,
+    fontSize: 12.5,
   },
   tabUnderline: {
     position: 'absolute',
     bottom: 0,
-    left: '20%',
-    right: '20%',
+    left: 0,
+    right: 0,
     height: 2,
-    borderRadius: 1,
-    backgroundColor: '#FF6B00',
   },
   scroll: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 14,
-    paddingTop: 14,
+    paddingHorizontal: SHAPE.screenPadding,
+    paddingTop: 13,
   },
   postCard: {
-    borderRadius: 14,
+    borderRadius: SHAPE.radiusHero,
     padding: 14,
-    marginBottom: 12,
-    borderWidth: StyleSheet.hairlineWidth,
+    marginBottom: 11,
   },
   postHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
-  },
-  avatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  avatarText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 15,
+    gap: 10,
   },
   postMeta: {
     flex: 1,
   },
-  postUserName: {
-    fontSize: 14,
-    fontWeight: '700',
-    marginBottom: 3,
-  },
-  postSubMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  typeTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 8,
-    gap: 3,
-  },
-  typeTagText: {
-    fontSize: 10,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
   timeAgo: {
-    fontSize: 12,
+    fontFamily: FONTS.body,
+    fontSize: 10.5,
+    marginTop: 2,
   },
   badgePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
-    marginBottom: 8,
     gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: SHAPE.radiusPill,
   },
   badgePillText: {
-    color: '#FF6B00',
-    fontSize: 12,
-    fontWeight: '700',
+    fontFamily: FONTS.bodyBold,
+    fontSize: 9.5,
+    letterSpacing: 0.5,
   },
   postText: {
-    fontSize: 14,
-    lineHeight: 21,
-    marginBottom: 12,
+    fontFamily: FONTS.body,
+    fontSize: 12.5,
+    lineHeight: 19,
+    marginTop: 10,
   },
   actionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    paddingTop: 10,
-    gap: 20,
+    borderTopWidth: 1,
+    marginTop: 11,
+    paddingTop: 11,
+    gap: 18,
   },
   actionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
   },
   actionCount: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 11.5,
   },
   bottomPad: {
-    height: 90,
+    height: 30,
   },
   challengeBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    padding: 14,
-    marginBottom: 12,
-    borderRadius: 16,
-    borderWidth: 1,
+    gap: 11,
+    padding: SHAPE.cardPadding,
+    marginBottom: 11,
+    borderRadius: SHAPE.radiusCard,
   },
   challengeIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 36,
+    height: 36,
+    borderRadius: SHAPE.radiusBadge + 2,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  challengeTitle: { fontSize: 16, fontWeight: '700' },
-  challengeSub: { fontSize: 12, marginTop: 2 },
-  fab: {
-    position: 'absolute',
-    bottom: 24,
-    right: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FF6B00',
-    paddingHorizontal: 16,
-    paddingVertical: 13,
-    borderRadius: 28,
-    shadowColor: '#FF6B00',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 8,
-    gap: 6,
-  },
-  fabLabel: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '700',
   },
 });
 

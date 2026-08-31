@@ -176,9 +176,96 @@ service cloud.firestore {
       }
 
       // Coach game film - the coach's own uploaded video metadata. The video file
-      // itself lives in Storage under users/{uid}/films/ (owner-only).
+      // itself lives in Storage under users/{uid}/films/ (owner-only — see
+      // storage.rules, where the read rule was narrowed from any-signed-in-user
+      // to the owner during the governance pass).
+      //
+      // Reads now consult the governance field `accessScope.allowedUids`
+      // (spec §6) instead of ownership alone, so the field is load-bearing
+      // rather than decorative. It defaults to [coachUid] in saveFilm, so this
+      // is currently equivalent to owner-only in practice — the point is that
+      // the moment a film-sharing UI writes a second uid into that array, the
+      // rule already honors it, rather than sharing silently not working (or,
+      // worse, being "made to work" by loosening the rule later under pressure).
+      //
+      // .get(..., default) chaining keeps this safe for legacy film docs
+      // written before Phase 0 added the governance fields — those have no
+      // accessScope at all and fall back to owner-only rather than erroring.
+      function filmAllowedUids(filmData) {
+        return filmData.get('accessScope', {}).get('allowedUids', []);
+      }
+
       match /films/{filmId} {
+        allow read: if isOwner(uid)
+          || (isSignedIn() && request.auth.uid in filmAllowedUids(resource.data));
+        allow create, delete: if isOwner(uid);
+        // Provenance is immutable: a film's ownerUid can never be reassigned by
+        // an update, so `authorizedBy`/`ownerUid` stay a trustworthy record of
+        // who authorized this footage. Partial updates are fine here —
+        // request.resource.data is the merged post-write state, so the
+        // taggedEventIds/processingStatus updates saveFilmEvent makes still pass.
+        allow update: if isOwner(uid)
+          && request.resource.data.get('ownerUid', null) == resource.data.get('ownerUid', null);
+      }
+
+      // SimCoach Coach: tagged basketball events extracted from a coach's own
+      // film (manual, automated, or hybrid extraction — see
+      // docs/SIMCOACH_COACH_TECHNICAL_SPEC.md §4-§5).
+      //
+      // Deliberately still owner-only, NOT accessScope-gated like films above.
+      // Gating these would mean a get() on the parent film doc inside the rule,
+      // evaluated once per event — a query returning 200 tagged events would
+      // fire 200 rule-side document reads, billed and subject to the per-request
+      // access-call cap. Since nothing today grants a non-owner access to film
+      // in the first place (allowedUids is always [coachUid]), that cost would
+      // buy nothing. If film sharing ever ships, denormalize allowedUids onto
+      // each filmEvent and match on it directly — the same fix applied to
+      // simulationSessions.participantUids in Phase 3, and for the same reason.
+      match /filmEvents/{eventId} {
         allow read, write: if isOwner(uid);
+      }
+
+      // SimCoach Coach Phase 2: opponent models aggregated from filmEvents,
+      // what-if simulation runs against them, and practice priorities
+      // flagged from those runs. All owner-only, matching films/filmEvents.
+      match /opponentModels/{opponentModelId} {
+        allow read, write: if isOwner(uid);
+      }
+      match /simulationRuns/{runId} {
+        allow read, write: if isOwner(uid);
+      }
+      match /practicePriorities/{priorityId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      // SimCoach Coach Phase 3: Team Simulation Collaboration & Communication
+      // (docs/SIMCOACH_COACH_TECHNICAL_SPEC.md §3.5/§8/§9). First non-owner
+      // access pattern in this file for SimCoach data — the coach still owns
+      // and fully controls the session doc, but a participant (currently:
+      // player only, see the firestoreService.js comment on
+      // createSimulationSession for why staff participants aren't supported
+      // yet) needs read access to a session shared with them, and write
+      // access to submit their own response. `participants` is a map keyed
+      // by uid specifically so `request.auth.uid in resource.data.participants`
+      // is a cheap, direct check — Firestore rules can't efficiently scan an
+      // array of {uid, role} objects for a matching sub-field.
+      match /simulationSessions/{sessionId} {
+        allow read: if isOwner(uid) || (isSignedIn() && request.auth.uid in resource.data.participants);
+        allow create, update, delete: if isOwner(uid);
+
+        // A participant may only create their own response, and only if the
+        // coach granted canRespond; only the coach can edit/remove entries
+        // (e.g. to reopen a session for a redo). Every check re-reads the
+        // parent session doc rather than trusting resource.data on the
+        // response itself, since permissions live on the session, not here.
+        match /responses/{responseId} {
+          allow read: if isOwner(uid) || (isSignedIn() &&
+            request.auth.uid in get(/databases/$(database)/documents/users/$(uid)/simulationSessions/$(sessionId)).data.participants);
+          allow create: if isSignedIn()
+            && request.auth.uid in get(/databases/$(database)/documents/users/$(uid)/simulationSessions/$(sessionId)).data.participants
+            && get(/databases/$(database)/documents/users/$(uid)/simulationSessions/$(sessionId)).data.participants[request.auth.uid].canRespond == true;
+          allow update, delete: if isOwner(uid);
+        }
       }
 
       // Scout watchlist, scouting reports & saved searches - owner-only

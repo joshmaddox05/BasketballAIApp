@@ -17,15 +17,40 @@ service firebase.storage {
                    && request.resource.contentType.matches('image/.*');
     }
 
-    // SimCoach game film (owner-only video upload)
+    // SimCoach game film — owner-only for BOTH read and write.
+    //
+    // Read was `request.auth != null` until the governance pass, which let any
+    // signed-in user in the app fetch any coach's opponent film by path. That
+    // contradicted this block's own "owner-only" label and the Firestore side,
+    // where the film metadata doc has always been isOwner(uid) — so the
+    // metadata was locked while the video itself, the actually sensitive
+    // artifact, was not. See docs/SIMCOACH_COACH_TECHNICAL_SPEC.md §6/§9.
+    //
+    // Tightening this does not break playback: uploadVideo() in
+    // src/utils/filmUpload.js returns a `?alt=media&token=...` download URL and
+    // SimCoachFilmTaggingScreen plays that URL directly. Download tokens bypass
+    // Storage rules by design, so the player is unaffected — which is also why
+    // deleting the Storage object (not just the Firestore doc) is the only
+    // thing that truly revokes access to a film. That's what deleteFilm and the
+    // enforceFilmRetention job now do.
     match /users/{userId}/films/{fileName} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null && request.auth.uid == userId;
       allow write: if request.auth.uid == userId
                    && request.resource.size < 500 * 1024 * 1024
                    && request.resource.contentType.matches('video/.*');
     }
 
     // CoachMarket drill videos (owner-only video upload)
+    //
+    // NOTE (found during the SimCoach governance pass, deliberately NOT changed
+    // here): this read rule has the same `request.auth != null` shape the film
+    // rule just moved away from, so any signed-in user can stream any coach's
+    // paid drill video by path without purchasing it. That's a CoachMarket
+    // revenue/entitlement question, not a SimCoach film-governance one, and
+    // fixing it properly means checking purchase records rather than just
+    // narrowing to the owner (buyers legitimately need read access). Left as-is
+    // rather than silently changed, since tightening it to owner-only would
+    // break playback for people who actually paid.
     match /users/{userId}/drills/{fileName} {
       allow read: if request.auth != null;
       allow write: if request.auth.uid == userId

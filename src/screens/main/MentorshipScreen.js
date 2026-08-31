@@ -4,6 +4,7 @@ import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, ScrollView, Tex
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
+import { EmptyState } from '../../components/dbe';
 import { canAccessFeature } from '../../utils/subscription';
 
 const MOCK_MENTORS = [
@@ -11,7 +12,7 @@ const MOCK_MENTORS = [
     id: '1',
     name: 'Coach D. Rivera',
     initials: 'DR',
-    color: '#FF6B00',
+    color: '#8A1C22',
     role: 'Shooting Coach',
     specialty: 'Mid-range & 3-point',
     rating: 4.9,
@@ -80,7 +81,7 @@ const MOCK_MY_MENTORS = [
     id: '1',
     name: 'Coach D. Rivera',
     initials: 'DR',
-    color: '#FF6B00',
+    color: '#8A1C22',
     role: 'Shooting Coach',
     specialty: 'Mid-range & 3-point',
     lastMessage: 'Great session yesterday — keep working on that follow-through.',
@@ -166,7 +167,7 @@ const MentorshipScreen = ({ navigation }) => {
           {mentor.name}
         </Text>
 
-        <View style={[styles.rolePill, { backgroundColor: '#FF6B00' + '22' }]}>
+        <View style={[styles.rolePill, { backgroundColor: '#8A1C22' + '22' }]}>
           <Text style={styles.rolePillText}>{mentor.role}</Text>
         </View>
 
@@ -176,7 +177,7 @@ const MentorshipScreen = ({ navigation }) => {
 
         {/* Rating row */}
         <View style={styles.ratingRow}>
-          <Ionicons name="star" size={12} color="#FF6B00" />
+          <Ionicons name="star" size={12} color="#8A1C22" />
           <Text style={[styles.ratingText, { color: textPrimary }]}>{mentor.rating}</Text>
           <Text style={[styles.sessionsText, { color: textSecondary }]}>· {mentor.sessions} sessions</Text>
         </View>
@@ -186,13 +187,13 @@ const MentorshipScreen = ({ navigation }) => {
           style={[
             styles.connectBtn,
             isConnected
-              ? { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: '#FF6B00' }
-              : { backgroundColor: '#FF6B00' },
+              ? { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: '#8A1C22' }
+              : { backgroundColor: '#8A1C22' },
           ]}
           onPress={() => handleConnect(mentor)}
           activeOpacity={0.8}
         >
-          <Text style={[styles.connectBtnText, { color: isConnected ? '#FF6B00' : '#FFFFFF' }]}>
+          <Text style={[styles.connectBtnText, { color: isConnected ? '#8A1C22' : '#FFFFFF' }]}>
             {isConnected ? 'Connected' : 'Connect'}
           </Text>
         </TouchableOpacity>
@@ -213,7 +214,7 @@ const MentorshipScreen = ({ navigation }) => {
           <Text style={[styles.myMentorName, { color: textPrimary }]}>{mentor.name}</Text>
           <Text style={[styles.myMentorLastSeen, { color: textSecondary }]}>{mentor.lastSeen}</Text>
         </View>
-        <Text style={[styles.myMentorRole, { color: '#FF6B00' }]}>{mentor.role}</Text>
+        <Text style={[styles.myMentorRole, { color: '#8A1C22' }]}>{mentor.role}</Text>
         <Text style={[styles.myMentorLastMsg, { color: textSecondary }]} numberOfLines={1}>
           {mentor.lastMessage}
         </Text>
@@ -224,7 +225,7 @@ const MentorshipScreen = ({ navigation }) => {
             <Text style={styles.unreadBadgeText}>{mentor.unread}</Text>
           </View>
         )}
-        <TouchableOpacity style={[styles.messageBtn, { backgroundColor: '#FF6B00' }]}>
+        <TouchableOpacity style={[styles.messageBtn, { backgroundColor: '#8A1C22' }]}>
           <Ionicons name="chatbubble-ellipses" size={14} color="#FFFFFF" />
           <Text style={styles.messageBtnText}>Message</Text>
         </TouchableOpacity>
@@ -233,21 +234,13 @@ const MentorshipScreen = ({ navigation }) => {
   );
 
   const renderEmptyMyMentors = () => (
-    <View style={styles.emptyState}>
-      <View style={[styles.emptyIconWrap, { backgroundColor: card }]}>
-        <Ionicons name="people-outline" size={48} color={textSecondary} />
-      </View>
-      <Text style={[styles.emptyTitle, { color: textPrimary }]}>No Mentors Yet</Text>
-      <Text style={[styles.emptySubtitle, { color: textSecondary }]}>
-        Connect with coaches and pro players to get personalized guidance for your game.
-      </Text>
-      <TouchableOpacity
-        style={styles.emptyAction}
-        onPress={() => setActiveTab('Find Mentors')}
-      >
-        <Text style={styles.emptyActionText}>Browse Mentors</Text>
-      </TouchableOpacity>
-    </View>
+    <EmptyState
+      icon="people-outline"
+      title="No Mentors Yet"
+      sub="Connect with coaches and pro players to get personalized guidance for your game."
+      ctaLabel="Browse Mentors"
+      onPress={() => setActiveTab('Find Mentors')}
+    />
   );
 
   return (
@@ -279,7 +272,7 @@ const MentorshipScreen = ({ navigation }) => {
               style={styles.tabItem}
               onPress={() => setActiveTab(tab)}
             >
-              <Text style={[styles.tabLabel, { color: isActive ? '#FF6B00' : textSecondary }]}>
+              <Text style={[styles.tabLabel, { color: isActive ? '#8A1C22' : textSecondary }]}>
                 {tab}
               </Text>
               {activeTab === 'My Mentors' && tab === 'My Mentors' && MOCK_MY_MENTORS.length > 0 && (
@@ -422,13 +415,13 @@ const styles = StyleSheet.create({
     right: '15%',
     height: 2,
     borderRadius: 1,
-    backgroundColor: '#FF6B00',
+    backgroundColor: '#8A1C22',
   },
   tabCountBadge: {
     position: 'absolute',
     top: 8,
     right: '22%',
-    backgroundColor: '#FF6B00',
+    backgroundColor: '#8A1C22',
     minWidth: 16,
     height: 16,
     borderRadius: 8,
@@ -546,7 +539,7 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   rolePillText: {
-    color: '#FF6B00',
+    color: '#8A1C22',
     fontSize: 10,
     fontWeight: '700',
     textTransform: 'uppercase',
@@ -639,7 +632,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   unreadBadge: {
-    backgroundColor: '#FF6B00',
+    backgroundColor: '#8A1C22',
     minWidth: 18,
     height: 18,
     borderRadius: 9,
@@ -663,40 +656,6 @@ const styles = StyleSheet.create({
   messageBtnText: {
     color: '#FFFFFF',
     fontSize: 12,
-    fontWeight: '700',
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingHorizontal: 32,
-    gap: 12,
-  },
-  emptyIconWrap: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 21,
-  },
-  emptyAction: {
-    backgroundColor: '#FF6B00',
-    paddingHorizontal: 24,
-    paddingVertical: 13,
-    borderRadius: 24,
-    marginTop: 8,
-  },
-  emptyActionText: {
-    color: '#FFFFFF',
-    fontSize: 15,
     fontWeight: '700',
   },
   bottomPad: {

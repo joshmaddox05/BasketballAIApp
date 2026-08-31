@@ -1,4 +1,8 @@
-// ScoutReportsScreen.js - Scout's scouting reports: list, create, edit
+// ScoutReportsScreen.js - Scout's scouting reports (design 14d).
+// Two modes on one screen (local state switch, no new route):
+//   'list'    — the report archive (existing behavior, restyled)
+//   'compose' — the report composer: rate and recommend (replaces the old modal)
+// Report shape unchanged: { athleteName, recommendation, status: 'draft'|'submitted', updatedAt }.
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   SafeAreaView,
@@ -8,13 +12,24 @@ import {
   TouchableOpacity,
   ScrollView,
   TextInput,
-  Modal,
   Alert,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAppContext } from '../../context/AppContext';
+import { TYPE, SHAPE } from '../../utils/typography';
+import {
+  ScreenHeader,
+  HeaderIconButton,
+  SectionLabel,
+  Avatar,
+  Row,
+  PrimaryButton,
+  OutlineButton,
+  EmptyState,
+} from '../../components/dbe';
+import { evalColorFor, evalFillFor } from './ScoutHomeScreen';
 import { canAccessFeature } from '../../utils/subscription';
 import {
   getScoutingReports,
@@ -24,9 +39,9 @@ import {
   SCOUTING_RUBRIC,
 } from '../../services/firestoreService';
 
-const POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'];
 const GRADES = ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D'];
 const RECOMMENDATIONS = ['Offer', 'Watch', 'Pass', 'Follow Up'];
+const RUBRIC_MAX = 5;
 
 const toDate = (value) => {
   if (!value) return null;
@@ -41,81 +56,94 @@ const formatReportDate = (value) => {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 };
 
-const GRADE_COLOR = (g) => {
-  if (!g) return '#9CA3AF';
-  if (g.startsWith('A')) return '#22C55E';
-  if (g.startsWith('B')) return '#3B82F6';
-  if (g.startsWith('C')) return '#F59E0B';
-  return '#EF4444';
-};
+const initialsOf = (name) =>
+  (name || '?')
+    .split(' ')
+    .map((n) => n[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase() || '?';
 
-function ReportCard({ report, theme, onEdit, onDelete }) {
-  const gradeColor = GRADE_COLOR(report.evalGrade);
+// ─── List mode: report row ────────────────────────────────────────────────────
+
+function ReportRow({ report, theme, onEdit, onDelete, style }) {
   const isSubmitted = report.status === 'submitted';
-
+  const gradeColor = evalColorFor(report.evalGrade, theme);
   return (
-    <View style={[styles.reportCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-      <View style={styles.reportHeader}>
-        <View style={[styles.gradeCircle, { borderColor: gradeColor, backgroundColor: gradeColor + '18' }]}>
-          <Text style={[styles.gradeText, { color: gradeColor }]}>{report.evalGrade}</Text>
+    <Row
+      style={style}
+      onPress={() => onEdit(report)}
+      leading={
+        <View style={[styles.gradeSquare, { backgroundColor: evalFillFor(report.evalGrade, theme) }]}>
+          <Text style={[styles.gradeSquareText, { color: gradeColor }]}>{report.evalGrade || '—'}</Text>
         </View>
-        <View style={styles.reportMeta}>
-          <Text style={[styles.athleteName, { color: theme.text }]}>{report.athleteName}</Text>
-          <Text style={[styles.positionDate, { color: theme.textSecondary }]}>
-            {report.position} · {report.date}
-          </Text>
+      }
+      title={report.athleteName}
+      meta={[report.recommendation, report.position, report.date].filter(Boolean).join(' · ')}
+      trailing={
+        <View style={styles.rowTrailing}>
+          <View
+            style={[
+              styles.statusChip,
+              { backgroundColor: isSubmitted ? theme.badgeFill : theme.steelFill },
+            ]}
+          >
+            <Text
+              style={[
+                styles.statusChipText,
+                { color: isSubmitted ? theme.accentText : theme.steel },
+              ]}
+            >
+              {isSubmitted ? 'SUBMITTED' : 'DRAFT'}
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => onDelete(report.id)}
+            hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+          >
+            <Ionicons name="trash-outline" size={15} color={theme.textDim} />
+          </TouchableOpacity>
         </View>
-        <View style={[styles.statusBadge, { backgroundColor: isSubmitted ? '#22C55E18' : '#F59E0B18' }]}>
-          <Text style={[styles.statusText, { color: isSubmitted ? '#22C55E' : '#F59E0B' }]}>
-            {isSubmitted ? 'Submitted' : 'Draft'}
-          </Text>
-        </View>
+      }
+    />
+  );
+}
+
+// ─── Compose mode: segmented 1–5 rating bar ───────────────────────────────────
+
+function RatingBar({ label, value = 0, onChange, theme }) {
+  return (
+    <View style={styles.ratingBlock}>
+      <View style={styles.ratingHead}>
+        <Text style={[styles.ratingLabel, { color: theme.textMuted }]}>{label}</Text>
+        <Text style={[styles.ratingValue, { color: theme.text }]}>{value || '—'}</Text>
       </View>
-
-      <View style={[styles.recRow, { backgroundColor: theme.background }]}>
-        <Ionicons name="flag-outline" size={13} color={theme.primary} />
-        <Text style={[styles.recText, { color: theme.primary }]}>Recommendation: {report.recommendation}</Text>
-      </View>
-
-      <Text style={[styles.notesText, { color: theme.textSecondary }]} numberOfLines={2}>
-        {report.notes}
-      </Text>
-
-      <View style={styles.reportActions}>
-        <TouchableOpacity
-          style={[styles.actionBtn, { backgroundColor: theme.primary + '18' }]}
-          onPress={() => onEdit(report)}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="create-outline" size={15} color={theme.primary} />
-          <Text style={[styles.actionBtnText, { color: theme.primary }]}>Edit</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.actionBtn, { backgroundColor: '#EF444418' }]}
-          onPress={() => onDelete(report.id)}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="trash-outline" size={15} color="#EF4444" />
-          <Text style={[styles.actionBtnText, { color: '#EF4444' }]}>Delete</Text>
-        </TouchableOpacity>
+      <View style={styles.ratingSegments}>
+        {Array.from({ length: RUBRIC_MAX }, (_, i) => i + 1).map((n) => (
+          <TouchableOpacity
+            key={n}
+            style={styles.ratingSegmentTap}
+            onPress={() => onChange(n)}
+            activeOpacity={0.7}
+            hitSlop={{ top: 8, bottom: 8 }}
+          >
+            <View
+              style={[
+                styles.ratingSegment,
+                { backgroundColor: n <= value ? theme.primary : theme.track },
+              ]}
+            />
+          </TouchableOpacity>
+        ))}
       </View>
     </View>
   );
 }
 
-function StarRating({ value = 0, onChange, theme }) {
-  return (
-    <View style={styles.starRow}>
-      {[1, 2, 3, 4, 5].map((n) => (
-        <TouchableOpacity key={n} onPress={() => onChange(n)} hitSlop={{ top: 6, bottom: 6, left: 3, right: 3 }} activeOpacity={0.7}>
-          <Ionicons name={n <= value ? 'star' : 'star-outline'} size={22} color={n <= value ? '#F59E0B' : theme.textSecondary} />
-        </TouchableOpacity>
-      ))}
-    </View>
-  );
-}
+// ─── Compose mode: the composer (design 14d) ──────────────────────────────────
 
-function ReportFormModal({ visible, onClose, onSave, initial, prospects, presetProspect, theme }) {
+function ReportComposer({ onClose, onSave, initial, prospects, presetProspect, theme }) {
   const lockProspect = !!initial; // editing → prospect is fixed
   const initialProspect = initial
     ? { id: initial.prospectUid, name: initial.athleteName, position: initial.position }
@@ -125,173 +153,190 @@ function ReportFormModal({ visible, onClose, onSave, initial, prospects, presetP
   const [evalGrade, setEvalGrade] = useState(initial?.evalGrade || 'B');
   const [notes, setNotes] = useState(initial?.notes || '');
   const [recommendation, setRecommendation] = useState(initial?.recommendation || 'Watch');
-  const [status, setStatus] = useState(initial?.status || 'draft');
   const [rubric, setRubric] = useState(initial?.rubric || {});
 
-  // Reset the form each time the modal opens.
-  useEffect(() => {
-    if (!visible) return;
-    setSelected(initial ? { id: initial.prospectUid, name: initial.athleteName, position: initial.position } : presetProspect || null);
-    setEvalGrade(initial?.evalGrade || 'B');
-    setNotes(initial?.notes || '');
-    setRecommendation(initial?.recommendation || 'Watch');
-    setStatus(initial?.status || 'draft');
-    setRubric(initial?.rubric || {});
-  }, [visible]);
+  const buildPayload = (status) => ({
+    prospectUid: selected.id || selected.uid,
+    athleteName: selected.name || 'Athlete',
+    position: selected.position || '—',
+    evalGrade,
+    recommendation,
+    notes,
+    status,
+    rubric,
+  });
 
-  const handleSave = () => {
+  const handleSave = (status) => {
     if (!selected) {
       Alert.alert('Select a prospect', 'Pick a prospect from your watchlist to report on.');
       return;
     }
-    onSave({
-      prospectUid: selected.id || selected.uid,
-      athleteName: selected.name || 'Athlete',
-      position: selected.position || '—',
-      evalGrade,
-      recommendation,
-      notes,
-      status,
-      rubric,
-    });
+    onSave(buildPayload(status));
   };
 
-  return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView style={[styles.modalContainer, { backgroundColor: theme.background }]}>
-        <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
-          <TouchableOpacity onPress={onClose}>
-            <Ionicons name="close" size={24} color={theme.text} />
-          </TouchableOpacity>
-          <Text style={[styles.modalTitle, { color: theme.text }]}>
-            {initial ? 'Edit Report' : 'New Report'}
-          </Text>
-          <TouchableOpacity onPress={handleSave}>
-            <Text style={[styles.modalSave, { color: theme.primary }]}>Save</Text>
-          </TouchableOpacity>
-        </View>
+  const isDraft = (initial?.status || 'draft') === 'draft';
 
-        <ScrollView contentContainerStyle={styles.modalScroll}>
-          {/* Prospect selector — reports must link to a watchlisted athlete */}
-          <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Prospect</Text>
-          {selected ? (
-            <View style={[styles.selectedProspect, { backgroundColor: theme.card, borderColor: theme.border }]}>
-              <View style={[styles.spAvatar, { backgroundColor: theme.primary + '22' }]}>
-                <Text style={[styles.spAvatarText, { color: theme.primary }]}>
-                  {(selected.name || '?').split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}
-                </Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.spName, { color: theme.text }]}>{selected.name}</Text>
-                <Text style={[styles.spMeta, { color: theme.textSecondary }]}>{selected.position || '—'}</Text>
-              </View>
-              {!lockProspect && (
-                <TouchableOpacity onPress={() => setSelected(null)}>
-                  <Text style={[styles.changeLink, { color: theme.primary }]}>Change</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          ) : prospects.length === 0 ? (
-            <Text style={[styles.emptyPicker, { color: theme.textSecondary }]}>
-              No prospects in your watchlist yet. Add prospects from search to report on them.
+  return (
+    <View style={{ flex: 1 }}>
+      <ScreenHeader
+        title="Scouting report"
+        subtitle={selected ? selected.name : 'New report'}
+        onBack={onClose}
+        right={
+          <View
+            style={[
+              styles.statusChip,
+              styles.headerStatusChip,
+              { backgroundColor: isDraft ? theme.steelFill : theme.badgeFill },
+            ]}
+          >
+            <Text
+              style={[
+                styles.statusChipText,
+                { color: isDraft ? theme.steel : theme.accentText },
+              ]}
+            >
+              {isDraft ? 'DRAFT' : 'SUBMITTED'}
             </Text>
-          ) : (
-            <View style={styles.pickerList}>
-              {prospects.map((p) => (
+          </View>
+        }
+      />
+
+      <ScrollView contentContainerStyle={styles.composerScroll} keyboardShouldPersistTaps="handled">
+        {/* Prospect — fixed card when selected, watchlist picker otherwise */}
+        {selected ? (
+          <Row
+            leading={<Avatar initials={initialsOf(selected.name)} size={36} tone="accent" />}
+            title={selected.name}
+            meta={[selected.position, evalGrade ? `EvalRank ${evalGrade}` : null].filter(Boolean).join(' · ')}
+            trailing={
+              !lockProspect ? (
+                <TouchableOpacity onPress={() => setSelected(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Text style={[styles.changeLink, { color: theme.accentText }]}>Change</Text>
+                </TouchableOpacity>
+              ) : null
+            }
+          />
+        ) : prospects.length === 0 ? (
+          <Text style={[styles.emptyPicker, { color: theme.textDim }]}>
+            No prospects in your watchlist yet. Add prospects from search to report on them.
+          </Text>
+        ) : (
+          <View style={{ gap: 8 }}>
+            {prospects.map((p) => (
+              <Row
+                key={p.id}
+                onPress={() => setSelected(p)}
+                leading={<Avatar initials={initialsOf(p.name)} size={36} tone="steel" />}
+                title={p.name}
+                meta={p.position || '—'}
+                trailing={<Ionicons name="chevron-forward" size={16} color={theme.textDim} />}
+              />
+            ))}
+          </View>
+        )}
+
+        {/* Recommendation — segmented, active solid primary */}
+        <View style={styles.section}>
+          <SectionLabel>Recommendation</SectionLabel>
+          <View style={styles.segmentRow}>
+            {RECOMMENDATIONS.map((r) => {
+              const active = recommendation === r;
+              return (
                 <TouchableOpacity
-                  key={p.id}
-                  style={[styles.pickerItem, { backgroundColor: theme.card, borderColor: theme.border }]}
-                  onPress={() => setSelected(p)}
+                  key={r}
+                  style={[
+                    styles.segmentBtn,
+                    active
+                      ? { backgroundColor: theme.primary }
+                      : { borderWidth: 1, borderColor: theme.hairline },
+                  ]}
+                  onPress={() => setRecommendation(r)}
                   activeOpacity={0.8}
                 >
-                  <View style={[styles.spAvatar, { backgroundColor: theme.primary + '22' }]}>
-                    <Text style={[styles.spAvatarText, { color: theme.primary }]}>
-                      {(p.name || '?').split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}
-                    </Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.spName, { color: theme.text }]}>{p.name}</Text>
-                    <Text style={[styles.spMeta, { color: theme.textSecondary }]}>{p.position || '—'}</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
+                  <Text
+                    numberOfLines={1}
+                    style={[styles.segmentText, { color: active ? '#FFFFFF' : theme.textMuted }]}
+                  >
+                    {r}
+                  </Text>
                 </TouchableOpacity>
-              ))}
-            </View>
-          )}
+              );
+            })}
+          </View>
+        </View>
 
-          {/* Standardized rubric */}
-          <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Rubric (1–5)</Text>
-          <View style={[styles.rubricCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            {SCOUTING_RUBRIC.map((dim, i) => (
-              <View
+        {/* Ratings — standardized rubric, 1–5 segmented bars */}
+        <View style={styles.section}>
+          <SectionLabel>Ratings</SectionLabel>
+          <View style={{ gap: 13 }}>
+            {SCOUTING_RUBRIC.map((dim) => (
+              <RatingBar
                 key={dim.key}
-                style={[styles.rubricRow, i < SCOUTING_RUBRIC.length - 1 && { borderBottomColor: theme.border, borderBottomWidth: StyleSheet.hairlineWidth }]}
-              >
-                <Text style={[styles.rubricLabel, { color: theme.text }]}>{dim.label}</Text>
-                <StarRating value={rubric[dim.key] || 0} onChange={(v) => setRubric((r) => ({ ...r, [dim.key]: v }))} theme={theme} />
-              </View>
+                label={dim.label}
+                value={rubric[dim.key] || 0}
+                onChange={(v) => setRubric((r) => ({ ...r, [dim.key]: v }))}
+                theme={theme}
+              />
             ))}
           </View>
+        </View>
 
-          <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>EvalRank Grade</Text>
-          <View style={styles.chipRow}>
-            {GRADES.map((g) => (
-              <TouchableOpacity
-                key={g}
-                style={[styles.chip, { borderColor: evalGrade === g ? GRADE_COLOR(g) : theme.border, backgroundColor: evalGrade === g ? GRADE_COLOR(g) + '18' : 'transparent' }]}
-                onPress={() => setEvalGrade(g)}
-              >
-                <Text style={[styles.chipText, { color: evalGrade === g ? GRADE_COLOR(g) : theme.textSecondary }]}>{g}</Text>
-              </TouchableOpacity>
-            ))}
+        {/* EvalRank grade */}
+        <View style={styles.section}>
+          <SectionLabel>EvalRank grade</SectionLabel>
+          <View style={styles.gradeRow}>
+            {GRADES.map((g) => {
+              const active = evalGrade === g;
+              return (
+                <TouchableOpacity
+                  key={g}
+                  style={[
+                    styles.gradeChip,
+                    active
+                      ? { backgroundColor: theme.primary }
+                      : { borderWidth: 1, borderColor: theme.hairline },
+                  ]}
+                  onPress={() => setEvalGrade(g)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.gradeChipText, { color: active ? '#FFFFFF' : theme.textMuted }]}>
+                    {g}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
+        </View>
 
-          <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Recommendation</Text>
-          <View style={styles.chipRow}>
-            {RECOMMENDATIONS.map((r) => (
-              <TouchableOpacity
-                key={r}
-                style={[styles.chip, { borderColor: recommendation === r ? theme.primary : theme.border, backgroundColor: recommendation === r ? theme.primary + '18' : 'transparent' }]}
-                onPress={() => setRecommendation(r)}
-              >
-                <Text style={[styles.chipText, { color: recommendation === r ? theme.primary : theme.textSecondary }]}>{r}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Notes</Text>
+        {/* Notes */}
+        <View style={styles.section}>
+          <SectionLabel>Notes</SectionLabel>
           <TextInput
-            style={[styles.textInput, styles.notesInput, { backgroundColor: theme.card, borderColor: theme.border, color: theme.text }]}
+            style={[styles.notesInput, { backgroundColor: theme.surface, color: theme.text }]}
             value={notes}
             onChangeText={setNotes}
             placeholder="Strengths, weaknesses, observations…"
-            placeholderTextColor={theme.textSecondary}
+            placeholderTextColor={theme.textDim}
             multiline
             numberOfLines={5}
             textAlignVertical="top"
           />
+        </View>
 
-          <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Status</Text>
-          <View style={styles.chipRow}>
-            {['draft', 'submitted'].map((s) => (
-              <TouchableOpacity
-                key={s}
-                style={[styles.chip, { borderColor: status === s ? theme.primary : theme.border, backgroundColor: status === s ? theme.primary + '18' : 'transparent' }]}
-                onPress={() => setStatus(s)}
-              >
-                <Text style={[styles.chipText, { color: status === s ? theme.primary : theme.textSecondary }]}>
-                  {s.charAt(0).toUpperCase() + s.slice(1)}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+        <View style={{ height: 16 }} />
+      </ScrollView>
 
-          <View style={{ height: 32 }} />
-        </ScrollView>
-      </SafeAreaView>
-    </Modal>
+      {/* Save draft | Submit */}
+      <View style={styles.footer}>
+        <OutlineButton label="Save draft" style={{ flex: 1 }} onPress={() => handleSave('draft')} />
+        <PrimaryButton label="Submit" style={{ flex: 1 }} onPress={() => handleSave('submitted')} />
+      </View>
+    </View>
   );
 }
+
+// ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function ScoutReportsScreen({ navigation, route }) {
   const { user, userData, theme, isDarkMode } = useAppContext();
@@ -299,9 +344,9 @@ export default function ScoutReportsScreen({ navigation, route }) {
   const subscription = userData?.subscription || 'free';
   const hasAccess = canAccessFeature('scoutLab', subscription);
 
+  const [mode, setMode] = useState('list'); // 'list' | 'compose'
   const [reports, setReports] = useState([]);
   const [watchlist, setWatchlist] = useState([]);
-  const [modalVisible, setModalVisible] = useState(false);
   const [editingReport, setEditingReport] = useState(null);
   const [presetProspect, setPresetProspect] = useState(null);
 
@@ -324,7 +369,7 @@ export default function ScoutReportsScreen({ navigation, route }) {
     if (p && hasAccess) {
       setPresetProspect({ id: p.id || p.uid, name: p.name, position: p.position });
       setEditingReport(null);
-      setModalVisible(true);
+      setMode('compose');
       navigation.setParams({ prospect: undefined });
     }
   }, [route?.params?.prospect, hasAccess]);
@@ -332,12 +377,18 @@ export default function ScoutReportsScreen({ navigation, route }) {
   const handleNew = useCallback(() => {
     setEditingReport(null);
     setPresetProspect(null);
-    setModalVisible(true);
+    setMode('compose');
   }, []);
 
   const handleEdit = useCallback((report) => {
     setEditingReport(report);
-    setModalVisible(true);
+    setMode('compose');
+  }, []);
+
+  const closeComposer = useCallback(() => {
+    setMode('list');
+    setEditingReport(null);
+    setPresetProspect(null);
   }, []);
 
   const handleDelete = useCallback((id) => {
@@ -361,8 +412,9 @@ export default function ScoutReportsScreen({ navigation, route }) {
 
   const handleSave = useCallback(async (data) => {
     const payload = editingReport ? { ...data, id: editingReport.id } : data;
-    setModalVisible(false);
+    setMode('list');
     setEditingReport(null);
+    setPresetProspect(null);
     try {
       await saveScoutingReport(scoutUid, payload);
       await loadReports();
@@ -376,11 +428,13 @@ export default function ScoutReportsScreen({ navigation, route }) {
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
         <StatusBar style={isDarkMode ? 'light' : 'dark'} />
         <View style={styles.lockCenter}>
-          <Ionicons name="lock-closed" size={48} color={theme.textSecondary} />
-          <Text style={[styles.lockTitle, { color: theme.text }]}>Scout Reports</Text>
-          <Text style={[styles.lockSub, { color: theme.textSecondary }]}>
-            Upgrade to PRO to create and manage scouting reports.
-          </Text>
+          <EmptyState
+            icon="lock-closed"
+            title="Scout Reports"
+            sub="Upgrade to PRO to create and manage scouting reports."
+            ctaLabel="Upgrade"
+            onPress={() => navigation.navigate('Subscription')}
+          />
         </View>
       </SafeAreaView>
     );
@@ -393,185 +447,139 @@ export default function ScoutReportsScreen({ navigation, route }) {
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <StatusBar style={isDarkMode ? 'light' : 'dark'} />
 
-      <View style={[styles.header, { borderBottomColor: theme.border }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={theme.text} />
-        </TouchableOpacity>
-        <View>
-          <Text style={[styles.headerTitle, { color: theme.text }]}>Scouting Reports</Text>
-          <Text style={[styles.headerSub, { color: theme.textSecondary }]}>
-            {submittedCount} submitted · {draftCount} draft
-          </Text>
-        </View>
-        <TouchableOpacity
-          style={[styles.newBtn, { backgroundColor: theme.primary }]}
-          onPress={handleNew}
-          activeOpacity={0.85}
-        >
-          <Ionicons name="add" size={20} color="#fff" />
-        </TouchableOpacity>
-      </View>
+      {mode === 'compose' ? (
+        <ReportComposer
+          key={editingReport?.id || presetProspect?.id || 'new'}
+          onClose={closeComposer}
+          onSave={handleSave}
+          initial={editingReport}
+          prospects={watchlist}
+          presetProspect={presetProspect}
+          theme={theme}
+        />
+      ) : (
+        <>
+          <ScreenHeader
+            title="Scouting reports"
+            subtitle={`${submittedCount} submitted · ${draftCount} draft${draftCount === 1 ? '' : 's'}`}
+            onBack={() => navigation.goBack()}
+            right={<HeaderIconButton icon="add" onPress={handleNew} />}
+          />
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {reports.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Ionicons name="document-text-outline" size={44} color={theme.textSecondary} />
-            <Text style={[styles.emptyTitle, { color: theme.text }]}>No reports yet</Text>
-            <Text style={[styles.emptySub, { color: theme.textSecondary }]}>
-              Tap + to create your first scouting report.
-            </Text>
-          </View>
-        ) : (
-          reports.map((r) => (
-            <ReportCard
-              key={r.id}
-              report={r}
-              theme={theme}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-            />
-          ))
-        )}
-        <View style={{ height: 40 }} />
-      </ScrollView>
-
-      <ReportFormModal
-        visible={modalVisible}
-        onClose={() => { setModalVisible(false); setEditingReport(null); setPresetProspect(null); }}
-        onSave={handleSave}
-        initial={editingReport}
-        prospects={watchlist}
-        presetProspect={presetProspect}
-        theme={theme}
-      />
+          <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+            {reports.length === 0 ? (
+              <EmptyState
+                icon="document-text-outline"
+                title="No reports yet"
+                sub="Rate and recommend a prospect from your watchlist."
+                ctaLabel="New report"
+                onPress={handleNew}
+              />
+            ) : (
+              reports.map((r, i) => (
+                <ReportRow
+                  key={r.id}
+                  report={r}
+                  theme={theme}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                  style={i > 0 ? { marginTop: 8 } : null}
+                />
+              ))
+            )}
+            <View style={{ height: 40 }} />
+          </ScrollView>
+        </>
+      )}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
+
+  scrollContent: {
+    paddingHorizontal: SHAPE.screenPadding,
+    paddingTop: 14,
   },
-  backBtn: { padding: 4 },
-  headerTitle: { fontSize: 18, fontWeight: '700' },
-  headerSub: { fontSize: 12, marginTop: 1 },
-  newBtn: {
+
+  // List rows
+  gradeSquare: {
     width: 38,
     height: 38,
-    borderRadius: 19,
+    borderRadius: SHAPE.radiusBadge + 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
-
-  scrollContent: { padding: 16 },
-
-  reportCard: {
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 16,
-    marginBottom: 14,
+  gradeSquareText: { fontFamily: TYPE.cardTitle.fontFamily, fontSize: 13 },
+  rowTrailing: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  statusChip: {
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: SHAPE.radiusBadge,
   },
-  reportHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 },
-  gradeCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 2,
+  headerStatusChip: { alignSelf: 'center' },
+  statusChipText: { fontFamily: TYPE.chip.fontFamily, fontSize: 9.5, letterSpacing: 0.4 },
+
+  // Composer
+  composerScroll: {
+    paddingHorizontal: SHAPE.screenPadding,
+    paddingTop: 14,
+  },
+  section: { marginTop: SHAPE.sectionGap },
+
+  changeLink: { fontFamily: TYPE.buttonSecondary.fontFamily, fontSize: 12 },
+  emptyPicker: { fontFamily: TYPE.tooltipBody.fontFamily, fontSize: 12, lineHeight: 18 },
+
+  segmentRow: { flexDirection: 'row', gap: 7 },
+  segmentBtn: {
+    flex: 1,
+    paddingVertical: 11,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  gradeText: { fontSize: 15, fontWeight: '900' },
-  reportMeta: { flex: 1 },
-  athleteName: { fontSize: 15, fontWeight: '700' },
-  positionDate: { fontSize: 12, marginTop: 1 },
-  statusBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
-  statusText: { fontSize: 11, fontWeight: '700' },
+  segmentText: { fontFamily: TYPE.buttonSecondary.fontFamily, fontSize: 10.5 },
 
-  recRow: {
+  ratingBlock: {},
+  ratingHead: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-    alignSelf: 'flex-start',
-    marginBottom: 8,
-  },
-  recText: { fontSize: 12, fontWeight: '600' },
-
-  notesText: { fontSize: 13, lineHeight: 19, marginBottom: 12 },
-
-  reportActions: { flexDirection: 'row', gap: 10 },
-  actionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 8,
-  },
-  actionBtnText: { fontSize: 13, fontWeight: '600' },
-
-  emptyState: { alignItems: 'center', paddingTop: 80, gap: 10 },
-  emptyTitle: { fontSize: 18, fontWeight: '700' },
-  emptySub: { fontSize: 14, textAlign: 'center' },
-
-  lockCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 },
-  lockTitle: { fontSize: 22, fontWeight: '700' },
-  lockSub: { fontSize: 14, textAlign: 'center', lineHeight: 20 },
-
-  // Modal
-  modalContainer: { flex: 1 },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
+    alignItems: 'baseline',
+    marginBottom: 6,
   },
-  modalTitle: { fontSize: 17, fontWeight: '700' },
-  modalSave: { fontSize: 16, fontWeight: '700' },
-  modalScroll: { padding: 16 },
+  ratingLabel: { fontFamily: TYPE.greeting.fontFamily, fontSize: 11.5 },
+  ratingValue: { fontFamily: TYPE.cardTitle.fontFamily, fontSize: 11.5 },
+  ratingSegments: { flexDirection: 'row', gap: 4 },
+  ratingSegmentTap: { flex: 1 },
+  ratingSegment: { height: 5, borderRadius: 3 },
 
-  fieldLabel: { fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 16 },
-  textInput: {
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-  },
-  notesInput: { height: 100, paddingTop: 12 },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: {
-    paddingHorizontal: 14,
+  gradeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  gradeChip: {
+    paddingHorizontal: 12,
     paddingVertical: 7,
-    borderRadius: 20,
-    borderWidth: 1.5,
+    borderRadius: SHAPE.radiusPill,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  chipText: { fontSize: 13, fontWeight: '600' },
+  gradeChipText: { fontFamily: TYPE.chip.fontFamily, fontSize: 10.5 },
 
-  // Prospect picker
-  selectedProspect: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 12, borderWidth: 1, padding: 12 },
-  pickerList: { gap: 8 },
-  pickerItem: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 12, borderWidth: 1, padding: 12 },
-  spAvatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  spAvatarText: { fontSize: 14, fontWeight: '700' },
-  spName: { fontSize: 15, fontWeight: '700' },
-  spMeta: { fontSize: 12, marginTop: 1 },
-  changeLink: { fontSize: 13, fontWeight: '700' },
-  emptyPicker: { fontSize: 13, lineHeight: 19 },
+  notesInput: {
+    borderRadius: SHAPE.radiusTile,
+    padding: 13,
+    minHeight: 96,
+    fontFamily: TYPE.tooltipBody.fontFamily,
+    fontSize: 11.5,
+    lineHeight: 18,
+  },
 
-  // Rubric
-  rubricCard: { borderRadius: 12, borderWidth: 1, paddingHorizontal: 14 },
-  rubricRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12 },
-  rubricLabel: { fontSize: 14, fontWeight: '600' },
-  starRow: { flexDirection: 'row', gap: 4 },
+  footer: {
+    flexDirection: 'row',
+    gap: SHAPE.cardGap,
+    paddingHorizontal: SHAPE.screenPadding,
+    paddingBottom: 8,
+    paddingTop: 6,
+  },
+
+  lockCenter: { flex: 1, justifyContent: 'center' },
 });

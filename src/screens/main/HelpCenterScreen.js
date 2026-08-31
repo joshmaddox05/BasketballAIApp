@@ -1,8 +1,16 @@
-import React, { useState } from 'react';
-import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, ScrollView, Linking } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { Animated, LayoutAnimation, Platform, SafeAreaView, StyleSheet, View, Text, TouchableOpacity, ScrollView, Linking, UIManager } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
+import { Entrance } from '../../components/dbe';
+import { MOTION } from '../../utils/typography';
+
+// Height is not transform-animatable in RN, so an expanding card is LayoutAnimation's
+// job, not Reanimated's. Android needs the experimental flag opted into explicitly.
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 const FAQS = [
   { q: 'How do I analyze my shot?', a: 'Go to Training → Analyze Your Shot. Record a video from the side angle. The AI will return your biomechanical score and coaching drills in seconds.' },
@@ -15,9 +23,33 @@ const FAQS = [
   { q: 'How do coaches sell content on CoachMarket?', a: 'Switch your account role to Coach in Profile → Settings → Account Type. Then navigate to Market → My Content to upload drill packs and courses.' },
 ];
 
+function Chevron({ expanded, color }) {
+  const t = useRef(new Animated.Value(expanded ? 1 : 0)).current;
+  React.useEffect(() => {
+    Animated.timing(t, {
+      toValue: expanded ? 1 : 0,
+      duration: MOTION.instant,
+      easing: MOTION.easeOut,
+      useNativeDriver: true,
+    }).start();
+  }, [expanded]);
+  return (
+    <Animated.View
+      style={{ transform: [{ rotate: t.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] }) }] }}
+    >
+      <Ionicons name="chevron-down" size={18} color={color} />
+    </Animated.View>
+  );
+}
+
 export default function HelpCenterScreen({ navigation }) {
   const { theme, isDarkMode } = useAppContext();
   const [expanded, setExpanded] = useState(null);
+
+  const toggle = (i) => {
+    LayoutAnimation.configureNext(LayoutAnimation.create(MOTION.quick, 'easeInEaseOut', 'opacity'));
+    setExpanded(expanded === i ? null : i);
+  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
@@ -37,12 +69,26 @@ export default function HelpCenterScreen({ navigation }) {
         </View>
         <Text style={[styles.sectionTitle, { color: theme.text }]}>Frequently Asked Questions</Text>
         {FAQS.map((item, i) => (
-          <TouchableOpacity key={i} style={[styles.faqItem, { backgroundColor: theme.card, borderColor: theme.border }]} onPress={() => setExpanded(expanded === i ? null : i)} activeOpacity={0.8}>
+          <TouchableOpacity
+            key={i}
+            style={[styles.faqItem, { backgroundColor: theme.card, borderColor: theme.border }]}
+            onPress={() => toggle(i)}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: expanded === i }}
+            accessibilityLabel={item.q}
+          >
             <View style={styles.faqRow}>
               <Text style={[styles.faqQ, { color: theme.text, flex: 1 }]}>{item.q}</Text>
-              <Ionicons name={expanded === i ? 'chevron-up' : 'chevron-down'} size={18} color={theme.textSecondary} />
+              {/* Rotate one chevron rather than swapping two icon names — a name swap
+                  is a second, separate snap on top of the height jump. */}
+              <Chevron expanded={expanded === i} color={theme.textSecondary} />
             </View>
-            {expanded === i && <Text style={[styles.faqA, { color: theme.textSecondary }]}>{item.a}</Text>}
+            {expanded === i && (
+              <Entrance variant="up" duration={MOTION.quick}>
+                <Text style={[styles.faqA, { color: theme.textSecondary }]}>{item.a}</Text>
+              </Entrance>
+            )}
           </TouchableOpacity>
         ))}
         <TouchableOpacity style={[styles.contactBtn, { backgroundColor: theme.primary }]} onPress={() => navigation.navigate('ContactUs')} activeOpacity={0.85}>

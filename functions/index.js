@@ -1243,3 +1243,143 @@ exports.onMessageCreated = onDocumentCreated('conversations/{convId}/messages/{m
     console.error(`Failed to push message for conversation ${convId}:`, e);
   }
 });
+
+// ============================================================================
+// SimCoach Coach — film retention enforcement (spec §6 governance)
+// ============================================================================
+
+// Named explicitly rather than relying on admin.storage().bucket()'s default
+// resolution. A wrong-bucket lookup here wouldn't throw loudly — it would just
+// quietly fail to find the video and report a clean run while the footage
+// survived, which is the single worst failure mode for a retention job. This
+// matches storageBucket in src/config/firebaseConfig.js.
+const FILM_BUCKET = 'basketball-ai-app-db000.firebasestorage.app';
+
+// Cap per run so a large backlog can't turn one invocation into a runaway job.
+// Anything left over is logged explicitly and picked up the next day — see the
+// leftover warning below; a silent truncation would read as "everything was
+// deleted" when it wasn't, which for a retention guarantee is worse than slow.
+const RETENTION_BATCH_CAP = 200;
+
+/**
+ * Delete one film completely: Storage object, tagged filmEvents, then the doc.
+ *
+ * Mirrors deleteFilm() in src/services/firestoreService.js, deliberately in the
+ * same order and for the same reason: the film doc is the only record of
+ * storagePath, so it goes last — a partial failure then leaves a retryable doc
+ * rather than a video no one can find to delete.
+ */
+const purgeFilm = async (filmDoc) => {
+  const coachUid = filmDoc.ref.parent.parent.id;
+  const filmId = filmDoc.id;
+  const { storagePath } = filmDoc.data();
+
+  if (storagePath) {
+    try {
+      await admin.storage().bucket(FILM_BUCKET).file(storagePath).delete();
+    } catch (e) {
+      // 404 = already gone; anything else is worth surfacing but shouldn't
+      // strand the Firestore side, or the film would be retried forever.
+      if (e?.code === 404) {
+        console.log(`Film ${filmId}: storage object already absent (${storagePath})`);
+      } else {
+        console.error(`Film ${filmId}: storage delete failed for ${storagePath}:`, e?.message || e);
+      }
+    }
+  } else {
+    console.warn(`Film ${filmId} (coach ${coachUid}) has no storagePath — nothing to delete in Storage.`);
+  }
+
+  const events = await admin.firestore()
+    .collection('users').doc(coachUid).collection('filmEvents')
+    .where('filmId', '==', filmId)
+    .get();
+
+  if (!events.empty) {
+    const batch = admin.firestore().batch();
+    events.docs.forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+  }
+
+  await filmDoc.ref.delete();
+  return { coachUid, filmId, eventsDeleted: events.size };
+};
+
+/**
+ * Scheduled function: enforce film retention policies, daily at 3:30 AM ET.
+ *
+ * This is the half of spec §6 that never shipped with Phase 0. The governance
+ * fields (retentionPolicy, accessScope, sharableForModelTraining) have been
+ * written onto every film doc since Phase 0, but nothing read them — so
+ * `retentionPolicy.autoDelete` was a promise the app made and had no mechanism
+ * to keep. Any film whose expiry has passed with autoDelete set is now actually
+ * purged: video first, then tagged events, then the metadata doc.
+ *
+ * Runs off a collectionGroup query because films live under each coach's own
+ * users/{uid}/films subcollection, so there's no single collection to scan.
+ * That requires the COLLECTION_GROUP composite index on
+ * retentionPolicy.autoDelete + retentionPolicy.expiresAt declared in
+ * firestore.indexes.json — without it this query throws "requires an index" on
+ * the very first run, and a retention job that silently never runs is exactly
+ * the kind of thing nobody notices until it matters.
+ *
+ * `expiresAt` is epoch millis (see setFilmRetention in firestoreService.js), so
+ * it compares directly against Date.now() with no Timestamp coercion.
+ *
+ * Deliberately NOT touched: opponentModels aggregated from a purged film. Those
+ * hold derived distributions, not footage, and recomputing or invalidating them
+ * is a real product decision (a coach losing a scouting report because film
+ * aged out may or may not be intended). Flagged in spec §9 rather than guessed
+ * at here.
+ */
+exports.enforceFilmRetention = onSchedule({
+  schedule: '30 3 * * *',
+  timeZone: 'America/New_York',
+  memory: '512MiB',
+}, async () => {
+  const now = Date.now();
+  console.log(`Starting film retention sweep (cutoff ${new Date(now).toISOString()})...`);
+
+  try {
+    const expired = await admin.firestore()
+      .collectionGroup('films')
+      .where('retentionPolicy.autoDelete', '==', true)
+      .where('retentionPolicy.expiresAt', '<=', now)
+      .limit(RETENTION_BATCH_CAP + 1)
+      .get();
+
+    if (expired.empty) {
+      console.log('Film retention sweep: nothing expired.');
+      return;
+    }
+
+    const overflow = expired.size > RETENTION_BATCH_CAP;
+    const batch = expired.docs.slice(0, RETENTION_BATCH_CAP);
+
+    let purged = 0;
+    let failed = 0;
+    for (const filmDoc of batch) {
+      try {
+        const result = await purgeFilm(filmDoc);
+        purged += 1;
+        console.log(`Purged film ${result.filmId} (coach ${result.coachUid}, ${result.eventsDeleted} events)`);
+      } catch (e) {
+        failed += 1;
+        console.error(`Failed to purge film ${filmDoc.id}:`, e?.message || e);
+      }
+    }
+
+    if (overflow) {
+      console.warn(
+        `Film retention sweep hit the ${RETENTION_BATCH_CAP}-film cap — more expired films remain ` +
+        'and will be picked up on the next run. Not an error, but if this repeats daily the cap ' +
+        'is too low for the backlog.'
+      );
+    }
+
+    console.log(`Film retention sweep complete: ${purged} purged, ${failed} failed.`);
+  } catch (error) {
+    console.error('Error in enforceFilmRetention:', error);
+    throw error;
+  }
+});

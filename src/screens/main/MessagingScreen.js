@@ -1,4 +1,6 @@
 // MessagingScreen.js - Real-time 1:1 chat (inbox + thread) for all roles.
+// DBE burgundy redesign (mock 11f) — presentation only: listeners, send,
+// compose and read-receipts are unchanged.
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   SafeAreaView,
@@ -10,7 +12,6 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator,
   Modal,
   Image,
 } from 'react-native';
@@ -25,6 +26,15 @@ import {
   getOrCreateConversation,
   getMessageableContacts,
 } from '../../services/firestoreService';
+import { TYPE, FONTS, SHAPE } from '../../utils/typography';
+import {
+  ScreenHeader,
+  HeaderIconButton,
+  AttentionDot,
+  Entrance,
+  EmptyState,
+  LoadingState,
+} from '../../components/dbe';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 const toDate = (value) => {
@@ -72,42 +82,76 @@ const mapThread = (conv, myUid) => {
 };
 
 // ─── Avatar ─────────────────────────────────────────────────────────────────
-function Avatar({ name, photoURL, size, theme }) {
+// Local variant (the dbe Avatar has no photo support): surface2 disc, accent
+// initials when the thread needs attention, steel otherwise.
+function Avatar({ name, photoURL, size, theme, accent }) {
   if (photoURL) {
     return <Image source={{ uri: photoURL }} style={{ width: size, height: size, borderRadius: size / 2 }} />;
   }
   return (
-    <View style={[styles.avatar, { width: size, height: size, borderRadius: size / 2, backgroundColor: theme.primary + '25' }]}>
-      <Text style={[styles.avatarText, { color: theme.primary, fontSize: size * 0.34 }]}>{initialsOf(name)}</Text>
+    <View
+      style={[
+        styles.avatar,
+        { width: size, height: size, borderRadius: size / 2, backgroundColor: theme.surface2 },
+      ]}
+    >
+      <Text
+        style={{
+          fontFamily: FONTS.bodyBold,
+          fontSize: size * 0.31,
+          color: accent ? theme.accentText : theme.steel,
+        }}
+      >
+        {initialsOf(name)}
+      </Text>
     </View>
   );
 }
 
 // ─── Thread row ──────────────────────────────────────────────────────────────
-function ThreadItem({ thread, theme, onPress }) {
+function ThreadItem({ thread, theme, onPress, delay = 0, last }) {
   return (
-    <TouchableOpacity
-      style={[styles.threadItem, { borderBottomColor: theme.border }]}
-      onPress={() => onPress(thread)}
-      activeOpacity={0.75}
-    >
-      <Avatar name={thread.name} photoURL={thread.photoURL} size={48} theme={theme} />
-      <View style={styles.threadInfo}>
-        <View style={styles.threadTopRow}>
-          <Text style={[styles.threadName, { color: theme.text }]}>{thread.name}</Text>
-          <Text style={[styles.threadTime, { color: theme.textSecondary }]}>{thread.time}</Text>
+    <Entrance variant="slideIn" delay={delay}>
+      <TouchableOpacity
+        style={[
+          styles.threadItem,
+          !last && { borderBottomWidth: 1, borderBottomColor: theme.hairline },
+        ]}
+        onPress={() => onPress(thread)}
+        activeOpacity={0.75}
+      >
+        <Avatar name={thread.name} photoURL={thread.photoURL} size={48} theme={theme} accent={thread.unread} />
+        <View style={styles.threadInfo}>
+          <View style={styles.threadTopRow}>
+            <Text
+              numberOfLines={1}
+              style={{ flex: 1, fontFamily: FONTS.bodyBold, fontSize: 14.5, color: theme.text }}
+            >
+              {thread.name}
+            </Text>
+            <Text style={{ fontFamily: FONTS.bodyMedium, fontSize: 11, color: theme.textDim }}>
+              {thread.time}
+            </Text>
+          </View>
+          <View style={styles.threadBottomRow}>
+            <Text
+              style={{
+                flex: 1,
+                fontFamily: thread.unread ? FONTS.bodyBold : FONTS.bodyMedium,
+                fontSize: 12.5,
+                color: thread.unread ? theme.text : theme.textMuted,
+              }}
+              numberOfLines={1}
+            >
+              {thread.lastMessage}
+            </Text>
+            {thread.unread && (
+              <AttentionDot size={8} color={theme.primary} haloColor={theme.pulseDot} delay={delay} />
+            )}
+          </View>
         </View>
-        <View style={styles.threadBottomRow}>
-          <Text
-            style={[styles.threadLast, { color: thread.unread ? theme.text : theme.textSecondary, fontWeight: thread.unread ? '700' : '400' }]}
-            numberOfLines={1}
-          >
-            {thread.lastMessage}
-          </Text>
-          {thread.unread && <View style={[styles.unreadDot, { backgroundColor: theme.primary }]} />}
-        </View>
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+    </Entrance>
   );
 }
 
@@ -149,22 +193,26 @@ function ChatView({ conversation, myUid, theme, onBack }) {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={90}
     >
-      <View style={[styles.chatHeader, { borderBottomColor: theme.border }]}>
-        <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={theme.text} />
+      <View style={[styles.chatHeader, { borderBottomColor: theme.hairline }]}>
+        <TouchableOpacity
+          onPress={onBack}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Ionicons name="chevron-back" size={22} color={theme.text} />
         </TouchableOpacity>
-        <Avatar name={name} photoURL={photoURL} size={36} theme={theme} />
-        <View style={styles.chatHeaderInfo}>
-          <Text style={[styles.chatName, { color: theme.text }]}>{name}</Text>
-        </View>
+        <Avatar name={name} photoURL={photoURL} size={34} theme={theme} accent />
+        <Text
+          numberOfLines={1}
+          style={[TYPE.subScreenTitle, { color: theme.text, flex: 1 }]}
+        >
+          {name}
+        </Text>
       </View>
 
       <ScrollView ref={scrollRef} contentContainerStyle={styles.messagesContent} showsVerticalScrollIndicator={false}>
         {messages.length === 0 ? (
           <View style={styles.chatEmpty}>
-            <Text style={[styles.chatEmptyText, { color: theme.textSecondary }]}>
-              No messages yet. Say hello 👋
-            </Text>
+            <Text style={[TYPE.cardBody, { color: theme.textDim }]}>No messages yet</Text>
           </View>
         ) : (
           messages.map((msg) => {
@@ -176,11 +224,28 @@ function ChatView({ conversation, myUid, theme, onBack }) {
                   styles.messageBubble,
                   mine
                     ? [styles.myBubble, { backgroundColor: theme.primary }]
-                    : [styles.theirBubble, { backgroundColor: theme.card, borderColor: theme.border }],
+                    : [styles.theirBubble, { backgroundColor: theme.surface }],
                 ]}
               >
-                <Text style={[styles.messageText, { color: mine ? '#fff' : theme.text }]}>{msg.text}</Text>
-                <Text style={[styles.messageTime, { color: mine ? 'rgba(255,255,255,0.65)' : theme.textSecondary }]}>
+                <Text
+                  style={{
+                    fontFamily: FONTS.body,
+                    fontSize: 13.5,
+                    lineHeight: 19,
+                    color: mine ? '#FFFFFF' : theme.text,
+                  }}
+                >
+                  {msg.text}
+                </Text>
+                <Text
+                  style={{
+                    fontFamily: FONTS.bodyMedium,
+                    fontSize: 9.5,
+                    marginTop: 4,
+                    textAlign: 'right',
+                    color: mine ? 'rgba(255,255,255,0.65)' : theme.textDim,
+                  }}
+                >
                   {clockTime(msg.createdAt)}
                 </Text>
               </View>
@@ -189,22 +254,33 @@ function ChatView({ conversation, myUid, theme, onBack }) {
         )}
       </ScrollView>
 
-      <View style={[styles.inputBar, { backgroundColor: theme.card, borderTopColor: theme.border }]}>
+      <View style={[styles.inputBar, { backgroundColor: theme.background, borderTopColor: theme.hairline }]}>
         <TextInput
-          style={[styles.messageInput, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
+          style={[
+            styles.messageInput,
+            {
+              backgroundColor: theme.surface,
+              color: theme.text,
+              borderColor: theme.hairline,
+              fontFamily: FONTS.body,
+            },
+          ]}
           placeholder="Message…"
-          placeholderTextColor={theme.textSecondary}
+          placeholderTextColor={theme.textDim}
           value={inputText}
           onChangeText={setInputText}
           multiline
         />
         <TouchableOpacity
-          style={[styles.sendBtn, { backgroundColor: inputText.trim() ? theme.primary : theme.border }]}
+          style={[
+            styles.sendBtn,
+            { backgroundColor: inputText.trim() ? theme.primary : theme.buttonDisabled },
+          ]}
           onPress={handleSend}
           activeOpacity={0.85}
           disabled={!inputText.trim() || sending}
         >
-          <Ionicons name="send" size={18} color="#fff" />
+          <Ionicons name="send" size={17} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -216,34 +292,32 @@ function ComposeModal({ visible, contacts, onPick, onClose, theme }) {
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-        <View style={[styles.header, { borderBottomColor: theme.border }]}>
-          <TouchableOpacity onPress={onClose}>
-            <Ionicons name="close" size={24} color={theme.text} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: theme.text }]}>New Message</Text>
-          <View style={{ width: 24 }} />
-        </View>
-        <ScrollView>
+        <ScreenHeader
+          title="New Message"
+          right={<HeaderIconButton icon="close" onPress={onClose} />}
+        />
+        <ScrollView contentContainerStyle={{ paddingHorizontal: SHAPE.screenPadding }}>
           {contacts.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Ionicons name="people-outline" size={40} color={theme.textSecondary} />
-              <Text style={[styles.emptyTitle, { color: theme.text }]}>No contacts yet</Text>
-              <Text style={[styles.emptySub, { color: theme.textSecondary }]}>
-                Link with an athlete or coach to start messaging.
-              </Text>
-            </View>
+            <EmptyState
+              icon="people-outline"
+              title="No contacts yet"
+              sub="Link with an athlete or coach to start messaging."
+            />
           ) : (
-            contacts.map((c) => (
+            contacts.map((c, i) => (
               <TouchableOpacity
                 key={c.uid}
-                style={[styles.threadItem, { borderBottomColor: theme.border }]}
+                style={[
+                  styles.threadItem,
+                  i < contacts.length - 1 && { borderBottomWidth: 1, borderBottomColor: theme.hairline },
+                ]}
                 onPress={() => onPick(c)}
                 activeOpacity={0.75}
               >
                 <Avatar name={c.name} photoURL={c.photoURL} size={44} theme={theme} />
                 <View style={styles.threadInfo}>
-                  <Text style={[styles.threadName, { color: theme.text }]}>{c.name}</Text>
-                  {!!c.role && <Text style={[styles.threadTime, { color: theme.textSecondary }]}>{c.role}</Text>}
+                  <Text style={[TYPE.rowTitle, { color: theme.text }]}>{c.name}</Text>
+                  {!!c.role && <Text style={[TYPE.rowMeta, { color: theme.textDim }]}>{c.role}</Text>}
                 </View>
               </TouchableOpacity>
             ))
@@ -323,40 +397,38 @@ export default function MessagingScreen({ navigation, route }) {
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <StatusBar style={isDarkMode ? 'light' : 'dark'} />
 
-      <View style={[styles.header, { borderBottomColor: theme.border }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={theme.text} />
-        </TouchableOpacity>
-        <View>
-          <Text style={[styles.headerTitle, { color: theme.text }]}>Messages</Text>
-          {totalUnread > 0 && (
-            <Text style={[styles.headerSub, { color: theme.primary }]}>{totalUnread} unread</Text>
-          )}
-        </View>
-        <TouchableOpacity
-          style={[styles.composeBtn, { backgroundColor: theme.primary + '18' }]}
-          onPress={openCompose}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="create-outline" size={22} color={theme.primary} />
-        </TouchableOpacity>
-      </View>
+      <ScreenHeader
+        title="Messages"
+        subtitle={totalUnread > 0 ? `${totalUnread} unread` : null}
+        onBack={() => navigation.goBack()}
+        right={<HeaderIconButton icon="create-outline" onPress={openCompose} badge={totalUnread > 0} />}
+      />
 
       {loading ? (
-        <ActivityIndicator color={theme.primary} style={{ marginTop: 40 }} />
+        <LoadingState />
       ) : (
-        <ScrollView showsVerticalScrollIndicator={false}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: SHAPE.screenPadding, paddingTop: 8 }}
+        >
           {conversations.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Ionicons name="chatbubbles-outline" size={44} color={theme.textSecondary} />
-              <Text style={[styles.emptyTitle, { color: theme.text }]}>No messages yet</Text>
-              <Text style={[styles.emptySub, { color: theme.textSecondary }]}>
-                Tap the compose button to message a linked athlete or coach.
-              </Text>
-            </View>
+            <EmptyState
+              icon="chatbubbles-outline"
+              title="No messages yet"
+              sub="Message a linked athlete or coach."
+              ctaLabel="New message"
+              onPress={openCompose}
+            />
           ) : (
-            conversations.map((thread) => (
-              <ThreadItem key={thread.convId} thread={thread} theme={theme} onPress={openThread} />
+            conversations.map((thread, i) => (
+              <ThreadItem
+                key={thread.convId}
+                thread={thread}
+                theme={theme}
+                onPress={openThread}
+                delay={i * 100}
+                last={i === conversations.length - 1}
+              />
             ))
           )}
         </ScrollView>
@@ -375,61 +447,33 @@ export default function MessagingScreen({ navigation, route }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-  },
-  backBtn: { padding: 4 },
-  headerTitle: { fontSize: 18, fontWeight: '700' },
-  headerSub: { fontSize: 12, marginTop: 1 },
-  composeBtn: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
 
   threadItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    gap: 12,
+    paddingVertical: 12,
+    gap: 13,
   },
   avatar: { alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontWeight: '800' },
-  threadInfo: { flex: 1 },
-  threadTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  threadName: { fontSize: 15, fontWeight: '700' },
-  threadTime: { fontSize: 11 },
-  threadBottomRow: { flexDirection: 'row', alignItems: 'center', marginTop: 3, gap: 8 },
-  threadLast: { flex: 1, fontSize: 13, lineHeight: 18 },
-  unreadDot: { width: 10, height: 10, borderRadius: 5 },
-
-  emptyState: { alignItems: 'center', paddingTop: 80, gap: 8, paddingHorizontal: 40 },
-  emptyTitle: { fontSize: 18, fontWeight: '700' },
-  emptySub: { fontSize: 13, textAlign: 'center', lineHeight: 19 },
+  threadInfo: { flex: 1, minWidth: 0 },
+  threadTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
+  threadBottomRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2, gap: 6 },
 
   // Chat view
   chatHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: SHAPE.screenPadding,
+    paddingVertical: 10,
     borderBottomWidth: 1,
     gap: 10,
   },
-  chatHeaderInfo: { flex: 1 },
-  chatName: { fontSize: 16, fontWeight: '700' },
 
-  messagesContent: { padding: 16, gap: 10, flexGrow: 1 },
+  messagesContent: { padding: SHAPE.screenPadding, gap: 10, flexGrow: 1 },
   chatEmpty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60 },
-  chatEmptyText: { fontSize: 14 },
-  messageBubble: { maxWidth: '80%', padding: 12, borderRadius: 16 },
+  messageBubble: { maxWidth: '80%', paddingHorizontal: 12, paddingVertical: 10, borderRadius: SHAPE.radiusCard },
   myBubble: { alignSelf: 'flex-end', borderBottomRightRadius: 4 },
-  theirBubble: { alignSelf: 'flex-start', borderWidth: 1, borderBottomLeftRadius: 4 },
-  messageText: { fontSize: 14, lineHeight: 20 },
-  messageTime: { fontSize: 10, marginTop: 4, textAlign: 'right' },
+  theirBubble: { alignSelf: 'flex-start', borderBottomLeftRadius: 4 },
 
   inputBar: {
     flexDirection: 'row',
@@ -444,7 +488,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    fontSize: 14,
+    fontSize: 13.5,
     maxHeight: 100,
   },
   sendBtn: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },

@@ -49,7 +49,7 @@ const buildStatBadges = ({ evalGrade, shotDNA, blueprintStatus }) => [
     id: 'evalRank',
     label: 'EvalRank Grade',
     value: evalGrade,
-    color: '#FF6B00', // orange – primary
+    color: '#8A1C22', // orange – primary
   },
   {
     id: 'shotDNA',

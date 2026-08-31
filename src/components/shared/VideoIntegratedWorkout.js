@@ -134,7 +134,7 @@ const VideoIntegratedWorkout = ({
             <Text style={styles.stepInstructions}>{step.instructions}</Text>
             {step.tips && (
               <View style={styles.stepTips}>
-                <Ionicons name="bulb-outline" size={16} color="#FF6B00" />
+                <Ionicons name="bulb-outline" size={16} color="#8A1C22" />
                 <Text style={styles.stepTipsText}>{step.tips}</Text>
               </View>
             )}
@@ -226,7 +226,7 @@ const styles = StyleSheet.create({
   },
   seeAllText: {
     fontSize: 14,
-    color: '#FF6B00',
+    color: '#8A1C22',
     fontWeight: '500',
   },
   videosList: {
@@ -284,7 +284,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#FF6B00',
+    backgroundColor: '#8A1C22',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -313,11 +313,11 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 6,
     borderLeftWidth: 3,
-    borderLeftColor: '#FF6B00',
+    borderLeftColor: '#8A1C22',
   },
   stepTipsText: {
     fontSize: 13,
-    color: '#E65100',
+    color: '#6F161B',
     marginLeft: 6,
     flex: 1,
     fontStyle: 'italic',

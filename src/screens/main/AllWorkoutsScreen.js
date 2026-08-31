@@ -161,7 +161,7 @@ const AllWorkoutsScreen = ({ navigation }) => {
     if (loading) {
         return (
             <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#FF6B00" />
+                <ActivityIndicator size="large" color="#8A1C22" />
             </View>
         );
     }
@@ -321,7 +321,7 @@ const AllWorkoutsScreen = ({ navigation }) => {
                                     {level}
                                 </Text>
                                 {selectedLevel === level && (
-                                    <Ionicons name="checkmark" size={18} color="#FF6B00" />
+                                    <Ionicons name="checkmark" size={18} color="#8A1C22" />
                                 )}
                             </TouchableOpacity>
                         ))}
@@ -430,7 +430,7 @@ const styles = StyleSheet.create({
         marginRight: 8,
     },
     activeSortButton: {
-        backgroundColor: '#FF6B00',
+        backgroundColor: '#8A1C22',
     },
     sortButtonText: {
         color: '#666',
@@ -476,7 +476,7 @@ const styles = StyleSheet.create({
         color: '#333',
     },
     selectedLevelOptionText: {
-        color: '#FF6B00',
+        color: '#8A1C22',
         fontWeight: '600',
     },
     workoutsList: {
@@ -567,7 +567,7 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     startButton: {
-        backgroundColor: '#FF6B00',
+        backgroundColor: '#8A1C22',
         paddingVertical: 8,
         paddingHorizontal: 16,
         borderRadius: 20,

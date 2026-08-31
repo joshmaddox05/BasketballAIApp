@@ -83,7 +83,7 @@ const PersonalizedWorkoutSection = ({ navigation, onWorkoutPress }) => {
 
         {workout.personalizedScore && (
           <View style={styles.matchBadge}>
-            <Ionicons name="sparkles" size={14} color="#FF6B00" />
+            <Ionicons name="sparkles" size={14} color="#8A1C22" />
             <Text style={styles.matchText}>
               {Math.round(workout.personalizedScore)}% Match
             </Text>
@@ -105,7 +105,7 @@ const PersonalizedWorkoutSection = ({ navigation, onWorkoutPress }) => {
       {nextWorkout && (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Ionicons name="flash" size={24} color="#FF6B00" />
+            <Ionicons name="flash" size={24} color="#8A1C22" />
             <Text style={styles.sectionTitle}>Your Next Workout</Text>
           </View>
 
@@ -121,15 +121,15 @@ const PersonalizedWorkoutSection = ({ navigation, onWorkoutPress }) => {
 
               <View style={styles.nextWorkoutMeta}>
                 <View style={styles.metaItem}>
-                  <Ionicons name="trending-up" size={16} color="#FF6B00" />
+                  <Ionicons name="trending-up" size={16} color="#8A1C22" />
                   <Text style={styles.metaText}>{nextWorkout.difficulty}</Text>
                 </View>
                 <View style={styles.metaItem}>
-                  <Ionicons name="time" size={16} color="#FF6B00" />
+                  <Ionicons name="time" size={16} color="#8A1C22" />
                   <Text style={styles.metaText}>{nextWorkout.estimatedDuration} min</Text>
                 </View>
                 <View style={styles.metaItem}>
-                  <Ionicons name="barbell" size={16} color="#FF6B00" />
+                  <Ionicons name="barbell" size={16} color="#8A1C22" />
                   <Text style={styles.metaText}>{nextWorkout.category}</Text>
                 </View>
               </View>
@@ -145,7 +145,7 @@ const PersonalizedWorkoutSection = ({ navigation, onWorkoutPress }) => {
       {/* Recommended Workouts */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Ionicons name="star" size={24} color="#FF6B00" />
+          <Ionicons name="star" size={24} color="#8A1C22" />
           <Text style={styles.sectionTitle}>Recommended for You</Text>
         </View>
 
@@ -216,8 +216,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#FF6B00',
-    shadowColor: '#FF6B00',
+    borderColor: '#8A1C22',
+    shadowColor: '#8A1C22',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
@@ -256,7 +256,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#FF6B00',
+    backgroundColor: '#8A1C22',
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 12,
@@ -308,7 +308,7 @@ const styles = StyleSheet.create({
   },
   categoryBadgeText: {
     fontSize: 11,
-    color: '#FF6B00',
+    color: '#8A1C22',
     fontWeight: '600',
   },
   difficultyBadge: {
@@ -360,7 +360,7 @@ const styles = StyleSheet.create({
   },
   matchText: {
     fontSize: 11,
-    color: '#FF6B00',
+    color: '#8A1C22',
     fontWeight: '600',
     marginLeft: 4,
   },

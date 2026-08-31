@@ -13,6 +13,7 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
+import { EmptyState } from '../../components/dbe';
 import { hasAccess, SUBSCRIPTION_TIERS } from '../../utils/subscription';
 import SubscriptionModal from '../../components/shared/SubscriptionModal';
 
@@ -70,7 +71,7 @@ const TrainingCategoryScreen = ({ route, navigation }) => {
     const getCategoryColor = () => {
         switch(category.toLowerCase()) {
             case 'shooting':
-                return '#FF6B00';
+                return '#8A1C22';
             case 'dribbling':
                 return '#4CAF50';
             case 'physical':
@@ -82,7 +83,7 @@ const TrainingCategoryScreen = ({ route, navigation }) => {
             case 'nutrition':
                 return '#00BCD4';
             default:
-                return '#FF6B00';
+                return '#8A1C22';
         }
     };
     
@@ -265,20 +266,14 @@ const TrainingCategoryScreen = ({ route, navigation }) => {
                     contentContainerStyle={styles.workoutsList}
                 />
             ) : (
-                <View style={styles.emptyState}>
-                    <Ionicons name={getCategoryIcon()} size={60} color={theme.textTertiary} />
-                    <Text style={[styles.emptyStateTitle, { color: theme.text }]}>No Workouts Available</Text>
-                    <Text style={[styles.emptyStateDescription, { color: theme.textSecondary }]}>
-                        There are currently no {category.toLowerCase()} workouts available.
-                        Check back later or explore other categories.
-                    </Text>
-                    <TouchableOpacity
-                        style={[styles.exploreButton, { backgroundColor: theme.primary }]}
-                        onPress={() => navigation.goBack()}
-                    >
-                        <Text style={styles.exploreButtonText}>Explore Categories</Text>
-                    </TouchableOpacity>
-                </View>
+                <EmptyState
+                    icon={getCategoryIcon()}
+                    title="No Workouts Available"
+                    sub={`There are currently no ${category.toLowerCase()} workouts available. Check back later or explore other categories.`}
+                    ctaLabel="Explore Categories"
+                    onPress={() => navigation.goBack()}
+                    style={{ flex: 1, justifyContent: 'center' }}
+                />
             )}
         </SafeAreaView>
         <SubscriptionModal
@@ -482,33 +477,6 @@ const styles = StyleSheet.create({
         color: '#FFF',
         fontSize: 14,
         fontWeight: '600',
-    },
-    emptyState: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 24,
-    },
-    emptyStateTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        marginTop: 16,
-        marginBottom: 8,
-    },
-    emptyStateDescription: {
-        fontSize: 14,
-        textAlign: 'center',
-        marginBottom: 24,
-    },
-    exploreButton: {
-        paddingHorizontal: 24,
-        paddingVertical: 12,
-        borderRadius: 8,
-    },
-    exploreButtonText: {
-        color: '#FFF',
-        fontWeight: 'bold',
-        fontSize: 16,
     },
 });
 

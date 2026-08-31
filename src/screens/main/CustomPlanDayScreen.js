@@ -40,7 +40,7 @@ const CustomPlanDayScreen = ({ navigation, route }) => {
 
   // Focus area config
   const focusConfig = FOCUS_AREAS[daySchedule.focusArea] || {
-    color: '#FF6B00',
+    color: '#8A1C22',
     icon: 'fitness-outline',
     name: daySchedule.focusArea
   };
@@ -247,7 +247,7 @@ const CustomPlanDayScreen = ({ navigation, route }) => {
         <View style={styles.completionContainer}>
           {isSaving ? (
             <>
-              <ActivityIndicator size="large" color="#FF6B00" />
+              <ActivityIndicator size="large" color="#8A1C22" />
               <Text style={styles.savingText}>Saving progress...</Text>
             </>
           ) : (
@@ -440,7 +440,7 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#FF6B00',
+    backgroundColor: '#8A1C22',
     borderRadius: 2
   },
   progressText: {
@@ -550,7 +550,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FF6B00',
+    backgroundColor: '#8A1C22',
     borderRadius: 16,
     paddingVertical: 18
   },
@@ -680,7 +680,7 @@ const styles = StyleSheet.create({
   completionStatValue: {
     fontSize: 28,
     fontWeight: '800',
-    color: '#FF6B00'
+    color: '#8A1C22'
   },
   completionStatLabel: {
     fontSize: 14,
@@ -688,7 +688,7 @@ const styles = StyleSheet.create({
     marginTop: 4
   },
   doneButton: {
-    backgroundColor: '#FF6B00',
+    backgroundColor: '#8A1C22',
     paddingHorizontal: 60,
     paddingVertical: 18,
     borderRadius: 16

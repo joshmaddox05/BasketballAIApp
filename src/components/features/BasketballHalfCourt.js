@@ -55,7 +55,7 @@ export default function BasketballHalfCourt({ width = 300, height = 180, style }
 
       {/* Backboard + rim */}
       <Line x1={cx - bbHalf} y1={bbY} x2={cx + bbHalf} y2={bbY} stroke={line} strokeWidth={sw + 0.6} />
-      <Circle cx={cx} cy={rimY} r={rimR} fill="none" stroke="#FF6B00" strokeWidth={sw} />
+      <Circle cx={cx} cy={rimY} r={rimR} fill="none" stroke="#8A1C22" strokeWidth={sw} />
       <Path d={restricted} fill="none" stroke={lineFaint} strokeWidth={sw} />
 
       {/* Three-point line */}

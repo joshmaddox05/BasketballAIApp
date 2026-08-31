@@ -54,7 +54,7 @@ const TrainingScreen = ({ navigation }) => {
     const [myPlans, setMyPlans] = useState([]);
 
     const trainingCategories = [
-        { id: '1', title: 'Shooting', icon: 'basketball-outline', color: '#FF6B00' },
+        { id: '1', title: 'Shooting', icon: 'basketball-outline', color: '#8A1C22' },
         { id: '2', title: 'Dribbling', icon: 'hand-left-outline', color: '#4CAF50' },
         { id: '3', title: 'Physical', icon: 'fitness-outline', color: '#2196F3' },
         { id: '4', title: 'Defense', icon: 'shield-outline', color: '#9C27B0' },
@@ -243,7 +243,7 @@ const TrainingScreen = ({ navigation }) => {
     if (loading) {
         return (
             <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#FF6B00" />
+                <ActivityIndicator size="large" color="#8A1C22" />
             </View>
         );
     }
@@ -318,7 +318,7 @@ const TrainingScreen = ({ navigation }) => {
                             activeOpacity={0.9}
                         >
                             <LinearGradient
-                                colors={['#FF6B00', '#FF8C33']}
+                                colors={['#8A1C22', '#4C0F14']}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 1 }}
                                 style={styles.buildWorkoutGradient}
@@ -331,7 +331,7 @@ const TrainingScreen = ({ navigation }) => {
                                         </Text>
                                         <View style={styles.buildWorkoutButton}>
                                             <Text style={styles.buildWorkoutButtonText}>Get Started</Text>
-                                            <Ionicons name="arrow-forward" size={16} color="#FF6B00" />
+                                            <Ionicons name="arrow-forward" size={16} color="#8A1C22" />
                                         </View>
                                     </View>
                                     <View style={styles.buildWorkoutIcon}>
@@ -823,7 +823,7 @@ const styles = StyleSheet.create({
         width: 40,
         height: 40,
         borderRadius: 20,
-        backgroundColor: '#FF6B00',
+        backgroundColor: '#8A1C22',
         justifyContent: 'center',
         alignItems: 'center',
         marginLeft: 8,
@@ -959,7 +959,7 @@ const styles = StyleSheet.create({
         marginBottom: 16,
         borderRadius: 16,
         overflow: 'hidden',
-        shadowColor: '#FF6B00',
+        shadowColor: '#8A1C22',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 8,
@@ -999,7 +999,7 @@ const styles = StyleSheet.create({
         alignSelf: 'flex-start',
     },
     buildWorkoutButtonText: {
-        color: '#FF6B00',
+        color: '#8A1C22',
         fontWeight: '700',
         fontSize: 14,
         marginRight: 6,

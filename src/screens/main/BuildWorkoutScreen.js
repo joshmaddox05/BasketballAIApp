@@ -248,7 +248,7 @@ const BuildWorkoutScreen = ({ navigation }) => {
     if (isGenerating) {
       return (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#FF6B00" />
+          <ActivityIndicator size="large" color="#8A1C22" />
           <Text style={styles.loadingText}>Generating your personalized plan...</Text>
         </View>
       );
@@ -289,11 +289,11 @@ const BuildWorkoutScreen = ({ navigation }) => {
         <View style={styles.planSummary}>
           <View style={styles.summaryRow}>
             <View style={styles.summaryItem}>
-              <Ionicons name="calendar-outline" size={20} color="#FF6B00" />
+              <Ionicons name="calendar-outline" size={20} color="#8A1C22" />
               <Text style={styles.summaryValue}>{generatedPlan.durationDays} Days</Text>
             </View>
             <View style={styles.summaryItem}>
-              <Ionicons name="time-outline" size={20} color="#FF6B00" />
+              <Ionicons name="time-outline" size={20} color="#8A1C22" />
               <Text style={styles.summaryValue}>
                 ~{Math.round(generatedPlan.totalEstimatedDuration / 60)}h total
               </Text>
@@ -322,7 +322,7 @@ const BuildWorkoutScreen = ({ navigation }) => {
           <View style={styles.scheduleHeader}>
             <Text style={styles.scheduleTitle}>Schedule</Text>
             <TouchableOpacity onPress={regeneratePlan} style={styles.regenerateButton}>
-              <Ionicons name="refresh" size={18} color="#FF6B00" />
+              <Ionicons name="refresh" size={18} color="#8A1C22" />
               <Text style={styles.regenerateText}>Regenerate</Text>
             </TouchableOpacity>
           </View>
@@ -512,7 +512,7 @@ const styles = StyleSheet.create({
     marginBottom: 16
   },
   retryButton: {
-    backgroundColor: '#FF6B00',
+    backgroundColor: '#8A1C22',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 12
@@ -597,7 +597,7 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   regenerateText: {
-    color: '#FF6B00',
+    color: '#8A1C22',
     fontSize: 14,
     fontWeight: '600',
     marginLeft: 4
@@ -630,7 +630,7 @@ const styles = StyleSheet.create({
     flex: 0.6,
     height: 52,
     borderRadius: 14,
-    backgroundColor: '#FF6B00',
+    backgroundColor: '#8A1C22',
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center'

@@ -1,5 +1,5 @@
 // MainNavigator.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,7 +8,7 @@ import { useAppContext } from '../context/AppContext';
 import FriendRequestModal from '../components/shared/FriendRequestModal';
 import DailyChallengeModal from '../components/shared/DailyChallengeModal';
 import { listenToFriendRequests } from '../services/firestoreService';
-import { TourProvider, TourOverlay, useTour } from '../components/tour';
+import { TourProvider, TourOverlay, useTour, getCoachTourSteps } from '../components/tour';
 import { navigationRef } from './AppNavigator';
 
 // Import your main app screens
@@ -39,6 +39,7 @@ import TermsOfServiceScreen from '../screens/main/TermsOfServiceScreen';
 
 // Import the shared screens utility
 import { addSharedScreensToStack } from './SharedStackNavigator';
+import { FONTS } from '../utils/typography';
 import AllActivitiesScreen from "../screens/main/AllActivitiesScreen";
 import ActivityDetailScreen from "../screens/main/ActivityDetailScreen";
 import EditProfileScreen from "../screens/main/EditProfileScreen";
@@ -47,6 +48,22 @@ import AchievementsScreen from "../screens/main/AchievementsScreen";
 import AllGoalsScreen from "../screens/main/AllGoalsScreen";
 import ShootingHistoryScreen from "../screens/main/ShootingHistoryScreen";
 import AccountPrivacyScreen from "../screens/main/AccountPrivacyScreen";
+
+// Shared DBE tab-bar chrome (design handoff: hairline top border, 20pt icons,
+// 9pt Figtree labels). Height stays automatic so safe-area insets keep working.
+const dbeTabBarOptions = (theme) => ({
+    tabBarActiveTintColor: theme.tabActive,
+    tabBarInactiveTintColor: theme.tabInactive,
+    headerShown: false,
+    tabBarStyle: {
+        backgroundColor: theme.tabBar,
+        borderTopWidth: 1,
+        borderTopColor: theme.hairline,
+        paddingTop: 6,
+        paddingBottom: 5,
+    },
+    tabBarLabelStyle: { fontFamily: FONTS.bodySemiBold, fontSize: 9 },
+});
 
 // For nested navigation within tabs
 const HomeStack = createStackNavigator();
@@ -230,18 +247,10 @@ function MainNavigatorContent() {
         <>
         <Tab.Navigator
             screenOptions={({ route }) => ({
-                tabBarIcon: ({ focused, color, size }) => (
-                    <TabBarIcon route={route} focused={focused} color={color} size={size} />
+                tabBarIcon: ({ focused, color }) => (
+                    <TabBarIcon route={route} focused={focused} color={color} size={20} />
                 ),
-                tabBarActiveTintColor: theme.tabActive,
-                tabBarInactiveTintColor: theme.tabInactive,
-                headerShown: false,
-                tabBarStyle: {
-                    backgroundColor: theme.tabBar,
-                    borderTopColor: theme.border,
-                    paddingBottom: 5,
-                    paddingTop: 5
-                }
+                ...dbeTabBarOptions(theme),
             })}
             screenListeners={{
                 state: (e) => onTabChange(e.data.state),
@@ -353,28 +362,83 @@ function CoachContentStackNavigator() {
     );
 }
 
-export function CoachMainNavigator() {
-    const { theme, userData } = useAppContext();
+// Coach tab-bar icon with TourStep registration for tour-highlighted tabs.
+// `stepId` is computed per route in the navigator (coachType-aware) and passed in.
+const CoachTabBarIcon = ({ route, focused, color, size, stepId }) => {
+    const { registerTarget, unregisterTarget, isTourActive, currentStep, measureTarget } = useTour();
+    const ref = React.useRef(null);
+
+    React.useEffect(() => {
+        if (stepId) registerTarget(stepId, ref);
+        return () => {
+            if (stepId) unregisterTarget(stepId);
+        };
+    }, [stepId, registerTarget, unregisterTarget]);
+
+    React.useEffect(() => {
+        if (isTourActive && currentStep?.id === stepId) {
+            const timer = setTimeout(() => measureTarget(stepId), 100);
+            return () => clearTimeout(timer);
+        }
+    }, [isTourActive, currentStep, stepId, measureTarget]);
+
+    const icons = {
+        CoachHome: focused ? 'home' : 'home-outline',
+        Roster: focused ? 'people' : 'people-outline',
+        Playbook: focused ? 'clipboard' : 'clipboard-outline',
+        Market: focused ? 'storefront' : 'storefront-outline',
+        Create: focused ? 'add-circle' : 'add-circle-outline',
+        CoachProfile: focused ? 'person' : 'person-outline',
+    };
+    const iconName = icons[route.name] || 'ellipse';
+
+    if (stepId) {
+        return (
+            <View ref={ref} collapsable={false}>
+                <Ionicons name={iconName} size={size} color={color} />
+            </View>
+        );
+    }
+    return <Ionicons name={iconName} size={size} color={color} />;
+};
+
+// Inner component that uses tour context (auto-start + tab-target wiring)
+function CoachMainNavigatorContent() {
+    const { theme, userData, user } = useAppContext();
+    const { hasSeenTour, isLoading: isTourLoading, startTour } = useTour();
     const isTrainer = userData?.coachType === 'trainer';
+
+    // The coach tour spotlights the first middle tab + Profile. Middle tab route
+    // name differs by coachType (org: Roster / trainer: Market).
+    const middleTabName = isTrainer ? 'Market' : 'Roster';
+    const coachTabStep = (routeName) => {
+        if (routeName === 'CoachProfile') return 'coach-profile-tab';
+        if (routeName === middleTabName) return 'coach-middle-tab';
+        return undefined;
+    };
+
+    // Auto-start the coach tour for coaches who haven't seen it yet
+    useEffect(() => {
+        if (!isTourLoading && !hasSeenTour && user?.uid) {
+            const timer = setTimeout(() => startTour(), 1000);
+            return () => clearTimeout(timer);
+        }
+    }, [isTourLoading, hasSeenTour, user?.uid, startTour]);
+
     return (
-        <TourProvider navigationRef={navigationRef}>
+        <>
         <CoachTab.Navigator
             screenOptions={({ route }) => ({
-                tabBarIcon: ({ focused, color, size }) => {
-                    const icons = {
-                        CoachHome: focused ? 'home' : 'home-outline',
-                        Roster: focused ? 'people' : 'people-outline',
-                        Playbook: focused ? 'clipboard' : 'clipboard-outline',
-                        Market: focused ? 'storefront' : 'storefront-outline',
-                        Create: focused ? 'add-circle' : 'add-circle-outline',
-                        CoachProfile: focused ? 'person' : 'person-outline',
-                    };
-                    return <Ionicons name={icons[route.name] || 'ellipse'} size={size} color={color} />;
-                },
-                tabBarActiveTintColor: theme.tabActive,
-                tabBarInactiveTintColor: theme.tabInactive,
-                headerShown: false,
-                tabBarStyle: { backgroundColor: theme.tabBar, borderTopColor: theme.border, paddingBottom: 5, paddingTop: 5 },
+                tabBarIcon: ({ focused, color }) => (
+                    <CoachTabBarIcon
+                        route={route}
+                        focused={focused}
+                        color={color}
+                        size={20}
+                        stepId={coachTabStep(route.name)}
+                    />
+                ),
+                ...dbeTabBarOptions(theme),
             })}
         >
             <CoachTab.Screen name="CoachHome" component={CoachHomeStackNavigator} options={{ title: 'Home' }} />
@@ -392,6 +456,17 @@ export function CoachMainNavigator() {
             <CoachTab.Screen name="CoachProfile" component={CoachProfileStackNavigator} options={{ title: 'Profile' }} />
         </CoachTab.Navigator>
         <TourOverlay theme={theme} />
+        </>
+    );
+}
+
+export function CoachMainNavigator() {
+    const { userData } = useAppContext();
+    // Memoize so the provider's step array reference is stable across renders
+    const coachSteps = useMemo(() => getCoachTourSteps(userData?.coachType), [userData?.coachType]);
+    return (
+        <TourProvider navigationRef={navigationRef} steps={coachSteps} storageKey="hasSeenCoachTour">
+            <CoachMainNavigatorContent />
         </TourProvider>
     );
 }
@@ -441,18 +516,15 @@ export function ScoutMainNavigator() {
         <TourProvider navigationRef={navigationRef}>
         <ScoutTab.Navigator
             screenOptions={({ route }) => ({
-                tabBarIcon: ({ focused, color, size }) => {
+                tabBarIcon: ({ focused, color }) => {
                     const icons = {
                         Discover: focused ? 'search' : 'search-outline',
                         Watchlist: focused ? 'bookmark' : 'bookmark-outline',
                         ScoutProfile: focused ? 'person' : 'person-outline',
                     };
-                    return <Ionicons name={icons[route.name] || 'ellipse'} size={size} color={color} />;
+                    return <Ionicons name={icons[route.name] || 'ellipse'} size={20} color={color} />;
                 },
-                tabBarActiveTintColor: theme.tabActive,
-                tabBarInactiveTintColor: theme.tabInactive,
-                headerShown: false,
-                tabBarStyle: { backgroundColor: theme.tabBar, borderTopColor: theme.border, paddingBottom: 5, paddingTop: 5 },
+                ...dbeTabBarOptions(theme),
             })}
         >
             <ScoutTab.Screen name="Discover" component={ScoutDiscoverStackNavigator} />
@@ -511,18 +583,15 @@ export function ParentMainNavigator() {
         <TourProvider navigationRef={navigationRef}>
         <ParentTab.Navigator
             screenOptions={({ route }) => ({
-                tabBarIcon: ({ focused, color, size }) => {
+                tabBarIcon: ({ focused, color }) => {
                     const icons = {
                         ParentHome: focused ? 'home' : 'home-outline',
                         Progress: focused ? 'stats-chart' : 'stats-chart-outline',
                         ParentProfile: focused ? 'person' : 'person-outline',
                     };
-                    return <Ionicons name={icons[route.name] || 'ellipse'} size={size} color={color} />;
+                    return <Ionicons name={icons[route.name] || 'ellipse'} size={20} color={color} />;
                 },
-                tabBarActiveTintColor: theme.tabActive,
-                tabBarInactiveTintColor: theme.tabInactive,
-                headerShown: false,
-                tabBarStyle: { backgroundColor: theme.tabBar, borderTopColor: theme.border, paddingBottom: 5, paddingTop: 5 },
+                ...dbeTabBarOptions(theme),
             })}
         >
             <ParentTab.Screen name="ParentHome" component={ParentHomeStackNavigator} options={{ title: 'Home' }} />

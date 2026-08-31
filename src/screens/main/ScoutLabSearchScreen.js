@@ -1,10 +1,23 @@
-// ScoutLabSearchScreen.js - Scout/Recruiter prospect search and watchlist
+// ScoutLabSearchScreen.js - Scout/Recruiter prospect search (design 14b).
+// Presentational redesign only — search, filters, watchlist and saved-search
+// logic unchanged. Results stay consent-filtered via searchScoutLabProspects.
 import React, { useState, useCallback, useEffect } from 'react';
 import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, ScrollView, TextInput, Alert } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAppContext } from '../../context/AppContext';
+import { TYPE, SHAPE } from '../../utils/typography';
+import {
+  ScreenHeader,
+  HeaderIconButton,
+  Chip,
+  Avatar,
+  Row,
+  PrimaryButton,
+  EmptyState,
+} from '../../components/dbe';
+import { evalColorFor, evalFillFor } from './ScoutHomeScreen';
 import {
   searchScoutLabProspects,
   saveWatchlistEntry,
@@ -112,114 +125,45 @@ const SAMPLE_PROSPECTS = [
   },
 ];
 
-function gradeColor(grade, primary) {
-  if (grade === 'A+' || grade === 'A') return '#22c55e';
-  if (grade === 'B+') return primary;
-  if (grade === 'B') return '#f59e0b';
-  return '#9ca3af';
-}
+const initialsOf = (name) =>
+  (name || '?')
+    .split(' ')
+    .map((n) => n[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase() || '?';
 
-function FilterChip({ label, active, onPress, theme }) {
+function ProspectResultRow({ prospect, isWatchlisted, onToggleWatchlist, theme, navigation, style }) {
+  const grade = prospect.evalGrade || '—';
+  const meta = [prospect.position, prospect.classYear ? `Class of ${prospect.classYear}` : null, prospect.city]
+    .filter(Boolean)
+    .join(' · ');
   return (
-    <TouchableOpacity
-      style={[
-        styles.filterChip,
-        active
-          ? { backgroundColor: theme.primary, borderColor: theme.primary }
-          : { backgroundColor: theme.card, borderColor: theme.border },
-      ]}
-      onPress={onPress}
-      activeOpacity={0.75}
-    >
-      <Text
-        style={[
-          styles.filterChipText,
-          { color: active ? '#fff' : theme.textSecondary },
-        ]}
-      >
-        {label}
-      </Text>
-    </TouchableOpacity>
-  );
-}
-
-function ProspectCard({ prospect, isWatchlisted, onAddWatchlist, onRemoveWatchlist, theme, navigation }) {
-  const badgeColor = gradeColor(prospect.evalGrade, theme.primary);
-  return (
-    <TouchableOpacity
-      style={[styles.prospectCard, { backgroundColor: theme.card, borderColor: theme.border }]}
-      activeOpacity={0.8}
+    <Row
+      style={style}
       onPress={() => navigation && navigation.navigate('ScoutProspectDetail', { prospect })}
-    >
-      <View style={styles.prospectCardTop}>
-        {/* Avatar */}
-        <View style={[styles.prospectAvatar, { backgroundColor: theme.primary + '20' }]}>
-          <Ionicons name="person" size={22} color={theme.primary} />
-        </View>
-
-        {/* Info */}
-        <View style={styles.prospectInfo}>
-          <Text style={[styles.prospectName, { color: theme.text }]}>{prospect.name}</Text>
-          <Text style={[styles.prospectMeta, { color: theme.textSecondary }]}>
-            {prospect.position} · {prospect.height} · Class of {prospect.classYear}
-          </Text>
-          <Text style={[styles.prospectSchool, { color: theme.textTertiary }]} numberOfLines={1}>
-            {prospect.school}
-          </Text>
-        </View>
-
-        {/* EvalRank badge */}
-        <View style={[styles.gradeBadge, { backgroundColor: badgeColor + '20', borderColor: badgeColor + '50' }]}>
-          <Text style={[styles.gradeText, { color: badgeColor }]}>{prospect.evalGrade}</Text>
-        </View>
-      </View>
-
-      <View style={[styles.prospectCardBottom, { borderTopColor: theme.border }]}>
-        {/* Region */}
-        <View style={styles.regionRow}>
-          <Ionicons name="location-outline" size={13} color={theme.textTertiary} />
-          <Text style={[styles.regionText, { color: theme.textTertiary }]}>{prospect.city}</Text>
-          <View style={[styles.regionChip, { backgroundColor: theme.backgroundTertiary || theme.border + '60' }]}>
-            <Text style={[styles.regionChipText, { color: theme.textSecondary }]}>{prospect.region}</Text>
+      leading={<Avatar initials={initialsOf(prospect.name)} tone={isWatchlisted ? 'accent' : 'steel'} />}
+      title={prospect.name}
+      meta={meta}
+      trailing={
+        <View style={styles.rowTrailing}>
+          <View style={[styles.gradeBadge, { backgroundColor: evalFillFor(grade, theme) }]}>
+            <Text style={[styles.gradeBadgeText, { color: evalColorFor(grade, theme) }]}>{grade}</Text>
           </View>
+          <TouchableOpacity
+            onPress={() => onToggleWatchlist(prospect)}
+            hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+          >
+            <Ionicons
+              name={isWatchlisted ? 'bookmark' : 'bookmark-outline'}
+              size={16}
+              color={isWatchlisted ? theme.accentText : theme.textDim}
+            />
+          </TouchableOpacity>
         </View>
-
-        {/* Watchlist button */}
-        {isWatchlisted ? (
-          <TouchableOpacity
-            style={[styles.watchlistBtn, styles.watchlistBtnActive, { borderColor: theme.primary, backgroundColor: theme.primary + '15' }]}
-            onPress={() => onRemoveWatchlist(prospect.id)}
-            activeOpacity={0.75}
-          >
-            <Ionicons name="bookmark" size={14} color={theme.primary} />
-            <Text style={[styles.watchlistBtnText, { color: theme.primary }]}>Saved</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            style={[styles.watchlistBtn, { borderColor: theme.border, backgroundColor: theme.card }]}
-            onPress={() => onAddWatchlist(prospect)}
-            activeOpacity={0.75}
-          >
-            <Ionicons name="bookmark-outline" size={14} color={theme.textSecondary} />
-            <Text style={[styles.watchlistBtnText, { color: theme.textSecondary }]}>Add to Watchlist</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-    </TouchableOpacity>
-  );
-}
-
-function WatchlistEmptyState({ theme }) {
-  return (
-    <View style={styles.emptyState}>
-      <View style={[styles.emptyIcon, { backgroundColor: theme.primary + '15' }]}>
-        <Ionicons name="bookmark-outline" size={36} color={theme.primary} />
-      </View>
-      <Text style={[styles.emptyTitle, { color: theme.text }]}>No Saved Prospects</Text>
-      <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
-        Prospects you add to your watchlist will appear here for quick access.
-      </Text>
-    </View>
+      }
+    />
   );
 }
 
@@ -227,7 +171,6 @@ export default function ScoutLabSearchScreen({ navigation }) {
   const { user, theme, isDarkMode } = useAppContext();
   const scoutUid = user?.uid;
 
-  const [activeTab, setActiveTab] = useState('search'); // 'search' | 'watchlist'
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [activePosition, setActivePosition] = useState(null);
@@ -355,362 +298,244 @@ export default function ScoutLabSearchScreen({ navigation }) {
   });
 
   const watchlistIds = new Set(watchlist.map((p) => p.id));
+  const hasActiveFilters = activePosition || activeGrade || activeRegion !== 'All Regions';
+
+  const handleToggleWatchlist = useCallback(
+    (prospect) => {
+      if (watchlistIds.has(prospect.id)) handleRemoveWatchlist(prospect.id);
+      else handleAddWatchlist(prospect);
+    },
+    [watchlistIds, handleAddWatchlist, handleRemoveWatchlist]
+  );
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <StatusBar style={isDarkMode ? 'light' : 'dark'} />
 
-      {/* Header */}
-      <View style={[styles.header, { borderBottomColor: theme.border }]}>
-        <TouchableOpacity
-          style={styles.backBtn}
-          onPress={() => navigation.goBack()}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="chevron-back" size={26} color={theme.text} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>Prospect Search</Text>
-        <View style={styles.headerRight} />
+      <ScreenHeader
+        title="Prospect Search"
+        onBack={() => navigation.goBack()}
+        right={
+          <HeaderIconButton
+            icon="options-outline"
+            badge={!!hasActiveFilters}
+            onPress={() => setShowFilters((v) => !v)}
+          />
+        }
+        style={{ borderBottomWidth: 0 }}
+      />
+
+      <View style={styles.searchWrap}>
+        <View style={[styles.searchRow, { backgroundColor: theme.surface }]}>
+          <Ionicons name="search-outline" size={16} color={theme.textDim} style={styles.searchIcon} />
+          <TextInput
+            style={[styles.searchInput, { color: theme.text }]}
+            placeholder="Prospects, schools, cities…"
+            placeholderTextColor={theme.textDim}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            returnKeyType="search"
+            clearButtonMode="while-editing"
+          />
+        </View>
+
+        {/* Filter chips — static (scout motion: only new rows animate) */}
+        {showFilters && (
+          <View style={styles.filtersPanel}>
+            <Text style={[TYPE.statCaption, styles.filterLabel, { color: theme.textDim }]}>Position</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRowContent}>
+              {POSITIONS.map((pos) => (
+                <Chip key={pos} label={pos} active={activePosition === pos} onPress={() => togglePosition(pos)} />
+              ))}
+            </ScrollView>
+
+            <Text style={[TYPE.statCaption, styles.filterLabel, { color: theme.textDim }]}>EvalRank</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRowContent}>
+              {GRADES.map((g) => (
+                <Chip key={g} label={g} active={activeGrade === g} onPress={() => toggleGrade(g)} />
+              ))}
+            </ScrollView>
+
+            <Text style={[TYPE.statCaption, styles.filterLabel, { color: theme.textDim }]}>Region</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRowContent}>
+              {REGIONS.map((r) => (
+                <Chip key={r} label={r} active={activeRegion === r} onPress={() => toggleRegion(r)} />
+              ))}
+            </ScrollView>
+
+            {hasActiveFilters ? (
+              <TouchableOpacity
+                style={styles.clearFiltersBtn}
+                onPress={() => {
+                  setActivePosition(null);
+                  setActiveGrade(null);
+                  setActiveRegion('All Regions');
+                }}
+                activeOpacity={0.75}
+              >
+                <Ionicons name="close-circle-outline" size={13} color={theme.textDim} />
+                <Text style={[styles.clearFiltersText, { color: theme.textDim }]}>Clear</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        )}
+
+        {/* Saved searches — tap to apply, × to remove */}
+        {savedSearches.length > 0 && (
+          <View style={styles.savedRow}>
+            {savedSearches.map((s) => (
+              <View key={s.id} style={[styles.savedChip, { backgroundColor: theme.surface, borderColor: theme.hairline }]}>
+                <TouchableOpacity onPress={() => applySavedSearch(s)} activeOpacity={0.7} style={styles.savedChipMain}>
+                  <Ionicons name="bookmark" size={11} color={theme.accentText} />
+                  <Text style={[styles.savedChipText, { color: theme.text }]} numberOfLines={1}>{s.name || 'Saved'}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => handleDeleteSavedSearch(s.id)} hitSlop={{ top: 6, bottom: 6, left: 4, right: 6 }}>
+                  <Ionicons name="close" size={13} color={theme.textDim} />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+
+      {/* Results count */}
+      <View style={[styles.resultsRow, { borderBottomColor: theme.hairline }]}>
+        <Text style={[TYPE.sectionLabel, { color: theme.textDim, letterSpacing: 1.3 }]}>
+          <Text style={{ color: theme.text }}>{filteredProspects.length}</Text>
+          {'  results'}
+        </Text>
       </View>
 
       <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Search Bar */}
-          <View style={[styles.searchRow, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            <Ionicons name="search-outline" size={18} color={theme.textSecondary} style={styles.searchIcon} />
-            <TextInput
-              style={[styles.searchInput, { color: theme.text }]}
-              placeholder="Search prospects, schools, cities..."
-              placeholderTextColor={theme.textTertiary || theme.textSecondary}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              returnKeyType="search"
-              clearButtonMode="while-editing"
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {filteredProspects.length === 0 ? (
+          <EmptyState
+            icon="search-outline"
+            title="No prospects found"
+            sub="Try adjusting your search terms or clearing filters."
+          />
+        ) : (
+          filteredProspects.map((prospect, i) => (
+            <ProspectResultRow
+              key={prospect.id}
+              prospect={prospect}
+              isWatchlisted={watchlistIds.has(prospect.id)}
+              onToggleWatchlist={handleToggleWatchlist}
+              theme={theme}
+              navigation={navigation}
+              style={i > 0 ? { marginTop: 8 } : null}
             />
-            <TouchableOpacity
-              style={[styles.filterIconBtn, showFilters && { backgroundColor: theme.primary + '20' }]}
-              onPress={() => setShowFilters((v) => !v)}
-              activeOpacity={0.75}
-            >
-              <Ionicons
-                name="options-outline"
-                size={20}
-                color={showFilters ? theme.primary : theme.textSecondary}
-              />
-            </TouchableOpacity>
-          </View>
+          ))
+        )}
 
-          {/* Filter Chips */}
-          {showFilters && (
-            <View style={styles.filtersPanel}>
-              {/* Position row */}
-              <Text style={[styles.filterLabel, { color: theme.textSecondary }]}>Position</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsRow} contentContainerStyle={styles.chipsRowContent}>
-                {POSITIONS.map((pos) => (
-                  <FilterChip
-                    key={pos}
-                    label={pos}
-                    active={activePosition === pos}
-                    onPress={() => togglePosition(pos)}
-                    theme={theme}
-                  />
-                ))}
-              </ScrollView>
+        {/* Consent footnote — hard requirement (README 14b) */}
+        <Text style={[styles.consentNote, { color: theme.textDim }]}>
+          Only athletes whose guardian approved scout visibility appear here.
+        </Text>
 
-              {/* Grade row */}
-              <Text style={[styles.filterLabel, { color: theme.textSecondary }]}>EvalRank Grade</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsRow} contentContainerStyle={styles.chipsRowContent}>
-                {GRADES.map((g) => (
-                  <FilterChip
-                    key={g}
-                    label={g}
-                    active={activeGrade === g}
-                    onPress={() => toggleGrade(g)}
-                    theme={theme}
-                  />
-                ))}
-              </ScrollView>
+        <View style={styles.bottomSpacer} />
+      </ScrollView>
 
-              {/* Region row */}
-              <Text style={[styles.filterLabel, { color: theme.textSecondary }]}>Region</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsRow} contentContainerStyle={styles.chipsRowContent}>
-                {REGIONS.map((r) => (
-                  <FilterChip
-                    key={r}
-                    label={r}
-                    active={activeRegion === r}
-                    onPress={() => toggleRegion(r)}
-                    theme={theme}
-                  />
-                ))}
-              </ScrollView>
-
-              {/* Save search + Clear filters */}
-              <View style={styles.filterActionsRow}>
-                <TouchableOpacity style={styles.clearFiltersBtn} onPress={handleSaveSearch} activeOpacity={0.75}>
-                  <Ionicons name="notifications-outline" size={14} color={theme.primary} />
-                  <Text style={[styles.clearFiltersText, { color: theme.primary }]}>Save Search</Text>
-                </TouchableOpacity>
-                {(activePosition || activeGrade || activeRegion !== 'All Regions') && (
-                  <TouchableOpacity
-                    style={styles.clearFiltersBtn}
-                    onPress={() => {
-                      setActivePosition(null);
-                      setActiveGrade(null);
-                      setActiveRegion('All Regions');
-                    }}
-                    activeOpacity={0.75}
-                  >
-                    <Ionicons name="close-circle-outline" size={14} color={theme.textSecondary} />
-                    <Text style={[styles.clearFiltersText, { color: theme.textSecondary }]}>Clear Filters</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-          )}
-
-          {/* Saved searches — tap to apply, × to remove (you'll be alerted on new matches) */}
-          {savedSearches.length > 0 && (
-            <View style={styles.savedRow}>
-              {savedSearches.map((s) => (
-                <View key={s.id} style={[styles.savedChip, { backgroundColor: theme.card, borderColor: theme.border }]}>
-                  <TouchableOpacity onPress={() => applySavedSearch(s)} activeOpacity={0.7} style={styles.savedChipMain}>
-                    <Ionicons name="bookmark" size={12} color={theme.primary} />
-                    <Text style={[styles.savedChipText, { color: theme.text }]} numberOfLines={1}>{s.name || 'Saved'}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => handleDeleteSavedSearch(s.id)} hitSlop={{ top: 6, bottom: 6, left: 4, right: 6 }}>
-                    <Ionicons name="close" size={14} color={theme.textSecondary} />
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </View>
-          )}
-
-          {/* Results count */}
-          <View style={styles.resultsRow}>
-            <Text style={[styles.resultsCount, { color: theme.textSecondary }]}>
-              {filteredProspects.length} prospect{filteredProspects.length !== 1 ? 's' : ''} found
-            </Text>
-          </View>
-
-          {/* Prospect cards */}
-          {filteredProspects.length === 0 ? (
-            <View style={styles.emptyState}>
-              <View style={[styles.emptyIcon, { backgroundColor: theme.primary + '15' }]}>
-                <Ionicons name="search-outline" size={36} color={theme.primary} />
-              </View>
-              <Text style={[styles.emptyTitle, { color: theme.text }]}>No Prospects Found</Text>
-              <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
-                Try adjusting your search terms or clearing filters to see more results.
-              </Text>
-            </View>
-          ) : (
-            filteredProspects.map((prospect) => (
-              <ProspectCard
-                key={prospect.id}
-                prospect={prospect}
-                isWatchlisted={watchlistIds.has(prospect.id)}
-                onAddWatchlist={handleAddWatchlist}
-                onRemoveWatchlist={handleRemoveWatchlist}
-                theme={theme}
-                navigation={navigation}
-              />
-            ))
-          )}
-
-          <View style={styles.bottomSpacer} />
-        </ScrollView>
+      <View style={styles.footer}>
+        <PrimaryButton label="Save this search" onPress={handleSaveSearch} />
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
+
+  searchWrap: {
+    paddingHorizontal: SHAPE.screenPadding,
+    paddingBottom: 10,
   },
-  backBtn: { padding: 4, marginRight: 4 },
-  headerTitle: { flex: 1, fontSize: 20, fontWeight: '800', letterSpacing: 0.2, marginLeft: 4 },
-  headerRight: { width: 36 },
-  tabBar: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    paddingHorizontal: 16,
-  },
-  tabBtn: {
-    paddingVertical: 12,
-    marginRight: 24,
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-  },
-  tabBtnActive: {},
-  tabBtnInner: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  tabBtnText: { fontSize: 14, fontWeight: '600' },
-  tabBadge: {
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
-  },
-  tabBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
-  scrollContent: { padding: 16 },
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    height: 46,
-    marginBottom: 12,
+    borderRadius: SHAPE.radiusTile,
+    paddingHorizontal: 13,
+    paddingVertical: 11,
   },
-  searchIcon: { marginRight: 8 },
+  searchIcon: { marginRight: 9 },
   searchInput: {
     flex: 1,
-    fontSize: 14,
-    height: '100%',
+    fontFamily: TYPE.greeting.fontFamily,
+    fontSize: 13,
+    padding: 0,
   },
-  filterIconBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 4,
-  },
+
   filtersPanel: {
-    marginBottom: 8,
+    marginTop: 10,
   },
   filterLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    marginBottom: 8,
+    marginBottom: 6,
     marginTop: 4,
   },
-  chipsRow: { marginBottom: 4 },
-  chipsRowContent: { gap: 8, paddingRight: 4 },
-  filterChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  filterChipText: { fontSize: 13, fontWeight: '600' },
+  chipsRowContent: { gap: 7, paddingRight: 4, paddingBottom: 6 },
   clearFiltersBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    alignSelf: 'flex-end',
-    marginTop: 6,
-    marginBottom: 2,
-  },
-  clearFiltersText: { fontSize: 12, fontWeight: '600' },
-  filterActionsRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 16 },
-  savedRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
-  savedChip: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 16, borderWidth: 1, paddingLeft: 10, paddingRight: 8, paddingVertical: 6, maxWidth: 200 },
-  savedChipMain: { flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1 },
-  savedChipText: { fontSize: 12, fontWeight: '600' },
-  resultsRow: {
-    marginBottom: 10,
-    marginTop: 4,
-  },
-  resultsCount: { fontSize: 12, fontWeight: '500' },
-  prospectCard: {
-    borderRadius: 14,
-    borderWidth: 1,
-    marginBottom: 12,
-    overflow: 'hidden',
-  },
-  prospectCardTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
-    gap: 12,
-  },
-  prospectAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  prospectInfo: { flex: 1 },
-  prospectName: { fontSize: 15, fontWeight: '700' },
-  prospectMeta: { fontSize: 12, marginTop: 2 },
-  prospectSchool: { fontSize: 12, marginTop: 2 },
-  gradeBadge: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  gradeText: { fontSize: 15, fontWeight: '800' },
-  prospectCardBottom: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderTopWidth: 1,
-  },
-  regionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: 4,
-    flex: 1,
+    alignSelf: 'flex-end',
+    marginTop: 2,
   },
-  regionText: { fontSize: 12, marginRight: 4 },
-  regionChip: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  regionChipText: { fontSize: 11, fontWeight: '600' },
-  watchlistBtn: {
+  clearFiltersText: { fontFamily: TYPE.buttonSecondary.fontFamily, fontSize: 11 },
+
+  savedRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 10 },
+  savedChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 8,
+    gap: 6,
+    borderRadius: SHAPE.radiusPill,
     borderWidth: 1,
+    paddingLeft: 10,
+    paddingRight: 8,
+    paddingVertical: 6,
+    maxWidth: 200,
   },
-  watchlistBtnActive: {},
-  watchlistBtnText: { fontSize: 12, fontWeight: '600' },
-  watchlistHeader: {
-    fontSize: 12,
-    fontWeight: '500',
-    marginBottom: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+  savedChipMain: { flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1 },
+  savedChipText: { fontFamily: TYPE.chip.fontFamily, fontSize: 10.5 },
+
+  resultsRow: {
+    paddingHorizontal: SHAPE.screenPadding,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
   },
-  emptyState: {
+
+  scrollContent: {
+    paddingHorizontal: SHAPE.screenPadding,
+    paddingTop: 12,
+  },
+
+  rowTrailing: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-    paddingHorizontal: 32,
+    gap: 10,
   },
-  emptyIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
+  gradeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: SHAPE.radiusBadge,
   },
-  emptyTitle: { fontSize: 18, fontWeight: '700', marginBottom: 8, textAlign: 'center' },
-  emptySubtitle: { fontSize: 14, textAlign: 'center', lineHeight: 21 },
-  bottomSpacer: { height: 24 },
+  gradeBadgeText: { fontFamily: TYPE.buttonPrimary.fontFamily, fontSize: 11 },
+
+  consentNote: {
+    fontFamily: TYPE.cardBody.fontFamily,
+    fontSize: 10.5,
+    lineHeight: 16,
+    paddingTop: 14,
+    paddingBottom: 6,
+  },
+
+  footer: {
+    paddingHorizontal: SHAPE.screenPadding,
+    paddingBottom: 8,
+    paddingTop: 6,
+  },
+
+  bottomSpacer: { height: 16 },
 });

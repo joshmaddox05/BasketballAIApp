@@ -57,7 +57,7 @@ const CATEGORY_COLORS = {
   History: '#FF7043',
   Mindset: '#42A5F5',
   Nutrition: '#66BB6A',
-  Default: '#FF6B00',
+  Default: '#8A1C22',
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

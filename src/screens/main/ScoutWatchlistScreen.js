@@ -4,9 +4,10 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAppContext } from '../../context/AppContext';
+import { EmptyState } from '../../components/dbe';
 import { getWatchlist, removeWatchlistEntry, updateWatchlistStatus, WATCHLIST_STATUSES } from '../../services/firestoreService';
 
-const GRADE_COLOR = { 'A+': '#22C55E', 'A': '#22C55E', 'A-': '#22C55E', 'B+': '#FF6B00', 'B': '#F59E0B', 'B-': '#F59E0B', 'C+': '#EF4444', 'C': '#EF4444' };
+const GRADE_COLOR = { 'A+': '#22C55E', 'A': '#22C55E', 'A-': '#22C55E', 'B+': '#8A1C22', 'B': '#F59E0B', 'B-': '#F59E0B', 'C+': '#EF4444', 'C': '#EF4444' };
 const GRADE_LABEL = { 9: '9th', 10: '10th', 11: '11th', 12: '12th' };
 const STATUS_LABEL = { watching: 'Watching', contacted: 'Contacted', offer: 'Offer', committed: 'Committed', pass: 'Pass' };
 const STATUS_COLOR = { watching: '#3B82F6', contacted: '#F59E0B', offer: '#A855F7', committed: '#22C55E', pass: '#EF4444' };
@@ -99,14 +100,13 @@ export default function ScoutWatchlistScreen({ navigation }) {
         {loading ? (
           <ActivityIndicator color={theme.primary} size="large" style={{ marginTop: 60 }} />
         ) : watchlist.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Ionicons name="bookmark-outline" size={48} color={theme.textSecondary} />
-            <Text style={[styles.emptyTitle, { color: theme.text }]}>No saved prospects</Text>
-            <Text style={[styles.emptySub, { color: theme.textSecondary }]}>Use Prospect Search to find and save athletes to your watchlist.</Text>
-            <TouchableOpacity style={[styles.searchBtn, { backgroundColor: theme.primary }]} onPress={() => navigation.navigate('ScoutLabSearch')}>
-              <Text style={styles.searchBtnText}>Search Prospects</Text>
-            </TouchableOpacity>
-          </View>
+          <EmptyState
+            icon="bookmark-outline"
+            title="No saved prospects"
+            sub="Use Prospect Search to find and save athletes to your watchlist."
+            ctaLabel="Search Prospects"
+            onPress={() => navigation.navigate('ScoutLabSearch')}
+          />
         ) : (
           watchlist.map(p => (
             <TouchableOpacity key={p.id} style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]} onPress={() => setSelected(selected === p.id ? null : p.id)} activeOpacity={0.8}>
@@ -174,11 +174,6 @@ const styles = StyleSheet.create({
   countBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
   countText: { fontSize: 12, fontWeight: '700' },
   scroll: { padding: 16, gap: 12 },
-  emptyState: { alignItems: 'center', paddingTop: 60, gap: 12 },
-  emptyTitle: { fontSize: 18, fontWeight: '700' },
-  emptySub: { fontSize: 14, textAlign: 'center' },
-  searchBtn: { paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12, marginTop: 8 },
-  searchBtnText: { color: '#fff', fontWeight: '700' },
   card: { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
   cardTop: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
   avatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },

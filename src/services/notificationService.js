@@ -33,7 +33,7 @@ export const registerForPushNotificationsAsync = async () => {
       name: 'Default',
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#FF6B35',
+      lightColor: '#8A1C22',
     });
 
     // Create separate channel for daily reminders
@@ -42,7 +42,7 @@ export const registerForPushNotificationsAsync = async () => {
       description: 'Daily challenge and workout reminders',
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#FF6B35',
+      lightColor: '#8A1C22',
     });
   }
 

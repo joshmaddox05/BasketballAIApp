@@ -24,7 +24,16 @@ import ScoutReportsScreen from '../screens/main/ScoutReportsScreen';
 import MessagingScreen from '../screens/main/MessagingScreen';
 import ProgressReportScreen from '../screens/main/ProgressReportScreen';
 import SimCoachFilmLibraryScreen from '../screens/main/SimCoachFilmLibraryScreen';
+import SimCoachFilmTaggingScreen from '../screens/main/SimCoachFilmTaggingScreen';
+import SimCoachTeamModelScreen from '../screens/main/SimCoachTeamModelScreen';
 import SimCoachGamePlanBuilderScreen from '../screens/main/SimCoachGamePlanBuilderScreen';
+import SimCoachOpponentsScreen from '../screens/main/SimCoachOpponentsScreen';
+import SimCoachOpponentModelScreen from '../screens/main/SimCoachOpponentModelScreen';
+import SimCoachWhatIfScreen from '../screens/main/SimCoachWhatIfScreen';
+import SimCoachCompareScreen from '../screens/main/SimCoachCompareScreen';
+import SimCoachSessionsScreen from '../screens/main/SimCoachSessionsScreen';
+import SimCoachSessionDetailScreen from '../screens/main/SimCoachSessionDetailScreen';
+import SimCoachSessionRespondScreen from '../screens/main/SimCoachSessionRespondScreen';
 
 // Import DBE module screens (shared across tabs)
 import ShotDNAScreen from '../screens/main/ShotDNAScreen';
@@ -170,7 +179,16 @@ export const sharedScreens = [
     { name: 'Messaging', component: MessagingScreen, options: { headerShown: false } },
     { name: 'ProgressReport', component: ProgressReportScreen, options: { headerShown: false } },
     { name: 'SimCoachFilmLibrary', component: SimCoachFilmLibraryScreen, options: { headerShown: false } },
+    { name: 'SimCoachFilmTagging', component: SimCoachFilmTaggingScreen, options: { headerShown: false } },
+    { name: 'SimCoachTeamModel', component: SimCoachTeamModelScreen, options: { headerShown: false } },
     { name: 'SimCoachGamePlanBuilder', component: SimCoachGamePlanBuilderScreen, options: { headerShown: false } },
+    { name: 'SimCoachOpponents', component: SimCoachOpponentsScreen, options: { headerShown: false } },
+    { name: 'SimCoachOpponentModel', component: SimCoachOpponentModelScreen, options: { headerShown: false } },
+    { name: 'SimCoachWhatIf', component: SimCoachWhatIfScreen, options: { headerShown: false } },
+    { name: 'SimCoachCompare', component: SimCoachCompareScreen, options: { headerShown: false } },
+    { name: 'SimCoachSessions', component: SimCoachSessionsScreen, options: { headerShown: false } },
+    { name: 'SimCoachSessionDetail', component: SimCoachSessionDetailScreen, options: { headerShown: false } },
+    { name: 'SimCoachSessionRespond', component: SimCoachSessionRespondScreen, options: { headerShown: false } },
     // Connections (role linking)
     { name: 'LinkAccount', component: LinkAccountScreen, options: { headerShown: false } },
     { name: 'Connections', component: ConnectionsScreen, options: { headerShown: false } },

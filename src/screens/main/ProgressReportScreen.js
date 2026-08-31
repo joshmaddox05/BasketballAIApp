@@ -1,4 +1,5 @@
-// ProgressReportScreen.js - Parent view of the linked child's EvalRank + Blueprint360 progress
+// ProgressReportScreen.js - Linked athlete/child progress report (13c redesign).
+// EvalRank + Blueprint360 + session trend; data loading unchanged.
 import React, { useState, useCallback } from 'react';
 import {
   SafeAreaView,
@@ -7,25 +8,36 @@ import {
   Text,
   TouchableOpacity,
   ScrollView,
-  ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAppContext } from '../../context/AppContext';
 import { getLinkedPlayers, getLinkedPlayerSummary } from '../../services/firestoreService';
+import { TYPE, SHAPE, FONTS } from '../../utils/typography';
+import {
+  Entrance,
+  BarFill,
+  Sparkline,
+  ScreenHeader,
+  HeaderIconButton,
+  SectionLabel,
+  Avatar,
+  PrimaryButton,
+  EmptyState,
+  LoadingState,
+} from '../../components/dbe';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Data mapping helpers (Firestore docs -> presentational shapes)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const gradeColorFor = (grade, theme) => {
+// Grade → palette voice: strong grades speak steel (neutral), weak grades speak
+// the burgundy attention accent.
+const gradeIsStrong = (grade) => {
   const g = (grade || '').toUpperCase();
-  if (g.startsWith('A')) return '#22C55E';
-  if (g.startsWith('B')) return theme.primary;
-  if (g.startsWith('C')) return '#F59E0B';
-  if (g.startsWith('D')) return '#EF4444';
-  return theme.textSecondary;
+  return g.startsWith('A') || g.startsWith('B');
 };
 
 // Fallback percentage when an EvalRank skill has no numeric score
@@ -77,29 +89,102 @@ const mapMilestones = (achievements) =>
     done: true,
   }));
 
-function SkillBar({ skill, theme }) {
-  const color = gradeColorFor(skill.grade, theme);
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+// Sessions per week over the last 4 weeks (oldest → newest), plus the change
+// vs the prior 4-week window when one exists.
+const mapSessionTrend = (activities) => {
+  const now = Date.now();
+  const counts = [0, 0, 0, 0];
+  let prior = 0;
+  (activities || []).forEach((a) => {
+    const d = toDate(a.createdAt);
+    if (!d) return;
+    const weeksAgo = Math.floor((now - d.getTime()) / WEEK_MS);
+    if (weeksAgo >= 0 && weeksAgo < 4) counts[3 - weeksAgo] += 1;
+    else if (weeksAgo >= 4 && weeksAgo < 8) prior += 1;
+  });
+  const current = counts.reduce((s, n) => s + n, 0);
+  let delta = null;
+  if (prior > 0) delta = Math.round(((current - prior) / prior) * 100);
+  return { counts, current, delta };
+};
+
+// Total logged minutes in the last 4 weeks (only if durations exist on activities).
+const mapCourtHours = (activities) => {
+  const cutoff = Date.now() - 4 * WEEK_MS;
+  let mins = 0;
+  (activities || []).forEach((a) => {
+    const d = toDate(a.createdAt);
+    if (!d || d.getTime() < cutoff) return;
+    mins += Number(a.duration || a.durationMinutes || 0) || 0;
+  });
+  return mins > 0 ? `${(mins / 60).toFixed(1)}h` : null;
+};
+
+const computeAdherence = (profile, activities) => {
+  const weekAgo = Date.now() - WEEK_MS;
+  const recent = (activities || []).filter((a) => {
+    const d = toDate(a.createdAt);
+    return d && d.getTime() >= weekAgo;
+  }).length;
+  const goal = profile?.preferences?.trainingDays?.length || 5;
+  return Math.min(100, Math.round((recent / goal) * 100));
+};
+
+const initialsOf = (name) =>
+  (name || 'A')
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sub-components
+// ─────────────────────────────────────────────────────────────────────────────
+
+function StatCell({ value, label, accent, theme }) {
+  return (
+    <View style={[styles.statCell, { backgroundColor: theme.surface }]}>
+      <Text style={[TYPE.statNumberMedium, { color: accent ? theme.accentText : theme.text }]}>
+        {value}
+      </Text>
+      <Text style={[styles.statCellLabel, { color: theme.textDim }]}>{label}</Text>
+    </View>
+  );
+}
+
+function SkillBar({ skill, theme, delay }) {
+  const strong = gradeIsStrong(skill.grade);
+  const color = strong ? theme.steel : theme.primary;
+  const textColor = strong ? theme.steel : theme.accentText;
   return (
     <View style={styles.skillRow}>
-      <View style={styles.skillLabelRow}>
-        <Text style={[styles.skillLabel, { color: theme.text }]}>{skill.label}</Text>
-        <View style={styles.skillRightRow}>
-          <Text style={[styles.skillPct, { color }]}>{skill.pct}%</Text>
-          <View style={[styles.gradePill, { backgroundColor: color + '18' }]}>
-            <Text style={[styles.gradeText, { color }]}>{skill.grade}</Text>
-          </View>
-        </View>
-      </View>
-      <View style={[styles.skillTrack, { backgroundColor: theme.border }]}>
-        <View style={[styles.skillFill, { width: `${skill.pct}%`, backgroundColor: color }]} />
-      </View>
+      <Text numberOfLines={1} style={[styles.skillLabel, { color: theme.textMuted }]}>
+        {skill.label}
+      </Text>
+      <BarFill
+        pct={skill.pct / 100}
+        color={color}
+        trackColor={theme.track}
+        height={6}
+        duration={700}
+        delay={delay}
+        style={{ flex: 1 }}
+      />
+      <Text style={[styles.skillValue, { color: textColor }]}>{skill.grade || `${skill.pct}%`}</Text>
     </View>
   );
 }
 
 function EmptyHint({ text, theme }) {
-  return <Text style={[styles.emptyHint, { color: theme.textSecondary }]}>{text}</Text>;
+  return <Text style={[TYPE.tooltipBody, { color: theme.textDim }]}>{text}</Text>;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Screen
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function ProgressReportScreen({ navigation }) {
   const { user, theme, isDarkMode, selectedChildUid } = useAppContext();
@@ -110,6 +195,7 @@ export default function ProgressReportScreen({ navigation }) {
   const [evalRank, setEvalRank] = useState(null);
   const [blueprint, setBlueprint] = useState(null);
   const [milestones, setMilestones] = useState([]);
+  const [activities, setActivities] = useState([]);
 
   const loadChild = useCallback(async () => {
     if (!parentUid) {
@@ -125,10 +211,17 @@ export default function ProgressReportScreen({ navigation }) {
         return;
       }
       const summary = await getLinkedPlayerSummary(linked.uid);
-      setChild({ name: summary.profile?.displayName || linked.name || 'Your Child' });
+      const profile = summary.profile || {};
+      setChild({
+        name: profile.displayName || linked.name || 'Your Child',
+        position: profile.position || '',
+        level: typeof profile.level === 'number' ? profile.level : 1,
+        profile,
+      });
       setEvalRank(summary.evalRank);
       setBlueprint(summary.blueprint);
       setMilestones(mapMilestones(summary.achievements));
+      setActivities(summary.activities || []);
     } finally {
       setLoading(false);
     }
@@ -140,23 +233,12 @@ export default function ProgressReportScreen({ navigation }) {
     }, [loadChild])
   );
 
-  const renderHeader = (subtitle) => (
-    <View style={[styles.header, { borderBottomColor: theme.border }]}>
-      <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-        <Ionicons name="arrow-back" size={24} color={theme.text} />
-      </TouchableOpacity>
-      <View>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>Progress Report</Text>
-        {subtitle ? <Text style={[styles.headerSub, { color: theme.textSecondary }]}>{subtitle}</Text> : null}
-      </View>
-      <TouchableOpacity
-        style={[styles.messageBtn, { backgroundColor: theme.primary + '18' }]}
-        onPress={() => navigation.navigate('Messaging')}
-        activeOpacity={0.7}
-      >
-        <Ionicons name="chatbubble-outline" size={20} color={theme.primary} />
-      </TouchableOpacity>
-    </View>
+  const header = (
+    <ScreenHeader
+      title="Progress Report"
+      onBack={() => navigation.goBack()}
+      right={<HeaderIconButton icon="chatbubble-outline" onPress={() => navigation.navigate('Messaging')} />}
+    />
   );
 
   // Loading state
@@ -164,10 +246,8 @@ export default function ProgressReportScreen({ navigation }) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
         <StatusBar style={isDarkMode ? 'light' : 'dark'} />
-        {renderHeader()}
-        <View style={styles.centered}>
-          <ActivityIndicator color={theme.primary} size="large" />
-        </View>
+        {header}
+        <LoadingState />
       </SafeAreaView>
     );
   }
@@ -177,140 +257,192 @@ export default function ProgressReportScreen({ navigation }) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
         <StatusBar style={isDarkMode ? 'light' : 'dark'} />
-        {renderHeader()}
+        {header}
         <View style={styles.centered}>
-          <View style={[styles.emptyIconWrap, { backgroundColor: theme.primary + '18' }]}>
-            <Ionicons name="people-outline" size={36} color={theme.primary} />
-          </View>
-          <Text style={[styles.emptyTitle, { color: theme.text }]}>Link your child</Text>
-          <Text style={[styles.emptySub, { color: theme.textSecondary }]}>
-            Connect to your child's account with their invite code to follow their training and progress.
-          </Text>
-          <TouchableOpacity
-            style={[styles.emptyButton, { backgroundColor: theme.primary }]}
+          <EmptyState
+            icon="people-outline"
+            title="Link your child"
+            sub="Connect to your child's account with their invite code to follow their training and progress."
+            ctaLabel="Link Your Child"
             onPress={() => navigation.navigate('LinkAccount', { onLinked: loadChild })}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="link" size={18} color="#FFFFFF" />
-            <Text style={styles.emptyButtonText}>Link Your Child</Text>
-          </TouchableOpacity>
+          />
         </View>
       </SafeAreaView>
     );
   }
 
-  const overallGrade = evalRank?.overallGrade || '--';
-  const gradeColor = gradeColorFor(overallGrade, theme);
+  const overallGrade = evalRank?.overallGrade || '—';
   const skills = mapSkills(evalRank);
   const todayWorkout = blueprint?.todayWorkout?.title;
   const daysCompleted = blueprint?.weekProgress ?? 0;
+  const trend = mapSessionTrend(activities);
+  const courtHours = mapCourtHours(activities);
+  const adherence = computeAdherence(child.profile, activities);
+  const chartWidth = Dimensions.get('window').width - SHAPE.screenPadding * 2 - 28;
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <StatusBar style={isDarkMode ? 'light' : 'dark'} />
-      {renderHeader(child.name)}
+      {header}
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* Overall EvalRank Grade */}
-        <View style={[styles.gradeCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <View style={styles.gradeCardInner}>
-            <View style={[styles.gradeCircle, { borderColor: gradeColor, backgroundColor: gradeColor + '12' }]}>
-              <Text style={[styles.gradeValue, { color: gradeColor }]}>{overallGrade}</Text>
-              <Text style={[styles.gradeSubLabel, { color: gradeColor }]}>EvalRank</Text>
-            </View>
-            <View style={styles.gradeInfo}>
-              <Text style={[styles.gradeTitle, { color: theme.text }]}>Overall Grade</Text>
-              <Text style={[styles.gradeDesc, { color: theme.textSecondary }]}>
-                {evalRank
-                  ? 'Based on latest evaluation across all skill areas'
-                  : 'No evaluation completed yet'}
+        {/* Identity row: avatar · name/meta · EvalRank grade */}
+        <Entrance variant="up" delay={0}>
+          <View style={styles.identityRow}>
+            <Avatar initials={initialsOf(child.name)} size={56} tone="accent" />
+            <View style={{ flex: 1 }}>
+              <Text numberOfLines={1} style={[styles.childName, { color: theme.text }]}>
+                {child.name}
               </Text>
-              <TouchableOpacity onPress={() => navigation.navigate('EvalRank')} activeOpacity={0.7}>
-                <Text style={[styles.viewLink, { color: theme.primary }]}>View Full Evaluation →</Text>
-              </TouchableOpacity>
+              <Text style={[styles.childMeta, { color: theme.textDim }]}>
+                {[child.position, `Level ${child.level}`, '4-week window'].filter(Boolean).join(' · ')}
+              </Text>
             </View>
+            <TouchableOpacity
+              style={styles.gradeBlock}
+              activeOpacity={0.7}
+              onPress={() => navigation.navigate('EvalRank')}
+            >
+              <Text style={[styles.gradeValue, { color: theme.text }]}>{overallGrade}</Text>
+              <Text style={[styles.gradeCaption, { color: theme.textDim }]}>EVALRANK</Text>
+            </TouchableOpacity>
+          </View>
+        </Entrance>
+
+        {/* Sessions logged — 4-week sparkline */}
+        <Entrance variant="cardIn" delay={80}>
+          <View style={[styles.trendCard, { backgroundColor: theme.surface }]}>
+            <View style={styles.trendHeader}>
+              <Text style={[TYPE.sectionLabel, { color: theme.textDim }]}>Sessions logged</Text>
+              {trend.delta !== null ? (
+                <Text
+                  style={[
+                    styles.trendDelta,
+                    { color: trend.delta < 0 ? theme.accentText : theme.steel },
+                  ]}
+                >
+                  {trend.delta < 0 ? '↓' : '↑'} {Math.abs(trend.delta)}% vs prior
+                </Text>
+              ) : null}
+            </View>
+            <Sparkline
+              data={trend.counts}
+              width={chartWidth}
+              height={72}
+              color={theme.primary}
+              strokeWidth={2.6}
+              style={{ marginTop: 10 }}
+            />
+            <View style={styles.weekLabels}>
+              {['W1', 'W2', 'W3', 'W4'].map((w) => (
+                <Text key={w} style={[styles.weekLabel, { color: theme.textDim }]}>
+                  {w}
+                </Text>
+              ))}
+            </View>
+          </View>
+        </Entrance>
+
+        {/* Stat tiles */}
+        <Entrance variant="cardIn" delay={160}>
+          <View style={styles.statRow}>
+            <StatCell value={trend.current} label="WORKOUTS" theme={theme} />
+            <StatCell value={courtHours || '—'} label="ON COURT" theme={theme} />
+            <StatCell value={`${adherence}%`} label="ADHERENCE" accent={adherence < 50} theme={theme} />
+          </View>
+        </Entrance>
+
+        {/* Skill breakdown */}
+        <View style={{ marginTop: SHAPE.sectionGap }}>
+          <SectionLabel action="Full evaluation" onAction={() => navigation.navigate('EvalRank')}>
+            Skill breakdown
+          </SectionLabel>
+          {skills.length > 0 ? (
+            skills.slice(0, 5).map((s, i) => (
+              <SkillBar key={s.label} skill={s} theme={theme} delay={100 + i * 100} />
+            ))
+          ) : (
+            <EmptyHint
+              text="No skill evaluation yet. An EvalRank assessment unlocks this section."
+              theme={theme}
+            />
+          )}
+        </View>
+
+        {/* Blueprint360 plan */}
+        <View style={{ marginTop: SHAPE.sectionGap }}>
+          <SectionLabel>Blueprint360™ plan</SectionLabel>
+          <View style={[styles.card, { backgroundColor: theme.surface }]}>
+            {blueprint ? (
+              <>
+                <View style={styles.planRow}>
+                  <View style={[styles.planIcon, { backgroundColor: theme.badgeFill }]}>
+                    <Ionicons name="map-outline" size={18} color={theme.accentText} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[TYPE.rowMeta, { color: theme.textDim, marginTop: 0 }]}>Today's focus</Text>
+                    <Text numberOfLines={1} style={[TYPE.rowTitle, { color: theme.text, marginTop: 2 }]}>
+                      {todayWorkout || 'Rest day'}
+                    </Text>
+                  </View>
+                </View>
+                <View style={[styles.divider, { backgroundColor: theme.hairline }]} />
+                <View style={styles.weekRow}>
+                  <Text style={[TYPE.rowMeta, { color: theme.textDim, marginTop: 0 }]}>This week</Text>
+                  <View style={styles.dots}>
+                    {[0, 1, 2, 3, 4].map((i) => (
+                      <View
+                        key={i}
+                        style={[
+                          styles.dot,
+                          { backgroundColor: i < daysCompleted ? theme.primary : theme.track },
+                        ]}
+                      />
+                    ))}
+                  </View>
+                  <Text style={[styles.weekCount, { color: theme.accentText }]}>{daysCompleted}/5</Text>
+                </View>
+              </>
+            ) : (
+              <EmptyHint text="No active training plan yet." theme={theme} />
+            )}
           </View>
         </View>
 
-        {/* Skill Breakdown */}
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>Skill Breakdown</Text>
-        <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          {skills.length > 0 ? (
-            skills.slice(0, 5).map((s) => <SkillBar key={s.label} skill={s} theme={theme} />)
-          ) : (
-            <EmptyHint text="No skill evaluation yet. Encourage your child to complete an EvalRank assessment." theme={theme} />
-          )}
-        </View>
-
-        {/* Blueprint360 Summary */}
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>Blueprint360™ Plan</Text>
-        <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          {blueprint ? (
-            <>
-              <View style={styles.planRow}>
-                <View style={[styles.planIcon, { backgroundColor: '#22C55E18' }]}>
-                  <Ionicons name="map-outline" size={20} color="#22C55E" />
-                </View>
-                <View style={styles.planInfo}>
-                  <Text style={[styles.planLabel, { color: theme.text }]}>Today's Focus</Text>
-                  <Text style={[styles.planTitle, { color: theme.primary }]}>
-                    {todayWorkout || 'Rest day'}
-                  </Text>
-                </View>
-              </View>
-              <View style={[styles.divider, { backgroundColor: theme.border }]} />
-              <View style={styles.weekRow}>
-                <Text style={[styles.weekLabel, { color: theme.textSecondary }]}>This Week</Text>
-                <View style={styles.dots}>
-                  {[0, 1, 2, 3, 4].map((i) => (
-                    <View
-                      key={i}
-                      style={[styles.dot, { backgroundColor: i < daysCompleted ? theme.primary : theme.border }]}
-                    />
-                  ))}
-                </View>
-                <Text style={[styles.weekCount, { color: theme.primary }]}>{daysCompleted}/5 days</Text>
-              </View>
-            </>
-          ) : (
-            <EmptyHint text="No active training plan yet." theme={theme} />
-          )}
-        </View>
-
-        {/* Recent Milestones */}
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>Recent Milestones</Text>
-        <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          {milestones.length > 0 ? (
-            milestones.map((m, i) => (
-              <View key={m.id}>
-                <View style={styles.milestoneRow}>
-                  <View style={[styles.milestoneDot, { backgroundColor: m.done ? '#22C55E18' : theme.border + '40' }]}>
-                    <Ionicons name={m.done ? 'checkmark-circle' : 'time-outline'} size={18} color={m.done ? '#22C55E' : theme.textSecondary} />
-                  </View>
-                  <View style={styles.milestoneInfo}>
-                    <Text style={[styles.milestoneLabel, { color: m.done ? theme.text : theme.textSecondary }]}>
+        {/* Recent milestones */}
+        <View style={{ marginTop: SHAPE.sectionGap }}>
+          <SectionLabel>Recent milestones</SectionLabel>
+          <View style={[styles.card, { backgroundColor: theme.surface }]}>
+            {milestones.length > 0 ? (
+              milestones.map((m, i) => (
+                <View key={m.id}>
+                  <View style={styles.milestoneRow}>
+                    <View style={[styles.milestoneIcon, { backgroundColor: theme.steelFill }]}>
+                      <Ionicons name="checkmark" size={15} color={theme.steel} />
+                    </View>
+                    <Text numberOfLines={1} style={[TYPE.rowTitle, { color: theme.text, flex: 1 }]}>
                       {m.label}
                     </Text>
-                    <Text style={[styles.milestoneDate, { color: theme.textSecondary }]}>{m.date}</Text>
+                    <Text style={[TYPE.rowMeta, { color: theme.textDim, marginTop: 0 }]}>{m.date}</Text>
                   </View>
+                  {i < milestones.length - 1 && (
+                    <View style={[styles.divider, { backgroundColor: theme.hairline }]} />
+                  )}
                 </View>
-                {i < milestones.length - 1 && <View style={[styles.divider, { backgroundColor: theme.border }]} />}
-              </View>
-            ))
-          ) : (
-            <EmptyHint text="No milestones earned yet." theme={theme} />
-          )}
+              ))
+            ) : (
+              <EmptyHint text="No milestones earned yet." theme={theme} />
+            )}
+          </View>
         </View>
 
-        {/* Message Coach CTA */}
-        <TouchableOpacity
-          style={[styles.ctaBtn, { backgroundColor: theme.primary }]}
+        {/* Message coach CTA */}
+        <PrimaryButton
+          label="Message Coach"
+          icon="chatbubble-outline"
           onPress={() => navigation.navigate('Messaging')}
-          activeOpacity={0.85}
-        >
-          <Ionicons name="chatbubble-outline" size={18} color="#fff" />
-          <Text style={styles.ctaBtnText}>Message Coach</Text>
-        </TouchableOpacity>
+          style={{ marginTop: SHAPE.sectionGap }}
+        />
 
         <View style={{ height: 32 }} />
       </ScrollView>
@@ -320,88 +452,63 @@ export default function ProgressReportScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
+  centered: { flex: 1, justifyContent: 'center' },
+  scroll: { paddingHorizontal: SHAPE.screenPadding, paddingTop: 14 },
+
+  identityRow: { flexDirection: 'row', alignItems: 'center', gap: 13 },
+  childName: { fontFamily: FONTS.heading, fontSize: 19, lineHeight: 21 },
+  childMeta: { fontFamily: FONTS.bodyMedium, fontSize: 11.5, marginTop: 4 },
+  gradeBlock: { alignItems: 'flex-end' },
+  gradeValue: { fontFamily: FONTS.heading, fontSize: 26, lineHeight: 26 },
+  gradeCaption: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 9.5,
+    letterSpacing: 1,
+    marginTop: 2,
   },
-  backBtn: { padding: 4 },
-  headerTitle: { fontSize: 18, fontWeight: '700' },
-  headerSub: { fontSize: 12, marginTop: 1 },
-  messageBtn: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
 
-  scroll: { padding: 16, gap: 0 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', marginBottom: 10, marginTop: 16 },
+  trendCard: { marginTop: 16, borderRadius: 20, padding: 14 },
+  trendHeader: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
+  trendDelta: { fontFamily: FONTS.bodyBold, fontSize: 11 },
+  weekLabels: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
+  weekLabel: { fontFamily: FONTS.bodySemiBold, fontSize: 9.5 },
 
-  card: { borderRadius: 14, borderWidth: 1, padding: 16, marginBottom: 4 },
+  statRow: { flexDirection: 'row', gap: SHAPE.cardGap, marginTop: 16 },
+  statCell: { flex: 1, borderRadius: SHAPE.radiusCard, padding: SHAPE.cardPadding },
+  statCellLabel: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 9.5,
+    letterSpacing: 1,
+    marginTop: 5,
+  },
+
+  skillRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+  skillLabel: { fontFamily: FONTS.bodySemiBold, fontSize: 11.5, width: 86 },
+  skillValue: { fontFamily: FONTS.bodyBold, fontSize: 11, width: 32, textAlign: 'right' },
+
+  card: { borderRadius: SHAPE.radiusCard, padding: 13 },
   divider: { height: 1, marginVertical: 10 },
 
-  emptyHint: { fontSize: 13, lineHeight: 19 },
-
-  gradeCard: { borderRadius: 16, borderWidth: 1, padding: 16, marginBottom: 4 },
-  gradeCardInner: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  gradeCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 3,
+  planRow: { flexDirection: 'row', alignItems: 'center', gap: 11 },
+  planIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  gradeValue: { fontSize: 26, fontWeight: '900', lineHeight: 30 },
-  gradeSubLabel: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  gradeInfo: { flex: 1 },
-  gradeTitle: { fontSize: 16, fontWeight: '700', marginBottom: 4 },
-  gradeDesc: { fontSize: 12, lineHeight: 17, marginBottom: 8 },
-  viewLink: { fontSize: 13, fontWeight: '600' },
-
-  skillRow: { marginBottom: 12 },
-  skillLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 },
-  skillLabel: { fontSize: 14, fontWeight: '600' },
-  skillRightRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  skillPct: { fontSize: 13, fontWeight: '700' },
-  gradePill: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
-  gradeText: { fontSize: 11, fontWeight: '700' },
-  skillTrack: { height: 7, borderRadius: 4, overflow: 'hidden' },
-  skillFill: { height: 7, borderRadius: 4 },
-
-  planRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 2 },
-  planIcon: { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  planInfo: { flex: 1 },
-  planLabel: { fontSize: 12, fontWeight: '600' },
-  planTitle: { fontSize: 14, fontWeight: '700', marginTop: 2 },
 
   weekRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  weekLabel: { fontSize: 12 },
   dots: { flexDirection: 'row', gap: 6 },
-  dot: { width: 12, height: 12, borderRadius: 6 },
-  weekCount: { fontSize: 12, fontWeight: '700' },
+  dot: { width: 11, height: 11, borderRadius: 6 },
+  weekCount: { fontFamily: FONTS.bodyBold, fontSize: 12 },
 
-  milestoneRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  milestoneDot: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  milestoneInfo: { flex: 1 },
-  milestoneLabel: { fontSize: 14, fontWeight: '600' },
-  milestoneDate: { fontSize: 11, marginTop: 2 },
-
-  ctaBtn: {
-    flexDirection: 'row',
+  milestoneRow: { flexDirection: 'row', alignItems: 'center', gap: 11 },
+  milestoneIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 16,
-    borderRadius: 14,
-    marginTop: 20,
   },
-  ctaBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-
-  // Loading / empty states
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
-  emptyIconWrap: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
-  emptyTitle: { fontSize: 18, fontWeight: '700', marginBottom: 8 },
-  emptySub: { fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 20 },
-  emptyButton: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 24, paddingVertical: 13, borderRadius: 12 },
-  emptyButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
 });

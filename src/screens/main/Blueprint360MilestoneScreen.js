@@ -12,7 +12,7 @@ const MILESTONES = [
   { id: 5, title: 'Complete 5-Day Plan', target: 5, current: 5, unit: ' days', category: 'Blueprint', completed: true, dueDate: 'Dec 15' },
 ];
 
-const CAT_COLORS = { Shooting: '#FF6B00', Training: '#3B82F6', Defense: '#22C55E', Consistency: '#F59E0B', Blueprint: '#A855F7' };
+const CAT_COLORS = { Shooting: '#8A1C22', Training: '#3B82F6', Defense: '#22C55E', Consistency: '#F59E0B', Blueprint: '#A855F7' };
 
 export default function Blueprint360MilestoneScreen({ navigation }) {
   const { theme, isDarkMode } = useAppContext();

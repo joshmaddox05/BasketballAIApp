@@ -92,8 +92,8 @@ const styles = StyleSheet.create({
     borderColor: '#4CAF50'
   },
   circleCurrent: {
-    backgroundColor: '#FF6B00',
-    borderColor: '#FF6B00'
+    backgroundColor: '#8A1C22',
+    borderColor: '#8A1C22'
   },
   circleUpcoming: {
     backgroundColor: '#1A1A1A',
@@ -120,7 +120,7 @@ const styles = StyleSheet.create({
     color: '#4CAF50'
   },
   stepLabelCurrent: {
-    color: '#FF6B00'
+    color: '#8A1C22'
   },
   stepLabelUpcoming: {
     color: '#666666'

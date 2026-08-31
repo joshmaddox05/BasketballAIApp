@@ -10,6 +10,7 @@ import {
     ScrollView
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { Entrance, BarFill } from '../../components/dbe';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
 import {
@@ -110,11 +111,15 @@ const AchievementsScreen = ({ navigation }) => {
         return date.toLocaleDateString();
     };
 
-    const renderAchievement = ({ item }) => {
+    const renderAchievement = ({ item, index }) => {
         const tierColor = getTierColor(item.tier);
         const isUnlocked = item.unlocked;
 
         return (
+            // Decorative stagger only — the entrance wraps the card, it never gates
+            // onPress. The index is capped so a long list does not tail off into a
+            // multi-second cascade.
+            <Entrance variant="cellIn" delay={Math.min(index, 8) * 60}>
             <View style={[
                 styles.achievementCard,
                 { backgroundColor: theme.card },
@@ -173,6 +178,7 @@ const AchievementsScreen = ({ navigation }) => {
                     </View>
                 </View>
             </View>
+            </Entrance>
         );
     };
 
@@ -224,17 +230,13 @@ const AchievementsScreen = ({ navigation }) => {
                         </Text>
                     )}
                 </View>
-                <View style={[styles.progressBar, { backgroundColor: theme.backgroundSecondary }]}>
-                    <View
-                        style={[
-                            styles.progressFill,
-                            {
-                                backgroundColor: theme.primary,
-                                width: `${Math.min(levelInfo.progressToNextLevel, 100)}%`
-                            }
-                        ]}
-                    />
-                </View>
+                <BarFill
+                    pct={Math.min(levelInfo.progressToNextLevel, 100) / 100}
+                    color={theme.primary}
+                    trackColor={theme.backgroundSecondary}
+                    height={8}
+                    radius={4}
+                />
             </View>
 
             {/* Category Filter */}
@@ -368,15 +370,6 @@ const styles = StyleSheet.create({
     },
     xpProgress: {
         fontSize: 12,
-    },
-    progressBar: {
-        height: 8,
-        borderRadius: 4,
-        overflow: 'hidden',
-    },
-    progressFill: {
-        height: '100%',
-        borderRadius: 4,
     },
     categoryScroll: {
         maxHeight: 50,

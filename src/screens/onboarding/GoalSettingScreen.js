@@ -22,7 +22,7 @@ const PRESET_GOALS = [
         description: 'Work on shooting form and consistency',
         icon: 'basketball',
         category: 'shooting',
-        color: '#FF6B00',
+        color: '#8A1C22',
         recommendedFor: ['beginner', 'intermediate', 'advanced']
     },
     {
@@ -175,7 +175,7 @@ const GoalSettingScreen = ({ navigation }) => {
                 {recommendedGoals.length > 0 && (
                     <View style={styles.recommendedSection}>
                         <View style={styles.recommendedHeader}>
-                            <Ionicons name="star" size={20} color="#FF6B00" />
+                            <Ionicons name="star" size={20} color="#8A1C22" />
                             <Text style={styles.recommendedTitle}>Recommended for {userData.level ? userData.level.charAt(0).toUpperCase() + userData.level.slice(1) : 'Beginner'}s</Text>
                         </View>
                         <View style={styles.goalsContainer}>
@@ -388,7 +388,7 @@ const GoalSettingScreen = ({ navigation }) => {
                             value={reminders}
                             onValueChange={setReminders}
                             trackColor={{ false: '#DEE4E7', true: '#FFD3B6' }}
-                            thumbColor={reminders ? '#FF6B00' : '#F5F5F5'}
+                            thumbColor={reminders ? '#8A1C22' : '#F5F5F5'}
                         />
                     </View>
                     <Text style={styles.reminderDescription}>
@@ -442,7 +442,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     activeStepDot: {
-        backgroundColor: '#FF6B00',
+        backgroundColor: '#8A1C22',
     },
     completedStepDot: {
         backgroundColor: '#4CAF50',
@@ -486,7 +486,7 @@ const styles = StyleSheet.create({
     recommendedTitle: {
         fontSize: 16,
         fontWeight: 'bold',
-        color: '#FF6B00',
+        color: '#8A1C22',
         marginLeft: 8,
     },
     recommendedGoalCard: {
@@ -520,7 +520,7 @@ const styles = StyleSheet.create({
     },
     selectedGoalCard: {
         backgroundColor: '#FFF0E6',
-        borderColor: '#FF6B00',
+        borderColor: '#8A1C22',
         borderWidth: 2,
     },
     goalCheckbox: {
@@ -537,8 +537,8 @@ const styles = StyleSheet.create({
         backgroundColor: 'transparent',
     },
     selectedGoalCheckbox: {
-        backgroundColor: '#FF6B00',
-        borderColor: '#FF6B00',
+        backgroundColor: '#8A1C22',
+        borderColor: '#8A1C22',
     },
     goalIconContainer: {
         width: 40,
@@ -550,7 +550,7 @@ const styles = StyleSheet.create({
         marginRight: 16,
     },
     selectedGoalIconContainer: {
-        backgroundColor: '#FF6B00',
+        backgroundColor: '#8A1C22',
     },
     goalInfo: {
         flex: 1,
@@ -562,7 +562,7 @@ const styles = StyleSheet.create({
         marginBottom: 4,
     },
     selectedGoalTitle: {
-        color: '#FF6B00',
+        color: '#8A1C22',
     },
     goalDescription: {
         fontSize: 14,
@@ -599,7 +599,7 @@ const styles = StyleSheet.create({
         width: 48,
         height: 48,
         borderRadius: 24,
-        backgroundColor: '#FF6B00',
+        backgroundColor: '#8A1C22',
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -627,14 +627,14 @@ const styles = StyleSheet.create({
     },
     selectedCategoryOption: {
         backgroundColor: '#FFF0E6',
-        borderColor: '#FF6B00',
+        borderColor: '#8A1C22',
     },
     categoryOptionText: {
         fontSize: 14,
         color: '#666',
     },
     selectedCategoryOptionText: {
-        color: '#FF6B00',
+        color: '#8A1C22',
         fontWeight: '500',
     },
     reminderContainer: {
@@ -681,7 +681,7 @@ const styles = StyleSheet.create({
     },
     continueButton: {
         flex: 2,
-        backgroundColor: '#FF6B00',
+        backgroundColor: '#8A1C22',
         paddingVertical: 14,
         borderRadius: 8,
         justifyContent: 'center',

@@ -1,4 +1,4 @@
-// ScoutLabScreen.js - Athlete's ScoutLab view: exposure, recruiting, scout activity
+// ScoutLabScreen.js - 12d: athlete exposure, scout activity, boost actions
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   SafeAreaView,
@@ -7,7 +7,6 @@ import {
   Text,
   TouchableOpacity,
   ScrollView,
-  TextInput,
   Switch,
   Alert,
 } from 'react-native';
@@ -21,6 +20,15 @@ import {
   unpublishScoutLabProfile,
   isHighSchoolGrade,
 } from '../../services/firestoreService';
+import {
+  Entrance,
+  PulseHalo,
+  RingProgress,
+  ScreenHeader,
+  SectionLabel,
+  PrimaryButton,
+} from '../../components/dbe';
+import { TYPE, SHAPE, FONTS } from '../../utils/typography';
 
 // ---------------------------------------------------------------------------
 // Mock data – replaced by real API data in production
@@ -31,19 +39,20 @@ const MOCK_SCOUTS_VIEWED = 12;
 const MOCK_ACTIVITY = [
   {
     id: '1',
-    text: 'Scout from Duke University viewed your profile',
+    text: 'Duke University viewed your profile',
     time: '2h ago',
     icon: 'eye-outline',
+    fresh: true,
   },
   {
     id: '2',
-    text: 'Scout from USC viewed your highlight reel',
+    text: 'USC viewed your highlight reel',
     time: '1d ago',
     icon: 'videocam-outline',
   },
   {
     id: '3',
-    text: 'Scout from Kentucky added you to watchlist',
+    text: 'Kentucky added you to a watchlist',
     time: '3d ago',
     icon: 'bookmark-outline',
   },
@@ -51,97 +60,61 @@ const MOCK_ACTIVITY = [
 
 const BOOST_ACTIONS = [
   {
+    id: 'profile',
+    label: 'Complete profile',
+    description: 'Stats, GPA and contact info',
+    icon: 'person-circle-outline',
+    done: true,
+  },
+  {
     id: 'highlights',
-    label: 'Upload Highlights',
+    label: 'Upload highlights',
     description: 'Add game film to stand out',
     icon: 'cloud-upload-outline',
     done: false,
   },
   {
-    id: 'profile',
-    label: 'Complete Profile',
-    description: 'Fill in stats, GPA, and contact info',
-    icon: 'person-circle-outline',
-    done: true,
-  },
-  {
     id: 'evaluation',
-    label: 'Request Evaluation',
+    label: 'Request evaluation',
     description: 'Get scored by a certified scout',
     icon: 'star-outline',
     done: false,
   },
 ];
 
+const tierFor = (score) =>
+  score >= 80 ? 'D1 READY' : score >= 65 ? 'D2 PROSPECT' : score >= 50 ? 'D3 PROSPECT' : 'BUILDING';
+
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
-function ScoreCircle({ score, theme }) {
-  const color = score >= 80 ? '#4CAF50' : score >= 60 ? theme.primary : '#FF9800';
-  return (
-    <View style={styles.scoreCircleWrapper}>
-      <View style={[styles.scoreCircle, { borderColor: color }]}>
-        <Text style={[styles.scoreNumber, { color }]}>{score}</Text>
-        <Text style={[styles.scoreOutOf, { color: theme.textSecondary }]}>/100</Text>
-      </View>
-      <Text style={[styles.scoreLabel, { color: theme.textSecondary }]}>Scout Readiness</Text>
-    </View>
-  );
-}
-
-function ReadinessBar({ score, theme }) {
-  const color = score >= 80 ? '#4CAF50' : score >= 60 ? theme.primary : '#FF9800';
-  const tier =
-    score >= 80 ? 'D1 Ready' : score >= 65 ? 'D2 Prospect' : score >= 50 ? 'D3 Prospect' : 'Building';
-  return (
-    <View style={styles.readinessBarWrapper}>
-      <View style={styles.readinessBarLabelRow}>
-        <Text style={[styles.readinessBarLabel, { color: theme.textSecondary }]}>
-          College Readiness
-        </Text>
-        <Text style={[styles.readinessBarPct, { color }]}>{score}%</Text>
-      </View>
-      <View style={[styles.readinessBarTrack, { backgroundColor: theme.progressBar || theme.backgroundTertiary }]}>
-        <View style={[styles.readinessBarFill, { width: `${score}%`, backgroundColor: color }]} />
-      </View>
-      <View style={[styles.tierChip, { backgroundColor: color + '22', borderColor: color }]}>
-        <Text style={[styles.tierChipText, { color }]}>{tier}</Text>
-      </View>
-    </View>
-  );
-}
-
 function LockedUpgradeCard({ theme, onUpgrade }) {
   return (
-    <View style={[styles.lockedCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-      <View style={[styles.lockedIconWrap, { backgroundColor: theme.primary + '22' }]}>
-        <Ionicons name="lock-closed" size={40} color={theme.primary} />
+    <Entrance variant="cardIn" style={[styles.lockedCard, { backgroundColor: theme.surface }]}>
+      <View style={[styles.lockedIconWrap, { backgroundColor: theme.badgeFill }]}>
+        <Ionicons name="lock-closed" size={28} color={theme.accentText} />
       </View>
-      <Text style={[styles.lockedTitle, { color: theme.text }]}>ScoutLab™ is PRO</Text>
-      <Text style={[styles.lockedBody, { color: theme.textSecondary }]}>
-        Unlock full recruiting exposure, scout activity tracking, and your shareable athlete
-        profile. Get seen by college programs nationwide.
+      <Text style={[TYPE.tooltipTitle, { color: theme.text, textAlign: 'center' }]}>
+        ScoutLab™ is PRO
       </Text>
-      <View style={[styles.lockedProBadge, { backgroundColor: theme.primary }]}>
-        <Text style={styles.lockedProBadgeText}>PRO Feature</Text>
-      </View>
+      <Text style={[TYPE.tooltipBody, { color: theme.textDim, textAlign: 'center', marginTop: 6 }]}>
+        Exposure score, scout activity and a shareable athlete profile.
+      </Text>
       <View style={styles.lockedPerksRow}>
-        {['Exposure Score', 'Scout Alerts', 'Shareable Profile'].map((perk) => (
+        {['Exposure score', 'Scout alerts', 'Shareable profile'].map((perk) => (
           <View key={perk} style={styles.lockedPerkItem}>
-            <Ionicons name="checkmark-circle" size={16} color={theme.primary} />
-            <Text style={[styles.lockedPerkText, { color: theme.textSecondary }]}>{perk}</Text>
+            <Ionicons name="checkmark" size={14} color={theme.accentText} />
+            <Text style={[TYPE.rowMeta, { color: theme.textMuted, marginTop: 0 }]}>{perk}</Text>
           </View>
         ))}
       </View>
-      <TouchableOpacity
-        style={[styles.upgradeBtn, { backgroundColor: theme.primary }]}
+      <PrimaryButton
+        label="Upgrade to PRO"
+        icon="rocket-outline"
         onPress={onUpgrade}
-        activeOpacity={0.85}
-      >
-        <Ionicons name="rocket-outline" size={18} color="#fff" style={{ marginRight: 8 }} />
-        <Text style={styles.upgradeBtnText}>Upgrade to PRO</Text>
-      </TouchableOpacity>
-    </View>
+        style={{ alignSelf: 'stretch', marginTop: 18 }}
+      />
+    </Entrance>
   );
 }
 
@@ -240,15 +213,7 @@ export default function ScoutLabScreen({ navigation }) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
         <StatusBar style={isDarkMode ? 'light' : 'dark'} />
-        {/* Minimal header even for locked state */}
-        <View style={[styles.header, { borderBottomColor: theme.border }]}>
-          <View>
-            <Text style={[styles.headerTitle, { color: theme.text }]}>ScoutLab™</Text>
-            <Text style={[styles.headerSubtitle, { color: theme.textSecondary }]}>
-              Exposure &amp; Recruiting
-            </Text>
-          </View>
-        </View>
+        <ScreenHeader title="ScoutLab™" subtitle="Recruiting exposure" />
         <ScrollView
           contentContainerStyle={styles.lockedScrollContent}
           showsVerticalScrollIndicator={false}
@@ -259,191 +224,222 @@ export default function ScoutLabScreen({ navigation }) {
     );
   }
 
+  const score = MOCK_READINESS_SCORE;
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <StatusBar style={isDarkMode ? 'light' : 'dark'} />
 
-      {/* Header */}
-      <View style={[styles.header, { borderBottomColor: theme.border }]}>
-        <View>
-          <Text style={[styles.headerTitle, { color: theme.text }]}>ScoutLab™</Text>
-          <Text style={[styles.headerSubtitle, { color: theme.textSecondary }]}>
-            Exposure &amp; Recruiting
-          </Text>
-        </View>
-        <TouchableOpacity
-          style={[styles.headerIconBtn, { backgroundColor: theme.card }]}
-          activeOpacity={0.7}
-          onPress={() => navigation.navigate('Notifications')}
-        >
-          <Ionicons name="notifications-outline" size={22} color={theme.primary} />
-        </TouchableOpacity>
-      </View>
+      <ScreenHeader
+        title="ScoutLab™"
+        subtitle="Recruiting exposure"
+        right={
+          <View
+            style={[
+              styles.statusPill,
+              { backgroundColor: directoryVisible ? theme.badgeFill : theme.steelFill },
+            ]}
+          >
+            <View style={styles.dotWrap}>
+              {directoryVisible ? <PulseHalo color={theme.accentText} duration={1800} /> : null}
+              <View
+                style={[
+                  styles.dot,
+                  { backgroundColor: directoryVisible ? theme.accentText : theme.steel },
+                ]}
+              />
+            </View>
+            <Text
+              style={[
+                styles.statusPillText,
+                { color: directoryVisible ? theme.accentText : theme.steel },
+              ]}
+            >
+              {directoryVisible ? 'PUBLISHED' : 'HIDDEN'}
+            </Text>
+          </View>
+        }
+      />
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* ── Exposure Readiness Score Card ───────────────────────────────── */}
-        <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <Text style={[styles.cardTitle, { color: theme.text }]}>Exposure Readiness Score</Text>
-          <View style={styles.scoreRow}>
-            <ScoreCircle score={MOCK_READINESS_SCORE} theme={theme} />
-            <View style={styles.scoreDetails}>
-              <ReadinessBar score={MOCK_READINESS_SCORE} theme={theme} />
-              <View style={[styles.trendChip, { backgroundColor: theme.primary + '18' }]}>
-                <Ionicons name="trending-up" size={13} color={theme.primary} />
-                <Text style={[styles.trendChipText, { color: theme.primary }]}>
-                  +6 pts this week
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* ── Exposure readiness ring ─────────────────────────────────────── */}
+        <View style={styles.scoreRow}>
+          <RingProgress
+            size={124}
+            strokeWidth={9}
+            progress={score / 100}
+            color={theme.primary}
+            trackColor={theme.track}
+            delay={200}
+          >
+            <Entrance variant="count" delay={800} style={{ alignItems: 'center' }}>
+              <Text style={[styles.scoreNumber, { color: theme.text }]}>{score}</Text>
+              <Text style={[styles.scoreOutOf, { color: theme.textDim }]}>/100</Text>
+            </Entrance>
+          </RingProgress>
+
+          <View style={{ flex: 1 }}>
+            <Text style={[TYPE.sectionLabel, { color: theme.textDim }]}>Scout readiness</Text>
+            <Entrance variant="chipPop" delay={1000} style={{ alignSelf: 'flex-start' }}>
+              <View
+                style={[
+                  styles.tierChip,
+                  { backgroundColor: theme.badgeFill, borderColor: theme.attentionBorder },
+                ]}
+              >
+                <Text style={[styles.tierChipText, { color: theme.accentText }]}>
+                  {tierFor(score)}
                 </Text>
+              </View>
+            </Entrance>
+
+            <View style={styles.viewsRow}>
+              <View style={[styles.viewsIcon, { backgroundColor: theme.steelFill }]}>
+                <PulseHalo color={theme.steelFill} duration={2200} />
+                <Ionicons name="eye-outline" size={16} color={theme.steel} />
+              </View>
+              <View>
+                <Text style={[styles.viewsNumber, { color: theme.text }]}>
+                  {MOCK_SCOUTS_VIEWED} scouts
+                </Text>
+                <Text style={[TYPE.rowMeta, { color: theme.textDim }]}>viewed you this month</Text>
               </View>
             </View>
           </View>
         </View>
 
-        {/* ── Recruiting Visibility Toggle ────────────────────────────────── */}
-        <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <View style={styles.visibilityRow}>
-            <View style={[styles.visibilityIconWrap, { backgroundColor: theme.primary + '18' }]}>
-              <Ionicons name={directoryVisible ? 'eye' : 'eye-off'} size={20} color={theme.primary} />
-            </View>
-            <View style={styles.visibilityText}>
-              <Text style={[styles.cardTitle, { color: theme.text, marginBottom: 2 }]}>
-                Recruiting Visibility
-              </Text>
-              <Text style={[styles.cardSubtitle, { color: theme.textSecondary, marginBottom: 0 }]}>
-                {directoryVisible
-                  ? 'Scouts can find you in prospect search'
-                  : 'Hidden from scout prospect search'}
-              </Text>
-            </View>
-            <Switch
-              value={directoryVisible}
-              onValueChange={handleToggleVisibility}
-              disabled={toggling}
-              trackColor={{ false: theme.border, true: theme.primary }}
-              thumbColor="#fff"
+        {/* ── Recruiting visibility toggle ────────────────────────────────── */}
+        <Entrance
+          variant="cardIn"
+          delay={120}
+          style={[styles.visibilityCard, { backgroundColor: theme.surface }]}
+        >
+          <View style={[styles.visibilityIconWrap, { backgroundColor: theme.badgeFill }]}>
+            <Ionicons
+              name={directoryVisible ? 'eye-outline' : 'eye-off-outline'}
+              size={17}
+              color={theme.accentText}
             />
           </View>
-        </View>
-
-        {/* ── Recruiting Portfolio Preview Card ───────────────────────────── */}
-        <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <View style={styles.cardTitleRow}>
-            <Text style={[styles.cardTitle, { color: theme.text }]}>Recruiting Portfolio</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('EditProfile')} activeOpacity={0.7}>
-              <Text style={[styles.cardEditLink, { color: theme.primary }]}>Edit</Text>
-            </TouchableOpacity>
+          <View style={{ flex: 1 }}>
+            <Text style={[TYPE.rowTitle, { color: theme.text }]}>Recruiting visibility</Text>
+            <Text style={[TYPE.rowMeta, { color: theme.textDim }]}>
+              {directoryVisible ? 'Findable in prospect search' : 'Hidden from prospect search'}
+            </Text>
           </View>
-          <View style={styles.portfolioRow}>
-            <View style={[styles.avatarPlaceholder, { backgroundColor: theme.primary + '25' }]}>
-              <Ionicons name="person" size={30} color={theme.primary} />
-            </View>
-            <View style={styles.portfolioInfo}>
-              <Text style={[styles.portfolioName, { color: theme.text }]}>{name}</Text>
-              <Text style={[styles.portfolioMeta, { color: theme.textSecondary }]}>
-                {position} · {grade} Grade
-              </Text>
-              <View style={styles.scoutsRow}>
-                <Ionicons name="eye" size={13} color={theme.primary} />
-                <Text style={[styles.scoutsLabel, { color: theme.textSecondary }]}>
-                  {' '}Scouts Viewed:{' '}
-                  <Text style={{ color: theme.primary, fontWeight: '700' }}>
-                    {MOCK_SCOUTS_VIEWED}
-                  </Text>
-                </Text>
-              </View>
-            </View>
-          </View>
-        </View>
+          <Switch
+            value={directoryVisible}
+            onValueChange={handleToggleVisibility}
+            disabled={toggling}
+            trackColor={{ false: theme.hairline, true: theme.primary }}
+            thumbColor="#FFFFFF"
+          />
+        </Entrance>
 
-        {/* ── Boost Visibility ────────────────────────────────────────────── */}
-        <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <Text style={[styles.cardTitle, { color: theme.text }]}>Boost Visibility</Text>
-          <Text style={[styles.cardSubtitle, { color: theme.textSecondary }]}>
-            Complete these actions to increase your score
-          </Text>
-          {BOOST_ACTIONS.map((action, index) => (
-            <React.Fragment key={action.id}>
-              <TouchableOpacity
-                style={styles.boostRow}
-                onPress={() => !action.done && handleBoostAction(action.id)}
-                activeOpacity={action.done ? 1 : 0.7}
+        {/* ── Athlete identity row ────────────────────────────────────────── */}
+        <Entrance
+          variant="cardIn"
+          delay={180}
+          style={[styles.portfolioCard, { backgroundColor: theme.surface }]}
+        >
+          <View style={[styles.avatarPlaceholder, { backgroundColor: theme.avatarFill }]}>
+            <Ionicons name="person" size={20} color={theme.accentText} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[TYPE.rowTitle, { color: theme.text }]}>{name}</Text>
+            <Text style={[TYPE.rowMeta, { color: theme.textDim }]}>
+              {position} · {grade} grade
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('EditProfile')}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={[styles.editLink, { color: theme.accentText }]}>Edit</Text>
+          </TouchableOpacity>
+        </Entrance>
+
+        {/* ── Scout activity ──────────────────────────────────────────────── */}
+        <View style={{ marginTop: SHAPE.sectionGap }}>
+          <SectionLabel>Scout activity</SectionLabel>
+          {MOCK_ACTIVITY.map((item, index) => (
+            <Entrance
+              key={item.id}
+              variant="slideIn"
+              delay={300 + index * 120}
+              style={[
+                styles.activityRow,
+                index < MOCK_ACTIVITY.length - 1 && {
+                  borderBottomWidth: 1,
+                  borderBottomColor: theme.hairline,
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.activityIconWrap,
+                  { backgroundColor: item.fresh ? theme.badgeFill : theme.steelFill },
+                ]}
               >
-                <View
-                  style={[
-                    styles.boostIconWrap,
-                    {
-                      backgroundColor: action.done
-                        ? '#4CAF5020'
-                        : theme.primary + '18',
-                    },
-                  ]}
-                >
-                  <Ionicons
-                    name={action.done ? 'checkmark-circle' : action.icon}
-                    size={20}
-                    color={action.done ? '#4CAF50' : theme.primary}
-                  />
-                </View>
-                <View style={styles.boostText}>
-                  <Text
-                    style={[
-                      styles.boostLabel,
-                      { color: action.done ? theme.textSecondary : theme.text },
-                      action.done && styles.boostLabelStruck,
-                    ]}
-                  >
+                <Ionicons
+                  name={item.icon}
+                  size={15}
+                  color={item.fresh ? theme.accentText : theme.steel}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.activityText, { color: theme.text }]}>{item.text}</Text>
+                <Text style={[TYPE.rowMeta, { color: theme.textDim }]}>{item.time}</Text>
+              </View>
+            </Entrance>
+          ))}
+        </View>
+
+        {/* ── Boost exposure ──────────────────────────────────────────────── */}
+        <View style={{ marginTop: SHAPE.sectionGap }}>
+          <SectionLabel>Boost your exposure</SectionLabel>
+          {BOOST_ACTIONS.map((action, index) => (
+            <Entrance key={action.id} variant="cellIn" delay={380 + index * 90}>
+              <TouchableOpacity
+                style={[
+                  styles.boostRow,
+                  { backgroundColor: theme.surface },
+                  index > 0 && { marginTop: 8 },
+                ]}
+                onPress={() => !action.done && handleBoostAction(action.id)}
+                activeOpacity={action.done ? 1 : 0.8}
+              >
+                {action.done ? (
+                  <View style={[styles.checkOn, { backgroundColor: theme.primary }]}>
+                    <Ionicons name="checkmark" size={13} color="#FFFFFF" />
+                  </View>
+                ) : (
+                  <View style={[styles.checkOff, { borderColor: theme.hairline }]} />
+                )}
+                <View style={{ flex: 1 }}>
+                  <Text style={[TYPE.rowTitle, { color: theme.text, fontSize: 12.5 }]}>
                     {action.label}
                   </Text>
-                  <Text style={[styles.boostDescription, { color: theme.textTertiary }]}>
+                  <Text style={[TYPE.rowMeta, { color: theme.textDim, fontSize: 10.5 }]}>
                     {action.description}
                   </Text>
                 </View>
-                {action.done ? (
-                  <Text style={[styles.doneTag, { color: '#4CAF50' }]}>Done</Text>
-                ) : (
-                  <Ionicons name="chevron-forward" size={18} color={theme.textTertiary} />
-                )}
+                {!action.done ? (
+                  <Ionicons name="chevron-forward" size={15} color={theme.textDim} />
+                ) : null}
               </TouchableOpacity>
-              {index < BOOST_ACTIONS.length - 1 && (
-                <View style={[styles.divider, { backgroundColor: theme.border }]} />
-              )}
-            </React.Fragment>
+            </Entrance>
           ))}
         </View>
 
-        {/* ── Recent Scout Activity ────────────────────────────────────────── */}
-        <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <Text style={[styles.cardTitle, { color: theme.text }]}>Recent Scout Activity</Text>
-          {MOCK_ACTIVITY.map((item, index) => (
-            <React.Fragment key={item.id}>
-              <View style={styles.activityRow}>
-                <View style={[styles.activityIconWrap, { backgroundColor: theme.primary + '18' }]}>
-                  <Ionicons name={item.icon} size={16} color={theme.primary} />
-                </View>
-                <View style={styles.activityInfo}>
-                  <Text style={[styles.activityText, { color: theme.text }]}>{item.text}</Text>
-                  <Text style={[styles.activityTime, { color: theme.textTertiary }]}>
-                    {item.time}
-                  </Text>
-                </View>
-              </View>
-              {index < MOCK_ACTIVITY.length - 1 && (
-                <View style={[styles.divider, { backgroundColor: theme.border }]} />
-              )}
-            </React.Fragment>
-          ))}
-        </View>
-
-        {/* ── View My Profile CTA ──────────────────────────────────────────── */}
+        {/* ── Share profile CTA ───────────────────────────────────────────── */}
         <TouchableOpacity
           style={[styles.primaryCta, { backgroundColor: theme.primary }]}
           activeOpacity={0.85}
           onPress={handleViewProfile}
         >
-          <Ionicons name="person-circle-outline" size={20} color="#fff" />
-          <Text style={styles.primaryCtaText}>View My Profile</Text>
+          <Text style={styles.primaryCtaText}>Share athlete profile</Text>
+          <Ionicons name="share-outline" size={17} color="#FFFFFF" />
         </TouchableOpacity>
 
         <View style={styles.bottomSpacer} />
@@ -458,206 +454,152 @@ export default function ScoutLabScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1 },
 
-  header: {
+  statusPill: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: SHAPE.radiusPill,
   },
-  headerTitle: { fontSize: 22, fontWeight: '800', letterSpacing: 0.2 },
-  headerSubtitle: { fontSize: 13, marginTop: 1 },
-  headerIconBtn: {
+  dotWrap: { width: 6, height: 6 },
+  dot: { width: 6, height: 6, borderRadius: 3 },
+  statusPillText: { fontFamily: FONTS.bodyBold, fontSize: 10, letterSpacing: 0.7 },
+
+  scrollContent: { paddingHorizontal: SHAPE.screenPadding, paddingTop: 16 },
+  lockedScrollContent: {
+    paddingHorizontal: SHAPE.screenPadding,
+    flexGrow: 1,
+    justifyContent: 'center',
+  },
+
+  // Score / readiness
+  scoreRow: { flexDirection: 'row', alignItems: 'center', gap: 18 },
+  scoreNumber: { fontFamily: FONTS.heading, fontSize: 38, lineHeight: 40 },
+  scoreOutOf: { fontFamily: FONTS.bodySemiBold, fontSize: 10, marginTop: 2 },
+  tierChip: {
+    borderRadius: SHAPE.radiusPill,
+    borderWidth: 1,
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+    marginTop: 8,
+  },
+  tierChipText: { fontFamily: FONTS.bodyExtraBold, fontSize: 11.5, letterSpacing: 0.5 },
+  viewsRow: { flexDirection: 'row', alignItems: 'center', gap: 9, marginTop: 14 },
+  viewsIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  viewsNumber: { fontFamily: FONTS.heading, fontSize: 17, lineHeight: 18 },
+
+  visibilityCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+    padding: SHAPE.cardPadding,
+    borderRadius: SHAPE.radiusCard,
+    marginTop: SHAPE.sectionGap,
+  },
+  visibilityIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: SHAPE.radiusBadge + 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  portfolioCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+    padding: SHAPE.cardPadding,
+    borderRadius: SHAPE.radiusCard,
+    marginTop: SHAPE.cardGap,
+  },
+  avatarPlaceholder: {
     width: 38,
     height: 38,
     borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  editLink: { fontFamily: FONTS.bodyBold, fontSize: 11 },
 
-  scrollContent: { padding: 16 },
-  lockedScrollContent: { padding: 16, flexGrow: 1, justifyContent: 'center' },
-
-  // Cards
-  card: {
-    borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-    padding: 16,
-    marginBottom: 14,
-  },
-  cardTitle: { fontSize: 16, fontWeight: '700', marginBottom: 4 },
-  cardSubtitle: { fontSize: 13, marginBottom: 12 },
-  cardTitleRow: {
+  // Activity
+  activityRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    gap: 11,
+    paddingVertical: 11,
   },
-  cardEditLink: { fontSize: 14, fontWeight: '600' },
-
-  visibilityRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  visibilityIconWrap: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
-  visibilityText: { flex: 1 },
-
-  divider: { height: StyleSheet.hairlineWidth },
-
-  // Score / readiness
-  scoreRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12, gap: 16 },
-  scoreCircleWrapper: { alignItems: 'center' },
-  scoreCircle: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    borderWidth: 5,
+  activityIconWrap: {
+    width: 30,
+    height: 30,
+    borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  scoreNumber: { fontSize: 26, fontWeight: '800' },
-  scoreOutOf: { fontSize: 11, marginTop: -2 },
-  scoreLabel: { fontSize: 11, marginTop: 6 },
-  scoreDetails: { flex: 1 },
-
-  readinessBarWrapper: { marginBottom: 10 },
-  readinessBarLabelRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 5,
-  },
-  readinessBarLabel: { fontSize: 12 },
-  readinessBarPct: { fontSize: 12, fontWeight: '700' },
-  readinessBarTrack: { height: 7, borderRadius: 4, overflow: 'hidden' },
-  readinessBarFill: { height: '100%', borderRadius: 4 },
-  tierChip: {
-    alignSelf: 'flex-start',
-    borderRadius: 8,
-    borderWidth: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    marginTop: 6,
-  },
-  tierChipText: { fontSize: 10, fontWeight: '700' },
-
-  trendChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
-    marginTop: 8,
-  },
-  trendChipText: { fontSize: 11, fontWeight: '600' },
-
-  // Portfolio
-  portfolioRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  avatarPlaceholder: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  portfolioInfo: { flex: 1 },
-  portfolioName: { fontSize: 16, fontWeight: '700' },
-  portfolioMeta: { fontSize: 13, marginTop: 2 },
-  scoutsRow: { flexDirection: 'row', alignItems: 'center', marginTop: 6 },
-  scoutsLabel: { fontSize: 13 },
+  activityText: { fontFamily: FONTS.bodySemiBold, fontSize: 12.5 },
 
   // Boost
   boostRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 11,
+    paddingHorizontal: 13,
     paddingVertical: 12,
-    gap: 12,
+    borderRadius: SHAPE.radiusTile,
   },
-  boostIconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+  checkOn: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  boostText: { flex: 1 },
-  boostLabel: { fontSize: 14, fontWeight: '600' },
-  boostLabelStruck: { textDecorationLine: 'line-through' },
-  boostDescription: { fontSize: 12, marginTop: 2 },
-  doneTag: { fontSize: 12, fontWeight: '700' },
-
-  // Activity
-  activityRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingVertical: 11,
-    gap: 10,
+  checkOff: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1.5,
   },
-  activityIconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 1,
-  },
-  activityInfo: { flex: 1 },
-  activityText: { fontSize: 13, lineHeight: 18 },
-  activityTime: { fontSize: 11, marginTop: 2 },
 
   // CTA
   primaryCta: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    height: 52,
-    borderRadius: 14,
-    marginTop: 4,
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    borderRadius: SHAPE.radiusTile,
+    marginTop: SHAPE.sectionGap,
   },
-  primaryCtaText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  primaryCtaText: { fontFamily: FONTS.bodyExtraBold, fontSize: 14.5, color: '#FFFFFF' },
 
   // Locked / Upgrade
   lockedCard: {
-    borderRadius: 20,
-    borderWidth: StyleSheet.hairlineWidth,
-    padding: 28,
+    borderRadius: SHAPE.radiusHero,
+    padding: 24,
     alignItems: 'center',
   },
   lockedIconWrap: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
+    width: 64,
+    height: 64,
+    borderRadius: SHAPE.radiusCard,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 18,
+    marginBottom: 14,
   },
-  lockedTitle: { fontSize: 22, fontWeight: '800', marginBottom: 12, textAlign: 'center' },
-  lockedBody: { fontSize: 14, textAlign: 'center', lineHeight: 21, marginBottom: 20 },
-  lockedProBadge: {
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 4,
-    marginBottom: 18,
-  },
-  lockedProBadgeText: { color: '#fff', fontSize: 12, fontWeight: '700', letterSpacing: 0.5 },
-  lockedPerksRow: { width: '100%', marginBottom: 24 },
+  lockedPerksRow: { width: '100%', marginTop: 14 },
   lockedPerkItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     paddingVertical: 5,
   },
-  lockedPerkText: { fontSize: 14 },
-  upgradeBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 32,
-    width: '100%',
-  },
-  upgradeBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
 
-  bottomSpacer: { height: 20 },
+  bottomSpacer: { height: 30 },
 });

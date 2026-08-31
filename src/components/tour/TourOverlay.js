@@ -1,21 +1,21 @@
-// TourOverlay.js - Main overlay with spotlight effect
+// TourOverlay.js - Main overlay with spotlight effect (DBE burgundy restyle)
+// Scrim + cutout mechanics are unchanged; only the appearance changed:
+// theme.scrim overlay, radius-16 cutout, pulsing spotRing halo (baiSpot),
+// and all chrome (step counter / skip / mute) moved into the tooltip card.
 import React, { useEffect, useRef } from 'react';
 import {
     View,
     StyleSheet,
-    Dimensions,
-    TouchableOpacity,
     TouchableWithoutFeedback,
-    Text,
     Animated,
     Alert
 } from 'react-native';
 import { useTour } from './TourProvider';
+import { PulseHalo } from '../dbe';
 import TourTooltip from './TourTooltip';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const SPOTLIGHT_PADDING = 8;
-const SPOTLIGHT_BORDER_RADIUS = 12;
+const SPOTLIGHT_BORDER_RADIUS = 16;
 
 const TourOverlay = ({ theme }) => {
     const {
@@ -30,7 +30,6 @@ const TourOverlay = ({ theme }) => {
     } = useTour();
 
     const fadeAnim = useRef(new Animated.Value(0)).current;
-    const spotlightAnim = useRef(new Animated.Value(0)).current;
 
     // Fade in/out animation
     useEffect(() => {
@@ -48,17 +47,6 @@ const TourOverlay = ({ theme }) => {
             }).start();
         }
     }, [isTourActive, fadeAnim]);
-
-    // Spotlight transition animation
-    useEffect(() => {
-        if (targetMeasurement) {
-            Animated.timing(spotlightAnim, {
-                toValue: 1,
-                duration: 300,
-                useNativeDriver: false,
-            }).start();
-        }
-    }, [targetMeasurement, spotlightAnim]);
 
     const handleSkip = () => {
         Alert.alert(
@@ -90,8 +78,14 @@ const TourOverlay = ({ theme }) => {
     const spotlightWidth = targetMeasurement ? targetMeasurement.width + (SPOTLIGHT_PADDING * 2) : 0;
     const spotlightHeight = targetMeasurement ? targetMeasurement.height + (SPOTLIGHT_PADDING * 2) : 0;
 
-    const overlayColor = theme?.overlay || 'rgba(0, 0, 0, 0.85)';
-    const primaryColor = theme?.primary || '#FF6B00';
+    const overlayColor = theme?.scrim || 'rgba(6, 6, 8, 0.76)';
+    const ringColor = theme?.spotRing || 'rgba(212, 112, 122, 0.5)';
+
+    // PulseHalo scales uniformly, so derive the max scale from the smaller
+    // dimension to get roughly the mock's ~10px ring growth (baiSpot),
+    // clamped so wide targets don't fling the halo too far sideways.
+    const minDim = Math.max(1, Math.min(spotlightWidth, spotlightHeight));
+    const haloMaxScale = Math.min(1.2, Math.max(1.06, 1 + 20 / minDim));
 
     return (
         <Animated.View
@@ -160,20 +154,28 @@ const TourOverlay = ({ theme }) => {
                         pointerEvents={isTabStep ? "none" : "auto"}
                     />
 
-                    {/* Spotlight border (visual highlight) */}
+                    {/* Pulsing spotlight ring (baiSpot): expanding halo in
+                        theme.spotRing fading to transparent, 2.5s loop, plus a
+                        thin static ring to frame the cutout between pulses.
+                        Renders above the scrim, below the tooltip. */}
                     <View
-                        style={[
-                            styles.spotlightBorder,
-                            {
-                                top: spotlightY - 2,
-                                left: spotlightX - 2,
-                                width: spotlightWidth + 4,
-                                height: spotlightHeight + 4,
-                                borderColor: primaryColor,
-                            }
-                        ]}
+                        style={{
+                            position: 'absolute',
+                            top: spotlightY,
+                            left: spotlightX,
+                            width: spotlightWidth,
+                            height: spotlightHeight,
+                        }}
                         pointerEvents="none"
-                    />
+                    >
+                        <PulseHalo
+                            color={ringColor}
+                            borderRadius={SPOTLIGHT_BORDER_RADIUS}
+                            maxScale={haloMaxScale}
+                            duration={2500}
+                        />
+                        <View style={[styles.spotlightRing, { borderColor: ringColor }]} />
+                    </View>
 
                     {/* Touchable spotlight area - only for non-tab steps */}
                     {!isTabStep && (
@@ -204,27 +206,10 @@ const TourOverlay = ({ theme }) => {
                             height: spotlightHeight,
                         }}
                         theme={theme}
+                        onSkip={handleSkip}
                     />
                 </>
             )}
-
-            {/* Skip button */}
-            <TouchableOpacity
-                style={[styles.skipButton, { backgroundColor: theme?.card || '#1E1E1E' }]}
-                onPress={handleSkip}
-                activeOpacity={0.7}
-            >
-                <Text style={[styles.skipText, { color: theme?.textSecondary || '#B8B8B8' }]}>
-                    Skip Tour
-                </Text>
-            </TouchableOpacity>
-
-            {/* Step counter */}
-            <View style={[styles.stepCounter, { backgroundColor: theme?.card || '#1E1E1E' }]}>
-                <Text style={[styles.stepCounterText, { color: theme?.text || '#FFFFFF' }]}>
-                    {currentStepIndex + 1} of {totalSteps}
-                </Text>
-            </View>
 
             {/* Loading state while transitioning */}
             {isTransitioning && !targetMeasurement && (
@@ -247,38 +232,14 @@ const styles = StyleSheet.create({
     overlay: {
         position: 'absolute',
     },
-    spotlightBorder: {
-        position: 'absolute',
+    spotlightRing: {
+        ...StyleSheet.absoluteFillObject,
         borderWidth: 2,
-        borderRadius: SPOTLIGHT_BORDER_RADIUS + 2,
+        borderRadius: SPOTLIGHT_BORDER_RADIUS,
     },
     spotlightTouchable: {
         position: 'absolute',
         borderRadius: SPOTLIGHT_BORDER_RADIUS,
-    },
-    skipButton: {
-        position: 'absolute',
-        top: 60,
-        right: 20,
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderRadius: 20,
-    },
-    skipText: {
-        fontSize: 14,
-        fontWeight: '500',
-    },
-    stepCounter: {
-        position: 'absolute',
-        top: 60,
-        left: 20,
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 16,
-    },
-    stepCounterText: {
-        fontSize: 13,
-        fontWeight: '600',
     },
     loadingOverlay: {
         position: 'absolute',

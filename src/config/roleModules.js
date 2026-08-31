@@ -3,13 +3,19 @@
 // `key` doubles as the navigation target (every key is a screen registered for all
 // roles via addSharedScreensToStack in SharedStackNavigator.js).
 // `feature` maps to the subscription feature keys in utils/subscription.js for tier gating.
+//
+// NOTE: modules deliberately carry NO per-module colour. They used to hold nine
+// different hues (blue/green/purple/amber/sky/pink/cyan/violet), which is the exact
+// multicolour-category-tile pattern the design system names as its anti-reference and
+// forbids under the Never-A-Rainbow rule. Modules are told apart by icon and label;
+// ModuleGrid renders them all in the two system voices (accent = available,
+// steel = locked).
 
 export const MODULE_META = {
   ShotDNA: {
     key: 'ShotDNA',
     label: 'ShotDNA™',
     icon: 'scan-outline',
-    color: '#FF6B00',
     feature: 'shotDNA',
     description: 'Shooting biomechanics & archetype',
   },
@@ -17,7 +23,6 @@ export const MODULE_META = {
     key: 'EvalRank',
     label: 'EvalRank™',
     icon: 'stats-chart',
-    color: '#3B82F6',
     feature: 'evalRank',
     description: 'Grade, stats & progress',
   },
@@ -25,7 +30,6 @@ export const MODULE_META = {
     key: 'Blueprint360',
     label: 'Blueprint360™',
     icon: 'map-outline',
-    color: '#22C55E',
     feature: 'blueprint360',
     description: 'Your plan & workouts',
   },
@@ -33,7 +37,6 @@ export const MODULE_META = {
     key: 'SimCoach',
     label: 'SimCoach™',
     icon: 'game-controller-outline',
-    color: '#A855F7',
     feature: 'simCoach',
     description: 'Basketball IQ & game plans',
   },
@@ -41,7 +44,6 @@ export const MODULE_META = {
     key: 'ScoutLab',
     label: 'ScoutLab™',
     icon: 'search-outline',
-    color: '#F59E0B',
     feature: 'scoutLab',
     description: 'Recruiting exposure (player)',
   },
@@ -49,7 +51,6 @@ export const MODULE_META = {
     key: 'ScoutLabSearch',
     label: 'Prospect Search',
     icon: 'search-outline',
-    color: '#F59E0B',
     feature: 'scoutLab',
     description: 'Discover & search prospects',
   },
@@ -57,7 +58,6 @@ export const MODULE_META = {
     key: 'ScoutReports',
     label: 'Reports',
     icon: 'document-text-outline',
-    color: '#0EA5E9',
     feature: 'scoutLab',
     description: 'Scouting reports',
   },
@@ -65,7 +65,6 @@ export const MODULE_META = {
     key: 'ParentScoutLab',
     label: 'Recruiting',
     icon: 'megaphone-outline',
-    color: '#F59E0B',
     feature: 'parentRecruiting', // unmapped in subscription.js → free (consent is never paywalled)
     description: "Child's recruiting & visibility",
   },
@@ -73,7 +72,6 @@ export const MODULE_META = {
     key: 'CoachMarket',
     label: 'CoachMarket™',
     icon: 'storefront-outline',
-    color: '#EC4899',
     feature: 'coachMarket',
     description: 'Coaching marketplace',
   },
@@ -81,7 +79,6 @@ export const MODULE_META = {
     key: 'HoopCommunity',
     label: 'HoopCommunity™',
     icon: 'people-outline',
-    color: '#06B6D4',
     feature: 'hoopCommunity',
     description: 'Challenges & community',
   },
@@ -89,7 +86,6 @@ export const MODULE_META = {
     key: 'LegacyVault',
     label: 'LegacyVault™',
     icon: 'library-outline',
-    color: '#8B5CF6',
     feature: 'legacyVault',
     description: 'Knowledge library',
   },
@@ -103,9 +99,10 @@ export const ROLE_MODULES = {
   // Fold hosts lead: Blueprint360 (Training), EvalRank (Progress), HoopCommunity (Challenges).
   player: ['Blueprint360', 'EvalRank', 'HoopCommunity', 'ShotDNA', 'SimCoach', 'ScoutLab', 'CoachMarket', 'LegacyVault'],
   coach: ['SimCoach', 'CoachMarket', 'HoopCommunity', 'LegacyVault'],
-  // Coach sub-types diverge: org coaches are team/IQ-centric (SimCoach), skills
-  // trainers are marketplace-centric (CoachMarket).
-  coachOrg: ['SimCoach', 'HoopCommunity', 'LegacyVault'],
+  // Coach sub-types diverge in emphasis: org coaches are team/IQ-centric (SimCoach
+  // leads), skills trainers are marketplace-centric (CoachMarket leads). Org coaches
+  // still get CoachMarket, but as a secondary tool (listed after their primary).
+  coachOrg: ['SimCoach', 'HoopCommunity', 'CoachMarket', 'LegacyVault'],
   coachTrainer: ['CoachMarket', 'HoopCommunity', 'LegacyVault'],
   scout: ['ScoutLabSearch', 'ScoutReports', 'HoopCommunity', 'LegacyVault'],
   parent: ['ParentScoutLab', 'HoopCommunity', 'LegacyVault'],

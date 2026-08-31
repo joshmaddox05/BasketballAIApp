@@ -495,12 +495,12 @@ const AllChallengesScreen = ({ navigation }) => {
 
     const getCategoryColor = (category) => {
         switch (category?.toLowerCase()) {
-            case 'shooting': return '#FF6B00';
+            case 'shooting': return '#8A1C22';
             case 'dribbling': return '#4CAF50';
             case 'physical': return '#2196F3';
             case 'defense': return '#9C27B0';
             case 'passing': return '#FF9800';
-            default: return '#FF6B00';
+            default: return '#8A1C22';
         }
     };
 

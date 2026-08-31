@@ -1,67 +1,70 @@
-// FeaturesIntroScreen.js
+// FeaturesIntroScreen.js — first-run feature carousel.
+//
+// Ported onto the burgundy system: theme colours (this screen used to be a hard-coded
+// white slab that ignored dark mode entirely), TYPE presets, SHAPE radii, the dbe
+// button voices, and no shadow.
+//
+// IMAGERY: each slide used to declare a `source` image, but the render checked
+// `item.image` — a key that never existed — so the photography never appeared and every
+// slide fell through to a flat colour placeholder. The four assets are also byte-
+// identical (one file copied under four names), so wiring `source` in would have shown
+// the same picture four times. The icon-led hero is deliberate until distinct per-feature
+// artwork exists; reintroduce it here when it does.
 import React, { useState, useRef } from 'react';
 import {
     StyleSheet,
     Text,
     View,
-    TouchableOpacity,
-    ScrollView,
     Animated,
     Dimensions,
-    Image,
     SafeAreaView,
-    Alert
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAppContext } from '../../context/AppContext';
-import welcomeBackground from '../../../assets/welcome-background.jpg'
-import featureTraining from '../../../assets/feature-training.jpg'
-import featureProgress from '../../../assets/feature-progress.jpg'
-import featureCommunity from '../../../assets/feature-community.jpg'
+import { PrimaryButton, OutlineButton } from '../../components/dbe';
+import { TYPE, SHAPE } from '../../utils/typography';
 
 const { width, height } = Dimensions.get('window');
 
+// No per-feature colour: differentiation is the icon and the words. Four hues here
+// (green / blue / purple alongside the burgundy) was the multicolour-category-tile
+// pattern the design system names as its anti-reference.
 const FEATURES = [
     {
         id: '1',
         title: 'AI Shooting Analysis',
         description: 'Get professional feedback on your shooting form with our AI-powered analysis. Upload a video and receive personalized tips to improve your technique.',
         icon: 'analytics',
-        color: '#FF6B00',
-        source: welcomeBackground
     },
     {
         id: '2',
         title: 'Personalized Training',
         description: 'Access custom workout plans based on your skill level, goals, and schedule. Each training plan is designed to help you improve efficiently.',
         icon: 'fitness',
-        color: '#4CAF50',
-        source: featureTraining
     },
     {
         id: '3',
         title: 'Progress Tracking',
         description: 'Monitor your improvement with detailed statistics and visualizations. Set goals, track achievements, and see your skills develop over time.',
         icon: 'stats-chart',
-        color: '#2196F3',
-        source: featureProgress
     },
     {
         id: '4',
         title: 'Community & Challenges',
         description: 'Join a community of basketball enthusiasts, participate in challenges, and learn from others. Share your progress and get motivated!',
         icon: 'people',
-        color: '#9C27B0',
-        source: featureCommunity
     }
 ];
 
 const FeaturesIntroScreen = ({ navigation }) => {
-    const { completeOnboarding } = useAppContext();
+    const { theme, isDarkMode } = useAppContext();
     const [currentIndex, setCurrentIndex] = useState(0);
     const flatListRef = useRef(null);
     const scrollX = useRef(new Animated.Value(0)).current;
+
+    const isLast = currentIndex === FEATURES.length - 1;
 
     const handleNext = () => {
         if (currentIndex < FEATURES.length - 1) {
@@ -84,30 +87,33 @@ const FeaturesIntroScreen = ({ navigation }) => {
         });
     };
 
-    const renderFeatureItem = ({ item, index }) => {
+    const renderFeatureItem = ({ item }) => {
         return (
             <View style={styles.featureItem}>
-                <View style={styles.featureImageContainer}>
-                    {item.image ? (
-                        <Image source={item.image} style={styles.featureImage} />
-                    ) : (
-                        <View style={[styles.featureImagePlaceholder, { backgroundColor: item.color }]}>
-                            <Ionicons name={item.icon} size={60} color="#FFF" />
-                        </View>
-                    )}
-                </View>
+                {/* Hero panel — the system's burgundy gradient, one voice for every
+                    slide. The icon appears once, here; it used to be repeated at 30dp
+                    in the card below as well. */}
+                <LinearGradient
+                    colors={theme.heroGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.featureHero}
+                >
+                    <Ionicons name={item.icon} size={60} color="#FFFFFF" />
+                </LinearGradient>
 
-                <View style={styles.featureInfo}>
-                    <View
-                        style={[
-                            styles.featureIconContainer,
-                            { backgroundColor: `${item.color}20` }
-                        ]}
-                    >
-                        <Ionicons name={item.icon} size={30} color={item.color} />
-                    </View>
-                    <Text style={styles.featureTitle}>{item.title}</Text>
-                    <Text style={styles.featureDescription}>{item.description}</Text>
+                <View
+                    style={[
+                        styles.featureInfo,
+                        { backgroundColor: theme.surface, borderColor: theme.hairline },
+                    ]}
+                >
+                    <Text style={[TYPE.screenTitle, styles.featureTitle, { color: theme.text }]}>
+                        {item.title}
+                    </Text>
+                    <Text style={[TYPE.tooltipBody, styles.featureDescription, { color: theme.textMuted }]}>
+                        {item.description}
+                    </Text>
                 </View>
             </View>
         );
@@ -115,8 +121,17 @@ const FeaturesIntroScreen = ({ navigation }) => {
 
     const renderPagination = () => {
         return (
-            <View style={styles.paginationContainer}>
-                <View style={styles.dotsContainer}>
+            <View
+                style={[
+                    styles.paginationContainer,
+                    { backgroundColor: theme.background, borderTopColor: theme.hairline },
+                ]}
+            >
+                <View
+                    style={styles.dotsContainer}
+                    accessibilityRole="adjustable"
+                    accessibilityLabel={`Page ${currentIndex + 1} of ${FEATURES.length}`}
+                >
                     {FEATURES.map((_, index) => {
                         const inputRange = [
                             (index - 1) * width,
@@ -124,9 +139,13 @@ const FeaturesIntroScreen = ({ navigation }) => {
                             (index + 1) * width
                         ];
 
-                        const dotWidth = scrollX.interpolate({
+                        // scaleX off a fixed 16dp base rather than animating `width`.
+                        // Driving width from scroll position forced the whole scroll
+                        // Animated.event off the native driver, so every scroll frame
+                        // crossed the bridge and relaid out the dot row.
+                        const dotScaleX = scrollX.interpolate({
                             inputRange,
-                            outputRange: [8, 16, 8],
+                            outputRange: [0.5, 1, 0.5],
                             extrapolate: 'clamp'
                         });
 
@@ -136,15 +155,21 @@ const FeaturesIntroScreen = ({ navigation }) => {
                             extrapolate: 'clamp'
                         });
 
+                        // One dot colour, with opacity carrying active/inactive. The old
+                        // version snapped backgroundColor off `currentIndex` while the
+                        // width interpolated, so the colour jumped mid-swipe.
                         return (
                             <Animated.View
                                 key={index}
                                 style={[
                                     styles.dot,
                                     {
-                                        width: dotWidth,
+                                        // accentText, not primary: burgundy on the dark
+                                        // room is 2.05:1 — effectively invisible. This token
+                                        // is burgundy on light and Signal Rose on dark.
+                                        backgroundColor: theme.accentText,
                                         opacity: dotOpacity,
-                                        backgroundColor: currentIndex === index ? '#FF6B00' : '#CCC'
+                                        transform: [{ scaleX: dotScaleX }]
                                     }
                                 ]}
                             />
@@ -152,31 +177,31 @@ const FeaturesIntroScreen = ({ navigation }) => {
                     })}
                 </View>
 
+                {/* Affirmative action is the solid primary and sits on the right. */}
                 <View style={styles.paginationButtons}>
-                    {currentIndex < FEATURES.length - 1 ? (
-                        <>
-                            <TouchableOpacity
-                                style={styles.skipButton}
-                                onPress={handleSkip}
-                            >
-                                <Text style={styles.skipButtonText}>Skip</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={styles.nextButton}
-                                onPress={handleNext}
-                            >
-                                <Text style={styles.nextButtonText}>Next</Text>
-                                <Ionicons name="arrow-forward" size={20} color="#FFF" />
-                            </TouchableOpacity>
-                        </>
-                    ) : (
-                        <TouchableOpacity
-                            style={styles.getStartedButton}
+                    {isLast ? (
+                        <PrimaryButton
+                            label="Get Started"
                             onPress={handleNext}
-                        >
-                            <Text style={styles.getStartedButtonText}>Get Started</Text>
-                        </TouchableOpacity>
+                            style={styles.fullWidthButton}
+                            accessibilityHint="Finishes the introduction"
+                        />
+                    ) : (
+                        <>
+                            <OutlineButton
+                                label="Skip"
+                                onPress={handleSkip}
+                                style={styles.splitButton}
+                                accessibilityHint="Jumps to the last feature"
+                            />
+                            <View style={{ width: SHAPE.gridGap }} />
+                            <PrimaryButton
+                                label="Next"
+                                iconRight="arrow-forward"
+                                onPress={handleNext}
+                                style={styles.splitButton}
+                            />
+                        </>
                     )}
                 </View>
             </View>
@@ -184,8 +209,10 @@ const FeaturesIntroScreen = ({ navigation }) => {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor="#FFF" />
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+            {/* expo-status-bar takes `style`, not RN's `barStyle` — the old prop was
+                silently ignored, so the bar never followed the theme. */}
+            <StatusBar style={isDarkMode ? 'light' : 'dark'} />
 
             <Animated.FlatList
                 ref={flatListRef}
@@ -197,7 +224,7 @@ const FeaturesIntroScreen = ({ navigation }) => {
                 showsHorizontalScrollIndicator={false}
                 onScroll={Animated.event(
                     [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-                    { useNativeDriver: false }
+                    { useNativeDriver: true }
                 )}
                 onMomentumScrollEnd={(event) => {
                     const index = Math.round(event.nativeEvent.contentOffset.x / width);
@@ -215,10 +242,11 @@ const FeaturesIntroScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#FFF',
     },
     flatListContent: {
-        alignItems: 'center',
+        // Cross-axis stretch, not center: centering left a dead band of room above the
+        // hero, so the burgundy plane floated with a hard edge instead of anchoring.
+        alignItems: 'stretch',
     },
     featureItem: {
         width: width,
@@ -226,65 +254,37 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-start',
         alignItems: 'center',
     },
-    featureImageContainer: {
+    featureHero: {
         width: '100%',
-        height: height * 0.45,
-    },
-    featureImage: {
-        width: '100%',
-        height: '100%',
-        resizeMode: 'cover',
-    },
-    featureImagePlaceholder: {
-        width: '100%',
-        height: '100%',
+        // 0.52, not 0.45: with the item top-anchored the shorter hero left a band of
+        // dead room between the card and the control bar that read as unfinished.
+        height: height * 0.52,
         justifyContent: 'center',
         alignItems: 'center',
     },
     featureInfo: {
         width: '90%',
-        backgroundColor: '#FFF',
-        borderRadius: 16,
+        borderRadius: SHAPE.radiusHero,
+        borderWidth: 1,
         padding: 24,
         marginTop: -30,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
         alignItems: 'center',
-    },
-    featureIconContainer: {
-        width: 70,
-        height: 70,
-        borderRadius: 35,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 16,
     },
     featureTitle: {
-        fontSize: 22,
-        fontWeight: 'bold',
-        color: '#333',
         marginBottom: 12,
         textAlign: 'center',
     },
     featureDescription: {
-        fontSize: 16,
-        color: '#666',
         textAlign: 'center',
-        lineHeight: 24,
     },
     paginationContainer: {
         position: 'absolute',
         bottom: 0,
         left: 0,
         right: 0,
-        paddingHorizontal: 24,
+        paddingHorizontal: SHAPE.screenPadding,
         paddingVertical: 20,
-        backgroundColor: '#FFF',
         borderTopWidth: 1,
-        borderTopColor: '#EEE',
     },
     dotsContainer: {
         flexDirection: 'row',
@@ -293,49 +293,18 @@ const styles = StyleSheet.create({
         marginBottom: 24,
     },
     dot: {
+        width: 16, // fixed base; the inactive state is scaleX 0.5 of this
         height: 8,
-        borderRadius: 4,
+        borderRadius: SHAPE.radiusPill,
         marginHorizontal: 4,
     },
     paginationButtons: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
     },
-    skipButton: {
-        paddingVertical: 12,
-    },
-    skipButtonText: {
-        fontSize: 16,
-        color: '#666',
-        fontWeight: '500',
-    },
-    nextButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#FF6B00',
-        paddingVertical: 12,
-        paddingHorizontal: 24,
-        borderRadius: 8,
-    },
-    nextButtonText: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#FFF',
-        marginRight: 8,
-    },
-    getStartedButton: {
-        backgroundColor: '#FF6B00',
-        paddingVertical: 16,
-        borderRadius: 8,
-        width: '100%',
-        alignItems: 'center',
-    },
-    getStartedButtonText: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#FFF',
-    },
+    // minHeight clears the 44pt touch-target floor on its own.
+    splitButton: { flex: 1, minHeight: 44 },
+    fullWidthButton: { flex: 1, minHeight: 44 },
 });
 
 export default FeaturesIntroScreen;

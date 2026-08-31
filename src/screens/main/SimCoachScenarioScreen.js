@@ -1,4 +1,5 @@
-// SimCoachScenarioScreen.js - Athlete views coach game plan on court and responds tactically
+// SimCoachScenarioScreen.js - Athlete views coach game plan on court and responds
+// tactically. DBE burgundy redesign (mock 11c) — presentation only.
 import React, { useState, useCallback } from 'react';
 import {
   SafeAreaView,
@@ -15,6 +16,8 @@ import { saveSimCoachResult } from '../../services/firestoreService';
 import { getCurrentUser } from '../../services/authService';
 import { getScenarioById } from '../../data/simCoachScenarios';
 import BasketballHalfCourt from '../../components/features/BasketballHalfCourt';
+import { TYPE, FONTS, SHAPE } from '../../utils/typography';
+import { ScreenHeader, Entrance, Float } from '../../components/dbe';
 
 // ─── Court Diagram ────────────────────────────────────────────────────────────
 const OFFENSIVE_POSITIONS = [
@@ -38,45 +41,60 @@ function CourtDiagram({ theme }) {
   const H = 170;
 
   return (
-    <View style={[styles.courtWrapper, { borderColor: theme.border }]}>
-      <View style={[styles.courtInner, { width: W, height: H }]}>
+    <View
+      style={{
+        borderRadius: SHAPE.radiusCard,
+        backgroundColor: theme.surface2,
+        padding: 14,
+        alignItems: 'center',
+        marginTop: 14,
+      }}
+    >
+      <View style={{ width: W, height: H, borderRadius: 8, overflow: 'hidden' }}>
         {/* Basketball half-court backdrop (SVG) */}
         <BasketballHalfCourt width={W} height={H} style={styles.courtSvg} />
 
+        {/* Offense speaks steel, defense speaks burgundy (mock 11c). */}
         {OFFENSIVE_POSITIONS.map((p) => (
           <View
             key={p.id}
-            style={[styles.playerToken, styles.offToken, { left: p.x * W - 14, top: p.y * H - 14 }]}
+            style={[
+              styles.playerToken,
+              { backgroundColor: theme.steel, left: p.x * W - 12, top: p.y * H - 12 },
+            ]}
           >
-            <Text style={styles.tokenLabel}>{p.label}</Text>
+            <Text style={[styles.tokenLabel, { color: theme.background }]}>{p.label}</Text>
           </View>
         ))}
 
         {DEFENSIVE_POSITIONS.map((p) => (
           <View
             key={p.id}
-            style={[styles.playerToken, styles.defToken, { left: p.x * W - 14, top: p.y * H - 14 }]}
+            style={[
+              styles.playerToken,
+              { backgroundColor: theme.primary, left: p.x * W - 12, top: p.y * H - 12 },
+            ]}
           >
-            <Text style={styles.tokenLabelDef}>{p.label}</Text>
+            <Text style={[styles.tokenLabel, { color: '#FFFFFF' }]}>{p.label}</Text>
           </View>
         ))}
 
-        <View style={[styles.ball, { left: 0.5 * W - 9, top: 0.58 * H - 9 }]}>
-          <Ionicons name="basketball" size={16} color="#FF6B00" />
-        </View>
+        <Float style={[styles.ball, { left: 0.5 * W - 9, top: 0.58 * H - 9 }]}>
+          <Ionicons name="basketball" size={17} color={theme.primary} />
+        </Float>
       </View>
       <View style={styles.legendRow}>
         <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: '#3B82F6' }]} />
-          <Text style={[styles.legendText, { color: theme.textSecondary }]}>Offense</Text>
+          <View style={[styles.legendDot, { backgroundColor: theme.steel }]} />
+          <Text style={[TYPE.chipSmall, { color: theme.textDim }]}>Offense</Text>
         </View>
         <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: '#EF4444' }]} />
-          <Text style={[styles.legendText, { color: theme.textSecondary }]}>Defense</Text>
+          <View style={[styles.legendDot, { backgroundColor: theme.primary }]} />
+          <Text style={[TYPE.chipSmall, { color: theme.textDim }]}>Defense</Text>
         </View>
         <View style={styles.legendItem}>
-          <Ionicons name="basketball" size={10} color="#FF6B00" />
-          <Text style={[styles.legendText, { color: theme.textSecondary }]}>Ball</Text>
+          <Ionicons name="basketball" size={10} color={theme.primary} />
+          <Text style={[TYPE.chipSmall, { color: theme.textDim }]}>Ball</Text>
         </View>
       </View>
     </View>
@@ -138,58 +156,103 @@ export default function SimCoachScenarioScreen({ navigation, route }) {
     });
   }, [navigation, selectedAnswer, scenarioData]);
 
+  const isRight = selectedAnswer === scenarioData.correctIndex;
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <StatusBar style={isDarkMode ? 'light' : 'dark'} />
 
-      <View style={[styles.navHeader, { borderBottomColor: theme.border }]}>
-        <TouchableOpacity
-          style={[styles.backBtn, { backgroundColor: theme.card }]}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons name="chevron-back" size={22} color={theme.text} />
-        </TouchableOpacity>
-        <View style={styles.navCenter}>
-          <Text style={[styles.navCategory, { color: theme.textSecondary }]} numberOfLines={1}>
-            {scenario.coachName || 'Game Plan'}
-          </Text>
-          <Text style={[styles.navTitle, { color: theme.text }]} numberOfLines={1}>
-            {scenarioData.title}
-          </Text>
-        </View>
-        <View style={[styles.categoryPill, { backgroundColor: theme.primary + '18' }]}>
-          <Text style={[styles.categoryPillText, { color: theme.primary }]}>{scenarioData.category}</Text>
-        </View>
-      </View>
+      <ScreenHeader
+        title="SimCoach"
+        subtitle={scenario.coachName || null}
+        onBack={() => navigation.goBack()}
+      />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* Category badge + scenario title */}
+        <View
+          style={{
+            alignSelf: 'flex-start',
+            paddingHorizontal: 9,
+            paddingVertical: 3,
+            borderRadius: 7,
+            backgroundColor: theme.badgeFill,
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: FONTS.bodyBold,
+              fontSize: 10,
+              letterSpacing: 0.6,
+              textTransform: 'uppercase',
+              color: theme.accentText,
+            }}
+          >
+            {scenarioData.category}
+          </Text>
+        </View>
+        <Text
+          style={{
+            fontFamily: FONTS.heading,
+            fontSize: 22,
+            lineHeight: 25,
+            color: theme.text,
+            marginTop: 9,
+          }}
+          numberOfLines={2}
+        >
+          {scenarioData.title}
+        </Text>
+
         {/* Court Diagram */}
         <CourtDiagram theme={theme} />
 
         {/* Play Steps */}
-        <View style={[styles.stepsCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <View style={styles.stepsHeader}>
-            <Ionicons name="list-outline" size={16} color={theme.primary} />
-            <Text style={[styles.stepsHeaderText, { color: theme.primary }]}>PLAY BREAKDOWN</Text>
-          </View>
-          {scenarioData.playSteps.map((step, i) => (
-            <View key={i} style={styles.stepRow}>
-              <View style={[styles.stepNum, { backgroundColor: theme.primary + '18' }]}>
-                <Text style={[styles.stepNumText, { color: theme.primary }]}>{i + 1}</Text>
+        {(scenarioData.playSteps || []).length > 0 && (
+          <View
+            style={{
+              borderRadius: SHAPE.radiusTile,
+              backgroundColor: theme.surface,
+              padding: SHAPE.cardPadding,
+              marginTop: 14,
+            }}
+          >
+            <Text style={[TYPE.sectionLabel, { color: theme.textDim, marginBottom: 10 }]}>
+              Play breakdown
+            </Text>
+            {scenarioData.playSteps.map((step, i) => (
+              <View key={i} style={styles.stepRow}>
+                <View style={[styles.stepNum, { backgroundColor: theme.badgeFill }]}>
+                  <Text style={[TYPE.chip, { color: theme.accentText }]}>{i + 1}</Text>
+                </View>
+                <Text
+                  style={{
+                    flex: 1,
+                    fontFamily: FONTS.bodySemiBold,
+                    fontSize: 12.5,
+                    lineHeight: 17,
+                    color: theme.textMuted,
+                  }}
+                >
+                  {step}
+                </Text>
               </View>
-              <Text style={[styles.stepText, { color: theme.text }]}>{step}</Text>
-            </View>
-          ))}
-        </View>
+            ))}
+          </View>
+        )}
 
         {/* Question */}
-        <View style={[styles.questionCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <View style={styles.questionHeader}>
-            <Ionicons name="help-circle-outline" size={16} color={theme.primary} />
-            <Text style={[styles.questionHeaderText, { color: theme.primary }]}>YOUR RESPONSE</Text>
-          </View>
-          <Text style={[styles.questionText, { color: theme.text }]}>{scenarioData.question}</Text>
-        </View>
+        <Text
+          style={{
+            fontFamily: FONTS.bodySemiBold,
+            fontSize: 13.5,
+            lineHeight: 20,
+            color: theme.text,
+            marginTop: 16,
+          }}
+        >
+          {scenarioData.question}
+        </Text>
 
         {/* Options */}
         <View style={styles.optionsSection}>
@@ -199,62 +262,133 @@ export default function SimCoachScenarioScreen({ navigation, route }) {
             const showCorrect = submitted && isCorrect;
             const showWrong = submitted && isSelected && !isCorrect;
 
-            let bg = theme.card;
-            let border = theme.border;
-            let textColor = theme.text;
+            let bg = theme.surface;
+            let borderColor = theme.hairline;
+            let borderWidth = 1;
+            let discBg = 'transparent';
+            let discBorder = theme.hairline;
+            let discText = theme.textDim;
+            let textColor = theme.textMuted;
 
-            if (showCorrect) { bg = '#22C55E18'; border = '#22C55E'; textColor = '#22C55E'; }
-            else if (showWrong) { bg = '#EF444418'; border = '#EF4444'; textColor = '#EF4444'; }
-            else if (isSelected && !submitted) { bg = theme.primary + '18'; border = theme.primary; textColor = theme.primary; }
+            if (showCorrect) {
+              bg = theme.success + '14';
+              borderColor = theme.success;
+              borderWidth = 1.5;
+              discBg = theme.success;
+              discBorder = theme.success;
+              discText = '#FFFFFF';
+              textColor = theme.text;
+            } else if (showWrong) {
+              bg = theme.error + '14';
+              borderColor = theme.error;
+              borderWidth = 1.5;
+              discBg = theme.error;
+              discBorder = theme.error;
+              discText = '#FFFFFF';
+              textColor = theme.text;
+            } else if (isSelected) {
+              bg = theme.attentionFill;
+              borderColor = theme.primary;
+              borderWidth = 1.5;
+              discBg = theme.primary;
+              discBorder = theme.primary;
+              discText = '#FFFFFF';
+              textColor = theme.text;
+            }
 
             return (
-              <TouchableOpacity
-                key={option.label}
-                style={[styles.optionBtn, { backgroundColor: bg, borderColor: border }]}
-                onPress={() => !submitted && setSelectedAnswer(idx)}
-                activeOpacity={submitted ? 1 : 0.75}
-                disabled={submitted}
-              >
-                <View style={[styles.optionLabelCircle, { borderColor: border, backgroundColor: border + '30' }]}>
-                  <Text style={[styles.optionLabel, { color: textColor }]}>{option.label}</Text>
-                </View>
-                <Text style={[styles.optionText, { color: textColor }]}>{option.text}</Text>
-                {showCorrect && <Ionicons name="checkmark-circle" size={20} color="#22C55E" />}
-                {showWrong && <Ionicons name="close-circle" size={20} color="#EF4444" />}
-              </TouchableOpacity>
+              <Entrance key={option.label} variant="chipPop" delay={idx * 80}>
+                <TouchableOpacity
+                  style={[styles.optionBtn, { backgroundColor: bg, borderColor, borderWidth }]}
+                  onPress={() => !submitted && setSelectedAnswer(idx)}
+                  activeOpacity={submitted ? 1 : 0.75}
+                  disabled={submitted}
+                >
+                  <View
+                    style={[
+                      styles.optionLabelCircle,
+                      { backgroundColor: discBg, borderColor: discBorder },
+                    ]}
+                  >
+                    <Text style={{ fontFamily: FONTS.bodyExtraBold, fontSize: 11, color: discText }}>
+                      {option.label}
+                    </Text>
+                  </View>
+                  <Text
+                    style={{
+                      flex: 1,
+                      fontFamily: FONTS.bodySemiBold,
+                      fontSize: 12.5,
+                      lineHeight: 17,
+                      color: textColor,
+                    }}
+                  >
+                    {option.text}
+                  </Text>
+                  {showCorrect && <Ionicons name="checkmark-circle" size={18} color={theme.success} />}
+                  {showWrong && <Ionicons name="close-circle" size={18} color={theme.error} />}
+                </TouchableOpacity>
+              </Entrance>
             );
           })}
         </View>
 
         {/* Feedback */}
         {submitted && (
-          <View style={[styles.feedbackCard, {
-            backgroundColor: selectedAnswer === scenarioData.correctIndex ? '#22C55E12' : '#EF444412',
-            borderColor: selectedAnswer === scenarioData.correctIndex ? '#22C55E' : '#EF4444',
-          }]}>
+          <Entrance
+            variant="pop"
+            style={{
+              borderRadius: SHAPE.radiusTile,
+              borderWidth: 1,
+              backgroundColor: theme.surface,
+              borderColor: isRight ? theme.success : theme.error,
+              padding: SHAPE.cardPadding,
+              marginTop: 14,
+            }}
+          >
             <View style={styles.feedbackHeader}>
               <Ionicons
-                name={selectedAnswer === scenarioData.correctIndex ? 'checkmark-circle' : 'close-circle'}
-                size={20}
-                color={selectedAnswer === scenarioData.correctIndex ? '#22C55E' : '#EF4444'}
+                name={isRight ? 'checkmark-circle' : 'close-circle'}
+                size={18}
+                color={isRight ? theme.success : theme.error}
               />
-              <Text style={[styles.feedbackTitle, { color: selectedAnswer === scenarioData.correctIndex ? '#22C55E' : '#EF4444' }]}>
-                {selectedAnswer === scenarioData.correctIndex ? "Correct Read!" : "Not Quite"}
+              <Text
+                style={{
+                  fontFamily: FONTS.heading,
+                  fontSize: 14,
+                  color: isRight ? theme.success : theme.error,
+                }}
+              >
+                {isRight ? 'Correct Read!' : 'Not Quite'}
               </Text>
             </View>
-            <Text style={[styles.feedbackText, { color: theme.text }]}>{scenarioData.explanation}</Text>
-          </View>
+            <Text
+              style={{
+                fontFamily: FONTS.body,
+                fontSize: 12.5,
+                lineHeight: 18,
+                color: theme.textMuted,
+                marginTop: 7,
+              }}
+            >
+              {scenarioData.explanation}
+            </Text>
+          </Entrance>
         )}
 
         {/* Action button */}
         {!submitted ? (
           <TouchableOpacity
-            style={[styles.actionBtn, { backgroundColor: selectedAnswer !== null ? theme.primary : theme.border }]}
+            style={[
+              styles.actionBtn,
+              { backgroundColor: selectedAnswer !== null ? theme.primary : theme.buttonDisabled },
+            ]}
             onPress={handleSubmit}
             disabled={selectedAnswer === null || saving}
             activeOpacity={selectedAnswer !== null ? 0.85 : 1}
           >
-            <Text style={styles.actionBtnText}>Submit Response</Text>
+            <Text style={styles.actionBtnText}>Submit answer</Text>
+            <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
@@ -262,8 +396,8 @@ export default function SimCoachScenarioScreen({ navigation, route }) {
             onPress={handleFinish}
             activeOpacity={0.85}
           >
-            <Text style={styles.actionBtnText}>View Results</Text>
-            <Ionicons name="arrow-forward" size={18} color="#fff" />
+            <Text style={styles.actionBtnText}>View results</Text>
+            <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
           </TouchableOpacity>
         )}
 
@@ -277,78 +411,66 @@ export default function SimCoachScenarioScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   container: { flex: 1 },
 
-  navHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    gap: 10,
+  scrollContent: {
+    paddingHorizontal: SHAPE.screenPadding,
+    paddingTop: 14,
+    paddingBottom: 40,
   },
-  backBtn: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
-  navCenter: { flex: 1 },
-  navCategory: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.6 },
-  navTitle: { fontSize: 14, fontWeight: '700', marginTop: 1 },
-  categoryPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  categoryPillText: { fontSize: 11, fontWeight: '700' },
 
-  scrollContent: { padding: 16, paddingBottom: 40 },
-
-  courtWrapper: {
-    borderRadius: 14,
-    padding: 12,
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  courtInner: {
-    position: 'relative',
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
   courtSvg: { position: 'absolute', top: 0, left: 0 },
-  playerToken: { position: 'absolute', width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  offToken: { backgroundColor: '#3B82F6', borderWidth: 1.5, borderColor: '#1D4ED8' },
-  defToken: { backgroundColor: '#EF4444', borderWidth: 1.5, borderColor: '#B91C1C' },
-  tokenLabel: { color: '#fff', fontSize: 11, fontWeight: '900' },
-  tokenLabelDef: { color: '#fff', fontSize: 10, fontWeight: '900' },
+  playerToken: {
+    position: 'absolute',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tokenLabel: { fontFamily: FONTS.bodyExtraBold, fontSize: 11 },
   ball: { position: 'absolute', width: 18, height: 18 },
 
-  legendRow: { flexDirection: 'row', gap: 16, marginTop: 8 },
+  legendRow: { flexDirection: 'row', gap: 16, marginTop: 10 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  legendDot: { width: 10, height: 10, borderRadius: 5 },
-  legendText: { fontSize: 10 },
+  legendDot: { width: 9, height: 9, borderRadius: 5 },
 
-  stepsCard: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 12 },
-  stepsHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
-  stepsHeaderText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
   stepRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 10 },
-  stepNum: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
-  stepNumText: { fontSize: 11, fontWeight: '800' },
-  stepText: { flex: 1, fontSize: 13, lineHeight: 19 },
+  stepNum: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
 
-  questionCard: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 14 },
-  questionHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
-  questionHeaderText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
-  questionText: { fontSize: 15, lineHeight: 22 },
+  optionsSection: { gap: SHAPE.cardGap, marginTop: 14 },
+  optionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 11,
+    paddingVertical: 12,
+    paddingHorizontal: 13,
+    gap: 10,
+  },
+  optionLabelCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 
-  optionsSection: { gap: 10, marginBottom: 14 },
-  optionBtn: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1.5, padding: 14, gap: 12 },
-  optionLabelCircle: { width: 28, height: 28, borderRadius: 14, borderWidth: 1.5, justifyContent: 'center', alignItems: 'center' },
-  optionLabel: { fontSize: 13, fontWeight: '800' },
-  optionText: { flex: 1, fontSize: 14, lineHeight: 20 },
-
-  feedbackCard: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 14 },
-  feedbackHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
-  feedbackTitle: { fontSize: 15, fontWeight: '800' },
-  feedbackText: { fontSize: 14, lineHeight: 21 },
+  feedbackHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
 
   actionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 16,
-    borderRadius: 14,
+    justifyContent: 'space-between',
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    borderRadius: SHAPE.radiusTile,
+    marginTop: 16,
   },
-  actionBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  actionBtnText: { color: '#FFFFFF', fontFamily: FONTS.bodyExtraBold, fontSize: 14.5 },
 });

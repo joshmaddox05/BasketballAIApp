@@ -3,4 +3,4 @@ export { TourProvider, useTour } from './TourProvider';
 export { default as TourOverlay } from './TourOverlay';
 export { default as TourTooltip } from './TourTooltip';
 export { default as TourStep } from './TourStep';
-export { TOUR_STEPS } from './tourConfig';
+export { TOUR_STEPS, getCoachTourSteps } from './tourConfig';

@@ -26,6 +26,7 @@ import { getAthleteAssignments, updateAssignmentStatus, getAthleteSessions, upda
 import { comprehensiveWorkouts } from '../../data/workouts';
 import ModuleGrid from '../../components/features/ModuleGrid';
 import { getModulesForRole } from '../../config/roleModules';
+import { Entrance, EmptyState } from '../../components/dbe';
 
 const shootingThumbnail = require('../../../assets/shooting-thumbnail.jpg');
 const dribblingThumbnail = require('../../../assets/dribbling-thumbnail.png');
@@ -228,14 +229,30 @@ function DBEHub({ shotDNAProfile, evalRankScore, simCoachIQScore, subscription, 
       </View>
 
       {/* Module hub — the app's primary surface. Training / Progress / Challenges now live
-          inside Blueprint360 / EvalRank / HoopCommunity, so the grid is the full catalog. */}
+          inside Blueprint360 / EvalRank / HoopCommunity, so the grid is the full catalog.
+
+          subtitleFor says what is waiting inside each module, which is a different axis
+          from the pipeline strip above (what you scored) — so the two do not repeat each
+          other. Only states we actually hold are claimed; everything else falls back to
+          the module's own description rather than inventing a number. */}
       <ModuleGrid
         title="Explore Modules"
-        layout="grid"
         modules={getModulesForRole('player')}
         subscription={subscription}
         theme={theme}
         navigation={navigation}
+        subtitleFor={(mod) => {
+          if (mod.key === 'ShotDNA') {
+            return shotDNAProfile ? 'Archetype on file' : 'Scan your shot to begin';
+          }
+          if (mod.key === 'EvalRank') {
+            return evalRankScore?.overallGrade ? 'Scorecard ready' : 'Train to earn your first grade';
+          }
+          if (mod.key === 'SimCoach') {
+            return simCoachIQScore ? 'Scenarios ready' : 'Test your read of the game';
+          }
+          return null;
+        }}
       />
     </View>
   );
@@ -254,20 +271,13 @@ const dbeStyles = StyleSheet.create({
 
 function EmptyWorkoutsState({ theme, onPress }) {
   return (
-    <View style={[styles.emptyState, { backgroundColor: theme.card, borderColor: theme.border }]}>
-      <Ionicons name="basketball-outline" size={40} color={theme.textSecondary} />
-      <Text style={[styles.emptyTitle, { color: theme.text }]}>No completed workouts yet</Text>
-      <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
-        Start with Beginner Shooting Basics to build your foundation.
-      </Text>
-      <TouchableOpacity
-        style={[styles.emptyBtn, { backgroundColor: theme.primary }]}
-        onPress={onPress}
-        activeOpacity={0.85}
-      >
-        <Text style={styles.emptyBtnText}>Browse Workouts</Text>
-      </TouchableOpacity>
-    </View>
+    <EmptyState
+      icon="basketball-outline"
+      title="No completed workouts yet"
+      sub="Start with Beginner Shooting Basics to build your foundation."
+      ctaLabel="Browse Workouts"
+      onPress={onPress}
+    />
   );
 }
 
@@ -561,65 +571,79 @@ export default function HomeScreen({ navigation }) {
         }
       >
         {/* ── Header ── */}
-        <HomeHeader userData={userData} theme={theme} onProfilePress={handleProfilePress} />
+        <Entrance variant="up">
+          <HomeHeader userData={userData} theme={theme} onProfilePress={handleProfilePress} />
+        </Entrance>
 
         {/* ── Next Action Card (primary CTA) ── */}
         {nextAction ? (
-          <NextActionCard action={nextAction} theme={theme} onPress={handleNextActionPress} />
+          <Entrance variant="cardIn" delay={80}>
+            <NextActionCard action={nextAction} theme={theme} onPress={handleNextActionPress} />
+          </Entrance>
         ) : null}
 
         {/* ── From Your Coach (assignments) ── */}
-        <CoachAssignmentsSection
-          assignments={coachAssignments}
-          theme={theme}
-          onOpen={handleOpenAssignment}
-          onComplete={handleCompleteAssignment}
-        />
+        <Entrance variant="cardIn">
+          <CoachAssignmentsSection
+            assignments={coachAssignments}
+            theme={theme}
+            onOpen={handleOpenAssignment}
+            onComplete={handleCompleteAssignment}
+          />
+        </Entrance>
 
         {/* ── Sessions with your coach ── */}
-        <CoachSessionsSection
-          sessions={coachSessions}
-          theme={theme}
-          onConfirm={handleConfirmSession}
-        />
+        <Entrance variant="cardIn">
+          <CoachSessionsSection
+            sessions={coachSessions}
+            theme={theme}
+            onConfirm={handleConfirmSession}
+          />
+        </Entrance>
 
         {/* ── DBE Ecosystem Hub ── */}
-        <DBEHub
-          shotDNAProfile={shotDNAProfile}
-          evalRankScore={evalRankScore}
-          simCoachIQScore={simCoachIQScore}
-          subscription={subscription}
-          theme={theme}
-          navigation={navigation}
-        />
+        <Entrance variant="cardIn" delay={160}>
+          <DBEHub
+            shotDNAProfile={shotDNAProfile}
+            evalRankScore={evalRankScore}
+            simCoachIQScore={simCoachIQScore}
+            subscription={subscription}
+            theme={theme}
+            navigation={navigation}
+          />
+        </Entrance>
 
         {/* ── Weekly Focus ── */}
-        <WeeklyFocusRow chips={weeklyChips} theme={theme} />
+        <Entrance variant="cardIn" delay={240}>
+          <WeeklyFocusRow chips={weeklyChips} theme={theme} />
+        </Entrance>
 
         {/* ── Recommended For You ── */}
         {recommendations.length > 0 && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>Recommended for You</Text>
-              <TouchableOpacity onPress={handleBrowseWorkouts}>
-                <Text style={[styles.seeAll, { color: theme.primary }]}>See all</Text>
-              </TouchableOpacity>
+          <Entrance variant="cardIn" delay={320}>
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>Recommended for You</Text>
+                <TouchableOpacity onPress={handleBrowseWorkouts}>
+                  <Text style={[styles.seeAll, { color: theme.primary }]}>See all</Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
+                {userPrefs.focusAreas?.length > 0
+                  ? `Based on your focus: ${userPrefs.focusAreas.slice(0, 2).join(', ')}`
+                  : 'Based on your training profile'}
+              </Text>
+              {recommendations.map((workout) => (
+                <RecommendedCard
+                  key={workout.id}
+                  workout={workout}
+                  reason={getRecommendationReason(workout, userPrefs)}
+                  theme={theme}
+                  onPress={handleWorkoutPress}
+                />
+              ))}
             </View>
-            <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
-              {userPrefs.focusAreas?.length > 0
-                ? `Based on your focus: ${userPrefs.focusAreas.slice(0, 2).join(', ')}`
-                : 'Based on your training profile'}
-            </Text>
-            {recommendations.map((workout) => (
-              <RecommendedCard
-                key={workout.id}
-                workout={workout}
-                reason={getRecommendationReason(workout, userPrefs)}
-                theme={theme}
-                onPress={handleWorkoutPress}
-              />
-            ))}
-          </View>
+          </Entrance>
         )}
 
         {/* ── Empty state if no activity at all ── */}
@@ -682,7 +706,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     borderRadius: 16,
     padding: 18,
-    shadowColor: '#FF6B00',
+    shadowColor: '#8A1C22',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -800,30 +824,6 @@ const styles = StyleSheet.create({
     maxWidth: 180,
   },
   reasonText: { fontSize: 11, fontWeight: '500' },
-
-  // Empty state
-  emptyState: {
-    marginHorizontal: 20,
-    marginTop: 8,
-    padding: 28,
-    borderRadius: 16,
-    borderWidth: 1,
-    alignItems: 'center',
-  },
-  emptyTitle: { fontSize: 17, fontWeight: '600', marginTop: 12, textAlign: 'center' },
-  emptySubtitle: {
-    fontSize: 14,
-    marginTop: 6,
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 20,
-  },
-  emptyBtn: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 25,
-  },
-  emptyBtnText: { color: '#FFFFFF', fontWeight: '600', fontSize: 15 },
 
   bottomSpacer: { height: 16 },
 });

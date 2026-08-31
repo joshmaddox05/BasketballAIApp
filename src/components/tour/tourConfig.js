@@ -43,3 +43,59 @@ export const TOUR_STEPS = [
         tooltipPosition: 'top',
     },
 ];
+
+// Coach onboarding tour — a concise, coachType-aware walkthrough of the Coach
+// Dashboard. Content steps (1-3) target elements on the CoachHome scroll view;
+// the last two steps spotlight tab-bar icons and advance on tap (no forced
+// navigation), so no screenListeners/waitForTab wiring is needed.
+export const getCoachTourSteps = (coachType) => {
+    const isTrainer = coachType === 'trainer';
+    return [
+        {
+            id: 'coach-stats',
+            target: 'coach-stats',
+            tab: 'CoachHome',
+            title: 'Your Coaching Dashboard',
+            description: isTrainer
+                ? 'A quick pulse on your studio — earnings, sales, and live listings at a glance.'
+                : 'A quick pulse on your program — active athletes, weekly sessions, and earnings at a glance.',
+            tooltipPosition: 'bottom',
+        },
+        {
+            id: 'coach-quick-actions',
+            target: 'coach-quick-actions',
+            tab: 'CoachHome',
+            title: 'Quick Actions',
+            description: isTrainer
+                ? 'Jump straight into creating drills, opening your storefront, or withdrawing earnings.'
+                : 'Jump straight into adding athletes, assigning work, booking sessions, or your playbook.',
+            tooltipPosition: 'bottom',
+        },
+        {
+            id: 'coach-tools',
+            target: 'coach-tools',
+            tab: 'CoachHome',
+            title: 'Coach Tools',
+            description: 'Your full toolkit lives here — SimCoach, CoachMarket, HoopCommunity and more. Tap any tile to open it.',
+            tooltipPosition: 'top',
+        },
+        {
+            id: 'coach-middle-tab',
+            target: 'coach-middle-tab',
+            tab: null,
+            title: isTrainer ? 'Your Market & Create Studio' : 'Your Roster & Playbook',
+            description: isTrainer
+                ? 'These tabs are your storefront and content studio — list drills and grow your marketplace.'
+                : 'These tabs are your team hub — manage your roster and build game plans in your playbook.',
+            tooltipPosition: 'top',
+        },
+        {
+            id: 'coach-profile-tab',
+            target: 'coach-profile-tab',
+            tab: null,
+            title: 'Profile & Settings',
+            description: 'Tap Profile anytime to replay this tour, mute the voice guide, or adjust your settings.',
+            tooltipPosition: 'top',
+        },
+    ];
+};

@@ -149,9 +149,9 @@ const ChallengeInviteModal = ({
               </Text>
             </View>
           </View>
-          <View style={[styles.h2hBadge, { backgroundColor: '#FF6B00' + '20' }]}>
-            <Ionicons name="flash" size={14} color="#FF6B00" />
-            <Text style={[styles.h2hBadgeText, { color: '#FF6B00' }]}>H2H</Text>
+          <View style={[styles.h2hBadge, { backgroundColor: '#8A1C22' + '20' }]}>
+            <Ionicons name="flash" size={14} color="#8A1C22" />
+            <Text style={[styles.h2hBadgeText, { color: '#8A1C22' }]}>H2H</Text>
           </View>
         </View>
 

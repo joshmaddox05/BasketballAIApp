@@ -31,7 +31,7 @@ const GOAL_TEMPLATES = [
     description: 'Counts every workout session you finish',
     category: 'consistency',
     icon: 'fitness',
-    color: '#FF6B00',
+    color: '#8A1C22',
     unit: 'workouts',
     defaultTarget: 3,
     maxTarget: 14,

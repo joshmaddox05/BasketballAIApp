@@ -7,6 +7,8 @@ export const STORAGE_KEYS = {
   LANGUAGE: 'language',
   BOOKMARKED_VIDEOS: 'bookmarkedVideos',
   HAS_SEEN_TOUR: 'hasSeenTour',
+  HAS_SEEN_COACH_TOUR: 'hasSeenCoachTour',
+  TOUR_VOICE_MUTED: 'tourVoiceMuted',
   AI_ANALYSIS_CACHE: 'ai_analysis_cache',
   AI_MODELS_CACHE: 'ai_models_cache',
   YOUTUBE_VIDEOS_CACHE: 'youtube_videos_cache',

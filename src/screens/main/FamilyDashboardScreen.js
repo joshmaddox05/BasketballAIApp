@@ -1,5 +1,9 @@
+// FamilyDashboardScreen.js - Family progress report (design handoff 14g).
+// Presentational restyle only: data loading, navigation and the child switcher
+// behavior are unchanged. One child's progress moves (sparkline draws, tiles
+// stagger in); nothing on this screen pulses.
 import React, { useState, useCallback, useEffect } from 'react';
-import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { SafeAreaView, StyleSheet, View, Text, ScrollView, Dimensions } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -7,6 +11,20 @@ import { useAppContext } from '../../context/AppContext';
 import { getLinkedPlayers, getLinkedPlayerSummary } from '../../services/firestoreService';
 import ChildSwitcher from '../../components/parent/ChildSwitcher';
 import { getLevelTitle } from '../../utils/constants';
+import { TYPE, SHAPE, FONTS } from '../../utils/typography';
+import {
+  Entrance,
+  Sparkline,
+  Avatar,
+  Chip,
+  StatTile,
+  ScreenHeader,
+  SectionLabel,
+  PrimaryButton,
+  OutlineButton,
+  EmptyState,
+  LoadingState,
+} from '../../components/dbe';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Data mapping helpers (Firestore docs -> presentational shapes)
@@ -47,7 +65,7 @@ const initialsFor = (name = '') =>
     .join('')
     .toUpperCase() || '?';
 
-const mapChild = (linked, profile) => {
+const mapChild = (linked, profile, evalRank) => {
   const stats = profile?.stats || {};
   const level = profile?.level || 1;
   const name = profile?.displayName || linked?.name || 'Athlete';
@@ -57,6 +75,7 @@ const mapChild = (linked, profile) => {
     levelTitle: typeof level === 'number' ? getLevelTitle(level) : 'Player',
     streak: stats.currentStreak || 0,
     subscriptionTier: profile?.subscription || 'free',
+    evalGrade: evalRank?.overallGrade || null,
     avatarInitials: initialsFor(name),
     totalWorkouts: stats.totalWorkouts || 0,
     joinDate: profile?.createdAt ? formatWhen(profile.createdAt) : '—',
@@ -72,149 +91,147 @@ const mapActivity = (a) => ({
   icon: a.icon || iconForActivity(a.title || a.name),
 });
 
-const ACHIEVEMENT_COLORS = ['#FF6B00', '#FFD700', '#60A5FA', '#A78BFA'];
-
-const mapAchievement = (ach, idx) => ({
+const mapAchievement = (ach) => ({
   id: ach.id,
   title: ach.title || ach.name || 'Achievement',
   description: ach.description || '',
   icon: ach.icon || 'trophy',
   earnedAt: formatWhen(ach.unlockedAt),
-  color: ach.color || ACHIEVEMENT_COLORS[idx % ACHIEVEMENT_COLORS.length],
 });
+
+// 6 monthly buckets of training volume from the already-loaded activity history.
+const buildVolume = (activities) => {
+  const now = new Date();
+  const buckets = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    buckets.push({
+      key: `${d.getFullYear()}-${d.getMonth()}`,
+      label: d.toLocaleDateString(undefined, { month: 'short' }).toUpperCase(),
+      count: 0,
+    });
+  }
+  (activities || []).forEach((a) => {
+    const d = toDate(a.createdAt);
+    if (!d) return;
+    const bucket = buckets.find((b) => b.key === `${d.getFullYear()}-${d.getMonth()}`);
+    if (bucket) bucket.count += 1;
+  });
+  const first = buckets[0].count;
+  const last = buckets[buckets.length - 1].count;
+  const deltaPct = first > 0 ? Math.round(((last - first) / first) * 100) : null;
+  return {
+    counts: buckets.map((b) => b.count),
+    labels: buckets.map((b) => b.label),
+    rangeLabel: `${buckets[0].label.charAt(0)}${buckets[0].label.slice(1).toLowerCase()} – ${buckets[5].label.charAt(0)}${buckets[5].label.slice(1).toLowerCase()} ${now.getFullYear()}`,
+    deltaPct,
+  };
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Sub-components
 // ─────────────────────────────────────────────────────────────────────────────
 
-function SectionHeader({ title, actionLabel, onAction, theme }) {
+function VolumeCard({ volume, theme }) {
+  const width = Dimensions.get('window').width - SHAPE.screenPadding * 2 - 30;
   return (
-    <View style={styles.sectionHeader}>
-      <Text style={[styles.sectionTitle, { color: theme.text }]}>{title}</Text>
-      {actionLabel ? (
-        <TouchableOpacity onPress={onAction} activeOpacity={0.7}>
-          <Text style={[styles.sectionAction, { color: theme.primary }]}>{actionLabel}</Text>
-        </TouchableOpacity>
-      ) : null}
-    </View>
+    <Entrance
+      variant="cardIn"
+      delay={50}
+      style={[styles.volumeCard, { backgroundColor: theme.surface }]}
+    >
+      <View style={styles.volumeHeader}>
+        <View>
+          <Text style={[styles.volumeTitle, { color: theme.text }]}>Training volume</Text>
+          <Text style={[styles.volumeRange, { color: theme.textDim }]}>{volume.rangeLabel}</Text>
+        </View>
+        {volume.deltaPct !== null && (
+          <Text style={[styles.volumeDelta, { color: theme.accentText }]}>
+            {volume.deltaPct >= 0 ? '+' : ''}
+            {volume.deltaPct}%
+          </Text>
+        )}
+      </View>
+      <Sparkline
+        data={volume.counts}
+        width={width}
+        height={92}
+        color={theme.primary}
+        strokeWidth={2.6}
+        style={styles.volumeChart}
+      />
+      <View style={styles.volumeLabels}>
+        {volume.labels.map((label) => (
+          <Text key={label} style={[styles.volumeMonth, { color: theme.textDim }]}>
+            {label}
+          </Text>
+        ))}
+      </View>
+    </Entrance>
   );
 }
 
-function ChildProfileCard({ child, theme }) {
-  const tierColors = {
-    free: '#9CA3AF',
-    basic: '#60A5FA',
-    premium: '#FF6B00',
-    pro: '#A78BFA',
-  };
-  const tierColor = tierColors[child.subscriptionTier] || '#9CA3AF';
-  const tierLabel = child.subscriptionTier.charAt(0).toUpperCase() + child.subscriptionTier.slice(1);
-
+function ActivityItem({ activity, index, theme, isLast }) {
   return (
-    <View style={[styles.profileCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-      <View style={styles.profileCardTop}>
-        {/* Avatar */}
-        <View style={[styles.avatar, { backgroundColor: theme.primary + '22' }]}>
-          <Text style={[styles.avatarText, { color: theme.primary }]}>{child.avatarInitials}</Text>
-        </View>
-
-        {/* Name + level */}
-        <View style={styles.profileInfo}>
-          <Text style={[styles.childName, { color: theme.text }]}>{child.name}</Text>
-          <View style={[styles.levelBadge, { backgroundColor: theme.primary + '20' }]}>
-            <Ionicons name="basketball" size={11} color={theme.primary} />
-            <Text style={[styles.levelText, { color: theme.primary }]}>
-              Lv. {child.level} · {child.levelTitle}
-            </Text>
-          </View>
-        </View>
-
-        {/* Tier badge */}
-        <View style={[styles.tierBadge, { borderColor: tierColor + '50', backgroundColor: tierColor + '15' }]}>
-          <Text style={[styles.tierText, { color: tierColor }]}>{tierLabel}</Text>
-        </View>
-      </View>
-
-      {/* Stats row */}
-      <View style={[styles.profileStatsRow, { borderTopColor: theme.border }]}>
-        <View style={styles.profileStat}>
-          <Ionicons name="flame" size={16} color="#FF6B00" />
-          <Text style={[styles.profileStatValue, { color: theme.text }]}>{child.streak}</Text>
-          <Text style={[styles.profileStatLabel, { color: theme.textSecondary }]}>Day Streak</Text>
-        </View>
-        <View style={[styles.profileStatDivider, { backgroundColor: theme.border }]} />
-        <View style={styles.profileStat}>
-          <Ionicons name="barbell" size={16} color={theme.primary} />
-          <Text style={[styles.profileStatValue, { color: theme.text }]}>{child.totalWorkouts}</Text>
-          <Text style={[styles.profileStatLabel, { color: theme.textSecondary }]}>Workouts</Text>
-        </View>
-        <View style={[styles.profileStatDivider, { backgroundColor: theme.border }]} />
-        <View style={styles.profileStat}>
-          <Ionicons name="calendar" size={16} color="#60A5FA" />
-          <Text style={[styles.profileStatValue, { color: theme.text }]}>{child.joinDate}</Text>
-          <Text style={[styles.profileStatLabel, { color: theme.textSecondary }]}>Member Since</Text>
-        </View>
-      </View>
-    </View>
-  );
-}
-
-function ActivityItem({ activity, theme }) {
-  return (
-    <View style={[styles.activityItem, { backgroundColor: theme.card, borderColor: theme.border }]}>
-      <View style={[styles.activityIconWrap, { backgroundColor: theme.primary + '18' }]}>
-        <Ionicons name={activity.icon} size={18} color={theme.primary} />
+    <Entrance
+      variant="slideIn"
+      delay={300 + index * 100}
+      style={[
+        styles.activityItem,
+        !isLast && { borderBottomWidth: 1, borderBottomColor: theme.hairline },
+      ]}
+    >
+      <View style={[styles.activityIconWrap, { backgroundColor: theme.badgeFill }]}>
+        <Ionicons name={activity.icon} size={14} color={theme.accentText} />
       </View>
       <View style={styles.activityInfo}>
-        <Text style={[styles.activityTitle, { color: theme.text }]}>{activity.title}</Text>
-        <Text style={[styles.activityMeta, { color: theme.textSecondary }]}>
-          {activity.completedAt} · {activity.duration}
+        <Text style={[styles.activityTitle, { color: theme.text }]} numberOfLines={1}>
+          {activity.title}
+        </Text>
+        <Text style={[TYPE.rowMeta, { color: theme.textDim }]} numberOfLines={1}>
+          {activity.completedAt}
+          {activity.duration ? ` · ${activity.duration}` : ''}
         </Text>
       </View>
-      <View style={styles.activityXP}>
-        <Text style={[styles.xpText, { color: theme.primary }]}>+{activity.xpEarned}</Text>
-        <Text style={[styles.xpLabel, { color: theme.textSecondary }]}>XP</Text>
-      </View>
-    </View>
+      <Text style={[styles.xpText, { color: theme.accentText }]}>+{activity.xpEarned} XP</Text>
+    </Entrance>
   );
 }
 
-function UpcomingSessionItem({ session, theme }) {
-  const typeColors = {
-    'Live Session': '#60A5FA',
-    'Workout': theme.primary,
-  };
-  const typeColor = typeColors[session.type] || theme.primary;
-
+function AchievementCard({ achievement, index, theme }) {
+  const accent = index === 0;
   return (
-    <View style={[styles.sessionItem, { backgroundColor: theme.card, borderColor: theme.border }]}>
-      <View style={[styles.sessionIconWrap, { backgroundColor: typeColor + '18' }]}>
-        <Ionicons name={session.icon} size={18} color={typeColor} />
+    <Entrance
+      variant="cellIn"
+      delay={350 + index * 80}
+      style={[styles.achievementCard, { backgroundColor: theme.surface }]}
+    >
+      <View
+        style={[
+          styles.achievementIconWrap,
+          { backgroundColor: accent ? theme.badgeFill : theme.steelFill },
+        ]}
+      >
+        <Ionicons
+          name={achievement.icon}
+          size={20}
+          color={accent ? theme.accentText : theme.steel}
+        />
       </View>
-      <View style={styles.sessionInfo}>
-        <Text style={[styles.sessionTitle, { color: theme.text }]}>{session.title}</Text>
-        <Text style={[styles.sessionMeta, { color: theme.textSecondary }]}>
-          {session.scheduledFor}
+      <Text style={[styles.achievementTitle, { color: theme.text }]} numberOfLines={1}>
+        {achievement.title}
+      </Text>
+      {achievement.description ? (
+        <Text style={[TYPE.cardBody, styles.achievementDesc, { color: theme.textDim }]} numberOfLines={2}>
+          {achievement.description}
         </Text>
-        <Text style={[styles.sessionCoach, { color: typeColor }]}>{session.coachName}</Text>
-      </View>
-      <View style={[styles.sessionTypeBadge, { backgroundColor: typeColor + '18' }]}>
-        <Text style={[styles.sessionTypeText, { color: typeColor }]}>{session.type}</Text>
-      </View>
-    </View>
-  );
-}
-
-function AchievementCard({ achievement, theme }) {
-  return (
-    <View style={[styles.achievementCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-      <View style={[styles.achievementIconWrap, { backgroundColor: achievement.color + '20' }]}>
-        <Ionicons name={achievement.icon} size={22} color={achievement.color} />
-      </View>
-      <Text style={[styles.achievementTitle, { color: theme.text }]}>{achievement.title}</Text>
-      <Text style={[styles.achievementDesc, { color: theme.textSecondary }]}>{achievement.description}</Text>
-      <Text style={[styles.achievementEarned, { color: theme.textSecondary }]}>{achievement.earnedAt}</Text>
-    </View>
+      ) : null}
+      {achievement.earnedAt ? (
+        <Text style={[styles.achievementEarned, { color: theme.textDim }]}>
+          {achievement.earnedAt}
+        </Text>
+      ) : null}
+    </Entrance>
   );
 }
 
@@ -229,6 +246,7 @@ export default function FamilyDashboardScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [children, setChildren] = useState([]);
   const [child, setChild] = useState(null);
+  const [volume, setVolume] = useState(null);
   const [recentActivity, setRecentActivity] = useState([]);
   const [achievements, setAchievements] = useState([]);
 
@@ -257,7 +275,8 @@ export default function FamilyDashboardScreen({ navigation }) {
     getLinkedPlayerSummary(active.uid)
       .then((summary) => {
         if (!alive) return;
-        setChild(mapChild(active, summary.profile));
+        setChild(mapChild(active, summary.profile, summary.evalRank));
+        setVolume(buildVolume(summary.activities));
         setRecentActivity((summary.activities || []).slice(0, 5).map(mapActivity));
         setAchievements((summary.achievements || []).slice(0, 2).map(mapAchievement));
       })
@@ -284,13 +303,11 @@ export default function FamilyDashboardScreen({ navigation }) {
   }, [navigation]);
 
   const renderHeader = () => (
-    <View style={[styles.header, { borderBottomColor: theme.border }]}>
-      <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} activeOpacity={0.7}>
-        <Ionicons name="chevron-back" size={24} color={theme.text} />
-      </TouchableOpacity>
-      <Text style={[styles.headerTitle, { color: theme.text }]}>Family Dashboard</Text>
-      <View style={styles.headerIconButton} />
-    </View>
+    <ScreenHeader
+      title="Progress report"
+      subtitle={child ? `${child.name} · last 6 months` : undefined}
+      onBack={() => navigation.goBack()}
+    />
   );
 
   // Loading state (initial — keep the switcher visible when switching children)
@@ -299,9 +316,7 @@ export default function FamilyDashboardScreen({ navigation }) {
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
         <StatusBar style={isDarkMode ? 'light' : 'dark'} />
         {renderHeader()}
-        <View style={styles.centered}>
-          <ActivityIndicator color={theme.primary} size="large" />
-        </View>
+        <LoadingState />
       </SafeAreaView>
     );
   }
@@ -312,22 +327,14 @@ export default function FamilyDashboardScreen({ navigation }) {
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
         <StatusBar style={isDarkMode ? 'light' : 'dark'} />
         {renderHeader()}
-        <View style={styles.centered}>
-          <View style={[styles.emptyIconWrap, { backgroundColor: theme.primary + '18' }]}>
-            <Ionicons name="people-outline" size={36} color={theme.primary} />
-          </View>
-          <Text style={[styles.emptyTitle, { color: theme.text }]}>Link your child</Text>
-          <Text style={[styles.emptySub, { color: theme.textSecondary }]}>
-            Connect to your child's account with their invite code to follow their training and progress.
-          </Text>
-          <TouchableOpacity
-            style={[styles.emptyButton, { backgroundColor: theme.primary }]}
+        <View style={styles.emptyWrap}>
+          <EmptyState
+            icon="people-outline"
+            title="Link your child"
+            sub="Connect to your child's account with their invite code to follow their training and progress."
+            ctaLabel="Link Your Child"
             onPress={() => navigation.navigate('LinkAccount', { onLinked: refreshChildren })}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="link" size={18} color="#FFFFFF" />
-            <Text style={styles.emptyButtonText}>Link Your Child</Text>
-          </TouchableOpacity>
+          />
         </View>
       </SafeAreaView>
     );
@@ -352,76 +359,107 @@ export default function FamilyDashboardScreen({ navigation }) {
           theme={theme}
         />
 
-        {/* Child Profile Card */}
-        {child && <ChildProfileCard child={child} theme={theme} />}
+        {/* Child identity row */}
+        {child && (
+          <View style={styles.identityRow}>
+            <Avatar initials={child.avatarInitials} size={38} tone="accent" />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.identityName, { color: theme.text }]}>{child.name}</Text>
+              <Text style={[TYPE.rowMeta, { color: theme.textDim }]}>
+                Lv. {child.level} · {child.levelTitle}
+              </Text>
+            </View>
+            <Chip small label={child.subscriptionTier.toUpperCase()} />
+          </View>
+        )}
 
-        {/* Action Buttons */}
+        {/* Training volume — 6-month sparkline */}
+        {volume && <VolumeCard volume={volume} theme={theme} />}
+
+        {/* Stat tiles */}
+        {child && (
+          <>
+            <View style={styles.tileRow}>
+              <StatTile value={child.totalWorkouts} label="Workouts done" delay={200} />
+              <StatTile value={child.streak} label="Day streak" delay={280} />
+            </View>
+            <View style={styles.tileRow}>
+              <StatTile
+                value={child.evalGrade || '—'}
+                label="EvalRank"
+                accent={!!child.evalGrade}
+                delay={360}
+              />
+              <StatTile value={child.joinDate} label="Member since" delay={440} />
+            </View>
+          </>
+        )}
+
+        {/* Actions */}
         <View style={styles.actionRow}>
-          <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: theme.primary }]}
+          <PrimaryButton
+            label="Message Coach"
+            icon="chatbubble-ellipses-outline"
             onPress={handleMessageCoach}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="chatbubble-ellipses" size={16} color="#FFFFFF" />
-            <Text style={styles.actionButtonText}>Message Coach</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.actionButtonOutline, { borderColor: theme.primary }]}
+            style={{ flex: 1 }}
+          />
+          <OutlineButton
+            label="Full Progress"
+            icon="bar-chart-outline"
             onPress={handleViewFullProgress}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="bar-chart" size={16} color={theme.primary} />
-            <Text style={[styles.actionButtonText, { color: theme.primary }]}>View Full Progress</Text>
-          </TouchableOpacity>
+            style={{ flex: 1 }}
+          />
         </View>
-
-        {/* Recruiting + Edit Athlete */}
-        <View style={styles.actionRow}>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.actionButtonOutline, { borderColor: theme.primary }]}
+        <View style={styles.actionRowTight}>
+          <OutlineButton
+            label="Recruiting"
+            icon="megaphone-outline"
             onPress={() => navigation.navigate('ParentScoutLab', { childUid: selectedChildUid })}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="megaphone-outline" size={16} color={theme.primary} />
-            <Text style={[styles.actionButtonText, { color: theme.primary }]}>Recruiting</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.actionButtonOutline, { borderColor: theme.primary }]}
+            style={{ flex: 1 }}
+          />
+          <OutlineButton
+            label="Edit Athlete"
+            icon="create-outline"
             onPress={() => navigation.navigate('EditAthleteProfile', { childUid: selectedChildUid })}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="create-outline" size={16} color={theme.primary} />
-            <Text style={[styles.actionButtonText, { color: theme.primary }]}>Edit Athlete</Text>
-          </TouchableOpacity>
+            style={{ flex: 1 }}
+          />
         </View>
 
         {/* Recent Activity */}
-        <SectionHeader title="Recent Activity" theme={theme} />
-        {recentActivity.length === 0 ? (
-          <Text style={[styles.placeholderText, { color: theme.textSecondary }]}>
-            No recent activity yet.
-          </Text>
-        ) : (
-          <View style={styles.activityList}>
-            {recentActivity.map((item) => (
-              <ActivityItem key={item.id} activity={item} theme={theme} />
-            ))}
-          </View>
-        )}
+        <View style={styles.section}>
+          <SectionLabel>Recent activity</SectionLabel>
+          {recentActivity.length === 0 ? (
+            <Text style={[TYPE.rowMeta, { color: theme.textDim }]}>No recent activity yet.</Text>
+          ) : (
+            <View style={[styles.activityContainer, { backgroundColor: theme.surface }]}>
+              {recentActivity.map((item, index) => (
+                <ActivityItem
+                  key={item.id}
+                  activity={item}
+                  index={index}
+                  theme={theme}
+                  isLast={index === recentActivity.length - 1}
+                />
+              ))}
+            </View>
+          )}
+        </View>
 
         {/* Recent Achievements */}
-        <SectionHeader title="Recently Earned" theme={theme} />
-        {achievements.length === 0 ? (
-          <Text style={[styles.placeholderText, { color: theme.textSecondary }]}>
-            No achievements earned yet.
-          </Text>
-        ) : (
-          <View style={styles.achievementsRow}>
-            {achievements.map((ach) => (
-              <AchievementCard key={ach.id} achievement={ach} theme={theme} />
-            ))}
-          </View>
-        )}
+        <View style={styles.section}>
+          <SectionLabel>Recently earned</SectionLabel>
+          {achievements.length === 0 ? (
+            <Text style={[TYPE.rowMeta, { color: theme.textDim }]}>
+              No achievements earned yet.
+            </Text>
+          ) : (
+            <View style={styles.achievementsRow}>
+              {achievements.map((ach, index) => (
+                <AchievementCard key={ach.id} achievement={ach} index={index} theme={theme} />
+              ))}
+            </View>
+          )}
+        </View>
 
         <View style={styles.bottomSpacer} />
       </ScrollView>
@@ -437,331 +475,154 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    letterSpacing: 0.3,
-  },
-  headerIconButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   scroll: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingHorizontal: SHAPE.screenPadding,
+    paddingTop: 14,
   },
-
-  // Profile Card
-  profileCard: {
-    borderRadius: 16,
-    borderWidth: 1,
-    overflow: 'hidden',
-    marginBottom: 16,
-  },
-  profileCardTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    gap: 12,
-  },
-  avatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    alignItems: 'center',
+  emptyWrap: {
+    flex: 1,
     justifyContent: 'center',
   },
-  avatarText: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  profileInfo: {
-    flex: 1,
-    gap: 6,
-  },
-  childName: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  levelBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  levelText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  tierBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  tierText: {
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  profileStatsRow: {
-    flexDirection: 'row',
-    borderTopWidth: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  profileStat: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 3,
-  },
-  profileStatDivider: {
-    width: 1,
-    marginVertical: 4,
-  },
-  profileStatValue: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  profileStatLabel: {
-    fontSize: 11,
+  section: {
+    marginTop: SHAPE.sectionGap,
   },
 
-  // Action Buttons
+  // Identity row
+  identityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+    marginBottom: 12,
+  },
+  identityName: {
+    fontFamily: FONTS.heading,
+    fontSize: 15,
+  },
+
+  // Training volume card
+  volumeCard: {
+    borderRadius: SHAPE.radiusHero,
+    padding: 15,
+  },
+  volumeHeader: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+  },
+  volumeTitle: {
+    fontFamily: FONTS.heading,
+    fontSize: 12.5,
+  },
+  volumeRange: {
+    fontFamily: FONTS.bodyMedium,
+    fontSize: 10,
+    marginTop: 3,
+  },
+  volumeDelta: {
+    fontFamily: FONTS.heading,
+    fontSize: 12,
+  },
+  volumeChart: {
+    marginTop: 12,
+  },
+  volumeLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  volumeMonth: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 9,
+  },
+
+  // Stat tiles
+  tileRow: {
+    flexDirection: 'row',
+    gap: SHAPE.cardGap,
+    marginTop: SHAPE.cardGap,
+  },
+
+  // Action buttons
   actionRow: {
     flexDirection: 'row',
-    gap: 10,
-    marginBottom: 24,
+    gap: SHAPE.cardGap,
+    marginTop: 16,
   },
-  actionButton: {
-    flex: 1,
+  actionRowTight: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 12,
-    borderRadius: 12,
-  },
-  actionButtonOutline: {
-    backgroundColor: 'transparent',
-    borderWidth: 1.5,
-  },
-  actionButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    gap: SHAPE.cardGap,
+    marginTop: SHAPE.cardGap,
   },
 
-  // Section Header
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  sectionAction: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-
-  // Activity List
-  activityList: {
-    gap: 8,
-    marginBottom: 24,
+  // Activity list
+  activityContainer: {
+    borderRadius: SHAPE.radiusCard,
+    paddingHorizontal: 13,
+    paddingVertical: 4,
   },
   activityItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
+    gap: 11,
+    paddingVertical: 11,
   },
   activityIconWrap: {
-    width: 38,
-    height: 38,
+    width: 30,
+    height: 30,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
   activityInfo: {
     flex: 1,
-    gap: 3,
   },
   activityTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  activityMeta: {
-    fontSize: 12,
-  },
-  activityXP: {
-    alignItems: 'center',
+    fontFamily: FONTS.bodyBold,
+    fontSize: 11.5,
   },
   xpText: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  xpLabel: {
-    fontSize: 10,
-    fontWeight: '500',
-  },
-
-  // Sessions
-  sessionList: {
-    gap: 8,
-    marginBottom: 24,
-  },
-  sessionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  sessionIconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sessionInfo: {
-    flex: 1,
-    gap: 2,
-  },
-  sessionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  sessionMeta: {
-    fontSize: 12,
-  },
-  sessionCoach: {
-    fontSize: 12,
-    fontWeight: '500',
-    marginTop: 1,
-  },
-  sessionTypeBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  sessionTypeText: {
+    fontFamily: FONTS.bodyBold,
     fontSize: 11,
-    fontWeight: '600',
   },
 
   // Achievements
   achievementsRow: {
     flexDirection: 'row',
-    gap: 10,
-    marginBottom: 8,
+    gap: SHAPE.gridGap,
   },
   achievementCard: {
     flex: 1,
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 14,
+    borderRadius: SHAPE.radiusTile,
+    padding: SHAPE.cardPadding,
     alignItems: 'center',
-    gap: 6,
   },
   achievementIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 2,
+    marginBottom: 8,
   },
   achievementTitle: {
-    fontSize: 13,
-    fontWeight: '700',
+    fontFamily: FONTS.bodyBold,
+    fontSize: 12,
     textAlign: 'center',
   },
   achievementDesc: {
-    fontSize: 11,
     textAlign: 'center',
+    marginTop: 3,
   },
   achievementEarned: {
-    fontSize: 10,
-    marginTop: 2,
+    fontFamily: FONTS.bodyMedium,
+    fontSize: 9.5,
+    marginTop: 5,
   },
 
   bottomSpacer: {
     height: 32,
-  },
-
-  // Loading / empty / placeholder states
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-    gap: 12,
-  },
-  emptyIconWrap: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-  },
-  emptySub: {
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  emptyButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 12,
-    marginTop: 8,
-  },
-  emptyButtonText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  placeholderText: {
-    fontSize: 13,
-    marginBottom: 24,
   },
 });

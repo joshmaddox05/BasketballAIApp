@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAppContext } from '../../context/AppContext';
 import { canAccessFeature } from '../../utils/subscription';
-import { getAthleteAssignments, getGamePlans } from '../../services/firestoreService';
+import { getAthleteAssignments, getGamePlans, getSharedSimulationSessions, getSessionResponses } from '../../services/firestoreService';
 import { SIM_COACH_SCENARIOS } from '../../data/simCoachScenarios';
 import LockedFeatureCard from '../../components/features/LockedFeatureCard';
 
@@ -69,7 +69,7 @@ function CoachView({ navigation, theme, coachUid }) {
     <View style={{ flex: 1 }}>
       {/* Tab bar */}
       <View style={[styles.tabBar, { borderBottomColor: theme.border }]}>
-        {[{ id: 'plans', label: 'Game Plans' }, { id: 'films', label: 'Film Library' }].map((t) => (
+        {[{ id: 'plans', label: 'Game Plans' }, { id: 'films', label: 'Film Library' }, { id: 'team', label: 'My Team' }, { id: 'scouting', label: 'Scouting' }].map((t) => (
           <TouchableOpacity
             key={t.id}
             style={[styles.tabBtn, tab === t.id && styles.tabBtnActive, tab === t.id && { borderBottomColor: theme.primary }]}
@@ -130,15 +130,74 @@ function CoachView({ navigation, theme, coachUid }) {
               ))
             )}
           </>
+        ) : tab === 'films' ? (
+          <>
+            <TouchableOpacity
+              style={[styles.ctaCard, { backgroundColor: theme.primary }]}
+              onPress={() => navigation.navigate('SimCoachFilmLibrary')}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="videocam-outline" size={22} color="#fff" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.ctaCardTitle}>Open Film Library</Text>
+                <Text style={styles.ctaCardSub}>Upload opponent film, tag plays, and build game plans from it</Text>
+              </View>
+              <Ionicons name="arrow-forward" size={18} color="#fff" />
+            </TouchableOpacity>
+            <View style={styles.emptyState}>
+              <Ionicons name="videocam-outline" size={40} color={theme.textSecondary} />
+              <Text style={[styles.ctaBlurbTitle, { color: theme.text }]}>Manage your film here</Text>
+              <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+                Uploads, play tagging, and per-opponent film all live in Film Library — tap above to open it.
+              </Text>
+            </View>
+          </>
+        ) : tab === 'team' ? (
+          <>
+            <TouchableOpacity
+              style={[styles.ctaCard, { backgroundColor: theme.primary }]}
+              onPress={() => navigation.navigate('SimCoachTeamModel')}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="people-outline" size={22} color="#fff" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.ctaCardTitle}>Open Your-Team Model</Text>
+                <Text style={styles.ctaCardSub}>See your roster grouped by archetype, with EvalRank and workload</Text>
+              </View>
+              <Ionicons name="arrow-forward" size={18} color="#fff" />
+            </TouchableOpacity>
+            <View style={styles.emptyState}>
+              <Ionicons name="people-outline" size={40} color={theme.textSecondary} />
+              <Text style={[styles.ctaBlurbTitle, { color: theme.text }]}>Not just a roster</Text>
+              <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+                Your-Team Model shows how your linked athletes function tactically — grouped by role, pulling live
+                from EvalRank, Archetypes, and Blueprint360. Tap above to open it.
+              </Text>
+            </View>
+          </>
         ) : (
-          <View style={styles.emptyState}>
-            <Ionicons name="videocam-outline" size={40} color={theme.textSecondary} />
-            <Text style={[styles.comingSoonTitle, { color: theme.text }]}>Film Library — Coming Soon</Text>
-            <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-              Upload opponent film and let AI extract plays into game plans. For now, build game plans
-              manually from the Game Plans tab.
-            </Text>
-          </View>
+          <>
+            <TouchableOpacity
+              style={[styles.ctaCard, { backgroundColor: theme.primary }]}
+              onPress={() => navigation.navigate('SimCoachOpponents')}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="shield-outline" size={22} color="#fff" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.ctaCardTitle}>Open Opponent Scouting</Text>
+                <Text style={styles.ctaCardSub}>Build scouting reports from tagged film and test coverages in the What-If Lab</Text>
+              </View>
+              <Ionicons name="arrow-forward" size={18} color="#fff" />
+            </TouchableOpacity>
+            <View style={styles.emptyState}>
+              <Ionicons name="shield-outline" size={40} color={theme.textSecondary} />
+              <Text style={[styles.ctaBlurbTitle, { color: theme.text }]}>Know what they'll run</Text>
+              <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+                Opponent Scouting turns tagged film into tendency reports, then lets you test coverages against them
+                and flag practice priorities. Tap above to open it.
+              </Text>
+            </View>
+          </>
         )}
         <View style={{ height: 32 }} />
       </ScrollView>
@@ -147,7 +206,7 @@ function CoachView({ navigation, theme, coachUid }) {
 }
 
 // ─── Athlete View ─────────────────────────────────────────────────────────────
-function AthleteView({ navigation, theme, iqData, scenarios }) {
+function AthleteView({ navigation, theme, iqData, scenarios, sessions }) {
   const score = iqData.score;
   const classification = IQ_CLASSIFICATION(score);
   const xpPct = Math.min(100, (iqData.currentXP / iqData.nextTierXP) * 100);
@@ -176,6 +235,39 @@ function AthleteView({ navigation, theme, iqData, scenarios }) {
           </View>
         </View>
       </View>
+
+      {/* Simulations the coach has shared for the team to weigh in on */}
+      {sessions.length > 0 && (
+        <>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Shared Simulations</Text>
+          {sessions.map((s) => {
+            const responded = s.__responded;
+            return (
+              <TouchableOpacity
+                key={s.id}
+                style={[styles.scenarioCard, { backgroundColor: theme.card, borderColor: responded ? theme.border : theme.primary + '50' }]}
+                onPress={() => navigation.navigate('SimCoachSessionRespond', { session: s })}
+                activeOpacity={0.8}
+              >
+                <View style={styles.scenarioTop}>
+                  <View style={[styles.scenarioIcon, { backgroundColor: responded ? '#22C55E18' : theme.primary + '18' }]}>
+                    <Ionicons name={responded ? 'checkmark-circle' : 'people-outline'} size={20} color={responded ? '#22C55E' : theme.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.scenarioTitle, { color: theme.text }]}>{s.title}</Text>
+                    <Text style={[styles.scenarioMeta, { color: theme.textSecondary }]}>{s.opponentName || 'Opponent'}</Text>
+                  </View>
+                  <View style={[styles.scenarioStatus, { backgroundColor: responded ? '#22C55E18' : theme.primary + '18' }]}>
+                    <Text style={[styles.scenarioStatusText, { color: responded ? '#22C55E' : theme.primary }]}>
+                      {responded ? 'Responded' : 'New'}
+                    </Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </>
+      )}
 
       {/* Assigned Scenarios */}
       <Text style={[styles.sectionTitle, { color: theme.text }]}>My Scenarios</Text>
@@ -236,6 +328,7 @@ export default function SimCoachScreen({ navigation }) {
   const isCoach = userData?.role === 'coach';
 
   const [scenarios, setScenarios] = useState([]);
+  const [sessions, setSessions] = useState([]);
 
   useFocusEffect(
     useCallback(() => {
@@ -244,6 +337,18 @@ export default function SimCoachScreen({ navigation }) {
       (async () => {
         const items = await getAthleteAssignments(user.uid, { type: 'scenario' });
         if (active) setScenarios(items.map(mapScenarioAssignment));
+
+        const shared = await getSharedSimulationSessions(user.uid);
+        // Cheap "have I already responded" flag per session — a few extra
+        // reads (one per shared session) rather than a denormalized counter,
+        // since a coach's team is small and this only runs on screen focus.
+        const withResponded = await Promise.all(
+          shared.map(async (s) => {
+            const responses = await getSessionResponses(s.coachUid, s.id).catch(() => []);
+            return { ...s, __responded: responses.some((r) => r.submittedBy === user.uid) };
+          })
+        );
+        if (active) setSessions(withResponded);
       })();
       return () => { active = false; };
     }, [isCoach, user?.uid])
@@ -272,7 +377,7 @@ export default function SimCoachScreen({ navigation }) {
             displayName="SimCoach™"
             description="Coaches upload opponent film, build annotated game plans, and assign tactical scenarios to athletes. Athletes study plays and build Basketball IQ."
             icon="videocam-outline"
-            colors={['#FF6B00', '#FF8E53']}
+            colors={['#8A1C22', '#4C0F14']}
           />
         </ScrollView>
       </SafeAreaView>
@@ -299,7 +404,7 @@ export default function SimCoachScreen({ navigation }) {
       {isCoach ? (
         <CoachView navigation={navigation} theme={theme} coachUid={user?.uid} />
       ) : (
-        <AthleteView navigation={navigation} theme={theme} iqData={iqData} scenarios={scenarios} />
+        <AthleteView navigation={navigation} theme={theme} iqData={iqData} scenarios={scenarios} sessions={sessions} />
       )}
     </SafeAreaView>
   );
@@ -403,5 +508,10 @@ const styles = StyleSheet.create({
 
   emptyState: { alignItems: 'center', paddingTop: 40, gap: 10 },
   emptyText: { fontSize: 13, textAlign: 'center', lineHeight: 19, maxWidth: 280 },
-  comingSoonTitle: { fontSize: 16, fontWeight: '800', marginTop: 4 },
+  // Renamed from `comingSoonTitle`: this styles the heading of the explanatory
+  // blurb under each tab's CTA card, and none of those tabs are "coming soon"
+  // any more — Film Library, Your-Team Model, and Opponent Scouting are all
+  // real screens now. The stale name was the last trace of the Phase 0
+  // placeholder reconciliation (§10 item 1).
+  ctaBlurbTitle: { fontSize: 16, fontWeight: '800', marginTop: 4 },
 });

@@ -311,7 +311,7 @@ const PersonalizationScreen = ({ navigation }) => {
                                 <Ionicons
                                     name="basketball"
                                     size={24}
-                                    color={focusAreas.shooting ? "#FF6B00" : "#666"}
+                                    color={focusAreas.shooting ? "#8A1C22" : "#666"}
                                 />
                                 <Text style={styles.focusAreaTitle}>Shooting</Text>
                             </View>
@@ -336,7 +336,7 @@ const PersonalizationScreen = ({ navigation }) => {
                                 <Ionicons
                                     name="hand-left"
                                     size={24}
-                                    color={focusAreas.dribbling ? "#FF6B00" : "#666"}
+                                    color={focusAreas.dribbling ? "#8A1C22" : "#666"}
                                 />
                                 <Text style={styles.focusAreaTitle}>Dribbling</Text>
                             </View>
@@ -361,7 +361,7 @@ const PersonalizationScreen = ({ navigation }) => {
                                 <Ionicons
                                     name="shield"
                                     size={24}
-                                    color={focusAreas.defense ? "#FF6B00" : "#666"}
+                                    color={focusAreas.defense ? "#8A1C22" : "#666"}
                                 />
                                 <Text style={styles.focusAreaTitle}>Defense</Text>
                             </View>
@@ -386,7 +386,7 @@ const PersonalizationScreen = ({ navigation }) => {
                                 <Ionicons
                                     name="barbell"
                                     size={24}
-                                    color={focusAreas.strength ? "#FF6B00" : "#666"}
+                                    color={focusAreas.strength ? "#8A1C22" : "#666"}
                                 />
                                 <Text style={styles.focusAreaTitle}>Strength</Text>
                             </View>
@@ -411,7 +411,7 @@ const PersonalizationScreen = ({ navigation }) => {
                                 <Ionicons
                                     name="heart"
                                     size={24}
-                                    color={focusAreas.cardio ? "#FF6B00" : "#666"}
+                                    color={focusAreas.cardio ? "#8A1C22" : "#666"}
                                 />
                                 <Text style={styles.focusAreaTitle}>Cardio</Text>
                             </View>
@@ -436,7 +436,7 @@ const PersonalizationScreen = ({ navigation }) => {
                                 <Ionicons
                                     name="golf"
                                     size={24}
-                                    color={focusAreas.strategy ? "#FF6B00" : "#666"}
+                                    color={focusAreas.strategy ? "#8A1C22" : "#666"}
                                 />
                                 <Text style={styles.focusAreaTitle}>Strategy</Text>
                             </View>
@@ -498,7 +498,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     activeStepDot: {
-        backgroundColor: '#FF6B00',
+        backgroundColor: '#8A1C22',
     },
     completedStepDot: {
         backgroundColor: '#4CAF50',
@@ -561,7 +561,7 @@ const styles = StyleSheet.create({
     selectedDayButton: {
         backgroundColor: '#FFF0E6',
         borderWidth: 1,
-        borderColor: '#FF6B00',
+        borderColor: '#8A1C22',
     },
     dayButtonText: {
         fontSize: 14,
@@ -569,7 +569,7 @@ const styles = StyleSheet.create({
         color: '#666',
     },
     selectedDayButtonText: {
-        color: '#FF6B00',
+        color: '#8A1C22',
     },
     durationContainer: {
         flexDirection: 'row',
@@ -586,14 +586,14 @@ const styles = StyleSheet.create({
     selectedDurationButton: {
         backgroundColor: '#FFF0E6',
         borderWidth: 1,
-        borderColor: '#FF6B00',
+        borderColor: '#8A1C22',
     },
     durationButtonText: {
         fontSize: 14,
         color: '#666',
     },
     selectedDurationButtonText: {
-        color: '#FF6B00',
+        color: '#8A1C22',
         fontWeight: '500',
     },
     timeContainer: {
@@ -611,7 +611,7 @@ const styles = StyleSheet.create({
         marginHorizontal: 4,
     },
     selectedTimeButton: {
-        backgroundColor: '#FF6B00',
+        backgroundColor: '#8A1C22',
     },
     timeButtonText: {
         fontSize: 14,
@@ -640,7 +640,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     selectedFocusAreaCard: {
-        borderColor: '#FF6B00',
+        borderColor: '#8A1C22',
         backgroundColor: '#FFF9F5',
     },
     focusAreaContent: {
@@ -663,8 +663,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     selectedFocusAreaCheckbox: {
-        backgroundColor: '#FF6B00',
-        borderColor: '#FF6B00',
+        backgroundColor: '#8A1C22',
+        borderColor: '#8A1C22',
     },
     actionButtonsContainer: {
         flexDirection: 'row',
@@ -688,7 +688,7 @@ const styles = StyleSheet.create({
     },
     continueButton: {
         flex: 2,
-        backgroundColor: '#FF6B00',
+        backgroundColor: '#8A1C22',
         paddingVertical: 14,
         borderRadius: 8,
         justifyContent: 'center',

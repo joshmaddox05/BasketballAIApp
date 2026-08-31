@@ -149,7 +149,7 @@ const VideoPlayerModal = ({ visible, video, onClose }) => {
                 <Ionicons 
                   name={isBookmarked ? "bookmark" : "bookmark-outline"} 
                   size={24} 
-                  color={isBookmarked ? "#FF6B35" : "#666"} 
+                  color={isBookmarked ? "#8A1C22" : "#666"} 
                 />
               </TouchableOpacity>
               <TouchableOpacity onPress={handleShare} style={styles.actionButton}>
@@ -204,7 +204,7 @@ const VideoPlayerModal = ({ visible, video, onClose }) => {
               {video.level && (
                 <View style={styles.levelContainer}>
                   <View style={styles.levelBadge}>
-                    <Ionicons name="trophy-outline" size={16} color="#FF6B35" />
+                    <Ionicons name="trophy-outline" size={16} color="#8A1C22" />
                     <Text style={styles.levelText}>{video.level}</Text>
                   </View>
                 </View>
@@ -251,7 +251,7 @@ const VideoPlayerModal = ({ visible, video, onClose }) => {
               {/* Tips */}
               <View style={styles.tipsContainer}>
                 <View style={styles.tipCard}>
-                  <Ionicons name="bulb-outline" size={20} color="#FF6B35" />
+                  <Ionicons name="bulb-outline" size={20} color="#8A1C22" />
                   <View style={styles.tipContent}>
                     <Text style={styles.tipTitle}>Watch & Practice</Text>
                     <Text style={styles.tipText}>
@@ -359,12 +359,12 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignSelf: 'flex-start',
     borderWidth: 1,
-    borderColor: '#FF6B35',
+    borderColor: '#8A1C22',
   },
   levelText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#FF6B35',
+    color: '#8A1C22',
     marginLeft: 4,
   },
   descriptionContainer: {
@@ -408,7 +408,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 12,
     borderLeftWidth: 4,
-    borderLeftColor: '#FF6B35',
+    borderLeftColor: '#8A1C22',
   },
   tipContent: {
     flex: 1,

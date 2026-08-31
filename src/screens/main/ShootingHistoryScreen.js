@@ -14,6 +14,7 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
+import { EmptyState } from '../../components/dbe';
 import { getUserShootingStats, getWorkoutHistory } from '../../services/firestoreService';
 import { LineChart } from 'react-native-chart-kit';
 import { getTheme } from '../../utils/theme';
@@ -244,7 +245,7 @@ const ShootingHistoryScreen = ({ navigation }) => {
                                 backgroundGradientFrom: theme.card,
                                 backgroundGradientTo: theme.card,
                                 decimalPlaces: 0,
-                                color: (opacity = 1) => `rgba(255, 107, 0, ${opacity})`,
+                                color: (opacity = 1) => `rgba(138, 28, 34, ${opacity})`,
                                 labelColor: () => theme.textSecondary,
                                 style: { borderRadius: 16 },
                                 propsForDots: {
@@ -304,15 +305,11 @@ const ShootingHistoryScreen = ({ navigation }) => {
                         Recent Sessions
                     </Text>
                     {recentSessions.length === 0 ? (
-                        <View style={[styles.emptyState, { backgroundColor: theme.card }]}>
-                            <Ionicons name="basketball-outline" size={48} color={theme.textSecondary} />
-                            <Text style={[styles.emptyTitle, { color: theme.text }]}>
-                                No Shooting Sessions Yet
-                            </Text>
-                            <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-                                Complete shooting workouts to see your history here.
-                            </Text>
-                        </View>
+                        <EmptyState
+                            icon="basketball-outline"
+                            title="No Shooting Sessions Yet"
+                            sub="Complete shooting workouts to see your history here."
+                        />
                     ) : (
                         recentSessions.slice(0, 10).map((session, index) => {
                             const stats = session.shootingStats;
@@ -580,23 +577,6 @@ const styles = StyleSheet.create({
     sessionStatLabel: {
         fontSize: 11,
         marginTop: 2,
-    },
-    emptyState: {
-        marginHorizontal: 16,
-        borderRadius: 16,
-        padding: 32,
-        alignItems: 'center',
-    },
-    emptyTitle: {
-        fontSize: 18,
-        fontWeight: '600',
-        marginTop: 16,
-        marginBottom: 8,
-    },
-    emptyText: {
-        fontSize: 14,
-        textAlign: 'center',
-        lineHeight: 20,
     },
     bottomPadding: {
         height: 32,

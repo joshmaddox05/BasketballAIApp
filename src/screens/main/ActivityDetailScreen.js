@@ -193,7 +193,7 @@ const ActivityDetailScreen = ({ route, navigation }) => {
     if (loading) {
         return (
             <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#FF6B00" />
+                <ActivityIndicator size="large" color="#8A1C22" />
             </View>
         );
     }
@@ -470,7 +470,7 @@ const ActivityDetailScreen = ({ route, navigation }) => {
                                 workoutId: activity.id.replace('workout-', '') || '1'
                             })}
                         >
-                            <Ionicons name="repeat" size={18} color="#FF6B00" />
+                            <Ionicons name="repeat" size={18} color="#8A1C22" />
                             <Text style={styles.repeatButtonText}>Repeat Workout</Text>
                         </TouchableOpacity>
                     )}
@@ -480,7 +480,7 @@ const ActivityDetailScreen = ({ route, navigation }) => {
                             style={styles.repeatButton}
                             onPress={() => navigation.navigate('ShootingAnalysis')}
                         >
-                            <Ionicons name="camera" size={18} color="#FF6B00" />
+                            <Ionicons name="camera" size={18} color="#8A1C22" />
                             <Text style={styles.repeatButtonText}>New Analysis</Text>
                         </TouchableOpacity>
                     )}
@@ -613,7 +613,7 @@ const styles = StyleSheet.create({
         height: 120,
         borderRadius: 60,
         borderWidth: 8,
-        borderColor: '#FF6B00',
+        borderColor: '#8A1C22',
         justifyContent: 'center',
         alignItems: 'center',
         alignSelf: 'center',
@@ -622,7 +622,7 @@ const styles = StyleSheet.create({
     performanceScoreText: {
         fontSize: 36,
         fontWeight: 'bold',
-        color: '#FF6B00',
+        color: '#8A1C22',
     },
     performanceScoreLabel: {
         fontSize: 12,
@@ -637,7 +637,7 @@ const styles = StyleSheet.create({
     },
     performanceFill: {
         height: '100%',
-        backgroundColor: '#FF6B00',
+        backgroundColor: '#8A1C22',
         borderRadius: 4,
     },
     performanceDescription: {
@@ -770,7 +770,7 @@ const styles = StyleSheet.create({
         width: 24,
         height: 24,
         borderRadius: 12,
-        backgroundColor: '#FF6B00',
+        backgroundColor: '#8A1C22',
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 12,
@@ -798,7 +798,7 @@ const styles = StyleSheet.create({
     leaderboardPositionValue: {
         fontSize: 24,
         fontWeight: 'bold',
-        color: '#FF6B00',
+        color: '#8A1C22',
     },
     leaderboardPositionTotal: {
         fontSize: 16,
@@ -840,7 +840,7 @@ const styles = StyleSheet.create({
     leaderboardScore: {
         fontSize: 16,
         fontWeight: 'bold',
-        color: '#FF6B00',
+        color: '#8A1C22',
     },
     actionContainer: {
         flexDirection: 'row',
@@ -857,18 +857,18 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
         borderRadius: 8,
         borderWidth: 1,
-        borderColor: '#FF6B00',
+        borderColor: '#8A1C22',
         marginRight: 8,
     },
     repeatButtonText: {
-        color: '#FF6B00',
+        color: '#8A1C22',
         fontSize: 14,
         fontWeight: '600',
         marginLeft: 6,
     },
     shareButtonLarge: {
         flex: 1,
-        backgroundColor: '#FF6B00',
+        backgroundColor: '#8A1C22',
         paddingVertical: 12,
         borderRadius: 8,
         justifyContent: 'center',
@@ -902,7 +902,7 @@ const styles = StyleSheet.create({
     backButtonText: {
         fontSize: 16,
         fontWeight: 'bold',
-        color: '#FF6B00',
+        color: '#8A1C22',
     }
 });
 

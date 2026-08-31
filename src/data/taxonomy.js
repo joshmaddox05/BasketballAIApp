@@ -6,7 +6,7 @@
  * These align with existing WORKOUT_CATEGORIES in workoutTemplates.js
  */
 export const CATEGORIES = [
-  { id: 'shooting', name: 'Shooting', icon: 'basketball-outline', color: '#FF6B35' },
+  { id: 'shooting', name: 'Shooting', icon: 'basketball-outline', color: '#8A1C22' },
   { id: 'dribbling', name: 'Dribbling', icon: 'hand-left-outline', color: '#4ECDC4' },
   { id: 'physical', name: 'Physical', icon: 'fitness-outline', color: '#45B7D1' },
   { id: 'defense', name: 'Defense', icon: 'shield-outline', color: '#96CEB4' },

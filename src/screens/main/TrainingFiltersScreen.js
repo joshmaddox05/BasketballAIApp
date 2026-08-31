@@ -148,7 +148,7 @@ const TrainingFiltersScreen = ({ route, navigation }) => {
                                 )}
                             </View>
                             <View style={styles.equipmentIconContainer}>
-                                <Ionicons name="basketball" size={20} color="#FF6B00" />
+                                <Ionicons name="basketball" size={20} color="#8A1C22" />
                             </View>
                             <Text style={styles.equipmentText}>Basketball</Text>
                         </TouchableOpacity>
@@ -163,7 +163,7 @@ const TrainingFiltersScreen = ({ route, navigation }) => {
                                 )}
                             </View>
                             <View style={styles.equipmentIconContainer}>
-                                <Ionicons name="basketball-outline" size={20} color="#FF6B00" />
+                                <Ionicons name="basketball-outline" size={20} color="#8A1C22" />
                             </View>
                             <Text style={styles.equipmentText}>Hoop</Text>
                         </TouchableOpacity>
@@ -178,7 +178,7 @@ const TrainingFiltersScreen = ({ route, navigation }) => {
                                 )}
                             </View>
                             <View style={styles.equipmentIconContainer}>
-                                <Ionicons name="triangle" size={20} color="#FF6B00" />
+                                <Ionicons name="triangle" size={20} color="#8A1C22" />
                             </View>
                             <Text style={styles.equipmentText}>Cones</Text>
                         </TouchableOpacity>
@@ -193,7 +193,7 @@ const TrainingFiltersScreen = ({ route, navigation }) => {
                                 )}
                             </View>
                             <View style={styles.equipmentIconContainer}>
-                                <Ionicons name="grid" size={20} color="#FF6B00" />
+                                <Ionicons name="grid" size={20} color="#8A1C22" />
                             </View>
                             <Text style={styles.equipmentText}>Agility Ladder</Text>
                         </TouchableOpacity>
@@ -208,7 +208,7 @@ const TrainingFiltersScreen = ({ route, navigation }) => {
                                 )}
                             </View>
                             <View style={styles.equipmentIconContainer}>
-                                <Ionicons name="infinite" size={20} color="#FF6B00" />
+                                <Ionicons name="infinite" size={20} color="#8A1C22" />
                             </View>
                             <Text style={styles.equipmentText}>Resistance Bands</Text>
                         </TouchableOpacity>
@@ -223,7 +223,7 @@ const TrainingFiltersScreen = ({ route, navigation }) => {
                                 )}
                             </View>
                             <View style={styles.equipmentIconContainer}>
-                                <Ionicons name="barbell" size={20} color="#FF6B00" />
+                                <Ionicons name="barbell" size={20} color="#8A1C22" />
                             </View>
                             <Text style={styles.equipmentText}>Weights</Text>
                         </TouchableOpacity>
@@ -240,7 +240,7 @@ const TrainingFiltersScreen = ({ route, navigation }) => {
                             value={showFeaturedOnly}
                             onValueChange={setShowFeaturedOnly}
                             trackColor={{ false: '#DEE4E7', true: '#FFD3B6' }}
-                            thumbColor={showFeaturedOnly ? '#FF6B00' : '#F5F5F5'}
+                            thumbColor={showFeaturedOnly ? '#8A1C22' : '#F5F5F5'}
                         />
                     </View>
                     
@@ -250,7 +250,7 @@ const TrainingFiltersScreen = ({ route, navigation }) => {
                             value={showNewOnly}
                             onValueChange={setShowNewOnly}
                             trackColor={{ false: '#DEE4E7', true: '#FFD3B6' }}
-                            thumbColor={showNewOnly ? '#FF6B00' : '#F5F5F5'}
+                            thumbColor={showNewOnly ? '#8A1C22' : '#F5F5F5'}
                         />
                     </View>
                 </View>
@@ -300,7 +300,7 @@ const styles = StyleSheet.create({
         paddingVertical: 6,
     },
     resetButtonText: {
-        color: '#FF6B00',
+        color: '#8A1C22',
         fontSize: 14,
         fontWeight: '500',
     },
@@ -331,7 +331,7 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     selectedOptionChip: {
-        backgroundColor: '#FF6B00',
+        backgroundColor: '#8A1C22',
     },
     optionChipText: {
         color: '#666',
@@ -356,17 +356,17 @@ const styles = StyleSheet.create({
         height: 24,
         borderRadius: 4,
         borderWidth: 2,
-        borderColor: '#FF6B00',
+        borderColor: '#8A1C22',
         marginRight: 12,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: equipment => equipment ? '#FF6B00' : 'transparent',
+        backgroundColor: equipment => equipment ? '#8A1C22' : 'transparent',
     },
     equipmentIconContainer: {
         width: 32,
         height: 32,
         borderRadius: 16,
-        backgroundColor: 'rgba(255, 107, 0, 0.1)',
+        backgroundColor: 'rgba(138, 28, 34, 0.1)',
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 12,
@@ -394,7 +394,7 @@ const styles = StyleSheet.create({
         borderTopColor: '#EEE',
     },
     applyButton: {
-        backgroundColor: '#FF6B00',
+        backgroundColor: '#8A1C22',
         paddingVertical: 14,
         borderRadius: 8,
         alignItems: 'center',

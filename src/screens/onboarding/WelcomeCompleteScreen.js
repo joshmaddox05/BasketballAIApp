@@ -177,7 +177,7 @@ const WelcomeCompleteScreen = ({ navigation }) => {
                     <View style={styles.profileSummary}>
                         <View style={styles.summaryCard}>
                             <View style={styles.summaryHeader}>
-                                <Ionicons name="person-circle" size={24} color="#FF6B00" />
+                                <Ionicons name="person-circle" size={24} color="#8A1C22" />
                                 <Text style={styles.summaryTitle}>Your Profile</Text>
                             </View>
                             <Text style={styles.summaryText}>
@@ -190,7 +190,7 @@ const WelcomeCompleteScreen = ({ navigation }) => {
 
                         <View style={styles.summaryCard}>
                             <View style={styles.summaryHeader}>
-                                <Ionicons name="flag" size={24} color="#FF6B00" />
+                                <Ionicons name="flag" size={24} color="#8A1C22" />
                                 <Text style={styles.summaryTitle}>Your Goals</Text>
                             </View>
                             <Text style={styles.summaryText}>
@@ -200,7 +200,7 @@ const WelcomeCompleteScreen = ({ navigation }) => {
 
                         <View style={styles.summaryCard}>
                             <View style={styles.summaryHeader}>
-                                <Ionicons name="fitness" size={24} color="#FF6B00" />
+                                <Ionicons name="fitness" size={24} color="#8A1C22" />
                                 <Text style={styles.summaryTitle}>Recommended Workout</Text>
                             </View>
                             <Text style={styles.summaryText}>
@@ -212,7 +212,7 @@ const WelcomeCompleteScreen = ({ navigation }) => {
                     <View style={styles.profileSummary}>
                         <View style={styles.summaryCard}>
                             <View style={styles.summaryHeader}>
-                                <Ionicons name={roleWelcome?.icon || 'rocket'} size={24} color="#FF6B00" />
+                                <Ionicons name={roleWelcome?.icon || 'rocket'} size={24} color="#8A1C22" />
                                 <Text style={styles.summaryTitle}>{roleWelcome?.title || "You're all set"}</Text>
                             </View>
                             <Text style={styles.summaryText}>
@@ -304,7 +304,7 @@ const styles = StyleSheet.create({
         width: 80,
         height: 80,
         borderRadius: 40,
-        backgroundColor: '#FF6B00',
+        backgroundColor: '#8A1C22',
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 16,
@@ -356,7 +356,7 @@ const styles = StyleSheet.create({
     },
     bold: {
         fontWeight: 'bold',
-        color: '#FF6B00',
+        color: '#8A1C22',
     },
     statsPreview: {
         backgroundColor: 'rgba(255, 255, 255, 0.1)',
@@ -383,7 +383,7 @@ const styles = StyleSheet.create({
     statNumber: {
         fontSize: 24,
         fontWeight: 'bold',
-        color: '#FF6B00',
+        color: '#8A1C22',
         marginBottom: 4,
     },
     statLabel: {
@@ -395,7 +395,7 @@ const styles = StyleSheet.create({
         paddingBottom: height * 0.05,
     },
     startTrainingButton: {
-        backgroundColor: '#FF6B00',
+        backgroundColor: '#8A1C22',
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',

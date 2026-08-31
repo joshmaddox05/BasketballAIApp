@@ -1,3 +1,12 @@
+// CoachSessionsScreen.js - Day timeline with live NOW marker (13d redesign).
+// Data loading, booking flow, and status updates unchanged.
+//
+// Timeline alignment (README 13d note): the vertical rail, the hour-label dots
+// and the NOW marker all share ONE center line at x = 53 inside the timeline
+// parent. Columns: time label 0–44, dot column 44–62 (dot centered at 53),
+// card from 64. The rail is absolutely positioned at left 52 (width 2) in the
+// same parent; the NOW row is a flow row padded to 48.5 so its 9px dot also
+// centers at 53. Dots are NEVER positioned relative to a card's content box.
 import React, { useState, useCallback } from 'react';
 import {
   SafeAreaView,
@@ -6,7 +15,6 @@ import {
   Text,
   TouchableOpacity,
   ScrollView,
-  Modal,
   TextInput,
   ActivityIndicator,
   Alert,
@@ -14,6 +22,7 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAppContext } from '../../context/AppContext';
 import {
   getLinkedPlayers,
@@ -21,8 +30,26 @@ import {
   createCoachingSession,
   updateSessionStatus,
 } from '../../services/firestoreService';
+import { TYPE, SHAPE, FONTS } from '../../utils/typography';
+import {
+  Entrance,
+  Float,
+  AttentionDot,
+  ScreenHeader,
+  SectionLabel,
+  Chip,
+  PrimaryButton,
+  EmptyState,
+  LoadingState,
+  BottomSheet,
+} from '../../components/dbe';
 
-const STATUS_COLOR = { confirmed: '#22C55E', pending: '#F59E0B', cancelled: '#EF4444', completed: '#6366F1' };
+// Shared center line for rail / dots / NOW marker (see header comment).
+const TIME_COL = 44; // time label column width
+const DOT_COL = 18; // dot column width → dot center at 44 + 9 = 53
+const CARD_GAP = 2; // card starts at 64
+const RAIL_LEFT = 52; // rail width 2 → center 53
+const NOW_PAD = 48.5; // NOW dot is 9px → center 53
 
 // Preset scheduling options (no native date picker dependency).
 const DAY_OPTIONS = [
@@ -48,11 +75,164 @@ const toDate = (value) => {
   return isNaN(d.getTime()) ? null : d;
 };
 
-const formatWhen = (value) => {
+// Compact hour label for the timeline column ("9:00", "12:30").
+const shortTime = (value) => {
   const d = toDate(value);
-  if (!d) return 'Time TBD';
-  return `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} · ${d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`;
+  if (!d) return '—';
+  let h = d.getHours() % 12;
+  if (h === 0) h = 12;
+  const m = d.getMinutes();
+  return m ? `${h}:${String(m).padStart(2, '0')}` : `${h}:00`;
 };
+
+const sameDay = (a, b) =>
+  a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+
+const dayLabel = (d) => {
+  const now = new Date();
+  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  const md = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  if (sameDay(d, now)) return `Today · ${md}`;
+  if (sameDay(d, tomorrow)) return `Tomorrow · ${md}`;
+  return `${d.toLocaleDateString(undefined, { weekday: 'short' })} · ${md}`;
+};
+
+// Group a session list into day sections (unscheduled sessions last).
+const groupByDay = (list) => {
+  const groups = [];
+  const byKey = {};
+  list.forEach((s) => {
+    const d = toDate(s.scheduledAt);
+    const key = d ? `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}` : 'tbd';
+    if (!byKey[key]) {
+      byKey[key] = { key, label: d ? dayLabel(d) : 'Unscheduled', date: d, items: [] };
+      groups.push(byKey[key]);
+    }
+    byKey[key].items.push(s);
+  });
+  return groups;
+};
+
+const sortByTime = (list, desc = false) =>
+  [...list].sort((a, b) => {
+    const ta = toDate(a.scheduledAt)?.getTime() ?? Infinity;
+    const tb = toDate(b.scheduledAt)?.getTime() ?? Infinity;
+    return desc ? tb - ta : ta - tb;
+  });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Timeline pieces
+// ─────────────────────────────────────────────────────────────────────────────
+
+function TimelineDot({ theme, variant }) {
+  if (variant === 'next') {
+    return (
+      <View style={[styles.dotHalo, { backgroundColor: theme.badgeFill }]}>
+        <View style={[styles.dot, { backgroundColor: theme.primary }]} />
+      </View>
+    );
+  }
+  return (
+    <View
+      style={[
+        styles.dot,
+        { backgroundColor: theme.surface2, borderWidth: 2, borderColor: theme.textDim },
+      ]}
+    />
+  );
+}
+
+function NowMarker({ theme }) {
+  return (
+    <View style={styles.nowRow}>
+      <AttentionDot size={9} color={theme.accentText} haloColor={theme.pulseDot} duration={1700} />
+      <Text style={[styles.nowText, { color: theme.accentText }]}>NOW</Text>
+      <LinearGradient
+        colors={[theme.pulseDot, 'transparent']}
+        start={{ x: 0, y: 0.5 }}
+        end={{ x: 1, y: 0.5 }}
+        style={styles.nowLine}
+      />
+    </View>
+  );
+}
+
+function statusBadge(s, isNext, theme) {
+  if (isNext) return { label: 'NEXT UP', bg: theme.badgeFill, color: theme.accentText };
+  const status = (s.status || 'pending').toUpperCase();
+  if (s.status === 'confirmed') return { label: status, bg: theme.steelFill, color: theme.steel };
+  if (s.status === 'pending') return { label: status, bg: theme.badgeFill, color: theme.accentText };
+  return { label: status, bg: theme.surface2, color: theme.textMuted };
+}
+
+function SessionRow({ s, theme, isNext, showComplete, onComplete, delay }) {
+  const done = s.status === 'completed' || s.status === 'cancelled';
+  const badge = statusBadge(s, isNext, theme);
+  const metaParts = [
+    s.location,
+    s.mode === 'virtual' ? 'Virtual' : 'Court session',
+    s.amount ? `$${s.amount}` : null,
+  ].filter(Boolean);
+  return (
+    <Entrance variant="slideIn" delay={delay}>
+      <View style={styles.timelineRow}>
+        <Text
+          style={[
+            styles.timeLabel,
+            { color: isNext ? theme.text : theme.textDim },
+          ]}
+        >
+          {shortTime(s.scheduledAt)}
+        </Text>
+        <View style={styles.dotCol}>
+          <TimelineDot theme={theme} variant={isNext ? 'next' : 'default'} />
+        </View>
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: theme.surface },
+            isNext && { borderWidth: 1, borderColor: theme.attentionBorder },
+            done && { opacity: 0.62 },
+          ]}
+        >
+          <View style={styles.cardTitleRow}>
+            <Text numberOfLines={1} style={[styles.cardTitle, { color: theme.text }]}>
+              {s.type}
+              {s.athleteName ? ` · ${s.athleteName}` : ''}
+            </Text>
+            <View style={[styles.badge, { backgroundColor: badge.bg }]}>
+              <Text style={[styles.badgeText, { color: badge.color }]}>{badge.label}</Text>
+            </View>
+          </View>
+          {metaParts.length > 0 ? (
+            <Text numberOfLines={1} style={[styles.cardMeta, { color: theme.textDim }]}>
+              {metaParts.join(' · ')}
+            </Text>
+          ) : null}
+          {showComplete && !done ? (
+            isNext ? (
+              <TouchableOpacity
+                style={[styles.miniPrimary, { backgroundColor: theme.primary }]}
+                onPress={onComplete}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.miniPrimaryText}>Mark completed</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity onPress={onComplete} hitSlop={{ top: 6, bottom: 6 }}>
+                <Text style={[styles.completeLink, { color: theme.accentText }]}>Mark completed</Text>
+              </TouchableOpacity>
+            )
+          ) : null}
+        </View>
+      </View>
+    </Entrance>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Screen
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function CoachSessionsScreen({ navigation }) {
   const { user, userData, theme, isDarkMode } = useAppContext();
@@ -97,6 +277,7 @@ export default function CoachSessionsScreen({ navigation }) {
     const d = toDate(s.scheduledAt);
     return s.status !== 'completed' && s.status !== 'cancelled' && (!d || d.getTime() >= now);
   });
+  const pending = upcoming.filter((s) => s.status === 'pending');
   const past = sessions.filter((s) => {
     const d = toDate(s.scheduledAt);
     return s.status === 'completed' || s.status === 'cancelled' || (d && d.getTime() < now);
@@ -162,237 +343,327 @@ export default function CoachSessionsScreen({ navigation }) {
     [load]
   );
 
-  const list = tab === 'upcoming' ? upcoming : past;
+  const list =
+    tab === 'upcoming' ? sortByTime(upcoming) : tab === 'pending' ? sortByTime(pending) : sortByTime(past, true);
+  const groups = groupByDay(list);
+
+  // The single "next up" session: earliest future session in the timeline.
+  const nextId = sortByTime(upcoming).find((s) => {
+    const d = toDate(s.scheduledAt);
+    return d && d.getTime() >= now;
+  })?.id;
+
+  const TABS = [
+    { id: 'upcoming', label: `Upcoming · ${upcoming.length}` },
+    { id: 'pending', label: `Pending · ${pending.length}` },
+    { id: 'past', label: 'Past' },
+  ];
+
+  let rowIndex = 0;
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <StatusBar style={isDarkMode ? 'light' : 'dark'} />
-      <View style={[styles.header, { borderBottomColor: theme.border }]}>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>Sessions</Text>
-        <TouchableOpacity style={[styles.addBtn, { backgroundColor: theme.primary }]} onPress={openBooking}>
-          <Ionicons name="add" size={22} color="#fff" />
-        </TouchableOpacity>
-      </View>
+      <ScreenHeader title="Sessions" style={{ borderBottomWidth: 0 }} />
 
-      <View style={[styles.tabs, { borderBottomColor: theme.border }]}>
-        {['upcoming', 'past'].map((t) => (
-          <TouchableOpacity
-            key={t}
-            style={[styles.tab, tab === t && { borderBottomColor: theme.primary, borderBottomWidth: 2 }]}
-            onPress={() => setTab(t)}
-          >
-            <Text style={[styles.tabText, { color: tab === t ? theme.primary : theme.textSecondary }]}>
-              {t.charAt(0).toUpperCase() + t.slice(1)}
-            </Text>
-          </TouchableOpacity>
-        ))}
+      <View style={[styles.tabs, { borderBottomColor: theme.hairline }]}>
+        {TABS.map((t) => {
+          const active = tab === t.id;
+          return (
+            <TouchableOpacity key={t.id} onPress={() => setTab(t.id)} style={styles.tabItem}>
+              <Text
+                style={[
+                  styles.tabText,
+                  active
+                    ? { color: theme.text, fontFamily: FONTS.bodyExtraBold }
+                    : { color: theme.textDim },
+                ]}
+              >
+                {t.label}
+              </Text>
+              {active ? <View style={[styles.tabBar, { backgroundColor: theme.primary }]} /> : null}
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       {loading ? (
-        <ActivityIndicator color={theme.primary} style={{ marginTop: 40 }} />
+        <LoadingState />
       ) : (
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-          {list.length === 0 ? (
-            <View style={styles.empty}>
-              <Ionicons name="calendar-outline" size={40} color={theme.textSecondary} />
-              <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-                {tab === 'upcoming' ? 'No upcoming sessions. Tap + to book one.' : 'No past sessions yet.'}
-              </Text>
-            </View>
+          {groups.length === 0 ? (
+            <EmptyState
+              icon="calendar-outline"
+              title={tab === 'past' ? 'No past sessions' : 'No sessions booked'}
+              sub={
+                tab === 'past'
+                  ? 'Completed sessions land here.'
+                  : 'Book a session with an athlete to build your day.'
+              }
+              ctaLabel={tab === 'past' ? undefined : 'Book session'}
+              onPress={tab === 'past' ? undefined : openBooking}
+            />
           ) : (
-            list.map((s) => (
-              <View key={s.id} style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-                <View style={[styles.iconBox, { backgroundColor: theme.primary + '18' }]}>
-                  <Ionicons name={s.mode === 'virtual' ? 'videocam-outline' : 'basketball-outline'} size={20} color={theme.primary} />
-                </View>
-                <View style={styles.cardInfo}>
-                  <Text style={[styles.sessionType, { color: theme.text }]}>{s.type}</Text>
-                  <Text style={[styles.athleteName, { color: theme.textSecondary }]}>{s.athleteName}</Text>
-                  <View style={styles.metaRow}>
-                    <Ionicons name="time-outline" size={12} color={theme.textSecondary} />
-                    <Text style={[styles.metaText, { color: theme.textSecondary }]}>{formatWhen(s.scheduledAt)}</Text>
-                    {!!s.amount && <Text style={[styles.amount, { color: theme.primary }]}>${s.amount}</Text>}
+            groups.map((group) => {
+              // NOW marker: only inside today's group, between the last past
+              // session and the first future one.
+              const isToday = group.date && sameDay(group.date, new Date());
+              const nowIndex = isToday
+                ? group.items.findIndex((s) => {
+                    const d = toDate(s.scheduledAt);
+                    return d && d.getTime() > now;
+                  })
+                : -1;
+              return (
+                <View key={group.key} style={styles.group}>
+                  <SectionLabel>{group.label}</SectionLabel>
+                  <View style={styles.timeline}>
+                    {/* Rail — same parent, center x = 53 */}
+                    <View style={[styles.rail, { backgroundColor: theme.hairline }]} />
+                    {group.items.map((s, i) => {
+                      const delay = 50 + rowIndex++ * 130;
+                      return (
+                        <React.Fragment key={s.id}>
+                          {isToday && nowIndex === i ? <NowMarker theme={theme} /> : null}
+                          <SessionRow
+                            s={s}
+                            theme={theme}
+                            isNext={s.id === nextId && tab !== 'past'}
+                            showComplete={tab !== 'past'}
+                            onComplete={() => markCompleted(s)}
+                            delay={delay}
+                          />
+                        </React.Fragment>
+                      );
+                    })}
+                    {isToday && nowIndex === -1 && group.items.length > 0 ? (
+                      <NowMarker theme={theme} />
+                    ) : null}
                   </View>
-                  {tab === 'upcoming' && (
-                    <TouchableOpacity onPress={() => markCompleted(s)} style={styles.completeLink}>
-                      <Text style={[styles.completeLinkText, { color: theme.primary }]}>Mark completed</Text>
-                    </TouchableOpacity>
-                  )}
                 </View>
-                <View style={[styles.statusBadge, { backgroundColor: (STATUS_COLOR[s.status] || '#888') + '22' }]}>
-                  <Text style={[styles.statusText, { color: STATUS_COLOR[s.status] || '#888' }]}>{s.status}</Text>
-                </View>
-              </View>
-            ))
+              );
+            })
           )}
-          <View style={{ height: 32 }} />
+          <View style={{ height: 90 }} />
         </ScrollView>
       )}
 
+      {/* Floating book button */}
+      {!loading ? (
+        <Float style={styles.fabWrap}>
+          <TouchableOpacity
+            style={[styles.fab, { backgroundColor: theme.primary, shadowColor: theme.primary }]}
+            onPress={openBooking}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="add" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+        </Float>
+      ) : null}
+
       {/* Booking modal */}
-      <Modal visible={modalOpen} animationType="slide" transparent onRequestClose={() => setModalOpen(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalSheet, { backgroundColor: theme.background }]}>
-            <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
-              <Text style={[styles.modalTitle, { color: theme.text }]}>Book Session</Text>
-              <TouchableOpacity onPress={() => setModalOpen(false)}>
-                <Ionicons name="close" size={24} color={theme.text} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView contentContainerStyle={styles.modalScroll} showsVerticalScrollIndicator={false}>
-              <Text style={[styles.label, { color: theme.text }]}>Athlete</Text>
-              {roster.length === 0 ? (
-                <Text style={[styles.hint, { color: theme.textSecondary }]}>No linked athletes yet.</Text>
-              ) : (
-                <View style={styles.chipWrap}>
-                  {roster.map((a) => {
-                    const selected = athlete?.uid === a.uid;
-                    return (
-                      <TouchableOpacity
-                        key={a.uid}
-                        style={[styles.chip, { backgroundColor: selected ? theme.primary + '18' : theme.card, borderColor: selected ? theme.primary : theme.border }]}
-                        onPress={() => setAthlete(a)}
-                      >
-                        <Text style={[styles.chipText, { color: selected ? theme.primary : theme.text }]}>{a.name || 'Athlete'}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              )}
-
-              <Text style={[styles.label, { color: theme.text }]}>Session type</Text>
-              <TextInput
-                style={[styles.input, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]}
-                value={type}
-                onChangeText={setType}
-                placeholder="e.g. Shooting Clinic"
-                placeholderTextColor={theme.textSecondary}
-              />
-
-              <Text style={[styles.label, { color: theme.text }]}>Mode</Text>
-              <View style={styles.chipWrap}>
-                {[
-                  { id: 'court', label: 'In-Person' },
-                  { id: 'virtual', label: 'Virtual' },
-                ].map((m) => {
-                  const selected = mode === m.id;
-                  return (
-                    <TouchableOpacity
-                      key={m.id}
-                      style={[styles.chip, { backgroundColor: selected ? theme.primary + '18' : theme.card, borderColor: selected ? theme.primary : theme.border }]}
-                      onPress={() => setMode(m.id)}
-                    >
-                      <Text style={[styles.chipText, { color: selected ? theme.primary : theme.text }]}>{m.label}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              <Text style={[styles.label, { color: theme.text }]}>Location</Text>
-              <TextInput
-                style={[styles.input, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]}
-                value={location}
-                onChangeText={setLocation}
-                placeholder={mode === 'virtual' ? 'Video link or note' : 'Court / gym'}
-                placeholderTextColor={theme.textSecondary}
-              />
-
-              <Text style={[styles.label, { color: theme.text }]}>Day</Text>
-              <View style={styles.chipWrap}>
-                {DAY_OPTIONS.map((d) => {
-                  const selected = dayOffset === d.id;
-                  return (
-                    <TouchableOpacity
-                      key={d.id}
-                      style={[styles.chip, { backgroundColor: selected ? theme.primary + '18' : theme.card, borderColor: selected ? theme.primary : theme.border }]}
-                      onPress={() => setDayOffset(d.id)}
-                    >
-                      <Text style={[styles.chipText, { color: selected ? theme.primary : theme.text }]}>{d.label}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              <Text style={[styles.label, { color: theme.text }]}>Time</Text>
-              <View style={styles.chipWrap}>
-                {TIME_SLOTS.map((t) => {
-                  const selected = hour === t.hour;
-                  return (
-                    <TouchableOpacity
-                      key={t.hour}
-                      style={[styles.chip, { backgroundColor: selected ? theme.primary + '18' : theme.card, borderColor: selected ? theme.primary : theme.border }]}
-                      onPress={() => setHour(t.hour)}
-                    >
-                      <Text style={[styles.chipText, { color: selected ? theme.primary : theme.text }]}>{t.label}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              <Text style={[styles.label, { color: theme.text }]}>Price (USD)</Text>
-              <TextInput
-                style={[styles.input, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]}
-                value={amount}
-                onChangeText={setAmount}
-                placeholder="0"
-                placeholderTextColor={theme.textSecondary}
-                keyboardType="decimal-pad"
-              />
-
-              <TouchableOpacity
-                style={[styles.createBtn, { backgroundColor: theme.primary }]}
-                onPress={handleCreate}
-                disabled={saving}
-                activeOpacity={0.85}
-              >
-                {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.createBtnText}>Create Session</Text>}
-              </TouchableOpacity>
-              <View style={{ height: 24 }} />
-            </ScrollView>
-          </View>
+      <BottomSheet visible={modalOpen} onClose={() => setModalOpen(false)} contentStyle={{ maxHeight: '90%' }}>
+        <View style={[styles.modalHeader, { borderBottomColor: theme.hairline }]}>
+          <Text style={[TYPE.subScreenTitle, { color: theme.text }]}>Book Session</Text>
+          <TouchableOpacity onPress={() => setModalOpen(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="close" size={22} color={theme.text} />
+          </TouchableOpacity>
         </View>
-      </Modal>
+
+        <ScrollView contentContainerStyle={styles.modalScroll} showsVerticalScrollIndicator={false}>
+          <Text style={[TYPE.sectionLabel, styles.fieldLabel, { color: theme.textDim }]}>Athlete</Text>
+          {roster.length === 0 ? (
+            <Text style={[TYPE.tooltipBody, { color: theme.textDim }]}>No linked athletes yet.</Text>
+          ) : (
+            <View style={styles.chipWrap}>
+              {roster.map((a) => (
+                <Chip
+                  key={a.uid}
+                  label={a.name || 'Athlete'}
+                  active={athlete?.uid === a.uid}
+                  onPress={() => setAthlete(a)}
+                />
+              ))}
+            </View>
+          )}
+
+          <Text style={[TYPE.sectionLabel, styles.fieldLabel, { color: theme.textDim }]}>Session type</Text>
+          <TextInput
+            style={[styles.input, { backgroundColor: theme.surface, color: theme.text }]}
+            value={type}
+            onChangeText={setType}
+            placeholder="e.g. Shooting Clinic"
+            placeholderTextColor={theme.textDim}
+          />
+
+          <Text style={[TYPE.sectionLabel, styles.fieldLabel, { color: theme.textDim }]}>Mode</Text>
+          <View style={styles.chipWrap}>
+            {[
+              { id: 'court', label: 'In-Person' },
+              { id: 'virtual', label: 'Virtual' },
+            ].map((m) => (
+              <Chip key={m.id} label={m.label} active={mode === m.id} onPress={() => setMode(m.id)} />
+            ))}
+          </View>
+
+          <Text style={[TYPE.sectionLabel, styles.fieldLabel, { color: theme.textDim }]}>Location</Text>
+          <TextInput
+            style={[styles.input, { backgroundColor: theme.surface, color: theme.text }]}
+            value={location}
+            onChangeText={setLocation}
+            placeholder={mode === 'virtual' ? 'Video link or note' : 'Court / gym'}
+            placeholderTextColor={theme.textDim}
+          />
+
+          <Text style={[TYPE.sectionLabel, styles.fieldLabel, { color: theme.textDim }]}>Day</Text>
+          <View style={styles.chipWrap}>
+            {DAY_OPTIONS.map((d) => (
+              <Chip key={d.id} label={d.label} active={dayOffset === d.id} onPress={() => setDayOffset(d.id)} />
+            ))}
+          </View>
+
+          <Text style={[TYPE.sectionLabel, styles.fieldLabel, { color: theme.textDim }]}>Time</Text>
+          <View style={styles.chipWrap}>
+            {TIME_SLOTS.map((t) => (
+              <Chip key={t.hour} label={t.label} active={hour === t.hour} onPress={() => setHour(t.hour)} />
+            ))}
+          </View>
+
+          <Text style={[TYPE.sectionLabel, styles.fieldLabel, { color: theme.textDim }]}>Price (USD)</Text>
+          <TextInput
+            style={[styles.input, { backgroundColor: theme.surface, color: theme.text }]}
+            value={amount}
+            onChangeText={setAmount}
+            placeholder="0"
+            placeholderTextColor={theme.textDim}
+            keyboardType="decimal-pad"
+          />
+
+          <PrimaryButton
+            label={saving ? 'Creating…' : 'Create Session'}
+            onPress={handleCreate}
+            disabled={saving}
+            style={{ marginTop: 20 }}
+          />
+          <View style={{ height: 24 }} />
+        </ScrollView>
+      </BottomSheet>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1 },
-  headerTitle: { fontSize: 20, fontWeight: '800' },
-  addBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  tabs: { flexDirection: 'row', borderBottomWidth: 1 },
-  tab: { flex: 1, alignItems: 'center', paddingVertical: 12 },
-  tabText: { fontSize: 14, fontWeight: '600' },
-  scroll: { padding: 16, gap: 12 },
-  empty: { alignItems: 'center', paddingTop: 60, gap: 12 },
-  emptyText: { fontSize: 13, textAlign: 'center', lineHeight: 19, maxWidth: 260 },
-  card: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, borderWidth: 1, padding: 14 },
-  iconBox: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  cardInfo: { flex: 1, gap: 4 },
-  sessionType: { fontSize: 15, fontWeight: '700' },
-  athleteName: { fontSize: 13 },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  metaText: { fontSize: 12, flex: 1 },
-  amount: { fontSize: 13, fontWeight: '700' },
-  completeLink: { marginTop: 4 },
-  completeLinkText: { fontSize: 12, fontWeight: '700' },
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  statusText: { fontSize: 11, fontWeight: '700', textTransform: 'capitalize' },
+
+  // Tabs
+  tabs: {
+    flexDirection: 'row',
+    gap: 20,
+    paddingHorizontal: SHAPE.screenPadding,
+    borderBottomWidth: 1,
+  },
+  tabItem: { paddingBottom: 9 },
+  tabText: { fontFamily: FONTS.bodySemiBold, fontSize: 12.5 },
+  tabBar: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 2 },
+
+  scroll: { paddingHorizontal: SHAPE.screenPadding, paddingTop: 12 },
+  group: { marginBottom: 6 },
+
+  // Timeline
+  timeline: { position: 'relative' },
+  rail: {
+    position: 'absolute',
+    left: RAIL_LEFT,
+    top: 4,
+    bottom: 8,
+    width: 2,
+  },
+  timelineRow: { flexDirection: 'row', marginBottom: 14 },
+  timeLabel: {
+    width: TIME_COL,
+    fontFamily: FONTS.bodyBold,
+    fontSize: 10,
+    textAlign: 'right',
+    paddingRight: 12,
+    paddingTop: 14,
+  },
+  dotCol: { width: DOT_COL, alignItems: 'center', paddingTop: 18 },
+  dot: { width: 9, height: 9, borderRadius: 5 },
+  dotHalo: {
+    width: 15,
+    height: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: -3,
+  },
+  nowRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingLeft: NOW_PAD,
+    marginBottom: 14,
+  },
+  nowText: { fontFamily: FONTS.bodyExtraBold, fontSize: 9, letterSpacing: 0.6 },
+  nowLine: { flex: 1, height: 1 },
+
+  // Session card
+  card: {
+    flex: 1,
+    marginLeft: CARD_GAP,
+    borderRadius: SHAPE.radiusCard,
+    padding: 13,
+  },
+  cardTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  cardTitle: { fontFamily: FONTS.bodyBold, fontSize: 13, flexShrink: 1 },
+  cardMeta: { fontFamily: FONTS.body, fontSize: 11, marginTop: 5 },
+  badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  badgeText: { fontFamily: FONTS.bodyBold, fontSize: 9, letterSpacing: 0.3 },
+  miniPrimary: {
+    marginTop: 11,
+    borderRadius: 10,
+    paddingVertical: 9,
+    alignItems: 'center',
+  },
+  miniPrimaryText: { fontFamily: FONTS.bodyExtraBold, fontSize: 11.5, color: '#FFFFFF' },
+  completeLink: { fontFamily: FONTS.bodyBold, fontSize: 12, marginTop: 9 },
+
+  // FAB
+  fabWrap: { position: 'absolute', right: 20, bottom: 24 },
+  fab: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
+  },
 
   // Modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalSheet: { maxHeight: '90%', borderTopLeftRadius: 20, borderTopRightRadius: 20 },
-  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1 },
-  modalTitle: { fontSize: 18, fontWeight: '800' },
-  modalScroll: { padding: 16 },
-  label: { fontSize: 14, fontWeight: '700', marginBottom: 8, marginTop: 12 },
-  hint: { fontSize: 13 },
-  input: { borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15 },
+  // BottomSheet owns the horizontal padding now; these only add vertical rhythm.
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  modalScroll: { paddingVertical: SHAPE.screenPadding },
+  fieldLabel: { marginBottom: 8, marginTop: 14 },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, borderWidth: 1.5 },
-  chipText: { fontSize: 13, fontWeight: '600' },
-  createBtn: { marginTop: 20, paddingVertical: 15, borderRadius: 14, alignItems: 'center' },
-  createBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  input: {
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontFamily: FONTS.body,
+    fontSize: 14,
+  },
 });

@@ -196,9 +196,9 @@ const YouTubeTestScreen = ({ navigation }) => {
             disabled={testing}
           >
             {testing ? (
-              <ActivityIndicator size="small" color="#FF6B00" />
+              <ActivityIndicator size="small" color="#8A1C22" />
             ) : (
-              <Ionicons name="search" size={20} color="#FF6B00" />
+              <Ionicons name="search" size={20} color="#8A1C22" />
             )}
             <Text style={[styles.buttonText, styles.secondaryButtonText]}>
               Test Category Search
@@ -211,9 +211,9 @@ const YouTubeTestScreen = ({ navigation }) => {
             disabled={testing}
           >
             {testing ? (
-              <ActivityIndicator size="small" color="#FF6B00" />
+              <ActivityIndicator size="small" color="#8A1C22" />
             ) : (
-              <Ionicons name="trending-up" size={20} color="#FF6B00" />
+              <Ionicons name="trending-up" size={20} color="#8A1C22" />
             )}
             <Text style={[styles.buttonText, styles.secondaryButtonText]}>
               Test Popular Videos
@@ -334,12 +334,12 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   primaryButton: {
-    backgroundColor: '#FF6B00',
+    backgroundColor: '#8A1C22',
   },
   secondaryButton: {
     backgroundColor: 'transparent',
     borderWidth: 2,
-    borderColor: '#FF6B00',
+    borderColor: '#8A1C22',
   },
   buttonText: {
     fontSize: 16,
@@ -348,7 +348,7 @@ const styles = StyleSheet.create({
     color: '#FFF',
   },
   secondaryButtonText: {
-    color: '#FF6B00',
+    color: '#8A1C22',
   },
   statusCard: {
     flexDirection: 'row',
@@ -385,7 +385,7 @@ const styles = StyleSheet.create({
   resultsCount: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#FF6B00',
+    color: '#8A1C22',
     marginBottom: 12,
   },
   videoResult: {
@@ -394,7 +394,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 8,
     borderLeftWidth: 3,
-    borderLeftColor: '#FF6B00',
+    borderLeftColor: '#8A1C22',
   },
   videoTitle: {
     fontSize: 14,

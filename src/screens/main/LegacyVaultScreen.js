@@ -1,21 +1,35 @@
+// LegacyVaultScreen.js — knowledge library
+// Design: handoff 12f "LegacyVault™ — knowledge library". Presentational layer
+// only; access gating, category routing and the ShotDNA archetype source are
+// unchanged.
 import React, { useState, useCallback } from 'react';
-import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, ScrollView, TextInput } from 'react-native';
+import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, ScrollView, TextInput, Animated } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
 import { canAccessFeature } from '../../utils/subscription';
+import {
+  ScreenHeader,
+  SectionLabel,
+  PrimaryButton,
+  Entrance,
+  Float,
+  useLoop,
+} from '../../components/dbe';
+import { TYPE, SHAPE } from '../../utils/typography';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Mock data
 // ─────────────────────────────────────────────────────────────────────────────
-
+// `tone` drives the burgundy-vs-steel voice from the mock: the two "prestige"
+// categories carry the accent, the rest stay neutral.
 const CATEGORIES = [
-  { id: 'legends', label: 'Legends', icon: 'star', articleCount: 84, color: '#FFD700' },
-  { id: 'playbooks', label: 'Playbooks', icon: 'book', articleCount: 62, color: '#60A5FA' },
-  { id: 'terminology', label: 'Terminology', icon: 'text', articleCount: 115, color: '#34D399' },
-  { id: 'film_room', label: 'Film Room', icon: 'film', articleCount: 47, color: '#F87171' },
-  { id: 'coaching', label: 'Coaching Methods', icon: 'people', articleCount: 39, color: '#A78BFA' },
-  { id: 'hall_of_fame', label: 'Hall of Fame', icon: 'trophy', articleCount: 31, color: '#FF6B00' },
+  { id: 'legends', label: 'Legends', icon: 'star', articleCount: 84, tone: 'accent' },
+  { id: 'playbooks', label: 'Playbooks', icon: 'book-outline', articleCount: 62, tone: 'steel' },
+  { id: 'terminology', label: 'Terminology', icon: 'list-outline', articleCount: 115, tone: 'steel' },
+  { id: 'film_room', label: 'Film Room', icon: 'film-outline', articleCount: 47, tone: 'steel' },
+  { id: 'coaching', label: 'Coaching', icon: 'people-outline', articleCount: 39, tone: 'steel' },
+  { id: 'hall_of_fame', label: 'Hall of Fame', icon: 'trophy-outline', articleCount: 31, tone: 'accent' },
 ];
 
 const MOCK_ARCHETYPE = {
@@ -23,135 +37,177 @@ const MOCK_ARCHETYPE = {
   description: 'Elite catch-and-shoot mechanics with off-ball movement mastery.',
   historicalCount: 14,
   players: [
-    {
-      id: 'p1',
-      name: 'Reggie Miller',
-      era: '1987–2005',
-      team: 'Indiana Pacers',
-      trait: 'Off-Screen Shooter',
-      icon: 'person',
-    },
-    {
-      id: 'p2',
-      name: 'Ray Allen',
-      era: '1996–2014',
-      team: 'Boston Celtics',
-      trait: 'Pure Marksman',
-      icon: 'person',
-    },
+    { id: 'p1', name: 'Reggie Miller', era: '1987–2005', team: 'Indiana Pacers', trait: 'Off-Screen Shooter' },
+    { id: 'p2', name: 'Ray Allen', era: '1996–2014', team: 'Boston Celtics', trait: 'Pure Marksman' },
+    { id: 'p3', name: 'Klay Thompson', era: '2011–2024', team: 'Golden State', trait: 'Catch & Shoot' },
   ],
 };
 
 const MOCK_FEATURED_ARTICLES = [
-  { id: 'f1', title: "The Evolution of the Three-Point Shot", category: 'Terminology', readTime: '6 min' },
+  { id: 'f1', title: 'The Evolution of the Three-Point Shot', category: 'Terminology', readTime: '6 min' },
   { id: 'f2', title: "Phil Jackson's Triangle Offense Explained", category: 'Playbooks', readTime: '9 min' },
 ];
+
+const initialsOf = (name) =>
+  (name || '').split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Sub-components
 // ─────────────────────────────────────────────────────────────────────────────
 
+// baiSpark — a small accent mote that fades and scales in place.
+function Spark({ color, size = 6, top, right, delay = 0 }) {
+  const t = useLoop(2400, delay);
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        top,
+        right,
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        backgroundColor: color,
+        opacity: t.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 1, 0] }),
+        transform: [{ scale: t.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.4, 1, 0.4] }) }],
+      }}
+    />
+  );
+}
+
 function SearchBar({ value, onChangeText, theme }) {
   return (
-    <View style={[styles.searchContainer, { backgroundColor: theme.card, borderColor: theme.border }]}>
-      <Ionicons name="search" size={16} color={theme.textSecondary} style={styles.searchIcon} />
+    <View style={[styles.searchRow, { backgroundColor: theme.surface }]}>
+      <Ionicons name="search-outline" size={15} color={theme.textDim} />
       <TextInput
-        style={[styles.searchInput, { color: theme.text }]}
+        style={[styles.searchInput, TYPE.rowTitle, { color: theme.text }]}
         placeholder="Search legends, plays, terminology…"
-        placeholderTextColor={theme.textSecondary}
+        placeholderTextColor={theme.textDim}
         value={value}
         onChangeText={onChangeText}
         returnKeyType="search"
         clearButtonMode="while-editing"
       />
-      {value.length > 0 && (
-        <TouchableOpacity onPress={() => onChangeText('')} activeOpacity={0.7} style={styles.searchClear}>
-          <Ionicons name="close-circle" size={16} color={theme.textSecondary} />
-        </TouchableOpacity>
-      )}
     </View>
   );
 }
 
-function CategoryCard({ category, onPress, theme }) {
+// The archetype lineage hero — the one card that earns display type.
+function ArchetypeCard({ archetype, theme, onPress }) {
+  return (
+    <Entrance variant="cardIn">
+      <TouchableOpacity
+        activeOpacity={onPress ? 0.85 : 1}
+        disabled={!onPress}
+        onPress={onPress}
+        style={[styles.archetypeCard, { backgroundColor: theme.surface }]}
+      >
+        <Spark color={theme.accentText} size={6} top={14} right={14} />
+        <Spark color={theme.accentText} size={4} top={30} right={34} delay={800} />
+
+        <Text style={[TYPE.statCaption, { color: theme.steel, letterSpacing: 1.5 }]}>
+          Your archetype lineage
+        </Text>
+        <Text style={[TYPE.tooltipTitle, { color: theme.text, fontSize: 19, marginTop: 5 }]}>
+          {archetype.name}
+        </Text>
+        <Text style={[TYPE.tooltipBody, { color: theme.textMuted, marginTop: 6, maxWidth: 250 }]}>
+          {archetype.description}
+        </Text>
+
+        <View style={[styles.lineageRow, { borderTopColor: theme.hairline }]}>
+          {archetype.players.slice(0, 3).map((p, i) => (
+            <View
+              key={p.id}
+              style={[
+                styles.lineageAvatar,
+                { backgroundColor: i === 0 ? theme.avatarFill : theme.steelFill },
+              ]}
+            >
+              <Text
+                style={[TYPE.chipSmall, { color: i === 0 ? theme.accentText : theme.steel }]}
+              >
+                {initialsOf(p.name)}
+              </Text>
+            </View>
+          ))}
+          <Text style={[TYPE.chip, { color: theme.textDim, marginLeft: 2 }]}>
+            {`${archetype.historicalCount} historical players`}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    </Entrance>
+  );
+}
+
+function CategoryCard({ category, onPress, theme, delay, locked }) {
+  const accent = category.tone === 'accent';
+  const iconColor = locked ? theme.textDim : accent ? theme.accentText : theme.steel;
+  const tile = (
+    <View style={[styles.catIcon, { backgroundColor: accent ? theme.badgeFill : theme.steelFill }]}>
+      <Ionicons name={category.icon} size={17} color={iconColor} />
+    </View>
+  );
+  return (
+    <Entrance variant="cardIn" delay={delay} style={styles.catCell}>
+      <TouchableOpacity
+        style={[styles.catCard, { backgroundColor: theme.surface, opacity: locked ? 0.45 : 1 }]}
+        onPress={locked ? undefined : () => onPress(category)}
+        activeOpacity={locked ? 1 : 0.8}
+        disabled={locked}
+      >
+        {locked ? tile : <Float duration={3200}>{tile}</Float>}
+        <Text style={[TYPE.rowTitle, { color: theme.text, fontSize: 13, marginTop: 10 }]}>
+          {category.label}
+        </Text>
+        <Text style={[TYPE.cardBody, { color: theme.textDim, marginTop: 2 }]}>
+          {`${category.articleCount} articles`}
+        </Text>
+      </TouchableOpacity>
+    </Entrance>
+  );
+}
+
+// Featured reading — a colored spine instead of an icon tile (text minimum).
+function FeaturedArticleRow({ article, theme, accent, last, onPress }) {
   return (
     <TouchableOpacity
-      style={[styles.categoryCard, { backgroundColor: theme.card, borderColor: theme.border }]}
-      onPress={() => onPress(category)}
+      style={[styles.featRow, { borderBottomColor: last ? 'transparent' : theme.hairline }]}
       activeOpacity={0.8}
+      onPress={onPress}
     >
-      <View style={[styles.categoryIconWrap, { backgroundColor: category.color + '1E' }]}>
-        <Ionicons name={category.icon} size={22} color={category.color} />
+      <View style={[styles.featSpine, { backgroundColor: accent ? theme.primary : theme.steel }]} />
+      <View style={{ flex: 1 }}>
+        <Text style={[TYPE.rowTitle, { color: theme.text, fontSize: 12.5, lineHeight: 17 }]}>
+          {article.title}
+        </Text>
+        <Text style={[TYPE.cardBody, { color: theme.textDim, marginTop: 2 }]}>
+          {`${article.category} · ${article.readTime} read`}
+        </Text>
       </View>
-      <Text style={[styles.categoryLabel, { color: theme.text }]}>{category.label}</Text>
-      <Text style={[styles.categoryCount, { color: theme.textSecondary }]}>
-        {category.articleCount} articles
-      </Text>
     </TouchableOpacity>
-  );
-}
-
-function ArchetypePlayerCard({ player, theme }) {
-  return (
-    <View style={[styles.playerCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-      <View style={[styles.playerAvatar, { backgroundColor: theme.primary + '20' }]}>
-        <Ionicons name={player.icon} size={20} color={theme.primary} />
-      </View>
-      <View style={styles.playerInfo}>
-        <Text style={[styles.playerName, { color: theme.text }]}>{player.name}</Text>
-        <Text style={[styles.playerTeam, { color: theme.textSecondary }]}>{player.team}</Text>
-        <Text style={[styles.playerEra, { color: theme.textSecondary }]}>{player.era}</Text>
-      </View>
-      <View style={[styles.playerTraitBadge, { backgroundColor: theme.primary + '18' }]}>
-        <Text style={[styles.playerTraitText, { color: theme.primary }]}>{player.trait}</Text>
-      </View>
-    </View>
   );
 }
 
 function LockedCard({ theme, onUpgrade }) {
   return (
-    <View style={[styles.lockedCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-      <View style={[styles.lockedIconWrap, { backgroundColor: theme.primary + '18' }]}>
-        <Ionicons name="lock-closed" size={28} color={theme.primary} />
+    <View style={[styles.lockedCard, { backgroundColor: theme.surface }]}>
+      <View style={[styles.lockedIcon, { backgroundColor: theme.badgeFill }]}>
+        <Ionicons name="lock-closed" size={26} color={theme.accentText} />
       </View>
-      <Text style={[styles.lockedTitle, { color: theme.text }]}>Premium Content</Text>
-      <Text style={[styles.lockedBody, { color: theme.textSecondary }]}>
-        LegacyVault™ is a Premium feature. Unlock the full basketball heritage library, personalized archetype
-        connections, and 300+ articles.
+      <Text style={[TYPE.tooltipTitle, { color: theme.text }]}>Premium Content</Text>
+      <Text style={[TYPE.tooltipBody, { color: theme.textDim, textAlign: 'center', marginTop: 6 }]}>
+        300+ articles, plus your archetype lineage.
       </Text>
-      <TouchableOpacity
-        style={[styles.upgradeButton, { backgroundColor: theme.primary }]}
+      <PrimaryButton
+        label="Upgrade to Premium"
+        icon="star"
         onPress={onUpgrade}
-        activeOpacity={0.85}
-      >
-        <Ionicons name="star" size={14} color="#FFFFFF" />
-        <Text style={styles.upgradeButtonText}>Upgrade to Premium</Text>
-      </TouchableOpacity>
-      <Text style={[styles.lockedNote, { color: theme.textSecondary }]}>
-        Starting at $9.99 / month
-      </Text>
+        style={{ alignSelf: 'stretch', marginTop: 18 }}
+      />
+      <Text style={[TYPE.rowMeta, { color: theme.textDim, marginTop: 10 }]}>From $9.99 / month</Text>
     </View>
-  );
-}
-
-function FeaturedArticleRow({ article, theme }) {
-  return (
-    <TouchableOpacity
-      style={[styles.featuredRow, { backgroundColor: theme.card, borderColor: theme.border }]}
-      activeOpacity={0.8}
-    >
-      <View style={[styles.featuredIconWrap, { backgroundColor: '#FF6B00' + '18' }]}>
-        <Ionicons name="document-text" size={18} color="#FF6B00" />
-      </View>
-      <View style={styles.featuredInfo}>
-        <Text style={[styles.featuredTitle, { color: theme.text }]}>{article.title}</Text>
-        <Text style={[styles.featuredMeta, { color: theme.textSecondary }]}>
-          {article.category} · {article.readTime} read
-        </Text>
-      </View>
-      <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
-    </TouchableOpacity>
   );
 }
 
@@ -174,6 +230,8 @@ export default function LegacyVaultScreen({ navigation }) {
   const categories = CATEGORIES;
   const featuredArticles = MOCK_FEATURED_ARTICLES;
 
+  const totalArticles = categories.reduce((sum, c) => sum + c.articleCount, 0);
+
   const handleCategoryPress = useCallback((category) => {
     navigation.navigate('LegacyVaultArticle', { category });
   }, [navigation]);
@@ -190,159 +248,72 @@ export default function LegacyVaultScreen({ navigation }) {
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <StatusBar style={isDarkMode ? 'light' : 'dark'} />
 
-      {/* Header */}
-      <View style={[styles.header, { borderBottomColor: theme.border }]}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="chevron-back" size={24} color={theme.text} />
-        </TouchableOpacity>
-        <View style={styles.headerTitleBlock}>
-          <Text style={[styles.headerTitle, { color: theme.text }]}>LegacyVault™</Text>
-          <Text style={[styles.headerSubtitle, { color: theme.textSecondary }]}>
-            Basketball Heritage &amp; Knowledge
-          </Text>
-        </View>
-        <View style={styles.headerRight}>
-          <View style={[styles.premiumBadge, { backgroundColor: theme.primary + '18', borderColor: theme.primary + '40' }]}>
-            <Ionicons name="star" size={10} color={theme.primary} />
-            <Text style={[styles.premiumBadgeText, { color: theme.primary }]}>PREMIUM</Text>
-          </View>
-        </View>
-      </View>
+      <ScreenHeader
+        title="LegacyVault™"
+        subtitle={`${totalArticles} articles · legends, plays, terms`}
+        onBack={() => navigation.goBack()}
+      />
 
       <ScrollView
-        style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Search */}
         <SearchBar value={searchQuery} onChangeText={setSearchQuery} theme={theme} />
 
         {hasAccess ? (
           <>
-            {/* Featured Articles */}
-            {!searchQuery && (
-              <>
-                <View style={[styles.sectionHeader, { marginTop: 4 }]}>
-                  <Text style={[styles.sectionTitle, { color: theme.text }]}>Featured</Text>
-                </View>
-                <View style={styles.featuredList}>
-                  {featuredArticles.map((article) => (
-                    <FeaturedArticleRow key={article.id} article={article} theme={theme} />
-                  ))}
-                </View>
-              </>
-            )}
-
-            {/* Category Grid */}
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>Browse Categories</Text>
-              <Text style={[styles.sectionCount, { color: theme.textSecondary }]}>
-                {filteredCategories.length} categories
-              </Text>
-            </View>
+            {!searchQuery && <ArchetypeCard archetype={archetype} theme={theme} />}
 
             {filteredCategories.length === 0 ? (
-              <View style={[styles.emptySearch, { backgroundColor: theme.card, borderColor: theme.border }]}>
-                <Ionicons name="search-outline" size={28} color={theme.textSecondary} />
-                <Text style={[styles.emptySearchText, { color: theme.textSecondary }]}>
-                  No categories match "{searchQuery}"
+              <View style={[styles.emptySearch, { backgroundColor: theme.surface }]}>
+                <Ionicons name="search-outline" size={26} color={theme.textDim} />
+                <Text style={[TYPE.cardBody, { color: theme.textDim, marginTop: 8 }]}>
+                  {`Nothing matches “${searchQuery}”`}
                 </Text>
               </View>
             ) : (
-              <View style={styles.categoryGrid}>
-                {filteredCategories.map((cat) => (
+              <View style={styles.catGrid}>
+                {filteredCategories.map((cat, i) => (
                   <CategoryCard
                     key={cat.id}
                     category={cat}
                     onPress={handleCategoryPress}
                     theme={theme}
+                    delay={100 + i * 80}
                   />
                 ))}
               </View>
             )}
 
-            {/* Archetype Connection */}
             {!searchQuery && (
-              <>
-                <View style={styles.sectionHeader}>
-                  <Text style={[styles.sectionTitle, { color: theme.text }]}>Your Archetype Connection</Text>
-                </View>
-
-                <View style={[styles.archetypeHeader, { backgroundColor: theme.primary + '12', borderColor: theme.primary + '30' }]}>
-                  <View style={styles.archetypeHeaderLeft}>
-                    <View style={[styles.archetypeIconWrap, { backgroundColor: theme.primary + '22' }]}>
-                      <Ionicons name="cellular" size={20} color={theme.primary} />
-                    </View>
-                    <View style={styles.archetypeHeaderInfo}>
-                      <Text style={[styles.archetypeName, { color: theme.text }]}>{archetype.name}</Text>
-                      <Text style={[styles.archetypeDesc, { color: theme.textSecondary }]}>
-                        {archetype.description}
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={[styles.archetypeCountBadge, { backgroundColor: theme.primary }]}>
-                    <Text style={styles.archetypeCountNum}>{archetype.historicalCount}</Text>
-                    <Text style={styles.archetypeCountLabel}>players</Text>
-                  </View>
-                </View>
-
-                <Text style={[styles.archetypeShareLine, { color: theme.textSecondary }]}>
-                  {archetype.historicalCount} historical players share your mechanics
-                </Text>
-
-                <View style={styles.playerList}>
-                  {archetype.players.map((player) => (
-                    <ArchetypePlayerCard key={player.id} player={player} theme={theme} />
-                  ))}
-                </View>
-
-                <TouchableOpacity
-                  style={[styles.archetypeMoreButton, { borderColor: theme.border }]}
-                  activeOpacity={0.75}
-                >
-                  <Text style={[styles.archetypeMoreText, { color: theme.primary }]}>
-                    Explore All {archetype.historicalCount} Connections
-                  </Text>
-                  <Ionicons name="chevron-forward" size={14} color={theme.primary} />
-                </TouchableOpacity>
-              </>
+              <View style={{ marginTop: SHAPE.sectionGap }}>
+                <SectionLabel>Featured reading</SectionLabel>
+                {featuredArticles.map((article, i) => (
+                  <FeaturedArticleRow
+                    key={article.id}
+                    article={article}
+                    theme={theme}
+                    accent={i === 0}
+                    last={i === featuredArticles.length - 1}
+                    onPress={() =>
+                      navigation.navigate('LegacyVaultArticle', {
+                        category: categories.find((c) => c.label === article.category) || categories[0],
+                      })
+                    }
+                  />
+                ))}
+              </View>
             )}
           </>
         ) : (
           <>
-            {/* Locked state — show a teaser of categories blurred/faded + upgrade card */}
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>Browse Categories</Text>
-            </View>
-
-            {/* Faded category grid preview */}
-            <View style={[styles.categoryGrid, styles.categoryGridLocked]}>
-              {categories.map((cat) => (
-                <View
-                  key={cat.id}
-                  style={[
-                    styles.categoryCard,
-                    styles.categoryCardLocked,
-                    { backgroundColor: theme.card, borderColor: theme.border },
-                  ]}
-                >
-                  <View style={[styles.categoryIconWrap, { backgroundColor: cat.color + '0E' }]}>
-                    <Ionicons name={cat.icon} size={22} color={cat.color + '60'} />
-                  </View>
-                  <Text style={[styles.categoryLabel, { color: theme.text + '55' }]}>{cat.label}</Text>
-                  <Text style={[styles.categoryCount, { color: theme.textSecondary + '55' }]}>
-                    {cat.articleCount} articles
-                  </Text>
-                </View>
+            {/* Locked — faded category preview above the upgrade card */}
+            <View style={styles.catGrid}>
+              {categories.map((cat, i) => (
+                <CategoryCard key={cat.id} category={cat} theme={theme} delay={i * 60} locked />
               ))}
             </View>
-
-            {/* Upgrade card */}
             <LockedCard theme={theme} onUpgrade={handleUpgrade} />
           </>
         )}
@@ -358,341 +329,89 @@ export default function LegacyVaultScreen({ navigation }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
+  container: { flex: 1 },
+  scrollContent: { paddingHorizontal: SHAPE.screenPadding, paddingTop: 11 },
+  searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    gap: 8,
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitleBlock: {
-    flex: 1,
-    gap: 1,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    letterSpacing: 0.2,
-  },
-  headerSubtitle: {
-    fontSize: 11,
-    fontWeight: '500',
-  },
-  headerRight: {
-    alignItems: 'flex-end',
-  },
-  premiumBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  premiumBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-  },
-  scroll: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 14,
-  },
-
-  // Search
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    gap: 9,
     borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingHorizontal: 13,
+    height: 42,
     marginBottom: 16,
   },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-    padding: 0,
-  },
-  searchClear: {
-    marginLeft: 6,
-  },
+  searchInput: { flex: 1, height: '100%', padding: 0 },
 
-  // Section Header
-  sectionHeader: {
+  archetypeCard: {
+    borderRadius: 20,
+    padding: 15,
+    overflow: 'hidden',
+  },
+  lineageRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  sectionCount: {
-    fontSize: 13,
-  },
-
-  // Featured Articles
-  featuredList: {
     gap: 8,
-    marginBottom: 22,
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
   },
-  featuredRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  featuredIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+  lineageAvatar: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  featuredInfo: {
-    flex: 1,
-    gap: 3,
-  },
-  featuredTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  featuredMeta: {
-    fontSize: 11,
-  },
 
-  // Category Grid (2 columns)
-  categoryGrid: {
+  catGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 22,
+    marginTop: 16,
+    marginHorizontal: -5.5,
   },
-  categoryGridLocked: {
-    opacity: 0.45,
+  catCell: { width: '50%', paddingHorizontal: 5.5, paddingBottom: 11 },
+  catCard: {
+    borderRadius: SHAPE.radiusCard,
+    padding: 13,
   },
-  categoryCard: {
-    width: '47.5%',
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 14,
-    alignItems: 'flex-start',
-    gap: 6,
-  },
-  categoryCardLocked: {
-    // No additional styles; opacity handled on parent
-  },
-  categoryIconWrap: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
+  catIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 2,
-  },
-  categoryLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  categoryCount: {
-    fontSize: 11,
   },
 
-  // Empty Search
+  featRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+    paddingVertical: 11,
+    borderBottomWidth: 1,
+  },
+  featSpine: { width: 4, height: 34, borderRadius: 2 },
+
   emptySearch: {
+    borderRadius: SHAPE.radiusCard,
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: 28,
-    borderRadius: 14,
-    borderWidth: 1,
-    gap: 8,
-    marginBottom: 22,
-  },
-  emptySearchText: {
-    fontSize: 13,
-    textAlign: 'center',
+    paddingVertical: 30,
+    marginTop: 16,
   },
 
-  // Archetype
-  archetypeHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-    marginBottom: 8,
-  },
-  archetypeHeaderLeft: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  archetypeIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  archetypeHeaderInfo: {
-    flex: 1,
-    gap: 3,
-  },
-  archetypeName: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  archetypeDesc: {
-    fontSize: 11,
-    lineHeight: 15,
-  },
-  archetypeCountBadge: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  archetypeCountNum: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#FFFFFF',
-  },
-  archetypeCountLabel: {
-    fontSize: 9,
-    color: '#FFFFFF',
-    fontWeight: '600',
-    marginTop: -2,
-  },
-  archetypeShareLine: {
-    fontSize: 12,
-    marginBottom: 10,
-  },
-  playerList: {
-    gap: 8,
-    marginBottom: 10,
-  },
-  playerCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  playerAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  playerInfo: {
-    flex: 1,
-    gap: 2,
-  },
-  playerName: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  playerTeam: {
-    fontSize: 11,
-  },
-  playerEra: {
-    fontSize: 11,
-  },
-  playerTraitBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  playerTraitText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  archetypeMoreButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 8,
-  },
-  archetypeMoreText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-
-  // Locked / Upgrade
   lockedCard: {
-    borderRadius: 18,
-    borderWidth: 1,
+    borderRadius: SHAPE.radiusHero,
     padding: 24,
     alignItems: 'center',
-    gap: 10,
-    marginTop: 4,
+    marginTop: 8,
   },
-  lockedIconWrap: {
+  lockedIcon: {
     width: 60,
     height: 60,
-    borderRadius: 30,
+    borderRadius: SHAPE.radiusCard,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 4,
-  },
-  lockedTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  lockedBody: {
-    fontSize: 13,
-    textAlign: 'center',
-    lineHeight: 19,
-  },
-  upgradeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 24,
-    paddingVertical: 13,
-    borderRadius: 12,
-    marginTop: 4,
-  },
-  upgradeButtonText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  lockedNote: {
-    fontSize: 11,
-    marginTop: 2,
+    marginBottom: 14,
   },
 
-  bottomSpacer: {
-    height: 32,
-  },
+  bottomSpacer: { height: 24 },
 });

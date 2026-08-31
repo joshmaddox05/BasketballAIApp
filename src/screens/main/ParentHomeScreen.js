@@ -1,8 +1,11 @@
-// ParentHomeScreen.js - Parent/Family Hub home dashboard
-import React, { useState, useCallback, useEffect } from 'react';
-import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
+// ParentHomeScreen.js - Parent/Family Hub home dashboard (design handoff 14e).
+// Presentational restyle only: data loading, navigation and the approve/deny
+// flow are unchanged. Consent is the only element on the screen that pulses.
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, ScrollView, Alert, Animated, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAppContext } from '../../context/AppContext';
 import {
@@ -16,6 +19,27 @@ import { getLevelTitle } from '../../utils/constants';
 import ModuleGrid from '../../components/features/ModuleGrid';
 import { getModulesForRole } from '../../config/roleModules';
 import ChildSwitcher from '../../components/parent/ChildSwitcher';
+import { TYPE, SHAPE, FONTS, MOTION } from '../../utils/typography';
+import { useReduceMotion } from '../../hooks/useReduceMotion';
+import {
+  Entrance,
+  Float,
+  BarFill,
+  ConsentGlow,
+  ScreenHeader,
+  HeaderIconButton,
+  SectionLabel,
+  PrimaryButton,
+  OutlineButton,
+  EmptyState,
+  LoadingState,
+} from '../../components/dbe';
+
+// Height is not transform-animatable in RN, so the list collapse is LayoutAnimation's
+// job. Android needs the experimental flag opted into explicitly.
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 // ─── Data mapping helpers (Firestore docs -> presentational shapes) ────────────
 
@@ -41,7 +65,7 @@ const initialsFor = (name = '') =>
     .join('')
     .toUpperCase() || '?';
 
-const mapChild = (linked, profile, latestAchievement) => {
+const mapChild = (linked, profile, latestAchievement, evalRank) => {
   const stats = profile?.stats || {};
   const level = profile?.level || 1;
   const name = profile?.displayName || linked?.name || 'Athlete';
@@ -53,6 +77,7 @@ const mapChild = (linked, profile, latestAchievement) => {
     streak: stats.currentStreak || 0,
     position: profile?.position || '—',
     team: profile?.team || 'Independent',
+    evalGrade: evalRank?.overallGrade || null,
     avatarInitials: initialsFor(name),
     recentAchievement: latestAchievement
       ? {
@@ -101,153 +126,239 @@ function ChildSummaryCard({ child, theme }) {
   const levelPercent = ((child.level % 10) / 10) * 100;
 
   return (
-    <View style={[styles.childCard, { backgroundColor: theme.primary }]}>
-      <View style={styles.childCardRow}>
-        {/* Avatar */}
-        <View style={styles.childAvatarWrapper}>
-          <View style={styles.childAvatar}>
-            <Text style={styles.childAvatarText}>{child.avatarInitials}</Text>
+    <Entrance variant="cardIn" delay={50}>
+      <LinearGradient
+        colors={theme.childGradient}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.childCard}
+      >
+        <View style={styles.childCardRow}>
+          {/* Avatar + streak badge */}
+          <View style={styles.childAvatarWrapper}>
+            <View style={styles.childAvatar}>
+              <Text style={styles.childAvatarText}>{child.avatarInitials}</Text>
+            </View>
+            <Float style={styles.streakBadge}>
+              <Ionicons name="flame" size={9} color={theme.primary} />
+              <Text style={[styles.streakBadgeText, { color: theme.primary }]}>{child.streak}</Text>
+            </Float>
           </View>
-          <View style={styles.streakBadge}>
-            <Ionicons name="flame" size={10} color="#FF6B00" />
-            <Text style={styles.streakBadgeText}>{child.streak}</Text>
+
+          {/* Info */}
+          <View style={styles.childInfo}>
+            <Text style={styles.childName}>{child.name}</Text>
+            <Text style={styles.childTeam}>
+              {child.team} · {child.position}
+            </Text>
+            <View style={styles.childMetaRow}>
+              <View style={styles.childMetaTag}>
+                <Text style={styles.childMetaText}>Lv. {child.level}</Text>
+              </View>
+              <View style={styles.childMetaTag}>
+                <Text style={styles.childMetaText}>Age {child.age}</Text>
+              </View>
+              {child.evalGrade ? (
+                <View style={styles.childMetaTag}>
+                  <Text style={styles.childMetaText}>EvalRank {child.evalGrade}</Text>
+                </View>
+              ) : null}
+            </View>
           </View>
         </View>
 
-        {/* Info */}
-        <View style={styles.childInfo}>
-          <Text style={styles.childName}>{child.name}</Text>
-          <Text style={styles.childTeam}>{child.team}</Text>
-          <View style={styles.childMetaRow}>
-            <View style={styles.childMetaTag}>
-              <Text style={styles.childMetaText}>Lv. {child.level}</Text>
-            </View>
-            <View style={styles.childMetaTag}>
-              <Text style={styles.childMetaText}>{child.position}</Text>
-            </View>
-            <View style={styles.childMetaTag}>
-              <Text style={styles.childMetaText}>Age {child.age}</Text>
-            </View>
-          </View>
+        {/* Level progress */}
+        <View style={styles.levelBarContainer}>
+          <BarFill
+            pct={levelPercent / 100}
+            color="#FFFFFF"
+            trackColor="rgba(255,255,255,0.2)"
+            height={5}
+            delay={400}
+            duration={1100}
+          />
+          <Text style={styles.levelBarLabel}>
+            Level {child.level} · {Math.round(levelPercent)}% to next
+          </Text>
         </View>
-      </View>
 
-      {/* Level Progress Bar */}
-      <View style={styles.levelBarContainer}>
-        <View style={styles.levelBarTrack}>
-          <View style={[styles.levelBarFill, { width: `${levelPercent}%` }]} />
+        {/* Recent achievement */}
+        <View style={styles.achievementRow}>
+          <Ionicons name={child.recentAchievement.icon} size={14} color="#FFFFFF" />
+          <Text style={styles.achievementText} numberOfLines={1}>
+            Earned “{child.recentAchievement.title}”
+            {child.recentAchievement.earnedDate ? ` · ${child.recentAchievement.earnedDate}` : ''}
+          </Text>
         </View>
-        <Text style={styles.levelBarLabel}>Level {child.level} · {levelPercent}% to next</Text>
-      </View>
-
-      {/* Recent Achievement */}
-      <View style={styles.achievementRow}>
-        <Ionicons name={child.recentAchievement.icon} size={14} color="rgba(255,255,255,0.9)" />
-        <Text style={styles.achievementText}>
-          Latest: {child.recentAchievement.title} — {child.recentAchievement.description}
-        </Text>
-      </View>
-    </View>
+      </LinearGradient>
+    </Entrance>
   );
 }
 
-function WeekSummary({ week, theme, isDarkMode }) {
-  const sectionBg = isDarkMode ? '#1A1A1A' : '#FFFFFF';
-  const completedPercent = Math.round((week.workoutsCompleted / week.workoutsGoal) * 100);
+function WeekSummary({ week, theme }) {
+  const workoutPct = week.workoutsGoal ? week.workoutsCompleted / week.workoutsGoal : 0;
+  const scheduledPct = Math.min(week.sessionsScheduled / 5, 1);
 
   return (
-    <View style={[styles.weekCard, { backgroundColor: sectionBg, borderColor: theme.border }]}>
+    <Entrance
+      variant="up"
+      delay={200}
+      style={[styles.weekCard, { backgroundColor: theme.surface }]}
+    >
       <View style={styles.weekRow}>
         {/* Workouts */}
         <View style={styles.weekStat}>
-          <Text style={[styles.weekStatNumber, { color: theme.primary }]}>
-            {week.workoutsCompleted}/{week.workoutsGoal}
+          <Text style={[TYPE.statNumberMedium, { color: theme.accentText }]}>
+            {week.workoutsCompleted}
+            <Text style={[styles.weekStatDenominator, { color: theme.textDim }]}>
+              /{week.workoutsGoal}
+            </Text>
           </Text>
-          <Text style={[styles.weekStatLabel, { color: theme.textSecondary }]}>Workouts</Text>
-          <View style={styles.weekProgressTrack}>
-            <View
-              style={[
-                styles.weekProgressFill,
-                { width: `${completedPercent}%`, backgroundColor: theme.primary },
-              ]}
-            />
-          </View>
+          <Text style={[TYPE.statCaption, styles.weekStatLabel, { color: theme.textDim }]}>
+            Workouts
+          </Text>
+          <BarFill
+            pct={workoutPct}
+            color={theme.accentText}
+            trackColor={theme.track}
+            height={4}
+            delay={450}
+            style={styles.weekBar}
+          />
         </View>
 
-        <View style={[styles.weekDivider, { backgroundColor: theme.border }]} />
+        <View style={[styles.weekDivider, { backgroundColor: theme.hairline }]} />
 
-        {/* Sessions */}
+        {/* Scheduled */}
         <View style={styles.weekStat}>
-          <Text style={[styles.weekStatNumber, { color: theme.primary }]}>
+          <Text style={[TYPE.statNumberMedium, { color: theme.accentText }]}>
             {week.sessionsScheduled}
           </Text>
-          <Text style={[styles.weekStatLabel, { color: theme.textSecondary }]}>Scheduled</Text>
+          <Text style={[TYPE.statCaption, styles.weekStatLabel, { color: theme.textDim }]}>
+            Scheduled
+          </Text>
+          <BarFill
+            pct={scheduledPct}
+            color={theme.steel}
+            trackColor={theme.track}
+            height={4}
+            delay={570}
+            style={styles.weekBar}
+          />
         </View>
       </View>
 
-      {/* Next Session */}
-      <View style={[styles.nextSessionRow, { borderTopColor: theme.border }]}>
-        <Ionicons name="calendar-outline" size={14} color={theme.primary} />
-        <Text style={[styles.nextSessionText, { color: theme.textSecondary }]}>
+      {/* Next session */}
+      <View style={[styles.nextSessionRow, { borderTopColor: theme.hairline }]}>
+        <Ionicons name="time-outline" size={14} color={theme.textDim} />
+        <Text style={[styles.nextSessionText, { color: theme.textMuted }]}>
           Next: {week.nextSession}
         </Text>
       </View>
-    </View>
+    </Entrance>
   );
 }
 
-function ActivityItem({ item, theme, isLast }) {
-  const accentColor =
-    item.accentType === 'primary'
-      ? theme.primary
-      : item.accentType === 'gold'
-      ? '#F5A623'
-      : '#4CAF50';
-
+function ActivityItem({ item, index, theme, isLast }) {
+  const accent = index === 0;
   return (
-    <View
+    <Entrance
+      variant="slideIn"
+      delay={350 + index * 100}
       style={[
         styles.activityItem,
-        !isLast && { borderBottomWidth: 1, borderBottomColor: theme.border },
+        !isLast && { borderBottomWidth: 1, borderBottomColor: theme.hairline },
       ]}
     >
-      <View style={[styles.activityIcon, { backgroundColor: accentColor + '18' }]}>
-        <Ionicons name={item.icon} size={16} color={accentColor} />
+      <View
+        style={[
+          styles.activityIcon,
+          { backgroundColor: accent ? theme.badgeFill : theme.steelFill },
+        ]}
+      >
+        <Ionicons
+          name={accent ? 'checkmark' : item.icon}
+          size={14}
+          color={accent ? theme.accentText : theme.steel}
+        />
       </View>
       <View style={styles.activityContent}>
-        <Text style={[styles.activityTitle, { color: theme.text }]}>{item.title}</Text>
-        <Text style={[styles.activityDetail, { color: theme.textSecondary }]} numberOfLines={1}>
+        <Text style={[styles.activityTitle, { color: theme.text }]} numberOfLines={1}>
+          {item.title}
+        </Text>
+        <Text style={[TYPE.rowMeta, { color: theme.textDim }]} numberOfLines={1}>
           {item.detail}
         </Text>
       </View>
-      <Text style={[styles.activityTime, { color: theme.textSecondary }]}>{item.time}</Text>
-    </View>
+      <Text style={[styles.activityTime, { color: theme.textDim }]}>{item.time}</Text>
+    </Entrance>
   );
 }
 
-function MessageCard({ message, theme, isDarkMode }) {
-  const sectionBg = isDarkMode ? '#1A1A1A' : '#FFFFFF';
+function ScoutRequestCard({ req, theme, onDecision }) {
+  // The decision is the highest-stakes action on this surface — the card leaves the
+  // way it arrived (Entrance variant="up" reversed) instead of vanishing mid-frame.
+  const exit = useRef(new Animated.Value(0)).current;
+  const reduceMotion = useReduceMotion();
+
+  const decide = (approve) => {
+    Animated.timing(exit, {
+      toValue: 1,
+      duration: MOTION.quick,
+      easing: MOTION.easeOut,
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished) onDecision(req, approve);
+    });
+  };
 
   return (
-    <View style={[styles.messageCard, { backgroundColor: sectionBg, borderColor: theme.border }]}>
-      <View style={[styles.messageAvatar, { backgroundColor: theme.primary + '22' }]}>
-        <Text style={[styles.messageAvatarText, { color: theme.primary }]}>
-          {message.avatarInitials}
-        </Text>
-      </View>
-      <View style={styles.messageContent}>
-        <View style={styles.messageTopRow}>
-          <Text style={[styles.messageSender, { color: theme.text }]}>{message.sender}</Text>
-          <Text style={[styles.messageTime, { color: theme.textSecondary }]}>{message.time}</Text>
+    <Entrance variant="up" delay={300}>
+      <Animated.View
+        style={{
+          opacity: exit.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }),
+          transform: reduceMotion
+            ? []
+            : [{ translateY: exit.interpolate({ inputRange: [0, 1], outputRange: [0, 18] }) }],
+        }}
+      >
+      <ConsentGlow color={theme.glowFill} borderRadius={SHAPE.radiusCard}>
+        <View
+          style={[
+            styles.scoutReqCard,
+            { backgroundColor: theme.attentionFill, borderColor: theme.attentionBorder },
+          ]}
+        >
+          <View style={styles.scoutReqInfo}>
+            <View style={[styles.scoutReqAvatar, { backgroundColor: theme.avatarFill }]}>
+              <Ionicons name="search-outline" size={16} color={theme.accentText} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.scoutReqName, { color: theme.text }]}>
+                {req.scoutName || 'A scout'}
+              </Text>
+              <Text style={[styles.scoutReqSub, { color: theme.textDim }]} numberOfLines={1}>
+                Wants access to {req.childName || 'your athlete'}'s eval data
+              </Text>
+            </View>
+          </View>
+          {/* Deny stays the outline on the left; Approve the solid primary on the right. */}
+          <View style={styles.scoutReqActions}>
+            <OutlineButton
+              label="Deny"
+              onPress={() => decide(false)}
+              style={styles.scoutReqBtn}
+            />
+            <PrimaryButton
+              label="Approve"
+              onPress={() => decide(true)}
+              style={styles.scoutReqBtn}
+            />
+          </View>
         </View>
-        <Text style={[styles.messagePreview, { color: theme.textSecondary }]} numberOfLines={2}>
-          {message.preview}
-        </Text>
-      </View>
-      {message.unread && (
-        <View style={[styles.unreadDot, { backgroundColor: theme.primary }]} />
-      )}
-    </View>
+      </ConsentGlow>
+      </Animated.View>
+    </Entrance>
   );
 }
 
@@ -295,7 +406,7 @@ export default function ParentHomeScreen({ navigation }) {
     getLinkedPlayerSummary(active.uid)
       .then((summary) => {
         if (!alive) return;
-        setChild(mapChild(active, summary.profile, (summary.achievements || [])[0]));
+        setChild(mapChild(active, summary.profile, (summary.achievements || [])[0], summary.evalRank));
         setWeek(mapWeek(summary.profile, summary.activities));
         setActivityFeed(mapActivityFeed(summary.activities));
       })
@@ -309,7 +420,9 @@ export default function ParentHomeScreen({ navigation }) {
 
   const handleScoutDecision = useCallback(
     async (req, approve) => {
-      // Optimistically remove from the list
+      // Optimistically remove from the list, closing the gap rather than teleporting
+      // the rows below upward.
+      LayoutAnimation.configureNext(LayoutAnimation.create(MOTION.quick, 'easeInEaseOut', 'opacity'));
       setScoutRequests((prev) => prev.filter((r) => !(r.childUid === req.childUid && r.scoutUid === req.scoutUid)));
       try {
         if (approve) {
@@ -331,86 +444,63 @@ export default function ParentHomeScreen({ navigation }) {
     }, [refreshChildren])
   );
 
-  const bgColor = isDarkMode ? '#0F0F0F' : '#F5F5F5';
-  const sectionBg = isDarkMode ? '#1A1A1A' : '#FFFFFF';
-
   const renderHeader = () => (
-    <View style={styles.header}>
-      <View>
-        <Text style={[styles.screenTitle, { color: theme.text }]}>Family Hub</Text>
-        <Text style={[styles.greeting, { color: theme.textSecondary }]}>Hello, {firstName}</Text>
-      </View>
-      <View style={styles.headerActions}>
-        <TouchableOpacity
-          style={[styles.notifBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
-          onPress={() => navigation.navigate('Messaging')}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="chatbubbles-outline" size={22} color={theme.text} />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.notifBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
-          onPress={() => navigation.navigate('Notifications')}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="notifications-outline" size={22} color={theme.text} />
-        </TouchableOpacity>
-      </View>
-    </View>
+    <ScreenHeader
+      title="Family Hub"
+      subtitle={`Hello, ${firstName}`}
+      right={
+        <>
+          <HeaderIconButton
+            icon="chatbubbles-outline"
+            onPress={() => navigation.navigate('Messaging')}
+          />
+          <HeaderIconButton
+            icon="notifications-outline"
+            badge={scoutRequests.length > 0}
+            onPress={() => navigation.navigate('Notifications')}
+          />
+        </>
+      }
+    />
   );
 
   if (loading && !child) {
     return (
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: bgColor }]}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
         <StatusBar style={isDarkMode ? 'light' : 'dark'} />
-        <View style={[styles.scrollContent, { flex: 1 }]}>
-          {renderHeader()}
-          <View style={styles.centered}>
-            <ActivityIndicator color={theme.primary} size="large" />
-          </View>
-        </View>
+        {renderHeader()}
+        <LoadingState />
       </SafeAreaView>
     );
   }
 
   if (children.length === 0) {
     return (
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: bgColor }]}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
         <StatusBar style={isDarkMode ? 'light' : 'dark'} />
-        <View style={[styles.scrollContent, { flex: 1 }]}>
-          {renderHeader()}
-          <View style={styles.centered}>
-            <View style={[styles.emptyIconWrap, { backgroundColor: theme.primary + '18' }]}>
-              <Ionicons name="people-outline" size={36} color={theme.primary} />
-            </View>
-            <Text style={[styles.emptyTitle, { color: theme.text }]}>Link your child</Text>
-            <Text style={[styles.emptySub, { color: theme.textSecondary }]}>
-              Connect to your child's account with their invite code to follow their training and progress.
-            </Text>
-            <TouchableOpacity
-              style={[styles.emptyButton, { backgroundColor: theme.primary }]}
-              onPress={() => navigation.navigate('LinkAccount', { onLinked: refreshChildren })}
-              activeOpacity={0.85}
-            >
-              <Ionicons name="link" size={18} color="#FFFFFF" />
-              <Text style={styles.emptyButtonText}>Link Your Child</Text>
-            </TouchableOpacity>
-          </View>
+        {renderHeader()}
+        <View style={styles.emptyWrap}>
+          <EmptyState
+            icon="people-outline"
+            title="Link your child"
+            sub="Connect to your child's account with their invite code to follow their training and progress."
+            ctaLabel="Link Your Child"
+            onPress={() => navigation.navigate('LinkAccount', { onLinked: refreshChildren })}
+          />
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: bgColor }]}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <StatusBar style={isDarkMode ? 'light' : 'dark'} />
+      {renderHeader()}
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {renderHeader()}
-
         {/* Child switcher — Family Hub supports multiple children */}
         <ChildSwitcher
           children={children}
@@ -425,15 +515,32 @@ export default function ParentHomeScreen({ navigation }) {
 
         {/* This Week */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>This Week</Text>
-          <WeekSummary week={week} theme={theme} isDarkMode={isDarkMode} />
+          <SectionLabel>This week</SectionLabel>
+          {week && <WeekSummary week={week} theme={theme} />}
         </View>
+
+        {/* Scout access requests — parent authorization for minors.
+            The only pulsing element on this screen (design: consent is the emotional center). */}
+        {scoutRequests.length > 0 && (
+          <View style={styles.section}>
+            <Text style={[TYPE.sectionLabel, styles.consentLabel, { color: theme.accentText }]}>
+              Scout access request
+            </Text>
+            {scoutRequests.map((req) => (
+              <ScoutRequestCard
+                key={`${req.childUid}_${req.scoutUid}`}
+                req={req}
+                theme={theme}
+                onDecision={handleScoutDecision}
+              />
+            ))}
+          </View>
+        )}
 
         {/* Family Tools — Module Hub is the primary surface */}
         <View style={styles.section}>
           <ModuleGrid
             title="Family Tools"
-            layout="grid"
             modules={getModulesForRole('parent')}
             subscription={userData?.subscription || 'free'}
             theme={theme}
@@ -444,102 +551,53 @@ export default function ParentHomeScreen({ navigation }) {
 
         {/* Recent Activity */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>Recent Activity</Text>
-          </View>
-          {activityFeed.length === 0 ? (
-            <View style={[styles.activityContainer, { backgroundColor: sectionBg, borderColor: theme.border }]}>
-              <Text style={[styles.emptyFeedText, { color: theme.textSecondary }]}>
+          <SectionLabel>Recent activity</SectionLabel>
+          <View style={[styles.activityContainer, { backgroundColor: theme.surface }]}>
+            {activityFeed.length === 0 ? (
+              <Text style={[TYPE.rowMeta, styles.emptyFeedText, { color: theme.textDim }]}>
                 No recent activity yet.
               </Text>
-            </View>
-          ) : (
-            <View style={[styles.activityContainer, { backgroundColor: sectionBg, borderColor: theme.border }]}>
-              {activityFeed.map((item, index) => (
+            ) : (
+              activityFeed.map((item, index) => (
                 <ActivityItem
                   key={item.id}
                   item={item}
+                  index={index}
                   theme={theme}
                   isLast={index === activityFeed.length - 1}
                 />
-              ))}
-            </View>
-          )}
+              ))
+            )}
+          </View>
         </View>
 
-        {/* Scout access requests — parent authorization for minors */}
-        {scoutRequests.length > 0 && (
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>Scout Access Requests</Text>
-            {scoutRequests.map((req) => (
-              <View
-                key={`${req.childUid}_${req.scoutUid}`}
-                style={[styles.scoutReqCard, { backgroundColor: sectionBg, borderColor: theme.border }]}
-              >
-                <View style={styles.scoutReqInfo}>
-                  <Ionicons name="search-outline" size={20} color={theme.primary} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.scoutReqName, { color: theme.text }]}>{req.scoutName || 'A scout'}</Text>
-                    <Text style={[styles.scoutReqSub, { color: theme.textSecondary }]}>
-                      Requests access to {req.childName || 'your child'}'s evaluation data
-                    </Text>
-                  </View>
-                </View>
-                <View style={styles.scoutReqActions}>
-                  <TouchableOpacity
-                    style={[styles.scoutReqDeny, { borderColor: theme.border }]}
-                    onPress={() => handleScoutDecision(req, false)}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={[styles.scoutReqDenyText, { color: theme.textSecondary }]}>Deny</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.scoutReqApprove, { backgroundColor: theme.primary }]}
-                    onPress={() => handleScoutDecision(req, true)}
-                    activeOpacity={0.85}
-                  >
-                    <Text style={styles.scoutReqApproveText}>Approve</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))}
-          </View>
-        )}
-
-        {/* Progress Report Button */}
+        {/* Progress Report CTA */}
         <TouchableOpacity
           style={[styles.progressReportBtn, { backgroundColor: theme.primary }]}
           onPress={() => navigation.navigate('FamilyDashboard')}
           activeOpacity={0.85}
         >
-          <View style={styles.progressReportLeft}>
-            <Ionicons name="bar-chart-outline" size={22} color="#FFFFFF" />
-            <View>
-              <Text style={styles.progressReportTitle}>View Progress Report</Text>
-              <Text style={styles.progressReportSub}>Full stats, history &amp; goals</Text>
-            </View>
+          <View>
+            <Text style={styles.progressReportTitle}>View progress report</Text>
+            <Text style={styles.progressReportSub}>Full stats, history &amp; goals</Text>
           </View>
-          <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.8)" />
+          <Ionicons name="chevron-forward" size={18} color="#FFFFFF" />
         </TouchableOpacity>
 
         {/* Recruiting + Edit Athlete for the selected child */}
         <View style={styles.childActionRow}>
-          <TouchableOpacity
-            style={[styles.childActionBtn, { backgroundColor: sectionBg, borderColor: theme.border }]}
+          <OutlineButton
+            label="Recruiting"
+            icon="megaphone-outline"
             onPress={() => navigation.navigate('ParentScoutLab', { childUid: selectedChildUid })}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="megaphone-outline" size={18} color={theme.primary} />
-            <Text style={[styles.childActionText, { color: theme.text }]}>Recruiting</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.childActionBtn, { backgroundColor: sectionBg, borderColor: theme.border }]}
+            style={{ flex: 1 }}
+          />
+          <OutlineButton
+            label="Edit Athlete"
+            icon="create-outline"
             onPress={() => navigation.navigate('EditAthleteProfile', { childUid: selectedChildUid })}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="create-outline" size={18} color={theme.primary} />
-            <Text style={[styles.childActionText, { color: theme.text }]}>Edit Athlete</Text>
-          </TouchableOpacity>
+            style={{ flex: 1 }}
+          />
         </View>
 
         <View style={styles.bottomPad} />
@@ -558,408 +616,263 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingHorizontal: SHAPE.screenPadding,
+    paddingTop: 14,
   },
-
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  screenTitle: {
-    fontSize: 26,
-    fontWeight: '700',
-    letterSpacing: -0.5,
-  },
-  greeting: {
-    fontSize: 14,
-    marginTop: 2,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  notifBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-  },
-  notifDot: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    borderWidth: 1.5,
-    borderColor: '#0F0F0F',
-  },
-
-  // Child Card
+  // Child Card (14e hero — theme.childGradient)
   childCard: {
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 16,
-    marginBottom: 24,
   },
   childCardRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 14,
+    alignItems: 'center',
   },
   childAvatarWrapper: {
     position: 'relative',
-    marginRight: 14,
+    marginRight: 13,
   },
   childAvatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: 'rgba(255,255,255,0.16)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   childAvatarText: {
-    fontSize: 20,
-    fontWeight: '700',
+    fontFamily: FONTS.bodyExtraBold,
+    fontSize: 17,
     color: '#FFFFFF',
   },
   streakBadge: {
     position: 'absolute',
-    bottom: -2,
-    right: -4,
+    bottom: -3,
+    right: -3,
     backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    paddingHorizontal: 5,
+    borderRadius: SHAPE.radiusPill,
+    paddingHorizontal: 6,
     paddingVertical: 2,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
   },
   streakBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#FF6B00',
+    fontFamily: FONTS.bodyExtraBold,
+    fontSize: 9,
   },
   childInfo: {
     flex: 1,
   },
   childName: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontFamily: FONTS.heading,
+    fontSize: 19,
+    lineHeight: 21,
     color: '#FFFFFF',
   },
   childTeam: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.8)',
-    marginTop: 2,
-    marginBottom: 8,
+    fontFamily: FONTS.bodyMedium,
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.72)',
+    marginTop: 3,
   },
   childMetaRow: {
     flexDirection: 'row',
-    gap: 6,
+    gap: 5,
     flexWrap: 'wrap',
+    marginTop: 7,
   },
   childMetaTag: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 6,
-    paddingHorizontal: 8,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    borderRadius: 7,
+    paddingHorizontal: 7,
     paddingVertical: 3,
   },
   childMetaText: {
-    fontSize: 11,
-    fontWeight: '600',
+    fontFamily: FONTS.bodyBold,
+    fontSize: 9,
     color: '#FFFFFF',
   },
   levelBarContainer: {
-    marginBottom: 12,
-  },
-  levelBarTrack: {
-    height: 5,
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    borderRadius: 3,
-    overflow: 'hidden',
-    marginBottom: 4,
-  },
-  levelBarFill: {
-    height: '100%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 3,
+    marginTop: 14,
   },
   levelBarLabel: {
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.8)',
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.75)',
+    marginTop: 6,
   },
   achievementRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
+    gap: 8,
+    marginTop: 12,
+    paddingTop: 11,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.18)',
   },
   achievementText: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.9)',
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 10.5,
+    color: 'rgba(255,255,255,0.85)',
     flex: 1,
   },
 
-  // Section
+  // Sections
   section: {
-    marginBottom: 24,
+    marginTop: SHAPE.sectionGap,
   },
-  scoutReqCard: { borderRadius: 12, borderWidth: 1, padding: 14, marginBottom: 10 },
-  scoutReqInfo: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  scoutReqName: { fontSize: 15, fontWeight: '700' },
-  scoutReqSub: { fontSize: 12, marginTop: 2 },
-  scoutReqActions: { flexDirection: 'row', gap: 10, marginTop: 12 },
-  scoutReqDeny: { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 10, borderWidth: 1 },
-  scoutReqDenyText: { fontSize: 13, fontWeight: '700' },
-  scoutReqApprove: { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 10 },
-  scoutReqApproveText: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 12,
-  },
-  seeAll: {
-    fontSize: 14,
-    fontWeight: '600',
+  consentLabel: {
+    marginBottom: SHAPE.labelGap,
   },
 
   // Week Card
   weekCard: {
-    borderRadius: 14,
-    borderWidth: 1,
-    overflow: 'hidden',
+    borderRadius: SHAPE.radiusCard,
+    padding: 14,
   },
   weekRow: {
     flexDirection: 'row',
-    padding: 16,
+    alignItems: 'center',
   },
   weekStat: {
     flex: 1,
-    alignItems: 'center',
   },
-  weekStatNumber: {
-    fontSize: 26,
-    fontWeight: '700',
+  weekStatDenominator: {
+    fontFamily: FONTS.heading,
+    fontSize: 12,
   },
   weekStatLabel: {
-    fontSize: 12,
-    marginTop: 2,
-    fontWeight: '500',
+    marginTop: 5,
   },
-  weekProgressTrack: {
+  weekBar: {
     marginTop: 8,
-    height: 4,
-    width: '80%',
-    backgroundColor: 'rgba(128,128,128,0.2)',
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  weekProgressFill: {
-    height: '100%',
-    borderRadius: 2,
   },
   weekDivider: {
     width: 1,
-    marginVertical: 4,
+    height: 52,
+    marginHorizontal: 16,
   },
   nextSessionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    marginTop: 13,
+    paddingTop: 11,
     borderTopWidth: 1,
   },
   nextSessionText: {
-    fontSize: 13,
+    fontFamily: FONTS.bodyMedium,
+    fontSize: 11,
   },
 
-  // Activity Feed
-  activityContainer: {
-    borderRadius: 12,
+  // Scout access request (consent) card
+  scoutReqCard: {
+    borderRadius: SHAPE.radiusCard,
     borderWidth: 1,
-    overflow: 'hidden',
+    padding: 13,
   },
-  activityItem: {
+  scoutReqInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
+    gap: 10,
   },
-  activityIcon: {
+  scoutReqAvatar: {
     width: 34,
     height: 34,
     borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+  },
+  scoutReqName: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 12.5,
+  },
+  scoutReqSub: {
+    fontFamily: FONTS.body,
+    fontSize: 10.5,
+    marginTop: 2,
+  },
+  scoutReqActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
+  },
+  scoutReqBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+
+  // Activity Feed
+  activityContainer: {
+    borderRadius: SHAPE.radiusCard,
+    paddingHorizontal: 13,
+    paddingVertical: 4,
+  },
+  activityItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+    paddingVertical: 11,
+  },
+  activityIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   activityContent: {
     flex: 1,
-    marginRight: 8,
   },
   activityTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  activityDetail: {
-    fontSize: 12,
+    fontFamily: FONTS.bodyBold,
+    fontSize: 11.5,
   },
   activityTime: {
-    fontSize: 11,
+    fontFamily: FONTS.bodyMedium,
+    fontSize: 9.5,
   },
-
-  // Messages
-  messageCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 14,
-    marginBottom: 10,
-  },
-  messageAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  messageAvatarText: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  messageContent: {
-    flex: 1,
-  },
-  messageTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  messageSender: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  messageTime: {
-    fontSize: 11,
-  },
-  messagePreview: {
-    fontSize: 12,
-    lineHeight: 17,
-  },
-  unreadDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginLeft: 8,
-    marginTop: 4,
-  },
-
-  // Child action row (Recruiting / Edit Athlete)
-  childActionRow: { flexDirection: 'row', gap: 10, marginTop: 12 },
-  childActionBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
+  emptyFeedText: {
     paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1,
   },
-  childActionText: { fontSize: 14, fontWeight: '600' },
 
-  // Progress Report Button
+  // Progress Report CTA
   progressReportBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderRadius: 14,
-    paddingVertical: 16,
-    paddingHorizontal: 18,
-    marginBottom: 8,
-  },
-  progressReportLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
+    borderRadius: SHAPE.radiusCard,
+    padding: 15,
+    marginTop: 16,
   },
   progressReportTitle: {
-    fontSize: 15,
-    fontWeight: '700',
+    fontFamily: FONTS.heading,
+    fontSize: 13.5,
     color: '#FFFFFF',
   },
   progressReportSub: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.8)',
-    marginTop: 1,
+    fontFamily: FONTS.body,
+    fontSize: 10.5,
+    color: 'rgba(255,255,255,0.72)',
+    marginTop: 3,
+  },
+
+  // Child action row (Recruiting / Edit Athlete)
+  childActionRow: {
+    flexDirection: 'row',
+    gap: SHAPE.cardGap,
+    marginTop: 12,
   },
 
   bottomPad: {
     height: 32,
   },
 
-  // Loading / empty states
-  centered: {
+  // Empty state wrapper
+  emptyWrap: {
     flex: 1,
-    alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 32,
-    gap: 12,
-  },
-  emptyIconWrap: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-  },
-  emptySub: {
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  emptyButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 12,
-    marginTop: 8,
-  },
-  emptyButtonText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  emptyFeedText: {
-    fontSize: 13,
-    padding: 16,
   },
 });

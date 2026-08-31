@@ -12,6 +12,7 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
+import { EmptyState } from '../../components/dbe';
 import { canAccessFeature } from '../../utils/subscription';
 
 const FILTERS = ['All', 'Last 30 Days', 'Last 90 Days'];
@@ -28,7 +29,7 @@ const MOCK_HISTORY = [
 
 function getScoreColor(score) {
   if (score >= 80) return '#4CAF50';
-  if (score >= 65) return '#FF6B00';
+  if (score >= 65) return '#8A1C22';
   return '#FF5252';
 }
 
@@ -136,13 +137,11 @@ export default function ShotDNAHistoryScreen({ navigation }) {
             <HistoryCard key={item.id} item={item} theme={theme} />
           ))
         ) : (
-          <View style={[styles.emptyState, { borderColor: theme.border }]}>
-            <Ionicons name="search-outline" size={44} color={theme.textSecondary} />
-            <Text style={[styles.emptyTitle, { color: theme.text }]}>No analyses found</Text>
-            <Text style={[styles.emptySubtext, { color: theme.textSecondary }]}>
-              Try a different filter or record your first shot analysis.
-            </Text>
-          </View>
+          <EmptyState
+            icon="search-outline"
+            title="No analyses found"
+            sub="Try a different filter or record your first shot analysis."
+          />
         )}
       </ScrollView>
     </SafeAreaView>
@@ -216,16 +215,4 @@ const styles = StyleSheet.create({
   },
   cardMetric: { fontSize: 12, fontWeight: '600' },
   cardDate: { fontSize: 11 },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 60,
-    marginTop: 40,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    paddingHorizontal: 30,
-    gap: 10,
-  },
-  emptyTitle: { fontSize: 17, fontWeight: '700' },
-  emptySubtext: { fontSize: 13, textAlign: 'center', lineHeight: 20 },
 });

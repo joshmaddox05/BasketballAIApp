@@ -78,7 +78,7 @@ function CourtDiagram({ theme }) {
 
         {/* Ball */}
         <View style={[styles.ball, { left: 0.5 * COURT_W - 8, top: 0.55 * COURT_H - 8 }]}>
-          <Ionicons name="basketball" size={14} color="#FF6B00" />
+          <Ionicons name="basketball" size={14} color="#8A1C22" />
         </View>
       </View>
       <View style={styles.courtLegend}>

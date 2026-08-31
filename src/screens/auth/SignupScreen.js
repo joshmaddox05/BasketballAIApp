@@ -506,11 +506,11 @@ const styles = StyleSheet.create({
         lineHeight: 20,
     },
     termsLink: {
-        color: '#FF6B00',
+        color: '#8A1C22',
         fontWeight: '500',
     },
     signupButton: {
-        backgroundColor: '#FF6B00',
+        backgroundColor: '#8A1C22',
         paddingVertical: 16,
         borderRadius: 12,
         alignItems: 'center',
@@ -555,7 +555,7 @@ const styles = StyleSheet.create({
     loginPromptLink: {
         fontSize: 14,
         fontWeight: 'bold',
-        color: '#FF6B00',
+        color: '#8A1C22',
     },
 });
 

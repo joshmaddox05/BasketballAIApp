@@ -106,7 +106,7 @@ const AllActivitiesScreen = ({ navigation }) => {
     if (loading) {
         return (
             <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#FF6B00" />
+                <ActivityIndicator size="large" color="#8A1C22" />
             </View>
         );
     }
@@ -282,7 +282,7 @@ const styles = StyleSheet.create({
         marginRight: 8,
     },
     activeFilterButton: {
-        backgroundColor: '#FF6B00',
+        backgroundColor: '#8A1C22',
     },
     filterButtonText: {
         color: '#666',
@@ -370,7 +370,7 @@ const styles = StyleSheet.create({
         marginBottom: 24,
     },
     startWorkoutButton: {
-        backgroundColor: '#FF6B00',
+        backgroundColor: '#8A1C22',
         paddingHorizontal: 24,
         paddingVertical: 12,
         borderRadius: 8,

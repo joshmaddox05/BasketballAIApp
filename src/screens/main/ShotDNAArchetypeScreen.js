@@ -1,5 +1,5 @@
-// ShotDNAArchetypeScreen.js - Archetype detail screen
-import React, { useState, useCallback } from 'react';
+// ShotDNAArchetypeScreen.js - Archetype detail screen (12a companion — burgundy system)
+import React from 'react';
 import {
   SafeAreaView,
   StyleSheet,
@@ -7,12 +7,20 @@ import {
   Text,
   TouchableOpacity,
   ScrollView,
-  ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAppContext } from '../../context/AppContext';
-import { canAccessFeature } from '../../utils/subscription';
+import {
+  Entrance,
+  Float,
+  ScreenHeader,
+  SectionLabel,
+  Avatar,
+  Row,
+} from '../../components/dbe';
+import { TYPE, SHAPE, FONTS } from '../../utils/typography';
 
 const MOCK_PROFILE = {
   archetype: 'Pure Scorer',
@@ -35,26 +43,27 @@ const MOCK_PROFILE = {
   ],
 };
 
-function ComparisonCard({ player, theme }) {
+const initialsOf = (name) =>
+  (name || '?')
+    .split(' ')
+    .map((w) => w[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+
+function ListItem({ icon, iconColor, iconFill, text, theme, delay }) {
   return (
-    <View style={[styles.compCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-      <View style={[styles.compIconCircle, { backgroundColor: theme.primary + '22' }]}>
-        <Ionicons name="basketball" size={22} color={theme.primary} />
+    <Entrance variant="slideIn" delay={delay} style={styles.listRow}>
+      <View style={[styles.listIcon, { backgroundColor: iconFill }]}>
+        <Ionicons name={icon} size={13} color={iconColor} />
       </View>
-      <View style={styles.compInfo}>
-        <Text style={[styles.compName, { color: theme.text }]}>{player.name}</Text>
-        <Text style={[styles.compEra, { color: theme.textSecondary }]}>{player.era}</Text>
-      </View>
-      <View style={[styles.simBadge, { backgroundColor: theme.primary + '22' }]}>
-        <Text style={[styles.simText, { color: theme.primary }]}>{player.similarity}%</Text>
-        <Text style={[styles.simLabel, { color: theme.textSecondary }]}>similar</Text>
-      </View>
-    </View>
+      <Text style={[TYPE.tooltipBody, { color: theme.textMuted, flex: 1 }]}>{text}</Text>
+    </Entrance>
   );
 }
 
 export default function ShotDNAArchetypeScreen({ navigation, route }) {
-  const { theme } = useAppContext();
+  const { theme, isDarkMode } = useAppContext();
   const profile = route.params?.profile || MOCK_PROFILE;
 
   const archetype = profile.archetype || MOCK_PROFILE.archetype;
@@ -67,74 +76,112 @@ export default function ShotDNAArchetypeScreen({ navigation, route }) {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      <StatusBar style="light" />
-      {/* Nav Header */}
-      <View style={[styles.navHeader, { borderBottomColor: theme.border }]}>
-        <TouchableOpacity
-          style={[styles.backBtn, { backgroundColor: theme.card }]}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons name="chevron-back" size={22} color={theme.text} />
-        </TouchableOpacity>
-        <Text style={[styles.navTitle, { color: theme.text }]}>Archetype Profile</Text>
-        <View style={{ width: 40 }} />
-      </View>
+      <StatusBar style={isDarkMode ? 'light' : 'dark'} />
+      <ScreenHeader title="Archetype Profile" onBack={() => navigation.goBack()} />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Archetype Badge Card */}
-        <View style={styles.badgeCard}>
-          <View style={[styles.badgeIconCircle, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-            <Ionicons name={icon} size={48} color="#FFF" />
-          </View>
-          <Text style={styles.badgeLabel}>ARCHETYPE</Text>
-          <Text style={styles.badgeName}>{archetype}</Text>
-          <Text style={styles.badgeRole}>{roleDescription}</Text>
-        </View>
+        {/* Archetype hero badge */}
+        <Entrance variant="cardIn">
+          <LinearGradient
+            colors={theme.heroGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.badgeCard}
+          >
+            <Float duration={3400}>
+              <View style={styles.badgeIconCircle}>
+                <Ionicons name={icon} size={42} color="#FFFFFF" />
+              </View>
+            </Float>
+            <Text style={styles.badgeLabel}>ARCHETYPE</Text>
+            <Text style={styles.badgeName}>{archetype}</Text>
+            <Text style={styles.badgeRole}>{roleDescription}</Text>
+          </LinearGradient>
+        </Entrance>
 
         {/* Strengths */}
-        <View style={[styles.section, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Strengths</Text>
-          {strengths.map((s, i) => (
-            <View key={i} style={styles.listRow}>
-              <View style={[styles.listIcon, { backgroundColor: '#4CAF5022' }]}>
-                <Ionicons name="checkmark" size={14} color="#4CAF50" />
-              </View>
-              <Text style={[styles.listText, { color: theme.text }]}>{s}</Text>
-            </View>
-          ))}
+        <View style={{ marginTop: SHAPE.sectionGap }}>
+          <SectionLabel>Strengths</SectionLabel>
+          <Entrance
+            variant="cardIn"
+            delay={100}
+            style={[styles.section, { backgroundColor: theme.surface }]}
+          >
+            {strengths.map((s, i) => (
+              <ListItem
+                key={i}
+                icon="checkmark"
+                iconColor={theme.steel}
+                iconFill={theme.steelFill}
+                text={s}
+                theme={theme}
+                delay={150 + i * 90}
+              />
+            ))}
+          </Entrance>
         </View>
 
         {/* Improvements */}
-        <View style={[styles.section, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Areas to Improve</Text>
-          {improvements.map((item, i) => (
-            <View key={i} style={styles.listRow}>
-              <View style={[styles.listIcon, { backgroundColor: theme.primary + '22' }]}>
-                <Ionicons name="arrow-up" size={14} color={theme.primary} />
-              </View>
-              <Text style={[styles.listText, { color: theme.text }]}>{item}</Text>
-            </View>
-          ))}
+        <View style={{ marginTop: SHAPE.sectionGap }}>
+          <SectionLabel>Areas to improve</SectionLabel>
+          <Entrance
+            variant="cardIn"
+            delay={200}
+            style={[styles.section, { backgroundColor: theme.surface }]}
+          >
+            {improvements.map((item, i) => (
+              <ListItem
+                key={i}
+                icon="arrow-up"
+                iconColor={theme.accentText}
+                iconFill={theme.badgeFill}
+                text={item}
+                theme={theme}
+                delay={250 + i * 90}
+              />
+            ))}
+          </Entrance>
         </View>
 
-        {/* Historical Comparisons */}
-        <View style={styles.comparisonsSection}>
-          <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 12 }]}>
-            Historical Comparisons
-          </Text>
+        {/* Historical comparisons */}
+        <View style={{ marginTop: SHAPE.sectionGap }}>
+          <SectionLabel
+            action={`${historicalComparisons.length} player${historicalComparisons.length === 1 ? '' : 's'}`}
+          >
+            Historical lineage
+          </SectionLabel>
           {historicalComparisons.map((player, i) => (
-            <ComparisonCard key={i} player={player} theme={theme} />
+            <Entrance key={player.name || i} variant="slideIn" delay={350 + i * 150}>
+              <Row
+                style={i > 0 ? { marginTop: 8 } : null}
+                leading={<Avatar tone="steel" size={34} initials={initialsOf(player.name)} />}
+                title={player.name}
+                meta={player.era}
+                trailing={
+                  player.similarity != null ? (
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={{ fontFamily: FONTS.bodyExtraBold, fontSize: 14, color: theme.accentText }}>
+                        {player.similarity}%
+                      </Text>
+                      <Text style={[TYPE.chipSmall, { color: theme.textDim, marginTop: 1 }]}>
+                        SIMILAR
+                      </Text>
+                    </View>
+                  ) : null
+                }
+              />
+            </Entrance>
           ))}
         </View>
 
-        {/* View Full History */}
+        {/* View full history */}
         <TouchableOpacity
-          style={[styles.historyBtn, { backgroundColor: theme.primary }]}
           activeOpacity={0.85}
           onPress={() => navigation.navigate('ShotDNAHistory')}
+          style={[styles.historyBtn, { backgroundColor: theme.primary }]}
         >
-          <Ionicons name="time-outline" size={18} color="#FFF" style={{ marginRight: 8 }} />
-          <Text style={styles.historyBtnText}>View Full History</Text>
+          <Ionicons name="time-outline" size={16} color="#FFFFFF" />
+          <Text style={[TYPE.buttonPrimary, { color: '#FFFFFF' }]}>View full history</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -143,124 +190,64 @@ export default function ShotDNAArchetypeScreen({ navigation, route }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  navHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  navTitle: { fontSize: 17, fontWeight: '700' },
-  scrollContent: { padding: 20, paddingBottom: 40 },
+  scrollContent: { padding: SHAPE.screenPadding, paddingTop: 14, paddingBottom: 40 },
   badgeCard: {
-    backgroundColor: '#FF6B00',
     borderRadius: 20,
-    padding: 28,
+    padding: 24,
     alignItems: 'center',
-    marginBottom: 20,
-    shadowColor: '#FF6B00',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 8,
+    overflow: 'hidden',
   },
   badgeIconCircle: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    justifyContent: 'center',
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    backgroundColor: 'rgba(255,255,255,0.14)',
     alignItems: 'center',
-    marginBottom: 16,
+    justifyContent: 'center',
+    marginBottom: 14,
   },
   badgeLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: 'rgba(255,255,255,0.75)',
+    fontFamily: FONTS.bodyBold,
+    fontSize: 9.5,
     letterSpacing: 1.5,
-    marginBottom: 6,
+    color: 'rgba(255,255,255,0.65)',
+    marginBottom: 5,
   },
   badgeName: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: '#FFF',
-    marginBottom: 12,
+    fontFamily: FONTS.heading,
+    fontSize: 24,
+    color: '#FFFFFF',
     textAlign: 'center',
+    marginBottom: 10,
   },
   badgeRole: {
-    fontSize: 14,
+    fontFamily: FONTS.body,
+    fontSize: 11.5,
+    lineHeight: 18,
     color: 'rgba(255,255,255,0.88)',
     textAlign: 'center',
-    lineHeight: 21,
   },
   section: {
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
+    borderRadius: SHAPE.radiusCard,
+    padding: SHAPE.cardPadding,
+    gap: 10,
   },
-  sectionTitle: { fontSize: 16, fontWeight: '700', marginBottom: 14 },
-  listRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-    gap: 12,
-  },
+  listRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 11 },
   listIcon: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    justifyContent: 'center',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     alignItems: 'center',
+    justifyContent: 'center',
     marginTop: 1,
   },
-  listText: { flex: 1, fontSize: 14, lineHeight: 20 },
-  comparisonsSection: { marginBottom: 20 },
-  compCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 10,
-    borderWidth: 1,
-  },
-  compIconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 14,
-  },
-  compInfo: { flex: 1 },
-  compName: { fontSize: 15, fontWeight: '700', marginBottom: 2 },
-  compEra: { fontSize: 12 },
-  simBadge: {
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 10,
-  },
-  simText: { fontSize: 18, fontWeight: '800' },
-  simLabel: { fontSize: 10 },
   historyBtn: {
+    marginTop: SHAPE.sectionGap,
+    borderRadius: SHAPE.radiusTile,
+    paddingVertical: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 15,
-    borderRadius: 14,
-    shadowColor: '#FF6B00',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    gap: 7,
   },
-  historyBtnText: { fontSize: 15, fontWeight: '700', color: '#FFF' },
 });

@@ -18,10 +18,12 @@ import { updateUserProfile } from '../../services/firestoreService';
 import { signOutUser } from '../../services/authService';
 import { signOutGoogle } from '../../services/googleAuthService';
 import { getTheme } from '../../utils/theme';
+import { useToast } from '../../components/dbe';
 
 const AccountPrivacyScreen = ({ navigation }) => {
     const { userData, user, isDarkMode, theme: contextTheme } = useAppContext();
     const theme = contextTheme || getTheme(isDarkMode || false);
+    const showToast = useToast();
 
     // Privacy settings state
     const [profileVisibility, setProfileVisibility] = useState(
@@ -71,7 +73,7 @@ const AccountPrivacyScreen = ({ navigation }) => {
                 }
             });
             setHasChanges(false);
-            Alert.alert('Success', 'Privacy settings saved successfully.');
+            showToast('Privacy settings saved successfully.');
         } catch (error) {
             console.error('Error saving privacy settings:', error);
             Alert.alert('Error', 'Failed to save privacy settings. Please try again.');

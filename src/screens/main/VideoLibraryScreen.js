@@ -197,7 +197,7 @@ const VideoLibraryScreen = ({ navigation }) => {
   if (loading && videos.length === 0) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#FF6B00" />
+        <ActivityIndicator size="large" color="#8A1C22" />
         <Text style={styles.loadingText}>Loading training videos...</Text>
       </View>
     );
@@ -269,7 +269,7 @@ const VideoLibraryScreen = ({ navigation }) => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={refreshVideos}
-            tintColor="#FF6B00"
+            tintColor="#8A1C22"
           />
         }
         ListHeaderComponent={
@@ -405,7 +405,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   selectedCategoryChip: {
-    backgroundColor: '#FF6B00',
+    backgroundColor: '#8A1C22',
   },
   categoryIcon: {
     marginRight: 4,
@@ -472,7 +472,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingHorizontal: 20,
     paddingVertical: 10,
-    backgroundColor: '#FF6B00',
+    backgroundColor: '#8A1C22',
     borderRadius: 8,
   },
   clearSearchText: {

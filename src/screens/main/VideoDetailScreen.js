@@ -232,7 +232,7 @@ const VideoDetailScreen = ({ route, navigation }) => {
               <Ionicons 
                 name={bookmarked ? "bookmark" : "bookmark-outline"} 
                 size={20} 
-                color={bookmarked ? "#FFF" : "#FF6B00"} 
+                color={bookmarked ? "#FFF" : "#8A1C22"} 
               />
               <Text style={[
                 styles.secondaryButtonText,
@@ -348,7 +348,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: 'rgba(255,107,0,0.9)',
+    backgroundColor: 'rgba(138, 28, 34,0.9)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -392,7 +392,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 6,
   },
   levelBadge: {
-    backgroundColor: '#FF6B00',
+    backgroundColor: '#8A1C22',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 12,
@@ -432,7 +432,7 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     flex: 1,
-    backgroundColor: '#FF6B00',
+    backgroundColor: '#8A1C22',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -450,7 +450,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'transparent',
     borderWidth: 2,
-    borderColor: '#FF6B00',
+    borderColor: '#8A1C22',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -459,11 +459,11 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   bookmarkedButton: {
-    backgroundColor: '#FF6B00',
-    borderColor: '#FF6B00',
+    backgroundColor: '#8A1C22',
+    borderColor: '#8A1C22',
   },
   secondaryButtonText: {
-    color: '#FF6B00',
+    color: '#8A1C22',
     fontSize: 16,
     fontWeight: 'bold',
     marginLeft: 8,

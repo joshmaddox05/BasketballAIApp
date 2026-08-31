@@ -170,7 +170,7 @@ const CustomPlanDetailScreen = ({ navigation, route }) => {
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="light-content" />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#FF6B00" />
+          <ActivityIndicator size="large" color="#8A1C22" />
           <Text style={styles.loadingText}>Loading plan...</Text>
         </View>
       </SafeAreaView>
@@ -220,7 +220,7 @@ const CustomPlanDetailScreen = ({ navigation, route }) => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="#FF6B00"
+            tintColor="#8A1C22"
           />
         }
       >
@@ -459,7 +459,7 @@ const styles = StyleSheet.create({
   progressPercentage: {
     fontSize: 24,
     fontWeight: '800',
-    color: '#FF6B00'
+    color: '#8A1C22'
   },
   progressBarContainer: {
     height: 8,
@@ -470,7 +470,7 @@ const styles = StyleSheet.create({
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: '#FF6B00',
+    backgroundColor: '#8A1C22',
     borderRadius: 4
   },
   progressStats: {
@@ -512,7 +512,7 @@ const styles = StyleSheet.create({
     marginLeft: 6
   },
   continueButton: {
-    backgroundColor: '#FF6B00',
+    backgroundColor: '#8A1C22',
     borderRadius: 16,
     padding: 20,
     marginBottom: 24

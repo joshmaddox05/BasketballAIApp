@@ -440,7 +440,7 @@ const AICameraCapture = ({
           {analysisMode.charAt(0).toUpperCase() + analysisMode.slice(1)} Analysis
         </Text>
         <View style={styles.portraitNotice}>
-          <Ionicons name="phone-portrait-outline" size={24} color="#FF6B35" />
+          <Ionicons name="phone-portrait-outline" size={24} color="#8A1C22" />
           <Text style={styles.portraitNoticeText}>Hold phone vertically for best results</Text>
         </View>
         {guides[analysisMode].map((guide, index) => (
@@ -477,7 +477,7 @@ const AICameraCapture = ({
   if (!permission) {
     return (
       <View style={styles.permissionContainer}>
-        <ActivityIndicator size="large" color="#FF6B35" />
+        <ActivityIndicator size="large" color="#8A1C22" />
         <Text style={styles.permissionText}>Loading camera...</Text>
       </View>
     );
@@ -538,7 +538,7 @@ const AICameraCapture = ({
 
           {/* Processing Overlay */}
           <View style={[styles.processingOverlay, { display: analysisPhase === 'processing' ? 'flex' : 'none' }]}>
-            <ActivityIndicator size="large" color="#FF6B35" />
+            <ActivityIndicator size="large" color="#8A1C22" />
             <Text style={styles.processingText}>Processing video...</Text>
           </View>
         </View>
@@ -641,7 +641,7 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   permissionButton: {
-    backgroundColor: '#FF6B35',
+    backgroundColor: '#8A1C22',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
@@ -693,7 +693,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#FF6B35',
+    backgroundColor: '#8A1C22',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -709,7 +709,7 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   readyButton: {
-    backgroundColor: '#FF6B35',
+    backgroundColor: '#8A1C22',
     paddingHorizontal: 32,
     paddingVertical: 16,
     borderRadius: 8,
@@ -799,7 +799,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   analysisType: {
-    backgroundColor: 'rgba(255,107,53,0.9)',
+    backgroundColor: 'rgba(138, 28, 34,0.9)',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 16,
@@ -937,7 +937,7 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: '#FF6B35',
+    backgroundColor: '#8A1C22',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,

@@ -167,6 +167,9 @@ export const AppProvider = ({ children }) => {
     const [theme, setTheme] = useState(getTheme(false));
     const [language, setLanguage] = useState('en');
 
+    // Tour voice narration (text-to-speech) mute preference
+    const [voiceMuted, setVoiceMuted] = useState(false);
+
     // Firebase auth state listener
     useEffect(() => {
         const unsubscribe = onAuthStateChange(async ({ user: authUser, profile }) => {
@@ -407,6 +410,7 @@ export const AppProvider = ({ children }) => {
                 const storedUseSystemTheme = await AsyncStorage.getItem('useSystemTheme');
                 const storedLanguage = await AsyncStorage.getItem('language');
                 const storedBookmarkedVideos = await AsyncStorage.getItem('bookmarkedVideos');
+                const storedVoiceMuted = await AsyncStorage.getItem('tourVoiceMuted');
 
                 if (storedUseSystemTheme !== null) {
                     const useSystem = JSON.parse(storedUseSystemTheme);
@@ -437,6 +441,7 @@ export const AppProvider = ({ children }) => {
 
                 if (storedLanguage) setLanguage(storedLanguage);
                 if (storedBookmarkedVideos) setBookmarkedVideos(JSON.parse(storedBookmarkedVideos));
+                if (storedVoiceMuted !== null) setVoiceMuted(JSON.parse(storedVoiceMuted));
             } catch (error) {
                 logger.error('Failed to load preferences', error);
             }
@@ -698,6 +703,17 @@ export const AppProvider = ({ children }) => {
         }
     };
 
+    // Toggle the tour voice narration mute preference (persisted immediately)
+    const toggleVoiceMuted = async () => {
+        const newValue = !voiceMuted;
+        setVoiceMuted(newValue);
+        try {
+            await AsyncStorage.setItem('tourVoiceMuted', JSON.stringify(newValue));
+        } catch (error) {
+            logger.error('Failed to save tour voice preference', error);
+        }
+    };
+
     const changeLanguage = async (newLang) => {
         setLanguage(newLang);
         try {
@@ -858,6 +874,8 @@ export const AppProvider = ({ children }) => {
             isDarkMode,
             setIsDarkMode,
             toggleDarkMode,
+            voiceMuted,
+            toggleVoiceMuted,
             useSystemTheme,
             theme,
             language,

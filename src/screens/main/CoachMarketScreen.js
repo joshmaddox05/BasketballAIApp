@@ -1,27 +1,44 @@
 // CoachMarketScreen.js - Coaching marketplace hub
+// Design: handoff 12e "CoachMarket™ — browse & book". Presentational layer only;
+// listing/purchase loading and the CoachMarketListing route are unchanged.
 import React, { useState, useCallback } from 'react';
-import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, ScrollView, TextInput, ActivityIndicator } from 'react-native';
+import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, ScrollView, TextInput } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAppContext } from '../../context/AppContext';
 import { canAccessFeature } from '../../utils/subscription';
 import { getCoachMarketListings, getUserCoachMarketPurchases } from '../../services/firestoreService';
+import {
+  ScreenHeader,
+  SectionLabel,
+  Chip,
+  Avatar,
+  PrimaryButton,
+  EmptyState,
+  LoadingState,
+  Entrance,
+  Shimmer,
+} from '../../components/dbe';
+import { TYPE, SHAPE } from '../../utils/typography';
 
 const CATEGORIES = ['All', 'Shooting', 'Ball Handling', 'Defense', 'Physical', 'Mental'];
-const AVATAR_COLORS = ['#FF6B00', '#8b5cf6', '#06b6d4', '#22c55e', '#f59e0b', '#ec4899'];
-const FEATURED_ACCENTS = ['#FF6B00', '#8b5cf6'];
+// The mock's rating gold. Deliberately one fixed value — it reads on both the
+// light and dark surface, and the token table has no rating color.
+const RATING_GOLD = '#E0B341';
+// Second featured banner is the neutral "steel" voice against the burgundy hero.
+const STEEL_GRADIENT = ['#3B3F4C', '#1C1E26'];
 
 const initialsOf = (name) =>
   (name || 'Coach').split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase();
 
-// Firestore listing → browse card shape.
+// Firestore listing → browse row shape.
 const mapListingCard = (l, idx) => ({
   id: l.id,
   raw: l,
   name: l.coachName || 'Coach',
   initials: initialsOf(l.coachName),
-  avatarColor: AVATAR_COLORS[idx % AVATAR_COLORS.length],
   drillName: l.title || 'Untitled Drill',
   rating: l.rating || 0,
   reviewCount: l.sales || 0,
@@ -36,171 +53,124 @@ const mapFeaturedCard = (l, idx) => ({
   raw: l,
   title: l.title || 'Untitled Drill',
   coach: l.coachName || 'Coach',
-  tagline: l.description || 'Coaching content',
   category: l.category || 'General',
   rating: l.rating || 0,
   reviewCount: l.sales || 0,
   price: `$${(l.price || 0).toFixed(0)}`,
-  badgeText: idx === 0 ? 'Top Seller' : 'Popular',
-  accentColor: FEATURED_ACCENTS[idx % FEATURED_ACCENTS.length],
+  badgeText: idx === 0 ? 'TOP SELLER' : 'POPULAR',
+  isHero: idx === 0,
 });
 
-function StarRating({ rating, theme }) {
-  const full = Math.floor(rating);
-  const half = rating - full >= 0.5;
+// Compact "★ 4.9 (214)" — replaces the five-glyph star row (text minimum).
+function RatingLine({ rating, count, theme, style }) {
+  if (!rating) return null;
   return (
-    <View style={styles.starsRow}>
-      {[1, 2, 3, 4, 5].map((i) => (
-        <Ionicons
-          key={i}
-          name={i <= full ? 'star' : i === full + 1 && half ? 'star-half' : 'star-outline'}
-          size={12}
-          color="#f59e0b"
-        />
-      ))}
-    </View>
+    <Text style={[TYPE.chip, { color: RATING_GOLD }, style]}>
+      ★ {rating}
+      {count ? <Text style={[TYPE.rowMeta, { color: theme.textDim }]}>{`  (${count})`}</Text> : null}
+    </Text>
   );
 }
 
-function CoachAvatar({ initials, color, size = 44 }) {
+function FeaturedCard({ item, theme, onPress, delay }) {
   return (
-    <View
-      style={[
-        styles.coachAvatar,
-        { backgroundColor: color + '25', width: size, height: size, borderRadius: size / 2 },
-      ]}
-    >
-      <Text style={[styles.coachAvatarText, { color, fontSize: size * 0.35 }]}>{initials}</Text>
-    </View>
-  );
-}
-
-function FeaturedCard({ item, theme, onPress }) {
-  return (
-    <TouchableOpacity
-      style={[styles.featuredCard, { backgroundColor: theme.card, borderColor: theme.border }]}
-      activeOpacity={0.85}
-      onPress={onPress}
-    >
-      {/* Color banner */}
-      <View style={[styles.featuredBanner, { backgroundColor: item.accentColor + '20' }]}>
-        <View style={[styles.featuredBadge, { backgroundColor: item.accentColor }]}>
-          <Text style={styles.featuredBadgeText}>{item.badgeText}</Text>
-        </View>
-        <View style={[styles.featuredCategoryChip, { backgroundColor: 'rgba(0,0,0,0.12)' }]}>
-          <Text style={[styles.featuredCategoryText, { color: item.accentColor }]}>{item.category}</Text>
-        </View>
-        <View style={[styles.featuredIconCircle, { backgroundColor: item.accentColor + '30' }]}>
-          <Ionicons name="basketball-outline" size={32} color={item.accentColor} />
-        </View>
-      </View>
-
-      {/* Card body */}
-      <View style={styles.featuredBody}>
-        <Text style={[styles.featuredTitle, { color: theme.text }]} numberOfLines={2}>
-          {item.title}
-        </Text>
-        <Text style={[styles.featuredCoach, { color: theme.textSecondary }]}>{item.coach}</Text>
-        <Text style={[styles.featuredTagline, { color: theme.textTertiary }]}>{item.tagline}</Text>
-        <View style={styles.featuredBottom}>
-          <View style={styles.featuredRatingRow}>
-            <StarRating rating={item.rating} theme={theme} />
-            <Text style={[styles.ratingValue, { color: theme.text }]}>{item.rating}</Text>
-            <Text style={[styles.reviewCount, { color: theme.textTertiary }]}>({item.reviewCount})</Text>
-          </View>
-          <Text style={[styles.featuredPrice, { color: theme.primary }]}>{item.price}</Text>
-        </View>
-        <TouchableOpacity
-          style={[styles.previewBtn, { backgroundColor: item.accentColor }]}
-          activeOpacity={0.85}
+    <Entrance variant="cardIn" delay={delay}>
+      <TouchableOpacity
+        style={[styles.featuredCard, { backgroundColor: theme.surface }]}
+        activeOpacity={0.85}
+        onPress={onPress}
+      >
+        <LinearGradient
+          colors={item.isHero ? theme.heroGradient : STEEL_GRADIENT}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.featuredBanner}
         >
-          <Ionicons name="play-circle-outline" size={16} color="#fff" />
-          <Text style={styles.previewBtnText}>Preview</Text>
-        </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
+          {item.isHero ? <Shimmer color={theme.shimmer} /> : null}
+          <View
+            style={[
+              styles.featuredBadge,
+              { backgroundColor: item.isHero ? '#FFFFFF' : 'rgba(255,255,255,0.16)' },
+            ]}
+          >
+            <Text
+              style={[
+                TYPE.chipSmall,
+                { color: item.isHero ? theme.primary : '#FFFFFF', letterSpacing: 0.6 },
+              ]}
+            >
+              {item.badgeText}
+            </Text>
+          </View>
+          <Text style={[TYPE.chipSmall, { color: 'rgba(255,255,255,0.75)' }]} numberOfLines={1}>
+            {item.category}
+          </Text>
+        </LinearGradient>
+
+        <View style={styles.featuredBody}>
+          <Text style={[TYPE.cardTitle, { color: theme.text, fontSize: 14, lineHeight: 18 }]} numberOfLines={2}>
+            {item.title}
+          </Text>
+          <Text style={[TYPE.rowMeta, { color: theme.textDim, marginTop: 4 }]} numberOfLines={1}>
+            {item.coach}
+          </Text>
+          <View style={styles.featuredBottom}>
+            <RatingLine rating={item.rating} count={item.reviewCount} theme={theme} />
+            <Text style={[TYPE.statNumberMedium, { color: theme.text, fontSize: 14 }]}>{item.price}</Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+    </Entrance>
   );
 }
 
-function ListingCard({ item, theme, onPreview }) {
+// Hairline list row — avatar, title, coach · category · level, rating, price.
+function ListingRow({ item, theme, onPress, delay, accent }) {
   return (
-    <TouchableOpacity
-      style={[styles.listingCard, { backgroundColor: theme.card, borderColor: theme.border }]}
-      activeOpacity={0.85}
-      onPress={onPreview}
-    >
-      <View style={styles.listingTop}>
-        <CoachAvatar initials={item.initials} color={item.avatarColor} size={48} />
-        <View style={styles.listingInfo}>
-          <Text style={[styles.listingDrillName, { color: theme.text }]} numberOfLines={2}>
+    <Entrance variant="slideIn" delay={delay}>
+      <TouchableOpacity
+        style={[styles.listRow, { borderBottomColor: theme.hairline }]}
+        activeOpacity={0.8}
+        onPress={onPress}
+      >
+        <Avatar initials={item.initials} size={44} tone={accent ? 'accent' : 'steel'} />
+        <View style={styles.listRowInfo}>
+          <Text style={[TYPE.rowTitle, { color: theme.text, fontSize: 13 }]} numberOfLines={1}>
             {item.drillName}
           </Text>
-          <Text style={[styles.listingCoachName, { color: theme.textSecondary }]}>{item.name}</Text>
-          <View style={styles.listingRatingRow}>
-            <StarRating rating={item.rating} theme={theme} />
-            <Text style={[styles.ratingValue, { color: theme.text }]}>{item.rating}</Text>
-            <Text style={[styles.reviewCount, { color: theme.textTertiary }]}>({item.reviewCount})</Text>
-          </View>
+          <Text style={[TYPE.rowMeta, { color: theme.textDim }]} numberOfLines={1}>
+            {`${item.name} · ${item.category} · ${item.level}`}
+          </Text>
+          <RatingLine
+            rating={item.rating}
+            count={item.reviewCount}
+            theme={theme}
+            style={{ marginTop: 3 }}
+          />
         </View>
-      </View>
-
-      <View style={[styles.listingBottom, { borderTopColor: theme.border }]}>
-        <View style={styles.listingMeta}>
-          <View style={[styles.categoryChip, { backgroundColor: theme.primary + '18', borderColor: theme.primary + '40' }]}>
-            <Text style={[styles.categoryChipText, { color: theme.primary }]}>{item.category}</Text>
-          </View>
-          <View style={[styles.levelChip, { backgroundColor: theme.backgroundTertiary || theme.border + '60' }]}>
-            <Text style={[styles.levelChipText, { color: theme.textSecondary }]}>{item.level}</Text>
-          </View>
-        </View>
-        <View style={styles.listingActions}>
-          <Text style={[styles.listingPrice, { color: theme.text }]}>{item.price}</Text>
-          <TouchableOpacity
-            style={[styles.listingPreviewBtn, { backgroundColor: theme.primary, borderColor: theme.primary }]}
-            activeOpacity={0.85}
-            onPress={onPreview}
-          >
-            <Text style={styles.listingPreviewBtnText}>View</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </TouchableOpacity>
+        <Text style={[TYPE.statNumberMedium, { color: theme.text, fontSize: 15 }]}>{item.price}</Text>
+      </TouchableOpacity>
+    </Entrance>
   );
 }
 
 function UpgradeGate({ theme, navigation }) {
   return (
-    <View style={[styles.upgradeGate, { backgroundColor: theme.card, borderColor: theme.border }]}>
-      <View style={[styles.gateIconCircle, { backgroundColor: theme.primary + '15' }]}>
-        <Ionicons name="lock-closed" size={32} color={theme.primary} />
+    <View style={[styles.upgradeGate, { backgroundColor: theme.surface }]}>
+      <View style={[styles.gateIcon, { backgroundColor: theme.badgeFill }]}>
+        <Ionicons name="lock-closed" size={28} color={theme.accentText} />
       </View>
-      <Text style={[styles.gateTitle, { color: theme.text }]}>Premium Feature</Text>
-      <Text style={[styles.gateSubtitle, { color: theme.textSecondary }]}>
-        CoachMarket™ is available to Premium and higher subscribers. Upgrade to browse and purchase coaching content from elite trainers.
+      <Text style={[TYPE.tooltipTitle, { color: theme.text }]}>Premium Feature</Text>
+      <Text style={[TYPE.tooltipBody, { color: theme.textDim, textAlign: 'center', marginTop: 6 }]}>
+        CoachMarket™ unlocks with Premium.
       </Text>
-      <TouchableOpacity
-        style={[styles.gateUpgradeBtn, { backgroundColor: theme.primary }]}
-        activeOpacity={0.85}
+      <PrimaryButton
+        label="Upgrade to Premium"
+        icon="arrow-up-circle-outline"
         onPress={() => navigation.navigate('Subscription')}
-      >
-        <Ionicons name="arrow-up-circle-outline" size={18} color="#fff" />
-        <Text style={styles.gateUpgradeBtnText}>Upgrade to Premium</Text>
-      </TouchableOpacity>
-      <Text style={[styles.gatePriceHint, { color: theme.textTertiary }]}>Starting at $9.99 / month</Text>
-    </View>
-  );
-}
-
-function MyPurchasesEmptyState({ theme }) {
-  return (
-    <View style={styles.emptyState}>
-      <View style={[styles.emptyIcon, { backgroundColor: theme.primary + '15' }]}>
-        <Ionicons name="bag-outline" size={36} color={theme.primary} />
-      </View>
-      <Text style={[styles.emptyTitle, { color: theme.text }]}>No Purchases Yet</Text>
-      <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
-        Courses and drills you purchase will appear here for offline access anytime.
-      </Text>
+        style={{ alignSelf: 'stretch', marginTop: 18 }}
+      />
+      <Text style={[TYPE.rowMeta, { color: theme.textDim, marginTop: 10 }]}>From $9.99 / month</Text>
     </View>
   );
 }
@@ -261,182 +231,152 @@ export default function CoachMarketScreen({ navigation }) {
     return matchesQuery && matchesCategory;
   });
 
+  const showBrowse = activeTab === 'browse';
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <StatusBar style={isDarkMode ? 'light' : 'dark'} />
 
-      {/* Header */}
-      <View style={[styles.header, { borderBottomColor: theme.border }]}>
-        <TouchableOpacity
-          style={styles.backBtn}
-          onPress={() => navigation.goBack()}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="chevron-back" size={26} color={theme.text} />
-        </TouchableOpacity>
-        <View style={styles.headerCenter}>
-          <Text style={[styles.headerTitle, { color: theme.text }]}>CoachMarket™</Text>
-          <Text style={[styles.headerSubtitle, { color: theme.textSecondary }]}>Learn from the Best</Text>
-        </View>
-        <View style={styles.headerRight} />
+      <ScreenHeader title="CoachMarket™" onBack={() => navigation.goBack()} />
+
+      {/* Browse / My Purchases */}
+      <View style={[styles.tabBar, { borderBottomColor: theme.hairline }]}>
+        {[
+          { key: 'browse', label: 'Browse' },
+          { key: 'purchases', label: 'My Purchases' },
+        ].map((t) => {
+          const on = activeTab === t.key;
+          return (
+            <TouchableOpacity
+              key={t.key}
+              style={[styles.tabBtn, { borderBottomColor: on ? theme.primary : 'transparent' }]}
+              onPress={() => setActiveTab(t.key)}
+              activeOpacity={0.8}
+            >
+              <Text style={[TYPE.buttonSecondary, { color: on ? theme.accentText : theme.textDim }]}>
+                {t.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
-      {/* Tab bar */}
-      <View style={[styles.tabBar, { borderBottomColor: theme.border, backgroundColor: theme.background }]}>
-        <TouchableOpacity
-          style={[styles.tabBtn, activeTab === 'browse' && [styles.tabBtnActive, { borderBottomColor: theme.primary }]]}
-          onPress={() => setActiveTab('browse')}
-          activeOpacity={0.8}
-        >
-          <Text style={[styles.tabBtnText, { color: activeTab === 'browse' ? theme.primary : theme.textSecondary }]}>
-            Browse
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tabBtn, activeTab === 'purchases' && [styles.tabBtnActive, { borderBottomColor: theme.primary }]]}
-          onPress={() => setActiveTab('purchases')}
-          activeOpacity={0.8}
-        >
-          <Text style={[styles.tabBtnText, { color: activeTab === 'purchases' ? theme.primary : theme.textSecondary }]}>
-            My Purchases
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {activeTab === 'purchases' ? (
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {!hasPremiumAccess ? (
-            <UpgradeGate theme={theme} navigation={navigation} />
-          ) : purchases.length === 0 ? (
-            <MyPurchasesEmptyState theme={theme} />
-          ) : (
-            purchases.map((p, idx) => (
-              <ListingCard
-                key={p.id}
-                item={mapListingCard({ ...p, title: p.title }, idx)}
-                theme={theme}
-                onPreview={() => openListing({ id: p.listingId, ...p })}
+      {showBrowse ? (
+        <>
+          {/* Search + category filters stay pinned above the scroll */}
+          <View style={styles.filterBlock}>
+            <View style={[styles.searchRow, { backgroundColor: theme.surface }]}>
+              <Ionicons name="search-outline" size={15} color={theme.textDim} />
+              <TextInput
+                style={[styles.searchInput, TYPE.rowTitle, { color: theme.text }]}
+                placeholder="Search drills, coaches, programs…"
+                placeholderTextColor={theme.textDim}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                returnKeyType="search"
+                clearButtonMode="while-editing"
               />
-            ))
-          )}
-          <View style={styles.bottomSpacer} />
-        </ScrollView>
-      ) : (
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Search bar */}
-          <View style={[styles.searchRow, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            <Ionicons name="search-outline" size={18} color={theme.textSecondary} style={styles.searchIcon} />
-            <TextInput
-              style={[styles.searchInput, { color: theme.text }]}
-              placeholder="Search coaches, drills, topics..."
-              placeholderTextColor={theme.textTertiary || theme.textSecondary}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              returnKeyType="search"
-              clearButtonMode="while-editing"
-            />
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.chipRow}
+            >
+              {CATEGORIES.map((cat) => (
+                <Chip
+                  key={cat}
+                  label={cat}
+                  active={activeCategory === cat}
+                  onPress={() => setActiveCategory(cat)}
+                />
+              ))}
+            </ScrollView>
           </View>
 
-          {/* Category filter chips */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.categoryRow}
-            contentContainerStyle={styles.categoryRowContent}
-          >
-            {CATEGORIES.map((cat) => (
-              <TouchableOpacity
-                key={cat}
-                style={[
-                  styles.categoryChipBtn,
-                  activeCategory === cat
-                    ? { backgroundColor: theme.primary, borderColor: theme.primary }
-                    : { backgroundColor: theme.card, borderColor: theme.border },
-                ]}
-                onPress={() => setActiveCategory(cat)}
-                activeOpacity={0.75}
-              >
-                <Text
-                  style={[
-                    styles.categoryChipBtnText,
-                    { color: activeCategory === cat ? '#fff' : theme.textSecondary },
-                  ]}
-                >
-                  {cat}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-
-          {/* Subscription gate overlay — shown if user lacks access */}
-          {!hasPremiumAccess ? (
-            <UpgradeGate theme={theme} navigation={navigation} />
-          ) : loading ? (
-            <ActivityIndicator color={theme.primary} style={{ marginTop: 40 }} />
-          ) : (
-            <>
-              {/* Featured section */}
-              {featured.length > 0 && (
-                <>
-                  <View style={styles.sectionHeader}>
-                    <Text style={[styles.sectionTitle, { color: theme.text }]}>Featured</Text>
-                    <View style={[styles.featuredBadgePill, { backgroundColor: theme.primary + '20' }]}>
-                      <Ionicons name="flame" size={12} color={theme.primary} />
-                      <Text style={[styles.featuredBadgePillText, { color: theme.primary }]}>Hot</Text>
-                    </View>
-                  </View>
-
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    style={styles.featuredScroll}
-                    contentContainerStyle={styles.featuredScrollContent}
-                  >
-                    {featured.map((item) => (
-                      <FeaturedCard key={item.id} item={item} theme={theme} onPress={() => openListing(item.raw)} />
-                    ))}
-                  </ScrollView>
-                </>
-              )}
-
-              {/* Browse section */}
-              <View style={[styles.sectionHeader, { marginTop: 8 }]}>
-                <Text style={[styles.sectionTitle, { color: theme.text }]}>Browse</Text>
-                <Text style={[styles.sectionCount, { color: theme.textSecondary }]}>
-                  {filteredListings.length} listing{filteredListings.length !== 1 ? 's' : ''}
-                </Text>
+          <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            {!hasPremiumAccess ? (
+              <View style={styles.gutter}>
+                <UpgradeGate theme={theme} navigation={navigation} />
               </View>
-
-              {filteredListings.length === 0 ? (
-                <View style={styles.emptyState}>
-                  <View style={[styles.emptyIcon, { backgroundColor: theme.primary + '15' }]}>
-                    <Ionicons name="search-outline" size={36} color={theme.primary} />
+            ) : loading ? (
+              <LoadingState style={{ paddingVertical: 60 }} />
+            ) : (
+              <>
+                {featured.length > 0 && (
+                  <View style={{ marginBottom: 4 }}>
+                    <View style={styles.gutter}>
+                      <SectionLabel action="See all" onAction={() => setActiveCategory('All')}>
+                        Featured
+                      </SectionLabel>
+                    </View>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.featuredRow}
+                    >
+                      {featured.map((item, i) => (
+                        <FeaturedCard
+                          key={item.id}
+                          item={item}
+                          theme={theme}
+                          delay={i * 90}
+                          onPress={() => openListing(item.raw)}
+                        />
+                      ))}
+                    </ScrollView>
                   </View>
-                  <Text style={[styles.emptyTitle, { color: theme.text }]}>No Listings Found</Text>
-                  <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
-                    No coaching drills match yet. Coaches publish content from their CoachMarket dashboard.
-                  </Text>
-                </View>
-              ) : (
-                filteredListings.map((item) => (
-                  <ListingCard
-                    key={item.id}
-                    item={item}
-                    theme={theme}
-                    onPreview={() => openListing(item.raw)}
-                  />
-                ))
-              )}
-            </>
-          )}
+                )}
 
+                <View style={[styles.gutter, { marginTop: SHAPE.sectionGap }]}>
+                  <SectionLabel>All coaches</SectionLabel>
+                  {filteredListings.length === 0 ? (
+                    <EmptyState
+                      icon="search-outline"
+                      title="No listings found"
+                      sub="Coaches publish content from their CoachMarket dashboard."
+                    />
+                  ) : (
+                    filteredListings.map((item, i) => (
+                      <ListingRow
+                        key={item.id}
+                        item={item}
+                        theme={theme}
+                        accent={i === 0}
+                        delay={100 + i * 120}
+                        onPress={() => openListing(item.raw)}
+                      />
+                    ))
+                  )}
+                </View>
+              </>
+            )}
+            <View style={styles.bottomSpacer} />
+          </ScrollView>
+        </>
+      ) : (
+        <ScrollView showsVerticalScrollIndicator={false}>
+          <View style={[styles.gutter, { paddingTop: 14 }]}>
+            {!hasPremiumAccess ? (
+              <UpgradeGate theme={theme} navigation={navigation} />
+            ) : purchases.length === 0 ? (
+              <EmptyState
+                icon="bag-outline"
+                title="No purchases yet"
+                sub="Anything you buy lands here for offline access."
+              />
+            ) : (
+              purchases.map((p, idx) => (
+                <ListingRow
+                  key={p.id}
+                  item={mapListingCard({ ...p, title: p.title }, idx)}
+                  theme={theme}
+                  accent={idx === 0}
+                  delay={100 + idx * 120}
+                  onPress={() => openListing({ id: p.listingId, ...p })}
+                />
+              ))
+            )}
+          </View>
           <View style={styles.bottomSpacer} />
         </ScrollView>
       )}
@@ -446,234 +386,79 @@ export default function CoachMarketScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-  },
-  backBtn: { padding: 4, width: 36 },
-  headerCenter: { flex: 1, alignItems: 'center' },
-  headerTitle: { fontSize: 20, fontWeight: '800', letterSpacing: 0.2 },
-  headerSubtitle: { fontSize: 12, marginTop: 1 },
-  headerRight: { width: 36 },
+  gutter: { paddingHorizontal: SHAPE.screenPadding },
   tabBar: {
     flexDirection: 'row',
     borderBottomWidth: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: SHAPE.screenPadding,
   },
   tabBtn: {
-    paddingVertical: 12,
-    marginRight: 24,
+    paddingVertical: 11,
+    marginRight: 22,
     borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
   },
-  tabBtnActive: {},
-  tabBtnText: { fontSize: 14, fontWeight: '600' },
-  scrollContent: { padding: 16 },
+  filterBlock: { paddingTop: 11 },
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 9,
     borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    height: 46,
-    marginBottom: 14,
+    paddingHorizontal: 13,
+    height: 42,
+    marginHorizontal: SHAPE.screenPadding,
   },
-  searchIcon: { marginRight: 8 },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-    height: '100%',
+  searchInput: { flex: 1, height: '100%', padding: 0 },
+  chipRow: {
+    gap: 7,
+    paddingHorizontal: SHAPE.screenPadding,
+    paddingVertical: 10,
   },
-  categoryRow: { marginBottom: 18 },
-  categoryRowContent: { gap: 8, paddingRight: 4 },
-  categoryChipBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  categoryChipBtnText: { fontSize: 13, fontWeight: '600' },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    gap: 8,
-  },
-  sectionTitle: { fontSize: 17, fontWeight: '800' },
-  sectionCount: { fontSize: 13, fontWeight: '500' },
-  featuredBadgePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-  },
-  featuredBadgePillText: { fontSize: 11, fontWeight: '700' },
-  featuredScroll: { marginBottom: 20 },
-  featuredScrollContent: { gap: 14, paddingRight: 4 },
+  featuredRow: { gap: 12, paddingHorizontal: SHAPE.screenPadding, paddingBottom: 2 },
   featuredCard: {
-    width: 240,
-    borderRadius: 16,
-    borderWidth: 1,
+    width: 216,
+    borderRadius: SHAPE.radiusHero,
     overflow: 'hidden',
   },
   featuredBanner: {
-    height: 110,
-    padding: 12,
+    height: 74,
+    padding: 11,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
   },
   featuredBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
+    paddingHorizontal: 9,
     paddingVertical: 4,
-    borderRadius: 6,
+    borderRadius: SHAPE.radiusPill,
   },
-  featuredBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700', textTransform: 'uppercase' },
-  featuredCategoryChip: {
-    alignSelf: 'flex-end',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-    marginTop: -28,
-  },
-  featuredCategoryText: { fontSize: 11, fontWeight: '600' },
-  featuredIconCircle: {
-    position: 'absolute',
-    right: 12,
-    top: 30,
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  featuredBody: { padding: 14 },
-  featuredTitle: { fontSize: 15, fontWeight: '800', lineHeight: 20, marginBottom: 4 },
-  featuredCoach: { fontSize: 12, fontWeight: '500', marginBottom: 2 },
-  featuredTagline: { fontSize: 11, marginBottom: 10 },
+  featuredBody: { padding: 12 },
   featuredBottom: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginTop: 10,
   },
-  featuredRatingRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  starsRow: { flexDirection: 'row', gap: 1 },
-  ratingValue: { fontSize: 12, fontWeight: '700' },
-  reviewCount: { fontSize: 11 },
-  featuredPrice: { fontSize: 16, fontWeight: '800' },
-  previewBtn: {
+  listRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    height: 36,
-    borderRadius: 10,
-  },
-  previewBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  listingCard: {
-    borderRadius: 14,
-    borderWidth: 1,
-    marginBottom: 12,
-    overflow: 'hidden',
-  },
-  listingTop: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    padding: 14,
     gap: 12,
+    paddingVertical: 11,
+    borderBottomWidth: 1,
   },
-  coachAvatar: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  coachAvatarText: { fontWeight: '800' },
-  listingInfo: { flex: 1 },
-  listingDrillName: { fontSize: 14, fontWeight: '700', lineHeight: 20, marginBottom: 3 },
-  listingCoachName: { fontSize: 12, marginBottom: 5 },
-  listingRatingRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  listingBottom: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderTopWidth: 1,
-  },
-  listingMeta: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  categoryChip: {
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 7,
-    borderWidth: 1,
-  },
-  categoryChipText: { fontSize: 11, fontWeight: '600' },
-  levelChip: {
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 7,
-  },
-  levelChipText: { fontSize: 11, fontWeight: '500' },
-  listingActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  listingPrice: { fontSize: 15, fontWeight: '800' },
-  listingPreviewBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 9,
-  },
-  listingPreviewBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  listRowInfo: { flex: 1 },
   upgradeGate: {
-    borderRadius: 18,
-    borderWidth: 1,
-    padding: 28,
+    borderRadius: SHAPE.radiusHero,
+    padding: 24,
     alignItems: 'center',
     marginTop: 8,
   },
-  gateIconCircle: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
+  gateIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: SHAPE.radiusCard,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: 14,
   },
-  gateTitle: { fontSize: 20, fontWeight: '800', marginBottom: 10 },
-  gateSubtitle: {
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 24,
-  },
-  gateUpgradeBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 28,
-    paddingVertical: 14,
-    borderRadius: 14,
-    marginBottom: 10,
-  },
-  gateUpgradeBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
-  gatePriceHint: { fontSize: 12 },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-    paddingHorizontal: 32,
-  },
-  emptyIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  emptyTitle: { fontSize: 18, fontWeight: '700', marginBottom: 8, textAlign: 'center' },
-  emptySubtitle: { fontSize: 14, textAlign: 'center', lineHeight: 21 },
   bottomSpacer: { height: 24 },
 });

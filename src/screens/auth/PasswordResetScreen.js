@@ -241,7 +241,7 @@ const styles = StyleSheet.create({
         color: '#333',
     },
     resetButton: {
-        backgroundColor: '#FF6B00',
+        backgroundColor: '#8A1C22',
         paddingVertical: 16,
         borderRadius: 12,
         alignItems: 'center',
@@ -294,7 +294,7 @@ const styles = StyleSheet.create({
     emailText: {
         fontSize: 16,
         fontWeight: 'bold',
-        color: '#FF6B00',
+        color: '#8A1C22',
         marginBottom: 20,
     },
     instructionsText: {
@@ -305,7 +305,7 @@ const styles = StyleSheet.create({
         marginBottom: 40,
     },
     backToLoginButton: {
-        backgroundColor: '#FF6B00',
+        backgroundColor: '#8A1C22',
         paddingVertical: 16,
         paddingHorizontal: 32,
         borderRadius: 12,
@@ -324,7 +324,7 @@ const styles = StyleSheet.create({
     },
     resendButtonText: {
         fontSize: 14,
-        color: '#FF6B00',
+        color: '#8A1C22',
         fontWeight: '600',
     },
 });
