@@ -36,6 +36,9 @@ import {
   getWorkoutHistory,
   setUserStats
 } from '../../services/firestoreService';
+import { recomputeEvalRank } from '../../services/evalRankService';
+import { markPlanDayForWorkout } from '../../services/blueprint360Service';
+import logger from '../../utils/logger';
 import { XP_REWARDS } from '../../data/achievements';
 
 const { width, height } = Dimensions.get('window');
@@ -107,7 +110,17 @@ const WorkoutVideoPlayer = ({ videoSource, style }) => {
 
 const ActiveWorkoutScreen = ({ route, navigation }) => {
   const { workoutId, resumeStep = 0, workout: passedWorkout, isCustom, fromCustomPlan, onWorkoutComplete } = route.params;
-  const { userData, theme: contextTheme, isDarkMode, workouts, dailyChallenge, updateChallenge } = useAppContext();
+  const {
+    userData,
+    theme: contextTheme,
+    isDarkMode,
+    workouts,
+    dailyChallenge,
+    updateChallenge,
+    setEvalRankScore,
+    blueprint360Plan,
+    setBlueprint360Plan,
+  } = useAppContext();
   const theme = contextTheme || getTheme(isDarkMode || false);
 
   // Workout state
@@ -520,7 +533,7 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
 
     try {
       // Save detailed workout completion to Firestore (using pre-calculated shootingStatsData)
-      await addWorkoutCompletion(userData.uid, {
+      const activityId = await addWorkoutCompletion(userData.uid, {
         workoutId: workout.id,
         title: workout.name || workout.title,
         category: category,
@@ -598,6 +611,29 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
         ...userData.stats,
         streak: newStreak
       });
+
+      // ============ BLUEPRINT360 PLAN DAY, THEN EVALRANK ============
+      // Credit the scheduled plan day, then recompute. Without the first step the
+      // plan prescribes work and never notices it being done, and plan adherence is
+      // the Load Stability (RC) input — so the loop train → adherence → EvalRank →
+      // next plan stays open. They run in sequence so the recompute reads the
+      // adherence this session just earned rather than the pre-session value.
+      //
+      // The whole chain is fire-and-forget: the completion UI never waits on it, and
+      // `shouldRecompute` throttles automatic runs so the append-only score
+      // collection does not gain a document per session.
+      (async () => {
+        if (blueprint360Plan) {
+          const updated = await markPlanDayForWorkout(userData.uid, blueprint360Plan, {
+            workoutTemplateId: workout.id,
+            category,
+            activityId,
+          });
+          if (updated) setBlueprint360Plan(updated);
+        }
+        const { record, skipped } = await recomputeEvalRank(userData.uid, { source: 'workout' });
+        if (record && !skipped) setEvalRankScore(record);
+      })().catch((error) => logger.error('Post-workout plan/EvalRank update failed', error));
 
       // ==================== GAMIFICATION ====================
       // Initialize gamification if needed

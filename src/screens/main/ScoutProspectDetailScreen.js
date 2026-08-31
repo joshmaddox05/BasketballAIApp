@@ -21,6 +21,7 @@ import {
   getLinkedPlayerSummary,
 } from '../../services/firestoreService';
 import { canAccessFeature } from '../../utils/subscription';
+import { evalGradeOf } from '../../services/blueprint/evalRankPresenter';
 
 const GRADE_LABEL = { 9: '9th', 10: '10th', 11: '11th', 12: '12th' };
 
@@ -42,7 +43,7 @@ const gradeProgress = (score) => {
 // the scout's subscription tier (feature: null = free once approved).
 const DEEP_SECTIONS = [
   { key: 'eval', icon: 'stats-chart', label: 'EvalRank breakdown', feature: 'evalRank',
-    value: (s) => (s?.evalRank?.overallGrade ? `Overall grade ${s.evalRank.overallGrade}` : 'No evaluation yet') },
+    value: (s) => (evalGradeOf(s?.evalRank) ? `Overall grade ${evalGradeOf(s.evalRank)}` : 'No evaluation yet') },
   { key: 'plan', icon: 'map-outline', label: 'Blueprint360 progress', feature: 'blueprint360',
     value: (s) => (s?.blueprint ? (s.blueprint.todayWorkout?.title ? `Today: ${s.blueprint.todayWorkout.title}` : 'Active plan') : 'No active plan') },
   { key: 'activity', icon: 'pulse-outline', label: 'Recent activity', feature: null,

@@ -3249,8 +3249,10 @@ export const getLatestShotDNAProfile = async (uid) => {
 
 export const saveEvalRankScore = async (uid, evalData) => {
   try {
+    // Records carry deeply nested provenance (per-component measurement metadata),
+    // and Firestore rejects `undefined` at any depth.
     const ref = await addDoc(collection(db, 'users', uid, 'evalRankScores'), {
-      ...evalData,
+      ...removeUndefined(evalData),
       createdAt: serverTimestamp(),
     });
     return ref.id;
@@ -3309,10 +3311,28 @@ export const getBlueprint360Plan = async (uid) => {
   }
 };
 
-export const updateBlueprint360DayCompletion = async (uid, weekIndex, dayIndex) => {
+/**
+ * Mark one plan day complete.
+ *
+ * Completions live in a sibling `completions` MAP keyed `${weekIndex}_${dayIndex}`,
+ * not inside `weeks`. This previously wrote the dot-path
+ * `weeks.${weekIndex}.days.${dayIndex}.completed`, which addresses map keys —
+ * but `weeks` is an array, and Firestore cannot dot-path into an array index, so
+ * the write could never take effect. A map key can be addressed directly, which
+ * keeps this a single-field update with no read-modify-write race.
+ *
+ * @param {string} uid
+ * @param {number} weekIndex
+ * @param {number} dayIndex
+ * @param {Object} meta - e.g. { workoutTemplateId, activityId }
+ */
+export const updateBlueprint360DayCompletion = async (uid, weekIndex, dayIndex, meta = {}) => {
   try {
     await updateDoc(doc(db, 'users', uid, 'blueprint360Plans', 'active'), {
-      [`weeks.${weekIndex}.days.${dayIndex}.completed`]: true,
+      [`completions.${weekIndex}_${dayIndex}`]: removeUndefined({
+        completedAt: new Date(),
+        ...meta,
+      }),
       updatedAt: serverTimestamp(),
     });
   } catch (error) {

@@ -21,6 +21,7 @@ import {
   isHighSchoolGrade,
 } from '../../services/firestoreService';
 import { uploadProfileImage } from '../../utils/profileImage';
+import { evalGradeOf } from '../../services/blueprint/evalRankPresenter';
 
 const POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'];
 const GRADE_LEVELS = [
@@ -115,9 +116,12 @@ export default function EditAthleteProfileScreen({ navigation, route }) {
             gradeLevel: update.gradeLevel,
             position: update.position,
             height: update.height,
-            archetype: dna?.archetype || null,
+            // The confirmed archetype is the engine's own enum. ShotDNA's `archetype`
+            // is a free-text CV comparison string and is always null today (its
+            // collection is never written), so it is only a fallback.
+            archetype: prof?.archetypeLabel || dna?.archetype || null,
             mainAttributes: prof?.preferences?.focusAreas || null,
-            evaluationScore: er?.overallGrade || null,
+            evaluationScore: evalGradeOf(er),
             region: prof?.region || null,
           }).catch(() => {});
         } else {

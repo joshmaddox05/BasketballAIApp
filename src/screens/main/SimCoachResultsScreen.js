@@ -12,8 +12,10 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
-import { saveEvalRankScore } from '../../services/firestoreService';
+import { recomputeEvalRank } from '../../services/evalRankService';
+import { markPlanDayForSimCoach } from '../../services/blueprint360Service';
 import { getCurrentUser } from '../../services/authService';
+import logger from '../../utils/logger';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function scoreBadgeColor(score) {
@@ -96,7 +98,14 @@ function QuestionBreakdownRow({ item, theme }) {
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 export default function SimCoachResultsScreen({ navigation, route }) {
-  const { theme, isDarkMode, evalRankScore, setEvalRankScore } = useAppContext();
+  const {
+    theme,
+    isDarkMode,
+    evalRankScore,
+    setEvalRankScore,
+    blueprint360Plan,
+    setBlueprint360Plan,
+  } = useAppContext();
   const [iqSaved, setIQSaved] = useState(false);
 
   const results = route.params?.results || [];
@@ -107,40 +116,34 @@ export default function SimCoachResultsScreen({ navigation, route }) {
   const sessionScore = Math.round((correctCount / Math.max(totalQuestions, 1)) * 100);
   const iqDelta = computeIQDelta(correctCount, totalQuestions);
 
-  // Feed IQ component back into EvalRank after session
+  // Recompute EvalRank from the full engine after the session.
+  //
+  // This used to append `{iqComponent, sessionCategory, source}` — a shape no reader
+  // could consume — and push an object-shaped `skillGrades` map into context, which
+  // was the source of both the mixed-schema history and the array-vs-object split
+  // across the screens. The session result itself is already persisted by
+  // SimCoachScenarioScreen via saveSimCoachResult; the engine reads it back from
+  // `users/{uid}/simCoachResults` and derives the IQ pillar as a mean over sessions.
   useEffect(() => {
     if (iqSaved || results.length === 0) return;
 
     const updateEvalRank = async () => {
-      try {
-        const user = getCurrentUser();
-        if (!user) return;
+      const user = getCurrentUser();
+      if (!user) return;
 
-        const currentIQ = evalRankScore?.skillGrades?.['Basketball IQ'] || 'C';
-        const newIQScore = sessionScore;
+      // Credit the scheduled plan day first, so the recompute that follows reads the
+      // adherence this session just earned rather than the pre-session value.
+      if (blueprint360Plan) {
+        const updated = await markPlanDayForSimCoach(user.uid, blueprint360Plan).catch(() => null);
+        if (updated) setBlueprint360Plan(updated);
+      }
 
-        await saveEvalRankScore(user.uid, {
-          iqComponent: newIQScore,
-          sessionCategory: categoryName,
-          source: 'simCoach',
-        });
-
-        // Update local EvalRank context with IQ improvement
-        setEvalRankScore((prev) => ({
-          ...prev,
-          skillGrades: {
-            ...(prev?.skillGrades || {}),
-            'Basketball IQ': newIQScore >= 80 ? 'A-' : newIQScore >= 65 ? 'B+' : 'B',
-          },
-          iqComponent: newIQScore,
-          lastUpdated: new Date().toISOString(),
-        }));
-
-        setIQSaved(true);
-      } catch (_) {}
+      const { record } = await recomputeEvalRank(user.uid, { source: 'simCoach', force: true });
+      if (record) setEvalRankScore(record);
+      setIQSaved(true);
     };
 
-    updateEvalRank();
+    updateEvalRank().catch((error) => logger.error('SimCoach EvalRank recompute failed', error));
   }, []);
 
   const handleShare = useCallback(async () => {

@@ -1,5 +1,10 @@
-// Blueprint360PlanDetailScreen.js - Full 4-week plan: week selector, calendar grid,
-// objectives, workload bars. DBE burgundy redesign (mock 11b) — presentation only.
+// Blueprint360PlanDetailScreen.js — the full generated plan: week selector, calendar
+// grid, objectives, workload bars.
+//
+// Renders users/{uid}/blueprint360Plans/active. The four weeks, the day cells, the
+// objectives and the workload bars were all hardcoded constants; every one of them
+// is now produced by services/blueprint/planGenerator from the player's archetype
+// and measured pillars.
 import React, { useState } from 'react';
 import {
   SafeAreaView,
@@ -13,73 +18,22 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
 import { TYPE, FONTS, SHAPE } from '../../utils/typography';
-import { ScreenHeader, Entrance, BarFill } from '../../components/dbe';
+import { ScreenHeader, Entrance, BarFill, EmptyState, ViewingBanner } from '../../components/dbe';
+import {
+  SKILL_TO_WORKOUT_CATEGORY,
+  DAY_TYPES,
+  isDayComplete,
+  selectCurrentWeekIndex,
+} from '../../services/blueprint/planGenerator';
+import { getCoreSkills } from '../../services/blueprint/archetypes';
+import { useModuleSubject } from '../../hooks/useModuleSubject';
 
-// ─── Mock plan data ───────────────────────────────────────────────────────────
-const MOCK_PLAN_WEEKS = [
-  {
-    week: 1,
-    workload: 65,
-    days: [
-      { day: 'Mon', workout: { id: 'w1', name: 'Shooting Form', category: 'Shooting', duration: 30 } },
-      { day: 'Tue', workout: { id: 'w2', name: 'Dribble Speed', category: 'Dribbling', duration: 25 } },
-      { day: 'Wed', workout: null },
-      { day: 'Thu', workout: { id: 'w3', name: 'Defense Slides', category: 'Defense', duration: 35 } },
-      { day: 'Fri', workout: { id: 'w4', name: 'Court Vision', category: 'IQ', duration: 20 } },
-      { day: 'Sat', workout: { id: 'w5', name: 'Full Workout', category: 'Physical', duration: 45 } },
-      { day: 'Sun', workout: null },
-    ],
-  },
-  {
-    week: 2,
-    workload: 78,
-    days: [
-      { day: 'Mon', workout: { id: 'w6', name: 'Pull-Up Jumpers', category: 'Shooting', duration: 30 } },
-      { day: 'Tue', workout: { id: 'w7', name: 'Ball Handling', category: 'Dribbling', duration: 30 } },
-      { day: 'Wed', workout: { id: 'w8', name: 'Footwork Drills', category: 'Physical', duration: 25 } },
-      { day: 'Thu', workout: null },
-      { day: 'Fri', workout: { id: 'w9', name: 'Pick & Roll D', category: 'Defense', duration: 35 } },
-      { day: 'Sat', workout: { id: 'w10', name: 'SimCoach Reads', category: 'IQ', duration: 20 } },
-      { day: 'Sun', workout: null },
-    ],
-  },
-  {
-    week: 3,
-    workload: 85,
-    days: [
-      { day: 'Mon', workout: { id: 'w11', name: 'Catch & Shoot', category: 'Shooting', duration: 35 } },
-      { day: 'Tue', workout: { id: 'w12', name: 'Off-Hand Drills', category: 'Dribbling', duration: 25 } },
-      { day: 'Wed', workout: null },
-      { day: 'Thu', workout: { id: 'w13', name: 'Lateral Quickness', category: 'Physical', duration: 40 } },
-      { day: 'Fri', workout: { id: 'w14', name: 'Help Defense', category: 'Defense', duration: 35 } },
-      { day: 'Sat', workout: { id: 'w15', name: 'Game Scenarios', category: 'IQ', duration: 30 } },
-      { day: 'Sun', workout: null },
-    ],
-  },
-  {
-    week: 4,
-    workload: 92,
-    days: [
-      { day: 'Mon', workout: { id: 'w16', name: 'Pressure Shooting', category: 'Shooting', duration: 40 } },
-      { day: 'Tue', workout: { id: 'w17', name: 'Attack Dribble', category: 'Dribbling', duration: 30 } },
-      { day: 'Wed', workout: { id: 'w18', name: 'Sprint Intervals', category: 'Physical', duration: 30 } },
-      { day: 'Thu', workout: null },
-      { day: 'Fri', workout: { id: 'w19', name: 'Close-Out D', category: 'Defense', duration: 35 } },
-      { day: 'Sat', workout: { id: 'w20', name: 'Full Evaluation', category: 'IQ', duration: 45 } },
-      { day: 'Sun', workout: null },
-    ],
-  },
-];
-
-const MONTHLY_OBJECTIVES = [
-  { id: '1', text: 'Raise Shooting EvalRank grade from B+ to A-', icon: 'basketball-outline' },
-  { id: '2', text: 'Complete at least 18 of 20 scheduled sessions', icon: 'calendar-outline' },
-  { id: '3', text: 'Improve Defense grade from C+ to B by week 4', icon: 'shield-checkmark-outline' },
-];
-
-// Two-voice system (mock 11b): priority categories carry the burgundy accent,
-// the rest speak steel. No per-category rainbow.
-const ACCENT_CATEGORIES = ['Shooting', 'Defense'];
+// Two-voice system: the categories this archetype treats as CORE carry the burgundy
+// accent, the rest speak steel. No per-category rainbow.
+const accentCategoriesFor = (archetypeId) =>
+  getCoreSkills(archetypeId)
+    .map((skill) => SKILL_TO_WORKOUT_CATEGORY[skill])
+    .filter(Boolean);
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 function WeekTab({ weekNum, active, theme, onPress }) {
@@ -110,10 +64,10 @@ function WeekTab({ weekNum, active, theme, onPress }) {
   );
 }
 
-function DayCell({ dayData, theme, onPress, delay }) {
-  const { day, workout } = dayData;
-  const isRest = !workout;
-  const accent = !isRest && ACCENT_CATEGORIES.includes(workout.category);
+function DayCell({ entry, completed, accentCategories, theme, onPress, delay }) {
+  const { day } = entry;
+  const isRest = entry.type === DAY_TYPES.REST;
+  const accent = !isRest && accentCategories.includes(entry.category);
 
   return (
     <Entrance
@@ -161,7 +115,7 @@ function DayCell({ dayData, theme, onPress, delay }) {
               marginTop: 4,
             }}
           >
-            Rest
+            {entry.gapNote ? 'No session' : 'Rest'}
           </Text>
         ) : (
           <>
@@ -175,7 +129,7 @@ function DayCell({ dayData, theme, onPress, delay }) {
               }}
               numberOfLines={2}
             >
-              {workout.name}
+              {entry.name}
             </Text>
             <View
               style={{
@@ -194,7 +148,7 @@ function DayCell({ dayData, theme, onPress, delay }) {
                   color: accent ? theme.accentText : theme.steel,
                 }}
               >
-                {workout.duration}m
+                {completed ? '✓ done' : `${entry.duration}m`}
               </Text>
             </View>
           </>
@@ -246,20 +200,52 @@ function WorkloadBar({ week, workload, maxWorkload, theme, delay }) {
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 export default function Blueprint360PlanDetailScreen({ navigation, route }) {
-  const { userData, theme, isDarkMode, blueprint360Plan } = useAppContext();
-  const [activeWeek, setActiveWeek] = useState(1);
+  const { theme, isDarkMode } = useAppContext();
+  const subject = useModuleSubject(route);
+  const { readOnly, blueprint360Plan } = subject;
 
-  const planWeeks = blueprint360Plan?.weeks || MOCK_PLAN_WEEKS;
+  const plan = blueprint360Plan;
+  const planWeeks = plan?.weeks || [];
+  // Open on the week the player is actually in, not always week 1.
+  const [activeWeek, setActiveWeek] = useState(() => (selectCurrentWeekIndex(plan) ?? 0) + 1);
+
   const currentWeekData = planWeeks.find((w) => w.week === activeWeek) || planWeeks[0];
   const maxWorkload = Math.max(...planWeeks.map((w) => w.workload), 1);
+  const accentCategories = accentCategoriesFor(plan?.archetypeId || subject.profile?.archetypeId);
+  const objectives = plan?.objectives || [];
+
+  if (!plan) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+        <StatusBar style={isDarkMode ? 'light' : 'dark'} />
+        <ScreenHeader title="My Plan" onBack={() => navigation.goBack()} />
+        <EmptyState
+          icon="calendar-outline"
+          title="No plan yet"
+          sub={
+            readOnly
+              ? `${subject.displayName} does not have a plan yet.`
+              : 'Generate a plan from Blueprint360 to see your week-by-week schedule.'
+          }
+          ctaLabel={readOnly ? undefined : 'Go to Blueprint360'}
+          onPress={() => navigation.goBack()}
+        />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <StatusBar style={isDarkMode ? 'light' : 'dark'} />
 
-      <ScreenHeader title="My 4-Week Plan" onBack={() => navigation.goBack()} />
+      <ScreenHeader
+        title={`My ${planWeeks.length}-Week Plan`}
+        onBack={() => navigation.goBack()}
+      />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {readOnly ? <ViewingBanner name={subject.displayName} style={{ marginBottom: 12 }} /> : null}
+
         {/* Week Selector */}
         <View style={{ flexDirection: 'row', gap: 7 }}>
           {planWeeks.map((w) => (
@@ -276,59 +262,74 @@ export default function Blueprint360PlanDetailScreen({ navigation, route }) {
         {/* Calendar Grid */}
         <Text style={[styles.sectionTitle, { color: theme.text }]}>Week {activeWeek} Schedule</Text>
         <View key={`week-${activeWeek}`} style={styles.calendarGrid}>
-          {currentWeekData.days.map((dayData, i) => (
+          {(currentWeekData?.days || []).map((entry, i) => (
             <DayCell
-              key={dayData.day}
-              dayData={dayData}
+              key={entry.day}
+              entry={entry}
+              completed={isDayComplete(plan, activeWeek - 1, i)}
+              accentCategories={accentCategories}
               theme={theme}
               delay={50 + i * 50}
-              onPress={() =>
-                dayData.workout &&
-                navigation.navigate('WorkoutDetail', { workout: dayData.workout })
-              }
+              onPress={() => {
+                // The plan grid is inspectable when viewing an athlete, but their
+                // sessions are not the viewer's to start.
+                if (readOnly) return;
+                if (entry.type === DAY_TYPES.SIMCOACH) {
+                  navigation.navigate('SimCoach');
+                } else if (entry.type === DAY_TYPES.WORKOUT && entry.workoutTemplateId) {
+                  // The id resolves against the hydrated catalog in context, so the
+                  // workout opens complete with its steps. Passing a partial object
+                  // crashed WorkoutDetailScreen, which reads `workout.steps.length`.
+                  navigation.navigate('WorkoutDetail', { workoutId: entry.workoutTemplateId });
+                }
+              }}
             />
           ))}
         </View>
 
-        {/* Monthly Objectives */}
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>Monthly Objectives</Text>
-        <View
-          style={{
-            borderRadius: SHAPE.radiusTile,
-            backgroundColor: theme.surface,
-            borderWidth: 1,
-            borderColor: theme.hairline,
-            overflow: 'hidden',
-          }}
-        >
-          {MONTHLY_OBJECTIVES.map((obj, i) => (
+        {/* Objectives — derived from the plan's own skill allocation */}
+        {objectives.length ? (
+          <>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Block Objectives</Text>
             <View
-              key={obj.id}
-              style={[
-                styles.objectiveRow,
-                i < MONTHLY_OBJECTIVES.length - 1 && {
-                  borderBottomWidth: 1,
-                  borderBottomColor: theme.hairline,
-                },
-              ]}
+              style={{
+                borderRadius: SHAPE.radiusTile,
+                backgroundColor: theme.surface,
+                borderWidth: 1,
+                borderColor: theme.hairline,
+                overflow: 'hidden',
+              }}
             >
-              <View style={[styles.objIconWrap, { backgroundColor: theme.badgeFill }]}>
-                <Ionicons name={obj.icon} size={15} color={theme.accentText} />
-              </View>
-              <Text
-                style={{
-                  flex: 1,
-                  fontFamily: FONTS.bodySemiBold,
-                  fontSize: 12.5,
-                  lineHeight: 17.5,
-                  color: theme.text,
-                }}
-              >
-                {obj.text}
-              </Text>
+              {objectives.map((obj, i) => (
+                <View
+                  key={obj.id}
+                  style={[
+                    styles.objectiveRow,
+                    i < objectives.length - 1 && {
+                      borderBottomWidth: 1,
+                      borderBottomColor: theme.hairline,
+                    },
+                  ]}
+                >
+                  <View style={[styles.objIconWrap, { backgroundColor: theme.badgeFill }]}>
+                    <Ionicons name={obj.icon} size={15} color={theme.accentText} />
+                  </View>
+                  <Text
+                    style={{
+                      flex: 1,
+                      fontFamily: FONTS.bodySemiBold,
+                      fontSize: 12.5,
+                      lineHeight: 17.5,
+                      color: theme.text,
+                    }}
+                  >
+                    {obj.text}
+                  </Text>
+                </View>
+              ))}
             </View>
-          ))}
-        </View>
+          </>
+        ) : null}
 
         {/* Workload Chart */}
         <Text style={[styles.sectionTitle, { color: theme.text }]}>Weekly Workload</Text>
@@ -353,6 +354,12 @@ export default function Blueprint360PlanDetailScreen({ navigation, route }) {
             />
           ))}
         </View>
+
+        {plan.contentGaps?.length ? (
+          <Text style={[styles.contentGapNote, { color: theme.textDim }]}>
+            Note: {plan.contentGaps.join('; ')}
+          </Text>
+        ) : null}
 
         <View style={styles.bottomSpacer} />
       </ScrollView>
@@ -401,5 +408,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
+  contentGapNote: { fontFamily: FONTS.body, fontSize: 11, lineHeight: 16, marginTop: 12 },
   bottomSpacer: { height: 20 },
 });

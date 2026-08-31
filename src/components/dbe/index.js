@@ -8,6 +8,8 @@ export { RingProgress, DrawnPath, Sparkline } from './Rings';
 export { BottomSheet } from './BottomSheet';
 export { ToastProvider, useToast } from './Toast';
 export { HeroTile, HeroTileText, HERO_FG, HERO_FG_MUTED, HERO_FG_DIM } from './HeroTile';
+export { default as GateStatusCard } from './GateStatusCard';
+export { default as ViewingBanner } from './ViewingBanner';
 export {
   ScreenHeader,
   HeaderIconButton,

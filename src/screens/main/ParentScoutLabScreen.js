@@ -28,6 +28,7 @@ import {
   EmptyState,
   LoadingState,
 } from '../../components/dbe';
+import { evalGradeOf } from '../../services/blueprint/evalRankPresenter';
 
 const GRADE_LABEL = { 9: '9th', 10: '10th', 11: '11th', 12: '12th' };
 
@@ -152,7 +153,7 @@ export default function ParentScoutLabScreen({ navigation, route }) {
   const childName = profile?.displayName || profile?.name || 'Your athlete';
   const firstName = childName.split(' ')[0];
   const gradeLabel = GRADE_LABEL[profile?.gradeLevel] || null;
-  const evalScore = evalRank?.overallGrade || null;
+  const evalScore = evalGradeOf(evalRank);
 
   const handleToggle = useCallback(
     async (next) => {
@@ -173,7 +174,7 @@ export default function ParentScoutLabScreen({ navigation, route }) {
             gradeLevel: profile.gradeLevel,
             position: profile.position || null,
             height: profile.height || null,
-            archetype: archetype || null,
+            archetype: profile?.archetypeLabel || archetype || null,
             mainAttributes: profile.preferences?.focusAreas || null,
             evaluationScore: evalScore || null,
             region: profile.region || null,

@@ -29,6 +29,7 @@ import {
   PrimaryButton,
 } from '../../components/dbe';
 import { TYPE, SHAPE, FONTS } from '../../utils/typography';
+import { evalGradeOf } from '../../services/blueprint/evalRankPresenter';
 
 // ---------------------------------------------------------------------------
 // Mock data – replaced by real API data in production
@@ -170,9 +171,9 @@ export default function ScoutLabScreen({ navigation }) {
             gradeLevel: userData?.gradeLevel,
             position: userData?.position || null,
             height: userData?.height || null,
-            archetype: shotDNAProfile?.archetype || null,
+            archetype: userData?.archetypeLabel || shotDNAProfile?.archetype || null,
             mainAttributes: userData?.preferences?.focusAreas || null,
-            evaluationScore: evalRankScore?.overallGrade || null,
+            evaluationScore: evalGradeOf(evalRankScore),
             region: userData?.region || null,
           });
         } else {

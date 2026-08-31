@@ -15,6 +15,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAppContext } from '../../context/AppContext';
 import { getLinkedPlayers, getLinkedPlayerSummary } from '../../services/firestoreService';
+import {
+  normalizeSkillGrades,
+  gradeToScore,
+  evalGradeOf,
+} from '../../services/blueprint/evalRankPresenter';
 import { TYPE, SHAPE, FONTS } from '../../utils/typography';
 import {
   Entrance,
@@ -40,32 +45,18 @@ const gradeIsStrong = (grade) => {
   return g.startsWith('A') || g.startsWith('B');
 };
 
-// Fallback percentage when an EvalRank skill has no numeric score
-const gradeToPct = (grade) => {
-  const g = (grade || '').toUpperCase();
-  if (g.startsWith('A')) return 88;
-  if (g.startsWith('B')) return 74;
-  if (g.startsWith('C')) return 58;
-  if (g.startsWith('D')) return 42;
-  return 50;
-};
-
-// EvalRank skillGrades may be an array of { label, grade, score } (canonical)
-// or an object of { label: grade }. Normalise both to { label, grade, pct }.
-const mapSkills = (evalRank) => {
-  const raw = evalRank?.skillGrades;
-  if (Array.isArray(raw)) {
-    return raw.map((s) => ({
-      label: s.label,
-      grade: s.grade,
-      pct: typeof s.score === 'number' ? s.score : gradeToPct(s.grade),
-    }));
-  }
-  if (raw && typeof raw === 'object') {
-    return Object.entries(raw).map(([label, grade]) => ({ label, grade, pct: gradeToPct(grade) }));
-  }
-  return [];
-};
+// EvalRank records come in three shapes across the app's history (canonical array,
+// legacy object map, and absent). `evalRankPresenter` is the one normalizer for all
+// of them — this screen's local copy was the only one that existed and had already
+// drifted from what the other readers assumed.
+const mapSkills = (evalRank) =>
+  normalizeSkillGrades(evalRank?.skillGrades).map((s) => ({
+    label: s.label,
+    grade: s.grade,
+    // An unmeasured pillar has no percentage; render the bar empty rather than
+    // inventing a midpoint for it.
+    pct: Number.isFinite(s.score) ? s.score : gradeToScore(s.grade) ?? 0,
+  }));
 
 const toDate = (value) => {
   if (!value) return null;
@@ -213,6 +204,7 @@ export default function ProgressReportScreen({ navigation }) {
       const summary = await getLinkedPlayerSummary(linked.uid);
       const profile = summary.profile || {};
       setChild({
+        uid: linked.uid,
         name: profile.displayName || linked.name || 'Your Child',
         position: profile.position || '',
         level: typeof profile.level === 'number' ? profile.level : 1,
@@ -271,7 +263,7 @@ export default function ProgressReportScreen({ navigation }) {
     );
   }
 
-  const overallGrade = evalRank?.overallGrade || '—';
+  const overallGrade = evalGradeOf(evalRank) || '—';
   const skills = mapSkills(evalRank);
   const todayWorkout = blueprint?.todayWorkout?.title;
   const daysCompleted = blueprint?.weekProgress ?? 0;
@@ -301,7 +293,7 @@ export default function ProgressReportScreen({ navigation }) {
             <TouchableOpacity
               style={styles.gradeBlock}
               activeOpacity={0.7}
-              onPress={() => navigation.navigate('EvalRank')}
+              onPress={() => navigation.navigate('EvalRank', { playerUid: child?.uid })}
             >
               <Text style={[styles.gradeValue, { color: theme.text }]}>{overallGrade}</Text>
               <Text style={[styles.gradeCaption, { color: theme.textDim }]}>EVALRANK</Text>
@@ -354,7 +346,7 @@ export default function ProgressReportScreen({ navigation }) {
 
         {/* Skill breakdown */}
         <View style={{ marginTop: SHAPE.sectionGap }}>
-          <SectionLabel action="Full evaluation" onAction={() => navigation.navigate('EvalRank')}>
+          <SectionLabel action="Full evaluation" onAction={() => navigation.navigate('EvalRank', { playerUid: child?.uid })}>
             Skill breakdown
           </SectionLabel>
           {skills.length > 0 ? (

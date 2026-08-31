@@ -39,6 +39,7 @@ import SimCoachSessionRespondScreen from '../screens/main/SimCoachSessionRespond
 import ShotDNAScreen from '../screens/main/ShotDNAScreen';
 import ShotDNAArchetypeScreen from '../screens/main/ShotDNAArchetypeScreen';
 import ShotDNAHistoryScreen from '../screens/main/ShotDNAHistoryScreen';
+import ArchetypeSelectScreen from '../screens/main/ArchetypeSelectScreen';
 import EvalRankScreen from '../screens/main/EvalRankScreen';
 import EvalRankDetailScreen from '../screens/main/EvalRankDetailScreen';
 import EvalRankBadgesScreen from '../screens/main/EvalRankBadgesScreen';
@@ -147,6 +148,7 @@ export const sharedScreens = [
     { name: 'ShotDNA', component: ShotDNAScreen, options: { headerShown: false } },
     { name: 'ShotDNAArchetype', component: ShotDNAArchetypeScreen, options: { headerShown: false } },
     { name: 'ShotDNAHistory', component: ShotDNAHistoryScreen, options: { headerShown: false } },
+    { name: 'ArchetypeSelect', component: ArchetypeSelectScreen, options: { headerShown: false } },
     { name: 'EvalRank', component: EvalRankScreen, options: { headerShown: false } },
     { name: 'EvalRankDetail', component: EvalRankDetailScreen, options: { headerShown: false } },
     { name: 'EvalRankBadges', component: EvalRankBadgesScreen, options: { headerShown: false } },

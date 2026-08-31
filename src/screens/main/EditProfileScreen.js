@@ -21,6 +21,20 @@ import { useAppContext } from '../../context/AppContext';
 import { updateUserProfile, getUserProfile } from '../../services/firestoreService';
 import { getTheme } from '../../utils/theme';
 import { uploadProfileImage } from '../../utils/profileImage';
+import { parseHeightToInches } from '../../services/blueprint/archetypeAssignment';
+
+// Height is stored as free text (`6'2"`). These two keep the picker and the stored
+// string in agreement so the archetype engine has a single format to parse.
+const splitHeight = (raw) => {
+    const inches = parseHeightToInches(raw);
+    if (!inches) return { feet: null, inches: null };
+    return { feet: Math.floor(inches / 12), inches: Math.round(inches % 12) };
+};
+
+const composeHeight = (feet, inches) => {
+    if (feet == null) return null;
+    return `${feet}'${inches ?? 0}"`;
+};
 
 const EditProfileScreen = ({ navigation }) => {
     const { userData, user, isDarkMode, theme: contextTheme, updateUserDataLocally } = useAppContext();
@@ -35,6 +49,11 @@ const EditProfileScreen = ({ navigation }) => {
     const [trainingDays, setTrainingDays] = useState(userData?.preferences?.trainingDays || []);
     const [preferredDuration, setPreferredDuration] = useState(userData?.preferences?.preferredDuration || 30);
     const [gradeLevel, setGradeLevel] = useState(userData?.gradeLevel ?? null);
+    // Position and height were previously parent-write-only (EditAthleteProfileScreen),
+    // so a solo player could never supply the archetype engine's strongest signal.
+    const [position, setPosition] = useState(userData?.position || null);
+    const [heightFeet, setHeightFeet] = useState(() => splitHeight(userData?.height).feet);
+    const [heightInches, setHeightInches] = useState(() => splitHeight(userData?.height).inches);
     const [coachType, setCoachType] = useState(userData?.coachType || 'org');
     const [bio, setBio] = useState(userData?.bio || '');
 
@@ -46,6 +65,15 @@ const EditProfileScreen = ({ navigation }) => {
     ];
     const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     const DURATION_OPTIONS = [15, 30, 45, 60, 90];
+    const POSITIONS = [
+        { value: 'PG', label: 'PG' },
+        { value: 'SG', label: 'SG' },
+        { value: 'SF', label: 'SF' },
+        { value: 'PF', label: 'PF' },
+        { value: 'C', label: 'C' },
+    ];
+    const FEET_OPTIONS = [4, 5, 6, 7];
+    const INCH_OPTIONS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
     const GRADE_LEVELS = [
         { value: 9, label: '9th' },
         { value: 10, label: '10th' },
@@ -63,11 +91,13 @@ const EditProfileScreen = ({ navigation }) => {
         const daysChanged = JSON.stringify(trainingDays) !== JSON.stringify(userData?.preferences?.trainingDays || []);
         const durationChanged = preferredDuration !== (userData?.preferences?.preferredDuration || 30);
         const gradeChanged = gradeLevel !== (userData?.gradeLevel ?? null);
+        const positionChanged = position !== (userData?.position || null);
+        const heightChanged = composeHeight(heightFeet, heightInches) !== (userData?.height || null);
         const coachTypeChanged = coachType !== (userData?.coachType || 'org');
         const bioChanged = bio !== (userData?.bio || '');
 
         setHasChanges(nameChanged || imageChanged || daysChanged || durationChanged || gradeChanged || coachTypeChanged || bioChanged);
-    }, [displayName, profileImage, trainingDays, preferredDuration, gradeLevel, coachType, bio, userData]);
+    }, [displayName, profileImage, trainingDays, preferredDuration, gradeLevel, position, heightFeet, heightInches, coachType, bio, userData]);
 
     const pickImage = async () => {
         try {
@@ -149,6 +179,15 @@ const EditProfileScreen = ({ navigation }) => {
             // Grade level is a player attribute that drives scout discoverability
             if (isPlayer && gradeLevel != null) {
                 profileUpdate.gradeLevel = gradeLevel;
+            }
+
+            // Archetype inputs. Height is written in the same `6'2"` free-text format
+            // EditAthleteProfileScreen uses, so a parent edit and a player edit agree
+            // and archetypeAssignment.parseHeightToInches only has one format to read.
+            if (isPlayer) {
+                if (position) profileUpdate.position = position;
+                const composed = composeHeight(heightFeet, heightInches);
+                if (composed) profileUpdate.height = composed;
             }
 
             // Coach sub-type (organization vs skills trainer) + public bio
@@ -262,6 +301,98 @@ const EditProfileScreen = ({ navigation }) => {
                             maxLength={50}
                         />
                     </View>
+
+                    {/* Position & Height (player only — the archetype engine's strongest
+                        signals, and previously only a linked parent could set them) */}
+                    {isPlayer && (
+                        <View style={[styles.section, { backgroundColor: theme.card }]}>
+                            <Text style={[styles.sectionTitle, { color: theme.text }]}>Position & Size</Text>
+                            <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
+                                These sharpen your archetype, which sets your shot menu and drill volume
+                            </Text>
+
+                            <View style={styles.durationContainer}>
+                                {POSITIONS.map((p) => (
+                                    <TouchableOpacity
+                                        key={p.value}
+                                        style={[
+                                            styles.durationButton,
+                                            {
+                                                backgroundColor: position === p.value
+                                                    ? theme.primary
+                                                    : theme.backgroundSecondary,
+                                                borderColor: position === p.value
+                                                    ? theme.primary
+                                                    : theme.border
+                                            }
+                                        ]}
+                                        onPress={() => setPosition(position === p.value ? null : p.value)}
+                                    >
+                                        <Text style={[
+                                            styles.durationText,
+                                            { color: position === p.value ? '#FFF' : theme.text }
+                                        ]}>
+                                            {p.label}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+
+                            <Text style={[styles.sectionSubtitle, { color: theme.textSecondary, marginTop: 14 }]}>
+                                Height
+                            </Text>
+                            <View style={styles.durationContainer}>
+                                {FEET_OPTIONS.map((f) => (
+                                    <TouchableOpacity
+                                        key={`ft-${f}`}
+                                        style={[
+                                            styles.durationButton,
+                                            {
+                                                backgroundColor: heightFeet === f
+                                                    ? theme.primary
+                                                    : theme.backgroundSecondary,
+                                                borderColor: heightFeet === f ? theme.primary : theme.border
+                                            }
+                                        ]}
+                                        onPress={() => setHeightFeet(heightFeet === f ? null : f)}
+                                    >
+                                        <Text style={[
+                                            styles.durationText,
+                                            { color: heightFeet === f ? '#FFF' : theme.text }
+                                        ]}>
+                                            {f}'
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                            {heightFeet != null && (
+                                <View style={styles.durationContainer}>
+                                    {INCH_OPTIONS.map((i) => (
+                                        <TouchableOpacity
+                                            key={`in-${i}`}
+                                            style={[
+                                                styles.durationButton,
+                                                {
+                                                    backgroundColor: heightInches === i
+                                                        ? theme.primary
+                                                        : theme.backgroundSecondary,
+                                                    borderColor: heightInches === i ? theme.primary : theme.border
+                                                }
+                                            ]}
+                                            onPress={() => setHeightInches(i)}
+                                        >
+                                            <Text style={[
+                                                styles.durationText,
+                                                { color: heightInches === i ? '#FFF' : theme.text }
+                                            ]}>
+                                                {i}"
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            )}
+                        </View>
+                    )}
 
                     {/* Grade Level Section (player only — drives recruiting eligibility) */}
                     {isPlayer && (

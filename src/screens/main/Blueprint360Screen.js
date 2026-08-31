@@ -1,30 +1,136 @@
-import React, { useState } from 'react';
-import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+// Blueprint360Screen.js — the enforced development plan.
+//
+// Every value here comes from a generated, persisted plan
+// (users/{uid}/blueprint360Plans/active). The screen previously rendered inline
+// literal fallbacks — a hardcoded "Shooting Form Fundamentals", 2 of 5 days done, a
+// fixed monthly objective, and invented Defense C+ / Basketball IQ B- weakness
+// alerts — none of which were ever backed by data, because nothing in the app had
+// ever written a plan.
+import React, { useCallback, useState } from 'react';
+import {
+  SafeAreaView,
+  StyleSheet,
+  View,
+  Text,
+  TouchableOpacity,
+  ScrollView,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
 import { canAccessFeature } from '../../utils/subscription';
+import { generateAndSavePlan } from '../../services/blueprint360Service';
+import {
+  selectCurrentWeekIndex,
+  selectWeekProgress,
+  selectTodayEntry,
+  selectNextIncompleteDay,
+  isPlanComplete,
+  DAY_TYPES,
+} from '../../services/blueprint/planGenerator';
+import { toUiEval } from '../../services/blueprint/evalRankPresenter';
+import { GateStatusCard, ViewingBanner, EmptyState, useToast } from '../../components/dbe';
+import logger from '../../utils/logger';
+import { useModuleSubject } from '../../hooks/useModuleSubject';
 
-const DAYS = ['M', 'T', 'W', 'T', 'F'];
+export default function Blueprint360Screen({ navigation, route }) {
+  const { theme, isDarkMode, userData, setBlueprint360Plan } = useAppContext();
+  const showToast = useToast();
 
-export default function Blueprint360Screen({ navigation }) {
-  const { theme, isDarkMode, userData, blueprint360Plan, evalRankScore } = useAppContext();
+  // A coach or parent may arrive with a `playerUid` — this screen then shows that
+  // athlete's plan, read-only.
+  const subject = useModuleSubject(route);
+  const { readOnly, blueprint360Plan, evalRankScore } = subject;
+
+  // Entitlement is always the VIEWER's, never the subject's: a coach on a paid plan
+  // may view a free athlete, and a free coach may not view a paid one for free.
   const subscription = userData?.subscription || 'free';
   const hasAccess = canAccessFeature('blueprint360', subscription);
+  const uid = subject.uid;
 
-  const todayWorkout = blueprint360Plan?.todayWorkout || { title: 'Shooting Form Fundamentals', category: 'Shooting', duration: 30 };
-  const daysCompleted = blueprint360Plan?.weekProgress || 2;
-  const monthlyObjective = blueprint360Plan?.monthlyObjective || 'Improve shooting accuracy from 65% to 75% and build a 5-day training streak';
+  const [generating, setGenerating] = useState(false);
 
-  const weaknessAlerts = [];
-  if (evalRankScore?.skillGrades) {
-    Object.entries(evalRankScore.skillGrades).forEach(([k, v]) => {
-      if (v === 'C' || v === 'D' || v === 'C+') weaknessAlerts.push({ skill: k, grade: v });
-    });
-  }
-  if (weaknessAlerts.length === 0) {
-    weaknessAlerts.push({ skill: 'Defense', grade: 'C+' }, { skill: 'Basketball IQ', grade: 'B-' });
-  }
+  const plan = blueprint360Plan;
+  const weekIndex = selectCurrentWeekIndex(plan);
+  const weekProgress = weekIndex === null ? null : selectWeekProgress(plan, weekIndex);
+  const today = selectTodayEntry(plan);
+  const upNext = selectNextIncompleteDay(plan);
+  const planFinished = isPlanComplete(plan);
+  const trainingDays = plan?.preferences?.trainingDays || [];
+
+  const ui = toUiEval(evalRankScore);
+
+  const handleGenerate = useCallback(
+    async (isRegenerate) => {
+      if (!uid || generating || readOnly) return;
+      if (!userData?.archetypeId) {
+        Alert.alert(
+          'Set your archetype first',
+          'Your plan is built from your archetype — it decides which skills you train and at what volume.',
+          [
+            { text: 'Not now', style: 'cancel' },
+            { text: 'Set archetype', onPress: () => navigation.navigate('ArchetypeSelect') },
+          ]
+        );
+        return;
+      }
+
+      const run = async () => {
+        setGenerating(true);
+        try {
+          const next = await generateAndSavePlan(uid, {
+            profile: userData,
+            evalRecord: evalRankScore,
+            subscription,
+            force: true,
+          });
+          if (next) {
+            setBlueprint360Plan(next);
+            showToast(isRegenerate ? 'Plan rebuilt' : 'Plan created');
+          } else {
+            showToast('Could not build your plan right now');
+          }
+        } catch (error) {
+          logger.error('Blueprint360 plan generation failed', error);
+          showToast('Could not build your plan right now');
+        } finally {
+          setGenerating(false);
+        }
+      };
+
+      // Regenerating discards completions, so it is confirmed rather than assumed.
+      if (isRegenerate && plan) {
+        Alert.alert(
+          'Rebuild your plan?',
+          'This replaces the current 4-week plan using your latest evaluation. Completed sessions on the old plan will not carry over.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Rebuild', style: 'destructive', onPress: run },
+          ]
+        );
+        return;
+      }
+      await run();
+    },
+    [uid, generating, readOnly, userData, evalRankScore, subscription, plan, setBlueprint360Plan, showToast, navigation]
+  );
+
+  const openDay = (entry) => {
+    if (!entry || readOnly) return;
+    if (entry.type === DAY_TYPES.SIMCOACH) {
+      navigation.navigate('SimCoach');
+      return;
+    }
+    if (entry.type === DAY_TYPES.WORKOUT && entry.workoutTemplateId) {
+      // Pass the id, not a partial object: WorkoutDetailScreen resolves it against
+      // the hydrated catalog, so the workout always arrives with its steps. Passing
+      // a bare `{title, category, duration}` crashed the detail screen, which reads
+      // `workout.steps.length` unconditionally.
+      navigation.navigate('WorkoutDetail', { workoutId: entry.workoutTemplateId });
+    }
+  };
 
   if (!hasAccess) {
     return (
@@ -40,14 +146,21 @@ export default function Blueprint360Screen({ navigation }) {
         <View style={styles.lockCenter}>
           <Ionicons name="lock-closed" size={48} color={theme.textSecondary} />
           <Text style={[styles.lockTitle, { color: theme.text }]}>Blueprint360™</Text>
-          <Text style={[styles.lockSubtitle, { color: theme.textSecondary }]}>Upgrade to Basic to unlock your personalized development plan.</Text>
-          <TouchableOpacity style={[styles.upgradeBtn, { backgroundColor: theme.primary }]} onPress={() => navigation.navigate('Subscription')}>
-            <Text style={styles.upgradeBtnText}>Upgrade to Basic</Text>
+          <Text style={[styles.lockSubtitle, { color: theme.textSecondary }]}>
+            Upgrade to unlock a development plan built from your archetype and your measured pillars.
+          </Text>
+          <TouchableOpacity
+            style={[styles.upgradeBtn, { backgroundColor: theme.primary }]}
+            onPress={() => navigation.navigate('Subscription')}
+          >
+            <Text style={styles.upgradeBtnText}>Upgrade</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
   }
+
+  const focus = today?.entry && today.entry.type !== DAY_TYPES.REST ? today : upNext ? { entry: upNext.entry, completed: false, isUpNext: true } : null;
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
@@ -58,90 +171,222 @@ export default function Blueprint360Screen({ navigation }) {
         </TouchableOpacity>
         <View>
           <Text style={[styles.headerTitle, { color: theme.text }]}>Blueprint360™</Text>
-          <Text style={[styles.headerSub, { color: theme.textSecondary }]}>Your Development Plan</Text>
+          <Text style={[styles.headerSub, { color: theme.textSecondary }]}>
+            {readOnly ? subject.displayName : 'Your Development Plan'}
+          </Text>
         </View>
         <View style={{ width: 24 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* Today's Focus */}
-        <View style={[styles.todayCard, { backgroundColor: theme.primary }]}>
-          <Text style={styles.todayLabel}>TODAY'S FOCUS</Text>
-          <Text style={styles.todayTitle}>{todayWorkout.title}</Text>
-          <View style={styles.todayMeta}>
-            <View style={styles.todayChip}>
-              <Text style={styles.todayChipText}>{todayWorkout.category}</Text>
-            </View>
-            <View style={styles.todayChip}>
-              <Ionicons name="time-outline" size={12} color="#fff" />
-              <Text style={styles.todayChipText}>{todayWorkout.duration} min</Text>
-            </View>
-          </View>
-          <TouchableOpacity
-            style={styles.startBtn}
-            onPress={() => navigation.navigate('WorkoutDetail', { workout: todayWorkout })}
-            activeOpacity={0.85}
-          >
-            <Text style={[styles.startBtnText, { color: theme.primary }]}>Start Now</Text>
-            <Ionicons name="arrow-forward" size={16} color={theme.primary} />
-          </TouchableOpacity>
-        </View>
+        {readOnly ? <ViewingBanner name={subject.displayName} /> : null}
 
-        {/* Week Progress */}
-        <View style={[styles.weekCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <Text style={[styles.cardTitle, { color: theme.text }]}>This Week</Text>
-          <View style={styles.daysRow}>
-            {DAYS.map((d, i) => (
-              <View key={i} style={[styles.dayDot, { backgroundColor: i < daysCompleted ? theme.primary : theme.border }]}>
-                <Text style={[styles.dayLabel, { color: i < daysCompleted ? '#fff' : theme.textSecondary }]}>{d}</Text>
+        {subject.error ? (
+          <EmptyState icon="lock-closed-outline" title="No access" sub={subject.error} />
+        ) : !plan ? (
+          <View style={[styles.emptyCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <Ionicons name="map-outline" size={40} color={theme.primary} />
+            <Text style={[styles.lockTitle, { color: theme.text }]}>No plan yet</Text>
+            <Text style={[styles.lockSubtitle, { color: theme.textSecondary }]}>
+              {readOnly
+                ? `${subject.displayName} does not have a plan yet.`
+                : 'Your plan is built from your archetype and whichever pillars have been measured. It sets what you train, and how much of it.'}
+            </Text>
+            {readOnly ? null : (
+            <TouchableOpacity
+              style={[styles.primaryBtn, { backgroundColor: theme.primary, alignSelf: 'stretch' }]}
+              disabled={generating}
+              onPress={() => handleGenerate(false)}
+            >
+              {generating ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <>
+                  <Text style={styles.primaryBtnText}>Generate my plan</Text>
+                  <Ionicons name="sparkles-outline" size={18} color="#fff" />
+                </>
+              )}
+            </TouchableOpacity>
+            )}
+          </View>
+        ) : (
+          <>
+            {planFinished ? (
+              <View style={[styles.objectiveCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                <Text style={[styles.cardTitle, { color: theme.text }]}>Plan complete</Text>
+                <Text style={[styles.objectiveText, { color: theme.textSecondary }]}>
+                  You have reached the end of this 4-week block. Rebuild it from your latest
+                  evaluation to keep the volume pointed at what is weakest now.
+                </Text>
               </View>
-            ))}
-          </View>
-          <Text style={[styles.weekNote, { color: theme.textSecondary }]}>{daysCompleted}/5 training days completed</Text>
-        </View>
+            ) : null}
 
-        {/* Monthly Objective */}
-        <View style={[styles.objectiveCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <View style={styles.objectiveHeader}>
-            <Ionicons name="flag-outline" size={18} color={theme.primary} />
-            <Text style={[styles.cardTitle, { color: theme.text }]}>Monthly Objective</Text>
-          </View>
-          <Text style={[styles.objectiveText, { color: theme.textSecondary }]}>{monthlyObjective}</Text>
-        </View>
-
-        {/* Weakness Alerts */}
-        {weaknessAlerts.length > 0 && (
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>Weakness Alerts</Text>
-            {weaknessAlerts.slice(0, 2).map((w, i) => (
-              <View key={i} style={[styles.alertCard, { backgroundColor: '#F59E0B12', borderColor: '#F59E0B40' }]}>
-                <Ionicons name="warning-outline" size={18} color="#F59E0B" />
-                <View style={styles.alertInfo}>
-                  <Text style={[styles.alertSkill, { color: theme.text }]}>{w.skill}</Text>
-                  <Text style={[styles.alertGrade, { color: '#F59E0B' }]}>Grade: {w.grade} — Needs work</Text>
+            {/* Today's focus */}
+            {focus ? (
+              <View style={[styles.todayCard, { backgroundColor: theme.primary }]}>
+                <Text style={styles.todayLabel}>
+                  {focus.isUpNext ? 'UP NEXT' : focus.completed ? "TODAY — DONE" : "TODAY'S FOCUS"}
+                </Text>
+                <Text style={styles.todayTitle}>{focus.entry.name}</Text>
+                <View style={styles.todayMeta}>
+                  <View style={styles.todayChip}>
+                    <Text style={styles.todayChipText}>{focus.entry.category}</Text>
+                  </View>
+                  <View style={styles.todayChip}>
+                    <Ionicons name="time-outline" size={12} color="#fff" />
+                    <Text style={styles.todayChipText}>{focus.entry.duration} min</Text>
+                  </View>
                 </View>
-                <TouchableOpacity onPress={() => navigation.navigate('EvalRankDetail')}>
-                  <Text style={{ color: theme.primary, fontSize: 12 }}>View</Text>
-                </TouchableOpacity>
+                {focus.entry.rationale ? (
+                  <Text style={styles.todayWhy}>{focus.entry.rationale}</Text>
+                ) : null}
+                {!focus.completed && !readOnly ? (
+                  <TouchableOpacity
+                    style={styles.startBtn}
+                    onPress={() => openDay(focus.entry)}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={[styles.startBtnText, { color: theme.primary }]}>Start Now</Text>
+                    <Ionicons name="arrow-forward" size={16} color={theme.primary} />
+                  </TouchableOpacity>
+                ) : null}
               </View>
-            ))}
-          </View>
+            ) : (
+              <View style={[styles.objectiveCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                <Text style={[styles.cardTitle, { color: theme.text }]}>Rest day</Text>
+                <Text style={[styles.objectiveText, { color: theme.textSecondary }]}>
+                  Nothing scheduled today. Recovery is part of the plan, not an absence from it.
+                </Text>
+              </View>
+            )}
+
+            {/* Week progress — the real training days, not a hardcoded Mon–Fri strip */}
+            {weekProgress ? (
+              <View style={[styles.weekCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                <Text style={[styles.cardTitle, { color: theme.text }]}>
+                  Week {weekIndex + 1} of {plan.weeks.length}
+                </Text>
+                <View style={styles.daysRow}>
+                  {(plan.weeks[weekIndex]?.days || []).map((entry, dayIndex) => {
+                    const scheduled = entry.type !== DAY_TYPES.REST;
+                    const done = !!plan.completions?.[`${weekIndex}_${dayIndex}`];
+                    return (
+                      <View
+                        key={entry.day}
+                        style={[
+                          styles.dayDot,
+                          {
+                            backgroundColor: done
+                              ? theme.primary
+                              : scheduled
+                              ? theme.border
+                              : 'transparent',
+                            borderWidth: scheduled ? 0 : 1,
+                            borderColor: theme.border,
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.dayLabel,
+                            { color: done ? '#fff' : theme.textSecondary },
+                          ]}
+                        >
+                          {entry.day[0]}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
+                <Text style={[styles.weekNote, { color: theme.textSecondary }]}>
+                  {weekProgress.completed}/{weekProgress.scheduled} sessions completed
+                  {trainingDays.length ? ` · training ${trainingDays.join(', ')}` : ''}
+                </Text>
+              </View>
+            ) : null}
+
+            {/* Objectives — derived from the plan's own allocation */}
+            {plan.objectives?.length ? (
+              <View style={[styles.objectiveCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                <View style={styles.objectiveHeader}>
+                  <Ionicons name="flag-outline" size={18} color={theme.primary} />
+                  <Text style={[styles.cardTitle, { color: theme.text }]}>This block's objectives</Text>
+                </View>
+                {plan.objectives.map((o) => (
+                  <View key={o.id} style={styles.objectiveRow}>
+                    <Ionicons name={o.icon} size={15} color={theme.primary} style={{ marginTop: 2 }} />
+                    <Text style={[styles.objectiveText, { color: theme.textSecondary, flex: 1 }]}>
+                      {o.text}
+                    </Text>
+                  </View>
+                ))}
+                <Text style={[styles.basedOn, { color: theme.textSecondary }]}>
+                  {plan.basedOn?.coverageLabel}
+                </Text>
+              </View>
+            ) : null}
+          </>
         )}
 
-        {/* Action Buttons */}
-        <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: theme.primary }]} onPress={() => navigation.navigate('Blueprint360PlanDetail')}>
-          <Text style={styles.primaryBtnText}>View Full Plan</Text>
-          <Ionicons name="calendar-outline" size={18} color="#fff" />
+        {/* What's blocked and why — replaces the invented weakness alerts */}
+        {ui ? (
+          <GateStatusCard
+            gates={ui.gates}
+            coverage={ui.coverage}
+            certification={ui.certification}
+            exposure={ui.exposure}
+            title="What your plan is working toward"
+          />
+        ) : null}
+
+        {/* Actions */}
+        {plan ? (
+          <TouchableOpacity
+            style={[styles.primaryBtn, { backgroundColor: theme.primary }]}
+            onPress={() => navigation.navigate('Blueprint360PlanDetail')}
+          >
+            <Text style={styles.primaryBtnText}>View Full Plan</Text>
+            <Ionicons name="calendar-outline" size={18} color="#fff" />
+          </TouchableOpacity>
+        ) : null}
+
+        {readOnly ? null : (
+        <TouchableOpacity
+          style={[styles.outlineBtn, { borderColor: theme.primary }]}
+          activeOpacity={0.8}
+          onPress={() => navigation.navigate('Blueprint360Milestones')}
+        >
+          <Ionicons name="flag-outline" size={16} color={theme.primary} />
+          <Text style={[styles.outlineBtnText, { color: theme.primary }]}>Milestones</Text>
         </TouchableOpacity>
-        {/* Training library lives inside Blueprint360 now that the Training tab was folded in. */}
-        <TouchableOpacity style={[styles.outlineBtn, { borderColor: theme.primary }]} activeOpacity={0.8} onPress={() => navigation.navigate('Training')}>
-          <Ionicons name="basketball-outline" size={16} color={theme.primary} />
-          <Text style={[styles.outlineBtnText, { color: theme.primary }]}>Browse Training Library</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.outlineBtn, { borderColor: theme.primary }]} activeOpacity={0.8}>
-          <Ionicons name="refresh-outline" size={16} color={theme.primary} />
-          <Text style={[styles.outlineBtnText, { color: theme.primary }]}>Regenerate Plan</Text>
-        </TouchableOpacity>
+        )}
+
+        {/* Training library lives inside Blueprint360 now that the Training tab was folded in.
+            It is the viewer's own library, so it is hidden when viewing an athlete. */}
+        {readOnly ? null : (
+          <TouchableOpacity
+            style={[styles.outlineBtn, { borderColor: theme.primary }]}
+            activeOpacity={0.8}
+            onPress={() => navigation.navigate('Training')}
+          >
+            <Ionicons name="basketball-outline" size={16} color={theme.primary} />
+            <Text style={[styles.outlineBtnText, { color: theme.primary }]}>Browse Training Library</Text>
+          </TouchableOpacity>
+        )}
+
+        {plan && !readOnly ? (
+          <TouchableOpacity
+            style={[styles.outlineBtn, { borderColor: theme.primary }]}
+            activeOpacity={0.8}
+            disabled={generating}
+            onPress={() => handleGenerate(true)}
+          >
+            <Ionicons name="refresh-outline" size={16} color={theme.primary} />
+            <Text style={[styles.outlineBtnText, { color: theme.primary }]}>
+              {generating ? 'Rebuilding…' : 'Regenerate Plan'}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
 
         <View style={{ height: 32 }} />
       </ScrollView>
@@ -161,29 +406,27 @@ const styles = StyleSheet.create({
   lockSubtitle: { fontSize: 14, textAlign: 'center', lineHeight: 20 },
   upgradeBtn: { paddingHorizontal: 28, paddingVertical: 14, borderRadius: 14, marginTop: 8 },
   upgradeBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  emptyCard: { borderRadius: 20, borderWidth: 1, padding: 24, alignItems: 'center', gap: 14 },
   todayCard: { borderRadius: 20, padding: 20 },
   todayLabel: { color: 'rgba(255,255,255,0.75)', fontSize: 11, fontWeight: '700', letterSpacing: 1, marginBottom: 6 },
   todayTitle: { color: '#fff', fontSize: 20, fontWeight: '800', marginBottom: 12 },
-  todayMeta: { flexDirection: 'row', gap: 8, marginBottom: 16 },
+  todayMeta: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   todayChip: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
   todayChipText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  todayWhy: { color: 'rgba(255,255,255,0.85)', fontSize: 12.5, lineHeight: 18, marginBottom: 16 },
   startBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#fff', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12, alignSelf: 'flex-start' },
   startBtnText: { fontSize: 14, fontWeight: '700' },
   weekCard: { borderRadius: 16, borderWidth: 1, padding: 16 },
   cardTitle: { fontSize: 15, fontWeight: '700', marginBottom: 12 },
-  daysRow: { flexDirection: 'row', gap: 10, marginBottom: 8 },
-  dayDot: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  daysRow: { flexDirection: 'row', gap: 7, marginBottom: 8 },
+  dayDot: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   dayLabel: { fontSize: 13, fontWeight: '700' },
-  weekNote: { fontSize: 12 },
+  weekNote: { fontSize: 12, lineHeight: 17 },
   objectiveCard: { borderRadius: 16, borderWidth: 1, padding: 16 },
   objectiveHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
-  objectiveText: { fontSize: 14, lineHeight: 20 },
-  section: { gap: 8 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', marginBottom: 4 },
-  alertCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 12, borderWidth: 1 },
-  alertInfo: { flex: 1 },
-  alertSkill: { fontSize: 14, fontWeight: '600' },
-  alertGrade: { fontSize: 12, marginTop: 2 },
+  objectiveRow: { flexDirection: 'row', gap: 8, alignItems: 'flex-start', marginBottom: 8 },
+  objectiveText: { fontSize: 13.5, lineHeight: 19 },
+  basedOn: { fontSize: 11.5, marginTop: 4 },
   primaryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 15, borderRadius: 14 },
   primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   outlineBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 14, borderWidth: 1.5 },

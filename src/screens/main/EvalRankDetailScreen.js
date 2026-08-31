@@ -1,6 +1,11 @@
-// EvalRankDetailScreen.js - Deep-dive evaluation: skill history, benchmark, percentile gauge
-// DBE burgundy redesign (mock 11d) — presentation only.
-import React from 'react';
+// EvalRankDetailScreen.js — per-pillar deep dive: score, history, and what would
+// measure the pillars that have no score yet.
+//
+// The old Position Percentile gauge is gone: there is no cohort corpus to compute a
+// percentile against (readiness D-1), and it rendered a hardcoded 78 for everyone.
+// Benchmarks are likewise absent rather than invented, so the delta row is hidden
+// instead of reporting "0 pts below average".
+import React, { useEffect, useState } from 'react';
 import {
   SafeAreaView,
   StyleSheet,
@@ -13,72 +18,21 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
 import { TYPE, FONTS, SHAPE } from '../../utils/typography';
 import { gradeTone } from '../../utils/gradeTone';
+import { toUiEval, NO_VALUE } from '../../services/blueprint/evalRankPresenter';
+import { recomputeEvalRank, loadEvalRankHistory } from '../../services/evalRankService';
+import logger from '../../utils/logger';
+import { useModuleSubject } from '../../hooks/useModuleSubject';
 import {
   ScreenHeader,
   Entrance,
   BarFill,
   Sparkline,
   PrimaryButton,
+  EmptyState,
+  GateStatusCard,
+  ViewingBanner,
+  useToast,
 } from '../../components/dbe';
-
-// ─── Mock data ───────────────────────────────────────────────────────────────
-const MOCK_SKILLS = [
-  {
-    label: 'Shooting',
-    grade: 'A-',
-    score: 88,
-    benchmark: 75,
-    trend: [72, 76, 80, 85, 88],
-    tips: [
-      'Maintain consistent elbow alignment at release.',
-      'Add more off-the-dribble shooting to your practice.',
-    ],
-  },
-  {
-    label: 'Dribbling',
-    grade: 'B',
-    score: 76,
-    benchmark: 70,
-    trend: [60, 65, 68, 73, 76],
-    tips: [
-      'Work on weak-hand dribble speed drills.',
-      'Practice change-of-pace attacks in traffic.',
-    ],
-  },
-  {
-    label: 'Physical',
-    grade: 'B+',
-    score: 81,
-    benchmark: 68,
-    trend: [70, 72, 75, 78, 81],
-    tips: [
-      'Increase lateral quickness with 5-cone drills.',
-      'Add plyometric jump training twice per week.',
-    ],
-  },
-  {
-    label: 'Defense',
-    grade: 'C+',
-    score: 64,
-    benchmark: 65,
-    trend: [55, 57, 59, 62, 64],
-    tips: [
-      'Improve close-out technique on the perimeter.',
-      'Study defensive positioning film for 10 min daily.',
-    ],
-  },
-  {
-    label: 'Basketball IQ',
-    grade: 'A',
-    score: 93,
-    benchmark: 72,
-    trend: [82, 85, 88, 90, 93],
-    tips: [
-      'Continue studying film on high-leverage situations.',
-      'Participate in advanced SimCoach scenarios.',
-    ],
-  },
-];
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 function SkillDetailCard({ skill, theme, delay }) {
@@ -119,13 +73,13 @@ function SkillDetailCard({ skill, theme, delay }) {
           </View>
         </View>
         <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 11.5, color: theme.textMuted }}>
-          {skill.score}/100
+          {Number.isFinite(skill.score) ? `${skill.score}/100` : NO_VALUE}
         </Text>
       </View>
 
       {/* Score bar */}
       <BarFill
-        pct={skill.score / 100}
+        pct={Number.isFinite(skill.score) ? skill.score / 100 : 0}
         color={tone.bar}
         trackColor={theme.track}
         height={8}
@@ -133,23 +87,52 @@ function SkillDetailCard({ skill, theme, delay }) {
         style={{ marginTop: 10 }}
       />
 
-      {/* Benchmark delta */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6 }}>
-        <Ionicons
-          name={aboveBenchmark ? 'trending-up' : 'trending-down'}
-          size={12}
-          color={aboveBenchmark ? theme.steel : theme.textDim}
-        />
-        <Text
-          style={{
-            fontFamily: FONTS.bodySemiBold,
-            fontSize: 11,
-            color: aboveBenchmark ? theme.steel : theme.textDim,
-          }}
-        >
-          {delta} {delta === 1 ? 'pt' : 'pts'} {aboveBenchmark ? 'above' : 'below'} average
-        </Text>
-      </View>
+      {/* An unmeasured pillar says what would measure it, rather than showing a zero. */}
+      {!skill.measured ? (
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 8 }}>
+          <Ionicons name="ellipse-outline" size={12} color={theme.textDim} style={{ marginTop: 2 }} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 11, color: theme.textDim }}>
+              {skill.unmeasuredReason}
+            </Text>
+            {skill.measureAction ? (
+              <Text
+                style={{
+                  fontFamily: FONTS.body,
+                  fontSize: 11,
+                  lineHeight: 15,
+                  color: theme.textMuted,
+                  marginTop: 2,
+                }}
+              >
+                {skill.measureAction}
+              </Text>
+            ) : null}
+          </View>
+        </View>
+      ) : null}
+
+      {/* Benchmark delta — only when a benchmark actually exists. The guard was
+          computed here but never applied, so an absent benchmark printed
+          "0 pts below average" against an average that does not exist. */}
+      {hasBenchmark ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6 }}>
+          <Ionicons
+            name={aboveBenchmark ? 'trending-up' : 'trending-down'}
+            size={12}
+            color={aboveBenchmark ? theme.steel : theme.textDim}
+          />
+          <Text
+            style={{
+              fontFamily: FONTS.bodySemiBold,
+              fontSize: 11,
+              color: aboveBenchmark ? theme.steel : theme.textDim,
+            }}
+          >
+            {delta} {delta === 1 ? 'pt' : 'pts'} {aboveBenchmark ? 'above' : 'below'} average
+          </Text>
+        </View>
+      ) : null}
 
       {/* Score history — drawn sparkline */}
       {Array.isArray(skill.trend) && skill.trend.length > 1 ? (
@@ -191,84 +174,119 @@ function SkillDetailCard({ skill, theme, delay }) {
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 export default function EvalRankDetailScreen({ navigation, route }) {
-  const { userData, theme, isDarkMode, evalRankScore } = useAppContext();
+  const { theme, isDarkMode, setEvalRankScore } = useAppContext();
+  const showToast = useToast();
 
-  const percentile = evalRankScore?.regionalPercentile ?? 78;
-  const skills =
-    evalRankScore?.skillGrades?.length ? evalRankScore.skillGrades : MOCK_SKILLS;
+  const subject = useModuleSubject(route);
+  const { readOnly, evalRankScore } = subject;
+  const uid = subject.uid;
+
+  const [history, setHistory] = useState([]);
+  const [running, setRunning] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    if (!uid) return undefined;
+    loadEvalRankHistory(uid)
+      .then((records) => {
+        if (alive) setHistory(records);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [uid, evalRankScore]);
+
+  const ui = toUiEval(evalRankScore, history);
+  const skills = ui?.skillGrades || [];
+
+  const handleRunEvaluation = async () => {
+    if (!uid || running || readOnly) return;
+    setRunning(true);
+    try {
+      const { record } = await recomputeEvalRank(uid, { source: 'manual', force: true });
+      if (record) {
+        setEvalRankScore(record);
+        showToast('Evaluation updated');
+      } else {
+        showToast('Could not run the evaluation right now');
+      }
+    } catch (error) {
+      logger.error('Run evaluation failed', error);
+      showToast('Could not run the evaluation right now');
+    } finally {
+      setRunning(false);
+    }
+  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <StatusBar style={isDarkMode ? 'light' : 'dark'} />
 
-      <ScreenHeader title="Evaluation Report" onBack={() => navigation.goBack()} />
+      <ScreenHeader
+        title="Evaluation Report"
+        subtitle={readOnly ? subject.displayName : undefined}
+        onBack={() => navigation.goBack()}
+      />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Per-skill deep dives */}
-        <View style={{ gap: 11 }}>
-          {skills.map((skill, i) => (
-            <SkillDetailCard key={skill.label} skill={skill} theme={theme} delay={50 + i * 50} />
-          ))}
-        </View>
+        {readOnly ? <ViewingBanner name={subject.displayName} style={{ marginBottom: 11 }} /> : null}
 
-        {/* Position Percentile Gauge */}
-        <View
-          style={{
-            borderRadius: SHAPE.radiusCard,
-            backgroundColor: theme.surface,
-            borderWidth: 1,
-            borderColor: theme.hairline,
-            padding: 16,
-            marginTop: 16,
-          }}
-        >
-          <Text style={{ fontFamily: FONTS.headingBold, fontSize: 14, color: theme.text }}>
-            Your Position Percentile
-          </Text>
-          <Text
-            style={{
-              fontFamily: FONTS.bodyMedium,
-              fontSize: 11.5,
-              color: theme.textDim,
-              marginTop: 3,
-              marginBottom: 12,
-            }}
-          >
-            Compared to players at your position in your region
-          </Text>
-          <BarFill
-            pct={percentile / 100}
-            color={theme.primary}
-            trackColor={theme.track}
-            height={12}
-            duration={900}
-            delay={500}
+        {subject.error ? (
+          <EmptyState icon="lock-closed-outline" title="No access" sub={subject.error} />
+        ) : !ui ? (
+          <EmptyState
+            icon="document-text-outline"
+            title="No evaluation yet"
+            sub={
+              readOnly
+                ? `${subject.displayName} has not been evaluated yet.`
+                : 'Run an evaluation to see a per-pillar breakdown of what has been measured.'
+            }
+            ctaLabel={readOnly ? undefined : running ? 'Running…' : 'Run evaluation'}
+            onPress={readOnly ? undefined : handleRunEvaluation}
           />
-          <View style={styles.gaugeLabelRow}>
-            <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 10.5, color: theme.textDim }}>0th</Text>
-            <View
-              style={{
-                paddingHorizontal: 10,
-                paddingVertical: 3,
-                borderRadius: SHAPE.radiusBadge,
-                backgroundColor: theme.badgeFill,
-              }}
-            >
-              <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 11.5, color: theme.accentText }}>
-                {percentile}th Percentile
-              </Text>
-            </View>
-            <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 10.5, color: theme.textDim }}>100th</Text>
-          </View>
-        </View>
+        ) : (
+          <>
+            {ui.banner ? (
+              <Entrance
+                variant="cardIn"
+                style={{
+                  borderRadius: SHAPE.radiusCard,
+                  backgroundColor: theme.steelFill,
+                  padding: 13,
+                  marginBottom: 11,
+                }}
+              >
+                <Text style={[TYPE.statCaption, { color: theme.steel }]}>{ui.banner}</Text>
+              </Entrance>
+            ) : null}
 
-        {/* Schedule Re-Evaluation */}
-        <PrimaryButton
-          icon="refresh-outline"
-          label="Schedule Re-Evaluation"
-          onPress={() => navigation.navigate('ShootingAnalysis')}
-          style={{ marginTop: SHAPE.sectionGap }}
-        />
+            {/* Per-pillar deep dives */}
+            <View style={{ gap: 11 }}>
+              {skills.map((skill, i) => (
+                <SkillDetailCard key={skill.key} skill={skill} theme={theme} delay={50 + i * 50} />
+              ))}
+            </View>
+
+            <GateStatusCard
+              gates={ui.gates}
+              coverage={ui.coverage}
+              certification={ui.certification}
+              exposure={ui.exposure}
+            />
+
+            {readOnly ? null : (
+              <PrimaryButton
+                icon="refresh-outline"
+                label={running ? 'Running evaluation…' : 'Run evaluation'}
+                disabled={running}
+                onPress={handleRunEvaluation}
+                style={{ marginTop: SHAPE.sectionGap }}
+              />
+            )}
+          </>
+        )}
 
         <View style={styles.bottomSpacer} />
       </ScrollView>
@@ -301,13 +319,6 @@ const styles = StyleSheet.create({
   },
 
   tipRow: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
-
-  gaugeLabelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 8,
-  },
 
   bottomSpacer: { height: 20 },
 });

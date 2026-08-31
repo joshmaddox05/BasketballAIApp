@@ -15,7 +15,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Polygon, Line, Circle } from 'react-native-svg';
 import { useAppContext } from '../../context/AppContext';
 import { canAccessFeature } from '../../utils/subscription';
-import { LockedFeatureCard } from '../../components/features/LockedFeatureCard';
+// LockedFeatureCard is a default export — importing it as a named binding resolved
+// to undefined and crashed this screen for any free-tier user.
+import LockedFeatureCard from '../../components/features/LockedFeatureCard';
 import {
   Entrance,
   Float,

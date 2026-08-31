@@ -27,6 +27,7 @@ import { comprehensiveWorkouts } from '../../data/workouts';
 import ModuleGrid from '../../components/features/ModuleGrid';
 import { getModulesForRole } from '../../config/roleModules';
 import { Entrance, EmptyState } from '../../components/dbe';
+import { evalGradeOf } from '../../services/blueprint/evalRankPresenter';
 
 const shootingThumbnail = require('../../../assets/shooting-thumbnail.jpg');
 const dribblingThumbnail = require('../../../assets/dribbling-thumbnail.png');
@@ -206,8 +207,8 @@ function DBEHub({ shotDNAProfile, evalRankScore, simCoachIQScore, subscription, 
         <Text style={[dbeStyles.pipelineTitle, { color: theme.text }]}>Your DBE Pipeline</Text>
         <View style={dbeStyles.pipelineRow}>
           <View style={dbeStyles.pipelineStat}>
-            <Text style={[dbeStyles.pipelineValue, { color: evalRankScore?.overallGrade ? theme.primary : theme.textSecondary }]}>
-              {evalRankScore?.overallGrade || '--'}
+            <Text style={[dbeStyles.pipelineValue, { color: evalGradeOf(evalRankScore) ? theme.primary : theme.textSecondary }]}>
+              {evalGradeOf(evalRankScore) || '--'}
             </Text>
             <Text style={[dbeStyles.pipelineLabel, { color: theme.textSecondary }]}>EvalRank</Text>
           </View>
@@ -246,7 +247,7 @@ function DBEHub({ shotDNAProfile, evalRankScore, simCoachIQScore, subscription, 
             return shotDNAProfile ? 'Archetype on file' : 'Scan your shot to begin';
           }
           if (mod.key === 'EvalRank') {
-            return evalRankScore?.overallGrade ? 'Scorecard ready' : 'Train to earn your first grade';
+            return evalGradeOf(evalRankScore) ? 'Scorecard ready' : 'Train to earn your first grade';
           }
           if (mod.key === 'SimCoach') {
             return simCoachIQScore ? 'Scenarios ready' : 'Test your read of the game';

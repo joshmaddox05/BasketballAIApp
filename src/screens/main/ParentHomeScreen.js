@@ -34,6 +34,7 @@ import {
   EmptyState,
   LoadingState,
 } from '../../components/dbe';
+import { evalGradeOf } from '../../services/blueprint/evalRankPresenter';
 
 // Height is not transform-animatable in RN, so the list collapse is LayoutAnimation's
 // job. Android needs the experimental flag opted into explicitly.
@@ -77,7 +78,7 @@ const mapChild = (linked, profile, latestAchievement, evalRank) => {
     streak: stats.currentStreak || 0,
     position: profile?.position || '—',
     team: profile?.team || 'Independent',
-    evalGrade: evalRank?.overallGrade || null,
+    evalGrade: evalGradeOf(evalRank),
     avatarInitials: initialsFor(name),
     recentAchievement: latestAchievement
       ? {

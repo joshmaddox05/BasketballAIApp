@@ -25,6 +25,7 @@ import {
   EmptyState,
   LoadingState,
 } from '../../components/dbe';
+import { evalGradeOf } from '../../services/blueprint/evalRankPresenter';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Data mapping helpers (Firestore docs -> presentational shapes)
@@ -75,7 +76,7 @@ const mapChild = (linked, profile, evalRank) => {
     levelTitle: typeof level === 'number' ? getLevelTitle(level) : 'Player',
     streak: stats.currentStreak || 0,
     subscriptionTier: profile?.subscription || 'free',
-    evalGrade: evalRank?.overallGrade || null,
+    evalGrade: evalGradeOf(evalRank),
     avatarInitials: initialsFor(name),
     totalWorkouts: stats.totalWorkouts || 0,
     joinDate: profile?.createdAt ? formatWhen(profile.createdAt) : '—',

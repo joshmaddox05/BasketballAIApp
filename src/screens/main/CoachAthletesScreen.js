@@ -17,6 +17,7 @@ import {
   EmptyState,
   LoadingState,
 } from '../../components/dbe';
+import { evalGradeOf } from '../../services/blueprint/evalRankPresenter';
 
 // ─── Data mapping helpers ──────────────────────────────────────────────────────
 
@@ -57,7 +58,7 @@ const mapAthlete = (linked, summary) => {
     name: profile.displayName || linked.name || 'Athlete',
     position: profile.position || '',
     level: typeof profile.level === 'number' ? profile.level : 1,
-    evalGrade: summary.evalRank?.overallGrade || '—',
+    evalGrade: evalGradeOf(summary.evalRank) || '—',
     blueprintStatus: !hasPlan ? 'NO PLAN' : adherence < 50 ? 'OFF TRACK' : 'ON TRACK',
     lastSession: relativeTime((summary.activities || [])[0]?.createdAt),
     adherence,
