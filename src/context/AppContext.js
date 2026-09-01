@@ -1,9 +1,10 @@
 // AppContext.js - Global app state with Firebase integration
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import logger from '../utils/logger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useColorScheme, AppState } from 'react-native';
 import { getTheme } from '../utils/theme';
+import { STORAGE_KEYS } from '../utils/constants';
 
 // Push notification imports
 import {
@@ -135,7 +136,9 @@ const AppContext = createContext();
 export const AppProvider = ({ children }) => {
     const [userData, setUserData] = useState(initialUserData);
     const [user, setUser] = useState(null); // Firebase auth user object
-    const [selectedChildUid, setSelectedChildUid] = useState(null); // active child for parent Family Hub
+    // Active child for the parent Family Hub. Persisted so a relaunch does not
+    // silently reset a multi-child parent back to their first athlete.
+    const [selectedChildUid, setSelectedChildUidState] = useState(null);
     const [activities, setActivities] = useState(initialActivities);
     const [workouts, setWorkouts] = useState(initialWorkouts);
     const [goals, setGoals] = useState(initialGoals);
@@ -351,6 +354,24 @@ export const AppProvider = ({ children }) => {
                 if (otherUid) {
                     navigationRef.current.navigate('Messaging', { otherUid });
                 }
+                return;
+            }
+
+            // Role-loop pushes (assignments, sessions, scout consent) carry their
+            // own destination, written by the Cloud Function that sent them. The
+            // Notifications screen is the safe fallback when a route is not
+            // reachable from the current role's navigator.
+            if (data?.route && navigationRef.current) {
+                try {
+                    navigationRef.current.navigate(data.route, data.params);
+                } catch (error) {
+                    logger.warn(`Push route "${data.route}" unreachable; opening Notifications`, error);
+                    try {
+                        navigationRef.current.navigate('Notifications');
+                    } catch (fallbackError) {
+                        // Navigator not ready — the notification is still in the inbox.
+                    }
+                }
             }
         });
 
@@ -411,6 +432,11 @@ export const AppProvider = ({ children }) => {
                 const storedLanguage = await AsyncStorage.getItem('language');
                 const storedBookmarkedVideos = await AsyncStorage.getItem('bookmarkedVideos');
                 const storedVoiceMuted = await AsyncStorage.getItem('tourVoiceMuted');
+                const storedChildUid = await AsyncStorage.getItem(STORAGE_KEYS.SELECTED_CHILD_UID);
+
+                if (storedChildUid) {
+                    setSelectedChildUidState(storedChildUid);
+                }
 
                 if (storedUseSystemTheme !== null) {
                     const useSystem = JSON.parse(storedUseSystemTheme);
@@ -702,6 +728,22 @@ export const AppProvider = ({ children }) => {
             logger.error('Failed to save dark mode preference', error);
         }
     };
+
+    // Persist the parent's active-child selection alongside the state update, so
+    // every call site gets persistence for free.
+    const setSelectedChildUid = useCallback(async (uid) => {
+        setSelectedChildUidState(uid);
+        try {
+            if (uid) {
+                await AsyncStorage.setItem(STORAGE_KEYS.SELECTED_CHILD_UID, uid);
+            } else {
+                await AsyncStorage.removeItem(STORAGE_KEYS.SELECTED_CHILD_UID);
+            }
+        } catch (error) {
+            // Non-fatal — the selection still holds for this session.
+            logger.warn('Could not persist selected child', error);
+        }
+    }, []);
 
     // Toggle the tour voice narration mute preference (persisted immediately)
     const toggleVoiceMuted = async () => {

@@ -155,15 +155,22 @@ test('registry: unknown drills return null (=> manual entry)', () => {
 test('isLiveTrackable: only true when a detector is implemented', () => {
   assert.equal(isLiveTrackable({ name: 'Crossovers' }), true);
   assert.equal(isLiveTrackable({ name: 'Pound Dribble' }), true);
-  assert.equal(isLiveTrackable({ name: 'Two-Ball Dribbling' }), false); // Phase 2, no detector yet
+  // Two-ball and slides used to match a keyword with no detector behind it, so
+  // the camera button never appeared for them. Both are implemented now.
+  assert.equal(isLiveTrackable({ name: 'Two-Ball Dribbling' }), true);
+  assert.equal(isLiveTrackable({ name: 'Defensive Slides' }), true);
+  // A drill that matches no keyword still falls back to manual rep entry.
   assert.equal(isLiveTrackable({ name: 'Free Throws' }), false);
 });
 
 test('createTracker / createDetector return live instances or null', () => {
   assert.equal(createTracker({ name: 'Crossovers' }).type, 'crossover');
   assert.equal(createTracker({ name: 'Free Throws' }), null);
-  assert.equal(createDetector('two_ball'), null);
+  assert.equal(createDetector('two_ball').type, 'two_ball');
+  assert.equal(createDetector('slide').type, 'slide');
   assert.equal(createDetector('crossover').type, 'crossover');
+  // An unregistered type is still null — the guard itself must keep working.
+  assert.equal(createDetector('nonexistent_movement'), null);
 });
 
 // ── landmark schema ──────────────────────────────────────────────────────────

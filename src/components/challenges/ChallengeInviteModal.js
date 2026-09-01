@@ -282,7 +282,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   title: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: 'bold',
   },
   countBadge: {
@@ -295,7 +295,7 @@ const styles = StyleSheet.create({
   },
   countText: {
     color: '#FFF',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: 'bold',
   },
   content: {
@@ -342,11 +342,11 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   challengerName: {
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: '600',
   },
   challengeTime: {
-    fontSize: 12,
+    fontSize: 14,
     marginTop: 2,
   },
   h2hBadge: {
@@ -358,7 +358,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   h2hBadgeText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '600',
   },
   challengeInfo: {
@@ -370,7 +370,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   challengeTitle: {
-    fontSize: 15,
+    fontSize: 16.5,
     fontWeight: '500',
     flex: 1,
   },
@@ -389,7 +389,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   declineText: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
   },
   acceptButton: {
@@ -403,7 +403,7 @@ const styles = StyleSheet.create({
   },
   acceptText: {
     color: '#FFF',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
   },
   loadingContainer: {
@@ -413,7 +413,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 12,
-    fontSize: 14,
+    fontSize: 16,
   },
   emptyState: {
     flex: 1,
@@ -430,14 +430,14 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: '600',
     marginBottom: 8,
   },
   emptySubtitle: {
-    fontSize: 14,
+    fontSize: 16,
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 21,
   },
 });
 

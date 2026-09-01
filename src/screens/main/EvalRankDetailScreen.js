@@ -67,12 +67,12 @@ function SkillDetailCard({ skill, theme, delay }) {
               backgroundColor: tone.fill,
             }}
           >
-            <Text style={{ fontFamily: FONTS.bodyExtraBold, fontSize: 11, color: tone.text }}>
+            <Text style={{ fontFamily: FONTS.bodyExtraBold, fontSize: 13, color: tone.text }}>
               {skill.grade}
             </Text>
           </View>
         </View>
-        <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 11.5, color: theme.textMuted }}>
+        <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 13.5, color: theme.textMuted }}>
           {Number.isFinite(skill.score) ? `${skill.score}/100` : NO_VALUE}
         </Text>
       </View>
@@ -92,15 +92,15 @@ function SkillDetailCard({ skill, theme, delay }) {
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 8 }}>
           <Ionicons name="ellipse-outline" size={12} color={theme.textDim} style={{ marginTop: 2 }} />
           <View style={{ flex: 1 }}>
-            <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 11, color: theme.textDim }}>
+            <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 13, color: theme.textDim }}>
               {skill.unmeasuredReason}
             </Text>
             {skill.measureAction ? (
               <Text
                 style={{
                   fontFamily: FONTS.body,
-                  fontSize: 11,
-                  lineHeight: 15,
+                  fontSize: 13,
+                  lineHeight: 16.5,
                   color: theme.textMuted,
                   marginTop: 2,
                 }}
@@ -125,7 +125,7 @@ function SkillDetailCard({ skill, theme, delay }) {
           <Text
             style={{
               fontFamily: FONTS.bodySemiBold,
-              fontSize: 11,
+              fontSize: 13,
               color: aboveBenchmark ? theme.steel : theme.textDim,
             }}
           >
@@ -140,7 +140,7 @@ function SkillDetailCard({ skill, theme, delay }) {
           <Sparkline data={skill.trend} width={110} height={30} color={tone.bar} />
           <View style={{ flex: 1, alignItems: 'flex-end' }}>
             <Text style={[TYPE.statCaption, { color: theme.textDim }]}>History</Text>
-            <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 11.5, color: theme.textMuted, marginTop: 3 }}>
+            <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 13.5, color: theme.textMuted, marginTop: 3 }}>
               {skill.trend[0]} → {skill.trend[skill.trend.length - 1]}
             </Text>
           </View>
@@ -157,8 +157,8 @@ function SkillDetailCard({ skill, theme, delay }) {
                 style={{
                   flex: 1,
                   fontFamily: FONTS.body,
-                  fontSize: 11.5,
-                  lineHeight: 16,
+                  fontSize: 13.5,
+                  lineHeight: 17.5,
                   color: theme.textMuted,
                 }}
               >

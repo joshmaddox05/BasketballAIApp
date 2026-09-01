@@ -481,7 +481,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     headerTitle: {
-        fontSize: 20,
+        fontSize: 21,
         fontWeight: '700',
         color: '#1F2937',
     },
@@ -509,7 +509,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#EEF2FF',
     },
     tabText: {
-        fontSize: 11,
+        fontSize: 13,
         fontWeight: '600',
         color: '#9CA3AF',
         marginTop: 4,
@@ -522,7 +522,7 @@ const styles = StyleSheet.create({
         padding: 20,
     },
     tabDescription: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#6B7280',
         marginBottom: 20,
         textAlign: 'center',
@@ -548,7 +548,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     scoreLabel: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: '600',
         color: '#fff',
         opacity: 0.9,
@@ -561,7 +561,7 @@ const styles = StyleSheet.create({
         marginBottom: 4,
     },
     scoreSubtext: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#fff',
         opacity: 0.8,
     },
@@ -575,7 +575,7 @@ const styles = StyleSheet.create({
         marginTop: 12,
     },
     confidenceText: {
-        fontSize: 12,
+        fontSize: 14,
         fontWeight: '600',
         color: '#fff',
         marginLeft: 6,
@@ -604,13 +604,13 @@ const styles = StyleSheet.create({
         }),
     },
     quickStatValue: {
-        fontSize: 20,
+        fontSize: 21,
         fontWeight: '700',
         color: '#1F2937',
         marginTop: 8,
     },
     quickStatLabel: {
-        fontSize: 11,
+        fontSize: 13,
         color: '#6B7280',
         marginTop: 4,
         textAlign: 'center',
@@ -619,7 +619,7 @@ const styles = StyleSheet.create({
         marginBottom: 24,
     },
     sectionTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: '700',
         color: '#1F2937',
         marginBottom: 12,
@@ -652,7 +652,7 @@ const styles = StyleSheet.create({
         marginRight: 12,
     },
     priorityText: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '700',
         color: '#fff',
     },
@@ -660,15 +660,15 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     priorityCueTitle: {
-        fontSize: 15,
+        fontSize: 16.5,
         fontWeight: '600',
         color: '#1F2937',
         marginBottom: 4,
     },
     priorityCueDescription: {
-        fontSize: 13,
+        fontSize: 15,
         color: '#6B7280',
-        lineHeight: 18,
+        lineHeight: 19,
     },
     phasesGrid: {
         flexDirection: 'row',
@@ -685,7 +685,7 @@ const styles = StyleSheet.create({
         gap: 6,
     },
     phaseName: {
-        fontSize: 13,
+        fontSize: 15,
         fontWeight: '600',
         color: '#1F2937',
     },
@@ -696,7 +696,7 @@ const styles = StyleSheet.create({
         borderRadius: 6,
     },
     qualityText: {
-        fontSize: 11,
+        fontSize: 13,
         fontWeight: '700',
         color: '#6366F1',
     },
@@ -729,25 +729,25 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     phaseTitle: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: '600',
         color: '#1F2937',
         marginBottom: 2,
     },
     phaseStatus: {
-        fontSize: 13,
+        fontSize: 15,
         color: '#6B7280',
     },
     phaseScoreContainer: {
         alignItems: 'center',
     },
     phaseScoreValue: {
-        fontSize: 24,
+        fontSize: 25,
         fontWeight: '700',
         color: '#6366F1',
     },
     phaseScoreLabel: {
-        fontSize: 12,
+        fontSize: 14,
         color: '#9CA3AF',
     },
     phaseDetails: {
@@ -759,7 +759,7 @@ const styles = StyleSheet.create({
         gap: 8,
     },
     phaseDetailText: {
-        fontSize: 13,
+        fontSize: 15,
         color: '#6B7280',
     },
     metricCard: {
@@ -786,7 +786,7 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
     metricName: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: '600',
         color: '#1F2937',
         marginBottom: 4,
@@ -796,12 +796,12 @@ const styles = StyleSheet.create({
         alignItems: 'baseline',
     },
     metricValue: {
-        fontSize: 24,
+        fontSize: 25,
         fontWeight: '700',
         color: '#6366F1',
     },
     metricUnit: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '600',
         color: '#9CA3AF',
         marginLeft: 4,
@@ -818,7 +818,7 @@ const styles = StyleSheet.create({
         marginBottom: 6,
     },
     metricScoreText: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: '700',
         color: '#fff',
     },
@@ -837,11 +837,11 @@ const styles = StyleSheet.create({
         marginBottom: 6,
     },
     comparisonLabel: {
-        fontSize: 13,
+        fontSize: 15,
         color: '#6B7280',
     },
     comparisonValue: {
-        fontSize: 13,
+        fontSize: 15,
         fontWeight: '600',
         color: '#1F2937',
     },
@@ -863,7 +863,7 @@ const styles = StyleSheet.create({
         borderRadius: 4,
     },
     metricProgressText: {
-        fontSize: 12,
+        fontSize: 14,
         fontWeight: '600',
         color: '#6B7280',
         minWidth: 35,
@@ -879,9 +879,9 @@ const styles = StyleSheet.create({
     },
     metricFeedbackText: {
         flex: 1,
-        fontSize: 13,
+        fontSize: 15,
         color: '#4F46E5',
-        lineHeight: 18,
+        lineHeight: 19,
     },
     // Removed NBA player card and comparison styles
     coachingCard: {
@@ -913,7 +913,7 @@ const styles = StyleSheet.create({
         borderRadius: 8,
     },
     coachingPriorityText: {
-        fontSize: 12,
+        fontSize: 14,
         fontWeight: '700',
         color: '#fff',
     },
@@ -924,20 +924,20 @@ const styles = StyleSheet.create({
         borderRadius: 6,
     },
     coachingImpactText: {
-        fontSize: 10,
+        fontSize: 12,
         fontWeight: '700',
         color: '#6B7280',
     },
     coachingTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: '700',
         color: '#1F2937',
         marginBottom: 8,
     },
     coachingDescription: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#6B7280',
-        lineHeight: 20,
+        lineHeight: 21,
         marginBottom: 12,
     },
     drillContainer: {
@@ -952,15 +952,15 @@ const styles = StyleSheet.create({
         marginBottom: 6,
     },
     drillLabel: {
-        fontSize: 12,
+        fontSize: 14,
         fontWeight: '700',
         color: '#4F46E5',
         textTransform: 'uppercase',
     },
     drillText: {
-        fontSize: 13,
+        fontSize: 15,
         color: '#4F46E5',
-        lineHeight: 18,
+        lineHeight: 19,
     },
     noDataContainer: {
         flex: 1,
@@ -969,7 +969,7 @@ const styles = StyleSheet.create({
         paddingVertical: 60,
     },
     noDataText: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#9CA3AF',
     },
 });

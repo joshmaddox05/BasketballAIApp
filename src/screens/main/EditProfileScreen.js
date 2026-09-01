@@ -590,7 +590,7 @@ const styles = StyleSheet.create({
         padding: 4,
     },
     headerTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: '600',
     },
     saveButton: {
@@ -599,7 +599,7 @@ const styles = StyleSheet.create({
         alignItems: 'flex-end',
     },
     saveText: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: '600',
     },
     keyboardView: {
@@ -649,7 +649,7 @@ const styles = StyleSheet.create({
     },
     changePhotoText: {
         marginTop: 12,
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: '500',
     },
     section: {
@@ -659,16 +659,16 @@ const styles = StyleSheet.create({
         padding: 16,
     },
     sectionTitle: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: '600',
         marginBottom: 4,
     },
     sectionSubtitle: {
-        fontSize: 14,
+        fontSize: 16,
         marginBottom: 12,
     },
     textInput: {
-        fontSize: 16,
+        fontSize: 17.5,
         paddingHorizontal: 16,
         paddingVertical: 12,
         borderRadius: 8,
@@ -689,7 +689,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
     },
     dayText: {
-        fontSize: 12,
+        fontSize: 14,
         fontWeight: '600',
     },
     durationContainer: {
@@ -704,7 +704,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
     },
     durationText: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '500',
     },
     infoRow: {
@@ -716,10 +716,10 @@ const styles = StyleSheet.create({
         borderBottomColor: 'rgba(0,0,0,0.1)',
     },
     infoLabel: {
-        fontSize: 14,
+        fontSize: 16,
     },
     infoValue: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '500',
     },
     bottomSpace: {

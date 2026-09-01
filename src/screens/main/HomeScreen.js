@@ -22,8 +22,17 @@ import {
   getRecommendationReason,
 } from '../../utils/homeHelpers';
 import { getPersonalizedWorkouts } from '../../services/workoutPersonalizationEngine';
-import { getAthleteAssignments, updateAssignmentStatus, getAthleteSessions, updateSessionStatus } from '../../services/firestoreService';
+import {
+  getAthleteAssignments,
+  updateAssignmentStatus,
+  getAthleteSessions,
+  updateSessionStatus,
+  ASSIGNMENT_STATUS,
+  isOpenStatus,
+} from '../../services/firestoreService';
 import { comprehensiveWorkouts } from '../../data/workouts';
+import { TYPE, SHAPE } from '../../utils/typography';
+import AssignmentRow from '../../components/features/AssignmentRow';
 import ModuleGrid from '../../components/features/ModuleGrid';
 import { getModulesForRole } from '../../config/roleModules';
 import { Entrance, EmptyState } from '../../components/dbe';
@@ -262,11 +271,11 @@ function DBEHub({ shotDNAProfile, evalRankScore, simCoachIQScore, subscription, 
 const dbeStyles = StyleSheet.create({
   hubSection: { marginBottom: 8, paddingHorizontal: 20 },
   pipelineCard: { borderRadius: 16, borderWidth: 1, padding: 16, marginBottom: 16 },
-  pipelineTitle: { fontSize: 14, fontWeight: '700', marginBottom: 12 },
+  pipelineTitle: { fontSize: 16, fontWeight: '700', marginBottom: 12 },
   pipelineRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around' },
   pipelineStat: { alignItems: 'center', flex: 1 },
-  pipelineValue: { fontSize: 22, fontWeight: '800' },
-  pipelineLabel: { fontSize: 11, marginTop: 2 },
+  pipelineValue: { fontSize: 23, fontWeight: '800' },
+  pipelineLabel: { fontSize: 13, marginTop: 2 },
   pipeDivider: { width: 1, height: 32 },
 });
 
@@ -286,41 +295,48 @@ function EmptyWorkoutsState({ theme, onPress }) {
 // From Your Coach — pending assignments (workouts + IQ scenarios)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function CoachAssignmentsSection({ assignments, theme, onOpen, onComplete }) {
+// Home shows ONE assignment, not the whole queue. Submitted work stays on the
+// athlete's side until the coach verifies it, so rendering everything turned Home
+// into a wall of cards for work the player had already done. The open assignment
+// is what needs their action, so that leads; the rest live on PlayerAssignments.
+function CoachAssignmentsSection({ assignments, theme, onOpen, onComplete, onViewAll }) {
   if (!assignments || assignments.length === 0) return null;
+
+  // Lead with something actionable; fall back to the newest submitted item so the
+  // section still reflects reality when everything is with the coach.
+  const lead = assignments.find((a) => isOpenStatus(a.status)) || assignments[0];
+  const openCount = assignments.filter((a) => isOpenStatus(a.status)).length;
+
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, { color: theme.text }]}>From Your Coach</Text>
-      </View>
-      {assignments.map((a) => {
-        const isScenario = a.type === 'scenario';
-        return (
-          <TouchableOpacity
-            key={a.id}
-            style={[styles.assignmentCard, { backgroundColor: theme.card, borderColor: theme.primary + '40' }]}
-            onPress={() => onOpen(a)}
-            activeOpacity={0.85}
-          >
-            <View style={[styles.assignmentIcon, { backgroundColor: theme.primary + '18' }]}>
-              <Ionicons name={isScenario ? 'bulb-outline' : 'barbell-outline'} size={20} color={theme.primary} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.assignmentTitle, { color: theme.text }]} numberOfLines={1}>{a.title}</Text>
-              <Text style={[styles.assignmentMeta, { color: theme.textSecondary }]} numberOfLines={1}>
-                {a.coachName}{a.note ? ` · ${a.note}` : ''}
-              </Text>
-            </View>
-            <TouchableOpacity
-              onPress={() => onComplete(a)}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              style={[styles.assignmentCheck, { borderColor: theme.primary }]}
-            >
-              <Ionicons name="checkmark" size={16} color={theme.primary} />
-            </TouchableOpacity>
+        {assignments.length > 1 && (
+          <TouchableOpacity onPress={onViewAll} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Text style={[styles.sectionAction, { color: theme.primary }]}>
+              View all · {assignments.length}
+            </Text>
           </TouchableOpacity>
-        );
-      })}
+        )}
+      </View>
+      {/* One shared row, not a third local copy. The Home version had drifted
+          off-system entirely — no fontFamily, a 1.5dp coloured border, an
+          off-scale radius, and burgundy glyphs on a burgundy tint at ~2:1. */}
+      <View style={[styles.assignmentCard, { backgroundColor: theme.card }]}>
+        <AssignmentRow item={lead} theme={theme} onOpen={onOpen} onComplete={onComplete} last />
+      </View>
+
+      {/* Say what is being hidden, rather than silently truncating. */}
+      {assignments.length > 1 && (
+        <TouchableOpacity onPress={onViewAll} activeOpacity={0.8} style={styles.assignmentMore}>
+          <Text style={[styles.assignmentMoreText, { color: theme.textSecondary }]}>
+            {openCount > 1
+              ? `${openCount - 1} more to do`
+              : `${assignments.length - 1} with your coach`}
+          </Text>
+          <Ionicons name="chevron-forward" size={14} color={theme.textSecondary} />
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -351,8 +367,8 @@ function CoachSessionsSection({ sessions, theme, onConfirm }) {
           : 'Time TBD';
         return (
           <View key={s.id} style={[styles.assignmentCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            <View style={[styles.assignmentIcon, { backgroundColor: theme.primary + '18' }]}>
-              <Ionicons name={s.mode === 'virtual' ? 'videocam-outline' : 'basketball-outline'} size={20} color={theme.primary} />
+            <View style={[styles.assignmentIcon, { backgroundColor: theme.badgeFill }]}>
+              <Ionicons name={s.mode === 'virtual' ? 'videocam-outline' : 'basketball-outline'} size={20} color={theme.accentText} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[styles.assignmentTitle, { color: theme.text }]} numberOfLines={1}>{s.type}</Text>
@@ -407,10 +423,14 @@ export default function HomeScreen({ navigation }) {
   const loadCoachAssignments = useCallback(async () => {
     if (!user?.uid) return;
     const [items, sessions] = await Promise.all([
-      getAthleteAssignments(user.uid, { status: 'assigned' }),
+      // Load every assignment, not just open ones. Filtering to 'assigned' meant a
+      // finished assignment simply disappeared, so the athlete had no way to see
+      // that it was awaiting their coach's review.
+      getAthleteAssignments(user.uid),
       getAthleteSessions(user.uid),
     ]);
-    setCoachAssignments(items);
+    // Verified work is done business — drop it from the home feed.
+    setCoachAssignments(items.filter((a) => a.status !== ASSIGNMENT_STATUS.VERIFIED));
     // Only upcoming, non-cancelled sessions surface on the athlete home.
     const now = Date.now();
     setCoachSessions(
@@ -486,7 +506,8 @@ export default function HomeScreen({ navigation }) {
       }
       const workout = comprehensiveWorkouts.find((w) => w.id === assignment.refId);
       if (workout) {
-        navigation.navigate('WorkoutDetail', { workout });
+        // Carry the assignment through so finishing the workout closes it.
+        navigation.navigate('WorkoutDetail', { workout, assignmentRefId: assignment.refId });
       } else {
         navigation.navigate('Training');
       }
@@ -494,11 +515,18 @@ export default function HomeScreen({ navigation }) {
     [navigation]
   );
 
+  // Manual completion, kept for work done off-app. Automatic submission happens
+  // in the workout/scenario completion flows.
   const handleCompleteAssignment = useCallback(
     async (assignment) => {
-      setCoachAssignments((prev) => prev.filter((a) => a.id !== assignment.id));
+      setCoachAssignments((prev) =>
+        prev.map((a) => (a.id === assignment.id ? { ...a, status: ASSIGNMENT_STATUS.SUBMITTED } : a))
+      );
       try {
-        await updateAssignmentStatus(user.uid, assignment.id, 'completed');
+        await updateAssignmentStatus(user.uid, assignment.id, ASSIGNMENT_STATUS.SUBMITTED, {
+          completionPercentage: 100,
+          source: 'manual',
+        });
       } catch (_) {
         loadCoachAssignments();
       }
@@ -590,6 +618,7 @@ export default function HomeScreen({ navigation }) {
             theme={theme}
             onOpen={handleOpenAssignment}
             onComplete={handleCompleteAssignment}
+            onViewAll={() => navigation.navigate('PlayerAssignments')}
           />
         </Entrance>
 
@@ -677,7 +706,7 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   headerLeft: { flex: 1 },
-  greeting: { fontSize: 22, fontWeight: '700', letterSpacing: -0.3 },
+  greeting: { fontSize: 23, fontWeight: '700', letterSpacing: -0.3 },
   levelRow: { marginTop: 4 },
   levelBadge: {
     flexDirection: 'row',
@@ -688,7 +717,7 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 20,
   },
-  levelText: { fontSize: 12, fontWeight: '600' },
+  levelText: { fontSize: 14, fontWeight: '600' },
   avatarButton: {
     width: 42,
     height: 42,
@@ -722,9 +751,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   nextActionText: { flex: 1 },
-  nextActionLabel: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 2 },
-  nextActionTitle: { fontSize: 17, fontWeight: '700', lineHeight: 22 },
-  nextActionSubtitle: { fontSize: 13, marginTop: 3, lineHeight: 18 },
+  nextActionLabel: { fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 2 },
+  nextActionTitle: { fontSize: 18, fontWeight: '700', lineHeight: 23 },
+  nextActionSubtitle: { fontSize: 15, marginTop: 3, lineHeight: 19 },
   nextActionCTA: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -735,7 +764,7 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     borderRadius: 20,
   },
-  nextActionCTAText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
+  nextActionCTAText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
 
   // Weekly Focus
   weeklySection: { marginHorizontal: 20, marginBottom: 24 },
@@ -751,8 +780,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   chipTextWrap: { flex: 1 },
-  chipValue: { fontSize: 18, fontWeight: '700', lineHeight: 22 },
-  chipLabel: { fontSize: 11, marginTop: 1 },
+  chipValue: { fontSize: 19, fontWeight: '700', lineHeight: 23 },
+  chipLabel: { fontSize: 13, marginTop: 1 },
 
   // Section header
   section: { marginBottom: 8 },
@@ -763,24 +792,33 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginBottom: 4,
   },
-  sectionTitle: { fontSize: 17, fontWeight: '700' },
-  seeAll: { fontSize: 14, fontWeight: '500' },
-  sectionSubtitle: { fontSize: 13, paddingHorizontal: 20, marginBottom: 12 },
-
-  // From Your Coach assignment cards
-  assignmentCard: {
+  sectionTitle: { fontSize: 18, fontWeight: '700' },
+  seeAll: { fontSize: 16, fontWeight: '500' },
+  sectionAction: { fontSize: 15, fontWeight: '600' },
+  assignmentMore: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginHorizontal: 20,
-    marginBottom: 10,
-    padding: 14,
-    borderRadius: 14,
-    borderWidth: 1.5,
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 10,
   },
-  assignmentIcon: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  assignmentTitle: { fontSize: 15, fontWeight: '700' },
-  assignmentMeta: { fontSize: 12, marginTop: 2 },
+  assignmentMoreText: { fontSize: 14.5, fontWeight: '500' },
+  sectionSubtitle: { fontSize: 15, paddingHorizontal: 20, marginBottom: 12 },
+
+  // From Your Coach assignment cards
+  // On the enumerated scales: card radius 16, screen padding 20, and the system's
+  // single 1dp hairline. The previous 1.5dp burgundy border at radius 14 was a
+  // highlighted-card idiom from a different design language.
+  assignmentCard: {
+    marginHorizontal: SHAPE.screenPadding,
+    marginBottom: 10,
+    borderRadius: SHAPE.radiusCard,
+    overflow: 'hidden',
+  },
+  // Shared with the sessions section below.
+  assignmentIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  assignmentTitle: { ...TYPE.rowTitle },
+  assignmentMeta: { ...TYPE.rowMeta },
   assignmentCheck: {
     width: 32,
     height: 32,
@@ -790,9 +828,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   confirmBtn: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8 },
-  confirmBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  confirmBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
   sessionStatusPill: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
-  sessionStatusText: { fontSize: 11, fontWeight: '700', textTransform: 'capitalize' },
+  sessionStatusText: { fontSize: 13, fontWeight: '700', textTransform: 'capitalize' },
 
   // Recommended cards
   recCard: {
@@ -810,11 +848,11 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 20,
   },
-  recBadgeText: { fontSize: 11, fontWeight: '600', textTransform: 'capitalize' },
-  recTitle: { fontSize: 15, fontWeight: '600', lineHeight: 20, marginBottom: 10 },
+  recBadgeText: { fontSize: 13, fontWeight: '600', textTransform: 'capitalize' },
+  recTitle: { fontSize: 16.5, fontWeight: '600', lineHeight: 21, marginBottom: 10 },
   recFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   recMeta: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  recMetaText: { fontSize: 12 },
+  recMetaText: { fontSize: 14 },
   reasonBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -824,7 +862,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     maxWidth: 180,
   },
-  reasonText: { fontSize: 11, fontWeight: '500' },
+  reasonText: { fontSize: 13, fontWeight: '500' },
 
   bottomSpacer: { height: 16 },
 });

@@ -258,7 +258,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     headerTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: 'bold',
         color: '#333',
     },
@@ -286,7 +286,7 @@ const styles = StyleSheet.create({
     },
     filterButtonText: {
         color: '#666',
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '500',
     },
     activeFilterButtonText: {
@@ -320,13 +320,13 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     activityTitle: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: '600',
         color: '#333',
         marginBottom: 4,
     },
     activityDate: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#666',
     },
     activityProgress: {
@@ -342,12 +342,12 @@ const styles = StyleSheet.create({
         marginBottom: 4,
     },
     progressText: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: 'bold',
         color: '#333',
     },
     progressLabel: {
-        fontSize: 12,
+        fontSize: 14,
         color: '#666',
     },
     emptyContainer: {
@@ -357,14 +357,14 @@ const styles = StyleSheet.create({
         padding: 40,
     },
     emptyTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: 'bold',
         color: '#333',
         marginTop: 16,
         marginBottom: 8,
     },
     emptyMessage: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#666',
         textAlign: 'center',
         marginBottom: 24,
@@ -378,7 +378,7 @@ const styles = StyleSheet.create({
     startWorkoutButtonText: {
         color: '#FFF',
         fontWeight: 'bold',
-        fontSize: 16,
+        fontSize: 17.5,
     },
 });
 

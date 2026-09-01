@@ -1163,7 +1163,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     headerTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: 'bold',
     },
     shareButton: {
@@ -1220,20 +1220,20 @@ const styles = StyleSheet.create({
     },
     badgeText: {
         color: '#FFF',
-        fontSize: 12,
+        fontSize: 14,
         fontWeight: '500',
     },
     challengeHeader: {
         padding: 16,
     },
     challengeTitle: {
-        fontSize: 22,
+        fontSize: 23,
         fontWeight: 'bold',
         marginBottom: 8,
     },
     challengeDescription: {
-        fontSize: 14,
-        lineHeight: 22,
+        fontSize: 16,
+        lineHeight: 23,
         marginBottom: 16,
     },
     challengeMeta: {
@@ -1246,7 +1246,7 @@ const styles = StyleSheet.create({
         marginRight: 24,
     },
     metaText: {
-        fontSize: 14,
+        fontSize: 16,
         marginLeft: 6,
     },
     joinButton: {
@@ -1259,7 +1259,7 @@ const styles = StyleSheet.create({
     },
     joinButtonText: {
         color: '#FFF',
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: 'bold',
         marginLeft: 8,
     },
@@ -1273,11 +1273,11 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     progressTitle: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: '600',
     },
     progressPercent: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: 'bold',
     },
     progressBar: {
@@ -1291,7 +1291,7 @@ const styles = StyleSheet.create({
         borderRadius: 4,
     },
     progressStatus: {
-        fontSize: 14,
+        fontSize: 16,
     },
     opponentContainer: {
         padding: 12,
@@ -1304,7 +1304,7 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     opponentTitle: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: '600',
         marginLeft: 8,
     },
@@ -1316,11 +1316,11 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     opponentStatValue: {
-        fontSize: 24,
+        fontSize: 25,
         fontWeight: 'bold',
     },
     opponentStatLabel: {
-        fontSize: 12,
+        fontSize: 14,
     },
     rewardContainer: {
         padding: 12,
@@ -1333,19 +1333,19 @@ const styles = StyleSheet.create({
         marginBottom: 4,
     },
     rewardTitle: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '600',
         marginLeft: 6,
     },
     rewardText: {
-        fontSize: 14,
+        fontSize: 16,
     },
     daysSelectorContainer: {
         padding: 16,
         marginTop: 8,
     },
     sectionTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: 'bold',
         marginBottom: 12,
     },
@@ -1365,7 +1365,7 @@ const styles = StyleSheet.create({
         opacity: 0.5,
     },
     dayButtonText: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '600',
     },
     selectedDayButtonText: {
@@ -1395,12 +1395,12 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     dayTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: 'bold',
         marginBottom: 4,
     },
     dayDescription: {
-        fontSize: 14,
+        fontSize: 16,
     },
     exercisesContainer: {
         marginBottom: 16,
@@ -1416,12 +1416,12 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     exerciseName: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: '500',
         marginBottom: 2,
     },
     exerciseReps: {
-        fontSize: 14,
+        fontSize: 16,
     },
     completeButton: {
         paddingHorizontal: 16,
@@ -1432,7 +1432,7 @@ const styles = StyleSheet.create({
     },
     completeButtonText: {
         color: '#FFF',
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '600',
     },
     exerciseStatus: {
@@ -1449,7 +1449,7 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(244, 67, 54, 0.1)',
     },
     exerciseStatusText: {
-        fontSize: 12,
+        fontSize: 14,
         fontWeight: '500',
         marginLeft: 4,
     },
@@ -1465,11 +1465,11 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     dayScoreLabel: {
-        fontSize: 14,
+        fontSize: 16,
         marginBottom: 2,
     },
     dayScoreValue: {
-        fontSize: 20,
+        fontSize: 21,
         fontWeight: 'bold',
     },
     dayCompletedMessage: {
@@ -1478,7 +1478,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     dayCompletedText: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '500',
         marginLeft: 6,
     },
@@ -1495,10 +1495,10 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
     yourRankLabel: {
-        fontSize: 14,
+        fontSize: 16,
     },
     yourRankValue: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: 'bold',
     },
     leaderboardContent: {
@@ -1518,7 +1518,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     rankText: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: 'bold',
     },
     leaderboardUser: {
@@ -1526,17 +1526,17 @@ const styles = StyleSheet.create({
         marginLeft: 12,
     },
     leaderboardUserName: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '500',
     },
     leaderboardDays: {
-        fontSize: 12,
+        fontSize: 14,
     },
     leaderboardScore: {
         paddingHorizontal: 10,
     },
     scoreValue: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: 'bold',
     },
     emptyLeaderboard: {
@@ -1545,7 +1545,7 @@ const styles = StyleSheet.create({
     },
     emptyLeaderboardText: {
         marginTop: 10,
-        fontSize: 14,
+        fontSize: 16,
     },
     actionButtonsContainer: {
         flexDirection: 'row',
@@ -1562,7 +1562,7 @@ const styles = StyleSheet.create({
         marginRight: 8,
     },
     inviteFriendsButtonText: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '500',
         marginLeft: 6,
     },
@@ -1575,7 +1575,7 @@ const styles = StyleSheet.create({
         borderRadius: 8,
     },
     leaveButtonText: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '500',
         marginLeft: 6,
     },
@@ -1586,7 +1586,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     shareChallengeButtonText: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#FFF',
         fontWeight: 'bold',
     },
@@ -1597,13 +1597,13 @@ const styles = StyleSheet.create({
         padding: 40,
     },
     errorTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: 'bold',
         marginTop: 16,
         marginBottom: 8,
     },
     errorMessage: {
-        fontSize: 14,
+        fontSize: 16,
         textAlign: 'center',
         marginBottom: 24,
     },
@@ -1615,7 +1615,7 @@ const styles = StyleSheet.create({
     backToHomeButtonText: {
         color: '#FFF',
         fontWeight: 'bold',
-        fontSize: 16,
+        fontSize: 17.5,
     },
     loadingOverlay: {
         ...StyleSheet.absoluteFillObject,
@@ -1631,7 +1631,7 @@ const styles = StyleSheet.create({
     },
     loadingText: {
         marginTop: 12,
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '500',
     }
 });

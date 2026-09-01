@@ -162,7 +162,7 @@ const styles = StyleSheet.create({
         marginBottom: 6,
     },
     title: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: 'bold',
         flex: 1,
     },
@@ -176,13 +176,13 @@ const styles = StyleSheet.create({
     },
     premiumText: {
         color: '#FFF',
-        fontSize: 10,
+        fontSize: 12,
         fontWeight: 'bold',
         marginLeft: 4,
     },
     description: {
-        fontSize: 14,
-        lineHeight: 20,
+        fontSize: 16,
+        lineHeight: 21,
         marginBottom: 8,
     },
     lockedDescription: {
@@ -194,7 +194,7 @@ const styles = StyleSheet.create({
         marginTop: 4,
     },
     unlockText: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '600',
         marginRight: 6,
     },

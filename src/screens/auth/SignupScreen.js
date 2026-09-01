@@ -436,7 +436,7 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     subtitle: {
-        fontSize: 16,
+        fontSize: 17.5,
         color: '#666',
     },
     form: {
@@ -456,7 +456,7 @@ const styles = StyleSheet.create({
     input: {
         flex: 1,
         height: 50,
-        fontSize: 16,
+        fontSize: 17.5,
         color: '#333',
     },
     visibilityToggle: {
@@ -467,7 +467,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 4,
     },
     passwordRequirementsTitle: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#666',
         marginBottom: 8,
     },
@@ -477,7 +477,7 @@ const styles = StyleSheet.create({
         marginBottom: 6,
     },
     passwordRequirementText: {
-        fontSize: 12,
+        fontSize: 14,
         color: '#999',
         marginLeft: 6,
     },
@@ -501,9 +501,9 @@ const styles = StyleSheet.create({
     },
     termsText: {
         flex: 1,
-        fontSize: 14,
+        fontSize: 16,
         color: '#666',
-        lineHeight: 20,
+        lineHeight: 21,
     },
     termsLink: {
         color: '#8A1C22',
@@ -516,7 +516,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     signupButtonText: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: 'bold',
         color: '#FFF',
     },
@@ -525,7 +525,7 @@ const styles = StyleSheet.create({
         marginBottom: 30,
     },
     orText: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#999',
         marginBottom: 16,
     },
@@ -549,11 +549,11 @@ const styles = StyleSheet.create({
         marginBottom: 30,
     },
     loginPromptText: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#666',
     },
     loginPromptLink: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: 'bold',
         color: '#8A1C22',
     },

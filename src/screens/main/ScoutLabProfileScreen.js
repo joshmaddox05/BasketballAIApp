@@ -340,7 +340,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   backBtn: { padding: 4, marginRight: 6 },
-  headerTitle: { flex: 1, fontSize: 18, fontWeight: '700' },
+  headerTitle: { flex: 1, fontSize: 19, fontWeight: '700' },
   shareIconBtn: {
     width: 38,
     height: 38,
@@ -367,11 +367,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   profileMeta: { flex: 1 },
-  profileName: { fontSize: 20, fontWeight: '800' },
-  profilePosition: { fontSize: 15, fontWeight: '700', marginTop: 3 },
-  profileDetail: { fontSize: 13, marginTop: 3 },
+  profileName: { fontSize: 21, fontWeight: '800' },
+  profilePosition: { fontSize: 16.5, fontWeight: '700', marginTop: 3 },
+  profileDetail: { fontSize: 15, marginTop: 3 },
   locationRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 5 },
-  locationText: { fontSize: 12 },
+  locationText: { fontSize: 14 },
   editProfileBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -381,7 +381,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
-  editProfileBtnText: { fontSize: 13, fontWeight: '600' },
+  editProfileBtnText: { fontSize: 15, fontWeight: '600' },
 
   // Stats row
   statsRow: {
@@ -403,7 +403,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   statBadgeLabel: {
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.4,
@@ -411,7 +411,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   statBadgeValue: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '800',
     textAlign: 'center',
   },
@@ -429,7 +429,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 12,
   },
-  cardTitle: { fontSize: 16, fontWeight: '700' },
+  cardTitle: { fontSize: 17.5, fontWeight: '700' },
   addVideoBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -438,7 +438,7 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 10,
   },
-  addVideoBtnText: { fontSize: 13, fontWeight: '600' },
+  addVideoBtnText: { fontSize: 15, fontWeight: '600' },
 
   // Video thumbnail
   videoThumb: {
@@ -474,13 +474,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
-  durationText: { color: '#fff', fontSize: 11, fontWeight: '600' },
+  durationText: { color: '#fff', fontSize: 13, fontWeight: '600' },
   videoMeta: {
     paddingHorizontal: 10,
     paddingVertical: 7,
   },
-  videoTitle: { color: '#fff', fontSize: 13, fontWeight: '600' },
-  videoViews: { color: 'rgba(255,255,255,0.75)', fontSize: 11, marginTop: 2 },
+  videoTitle: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  videoViews: { color: 'rgba(255,255,255,0.75)', fontSize: 13, marginTop: 2 },
 
   // Buttons
   primaryBtn: {
@@ -492,7 +492,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     marginBottom: 12,
   },
-  primaryBtnText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  primaryBtnText: { color: '#fff', fontSize: 16.5, fontWeight: '800' },
   secondaryBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -502,7 +502,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
   },
-  secondaryBtnText: { fontSize: 15, fontWeight: '600' },
+  secondaryBtnText: { fontSize: 16.5, fontWeight: '600' },
 
   bottomSpacer: { height: 20 },
 });

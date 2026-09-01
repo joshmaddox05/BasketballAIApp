@@ -192,36 +192,36 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1 },
   backBtn: { padding: 4 },
-  headerTitle: { fontSize: 16, fontWeight: '700' },
-  headerSub: { fontSize: 12, marginTop: 1 },
+  headerTitle: { fontSize: 17.5, fontWeight: '700' },
+  headerSub: { fontSize: 14, marginTop: 1 },
 
   scroll: { padding: 16 },
 
   promptCard: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 16, gap: 6 },
-  promptTitle: { fontSize: 14, fontWeight: '700' },
-  promptSub: { fontSize: 12, lineHeight: 17 },
+  promptTitle: { fontSize: 16, fontWeight: '700' },
+  promptSub: { fontSize: 14, lineHeight: 18 },
 
-  sectionTitle: { fontSize: 14, fontWeight: '700', marginBottom: 10 },
+  sectionTitle: { fontSize: 16, fontWeight: '700', marginBottom: 10 },
   sectionCard: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 14, gap: 8 },
 
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
   chip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5 },
-  chipText: { fontSize: 12, fontWeight: '600' },
+  chipText: { fontSize: 14, fontWeight: '600' },
 
-  textInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, minHeight: 60, textAlignVertical: 'top', marginBottom: 14 },
+  textInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 16, minHeight: 60, textAlignVertical: 'top', marginBottom: 14 },
 
   submitBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 13, borderRadius: 12 },
-  submitBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  submitBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 
   myAnswerRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  myAnswerText: { fontSize: 13, fontWeight: '700' },
-  myAnswerNote: { fontSize: 12, fontStyle: 'italic' },
-  matchText: { fontSize: 12, fontWeight: '600' },
+  myAnswerText: { fontSize: 15, fontWeight: '700' },
+  myAnswerNote: { fontSize: 14, fontStyle: 'italic' },
+  matchText: { fontSize: 14, fontWeight: '600' },
 
   responseRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, paddingVertical: 10 },
-  responseName: { fontSize: 13, fontWeight: '600' },
-  responseAction: { fontSize: 12 },
+  responseName: { fontSize: 15, fontWeight: '600' },
+  responseAction: { fontSize: 14 },
 
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 12 },
-  deniedTitle: { fontSize: 20, fontWeight: '700' },
+  deniedTitle: { fontSize: 21, fontWeight: '700' },
 });

@@ -311,7 +311,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: 'bold',
     color: '#333',
   },
@@ -363,7 +363,7 @@ const styles = StyleSheet.create({
   },
   durationText: {
     color: '#FFF',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '500',
   },
   videoInfo: {
@@ -371,10 +371,10 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   videoTitle: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: 'bold',
     color: '#333',
-    lineHeight: 24,
+    lineHeight: 25,
     marginBottom: 8,
   },
   videoMeta: {
@@ -383,11 +383,11 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   metaText: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
   },
   metaDot: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
     marginHorizontal: 6,
   },
@@ -399,7 +399,7 @@ const styles = StyleSheet.create({
   },
   levelText: {
     color: '#FFF',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '500',
   },
   channelInfo: {
@@ -417,13 +417,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   channelName: {
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: '600',
     color: '#333',
     marginBottom: 2,
   },
   channelSubscribers: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
   },
   actionButtons: {
@@ -442,7 +442,7 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     color: '#FFF',
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: 'bold',
     marginLeft: 8,
   },
@@ -464,7 +464,7 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     color: '#8A1C22',
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: 'bold',
     marginLeft: 8,
   },
@@ -475,21 +475,21 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   descriptionTitle: {
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 8,
   },
   description: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
-    lineHeight: 20,
+    lineHeight: 21,
   },
   tagsContainer: {
     marginBottom: 20,
   },
   tagsTitle: {
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 8,
@@ -507,14 +507,14 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   tagText: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#666',
   },
   relatedSection: {
     marginTop: 8,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 16,
@@ -537,18 +537,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   relatedVideoTitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
     color: '#333',
-    lineHeight: 18,
+    lineHeight: 19,
   },
   relatedVideoChannel: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#666',
     marginTop: 2,
   },
   relatedVideoMeta: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#999',
     marginTop: 2,
   },

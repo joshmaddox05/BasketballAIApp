@@ -1235,7 +1235,7 @@ const styles = StyleSheet.create({
         borderBottomWidth: 1,
     },
     headerTitle: {
-        fontSize: 24,
+        fontSize: 25,
         fontFamily: FONTS.bodyBold,
     },
     tabsContainer: {
@@ -1251,7 +1251,7 @@ const styles = StyleSheet.create({
     activeTab: {
     },
     tabText: {
-        fontSize: 12,
+        fontSize: 14,
         fontFamily: FONTS.bodyMedium,
         textAlign: 'center',
     },
@@ -1282,7 +1282,7 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     summaryTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontFamily: FONTS.bodyBold,
     },
     timeframeSelector: {
@@ -1294,7 +1294,7 @@ const styles = StyleSheet.create({
     },
     timeframeText: {
         fontFamily: FONTS.body,
-        fontSize: 12,
+        fontSize: 14,
         marginRight: 4,
     },
     metricsRow: {
@@ -1309,13 +1309,13 @@ const styles = StyleSheet.create({
         marginHorizontal: 4,
     },
     metricValue: {
-        fontSize: 24,
+        fontSize: 25,
         fontFamily: FONTS.heading,
         marginBottom: 4,
     },
     metricLabel: {
         fontFamily: FONTS.body,
-        fontSize: 12,
+        fontSize: 14,
     },
     metricIcon: {
         marginBottom: 8,
@@ -1329,7 +1329,7 @@ const styles = StyleSheet.create({
         gap: 8,
     },
     caloriesText: {
-        fontSize: 14,
+        fontSize: 16,
         fontFamily: FONTS.bodyMedium,
     },
     loadingContainer: {
@@ -1341,14 +1341,14 @@ const styles = StyleSheet.create({
     loadingText: {
         marginTop: 12,
         fontFamily: FONTS.body,
-        fontSize: 16,
+        fontSize: 17.5,
     },
     chartContainer: {
         padding: 16,
         marginTop: 8,
     },
     chartTitle: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontFamily: FONTS.bodyBold,
         marginBottom: 16,
     },
@@ -1363,7 +1363,7 @@ const styles = StyleSheet.create({
         gap: 8,
     },
     chartPeriod: {
-        fontSize: 12,
+        fontSize: 14,
         fontFamily: FONTS.bodyMedium,
     },
     shootingAccuracyCard: {
@@ -1383,7 +1383,7 @@ const styles = StyleSheet.create({
     },
     accuracyLabel: {
         fontFamily: FONTS.body,
-        fontSize: 14,
+        fontSize: 16,
         marginTop: 4,
     },
     accuracyProgressBar: {
@@ -1413,12 +1413,12 @@ const styles = StyleSheet.create({
         borderRadius: 5,
     },
     accuracyStatText: {
-        fontSize: 14,
+        fontSize: 16,
         fontFamily: FONTS.bodyMedium,
     },
     accuracyHint: {
         fontFamily: FONTS.body,
-        fontSize: 12,
+        fontSize: 14,
         textAlign: 'center',
         fontStyle: 'italic',
     },
@@ -1432,7 +1432,7 @@ const styles = StyleSheet.create({
         gap: 4,
     },
     trendText: {
-        fontSize: 12,
+        fontSize: 14,
         fontFamily: FONTS.bodySemiBold,
     },
     skillChartContainer: {
@@ -1450,11 +1450,11 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     sectionTitle: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontFamily: FONTS.heading,
     },
     seeAllText: {
-        fontSize: 14,
+        fontSize: 16,
         fontFamily: FONTS.bodyMedium,
     },
     skillProgressRow: {
@@ -1470,11 +1470,11 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     skillName: {
-        fontSize: 14,
+        fontSize: 16,
         fontFamily: FONTS.bodyMedium,
     },
     skillValue: {
-        fontSize: 14,
+        fontSize: 16,
         fontFamily: FONTS.bodyBold,
     },
     progressBar: {
@@ -1502,7 +1502,7 @@ const styles = StyleSheet.create({
     },
     goalName: {
         fontFamily: FONTS.body,
-        fontSize: 14,
+        fontSize: 16,
         marginBottom: 8,
     },
     goalProgress: {
@@ -1518,17 +1518,17 @@ const styles = StyleSheet.create({
         alignItems: 'flex-end',
     },
     goalPercentage: {
-        fontSize: 14,
+        fontSize: 16,
         fontFamily: FONTS.bodyBold,
         marginBottom: 2,
     },
     goalDeadline: {
         fontFamily: FONTS.body,
-        fontSize: 12,
+        fontSize: 14,
     },
     moreIndicator: {
         fontFamily: FONTS.body,
-        fontSize: 12,
+        fontSize: 14,
         textAlign: 'center',
         marginTop: 8,
     },
@@ -1555,7 +1555,7 @@ const styles = StyleSheet.create({
     },
     badgeName: {
         fontFamily: FONTS.body,
-        fontSize: 12,
+        fontSize: 14,
         textAlign: 'center',
     },
     lockedAchievement: {
@@ -1580,13 +1580,13 @@ const styles = StyleSheet.create({
     },
     emptyStateText: {
         fontFamily: FONTS.body,
-        fontSize: 14,
+        fontSize: 16,
         textAlign: 'center',
         marginBottom: 16,
     },
     emptyStateSubtext: {
         fontFamily: FONTS.body,
-        fontSize: 13,
+        fontSize: 15,
         textAlign: 'center',
     },
     emptyStateButton: {
@@ -1619,7 +1619,7 @@ const styles = StyleSheet.create({
     },
     skillTabText: {
         fontFamily: FONTS.body,
-        fontSize: 14,
+        fontSize: 16,
         marginLeft: 6,
     },
     selectedSkillTabText: {
@@ -1636,20 +1636,20 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     skillDetailName: {
-        fontSize: 18,
+        fontSize: 19,
         fontFamily: FONTS.heading,
         marginBottom: 4,
     },
     skillDetailRating: {
         fontFamily: FONTS.body,
-        fontSize: 14,
+        fontSize: 16,
     },
     skillBreakdownContainer: {
         padding: 16,
         marginTop: 8,
     },
     skillBreakdownTitle: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontFamily: FONTS.bodyBold,
         marginBottom: 16,
     },
@@ -1675,11 +1675,11 @@ const styles = StyleSheet.create({
         marginRight: 10,
     },
     skillBreakdownName: {
-        fontSize: 14,
+        fontSize: 16,
         fontFamily: FONTS.bodyMedium,
     },
     skillBreakdownValue: {
-        fontSize: 14,
+        fontSize: 16,
         fontFamily: FONTS.bodyBold,
     },
     skillBreakdownBar: {
@@ -1697,7 +1697,7 @@ const styles = StyleSheet.create({
     },
     categorySubtitle: {
         fontFamily: FONTS.body,
-        fontSize: 13,
+        fontSize: 15,
         marginBottom: 16,
     },
     categoryItem: {
@@ -1722,16 +1722,16 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     categoryName: {
-        fontSize: 15,
+        fontSize: 16.5,
         fontFamily: FONTS.bodySemiBold,
     },
     categoryCount: {
         fontFamily: FONTS.body,
-        fontSize: 12,
+        fontSize: 14,
         marginTop: 2,
     },
     categoryPercentage: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontFamily: FONTS.bodyBold,
     },
     categoryBar: {
@@ -1772,13 +1772,13 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     trainingItemTitle: {
-        fontSize: 14,
+        fontSize: 16,
         fontFamily: FONTS.bodySemiBold,
         marginBottom: 4,
     },
     trainingItemDescription: {
         fontFamily: FONTS.body,
-        fontSize: 12,
+        fontSize: 14,
     },
 
     // Goals Tab Styles
@@ -1791,7 +1791,7 @@ const styles = StyleSheet.create({
         borderBottomWidth: 1,
     },
     goalsTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontFamily: FONTS.bodyBold,
     },
     addGoalButton: {
@@ -1804,7 +1804,7 @@ const styles = StyleSheet.create({
     },
     addGoalText: {
         color: '#FFF',
-        fontSize: 14,
+        fontSize: 16,
         fontFamily: FONTS.bodyBold,
         marginLeft: 4,
     },
@@ -1834,7 +1834,7 @@ const styles = StyleSheet.create({
         marginRight: 10,
     },
     goalCardTitle: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontFamily: FONTS.heading,
     },
     goalCardProgress: {
@@ -1847,10 +1847,10 @@ const styles = StyleSheet.create({
     },
     goalCardProgressText: {
         fontFamily: FONTS.body,
-        fontSize: 14,
+        fontSize: 16,
     },
     goalCardProgressPercentage: {
-        fontSize: 14,
+        fontSize: 16,
         fontFamily: FONTS.bodyBold,
     },
     goalCardProgressBar: {
@@ -1872,7 +1872,7 @@ const styles = StyleSheet.create({
     },
     goalCardDetailText: {
         fontFamily: FONTS.body,
-        fontSize: 14,
+        fontSize: 16,
         marginLeft: 8,
     },
     updateProgressContainer: {
@@ -1881,7 +1881,7 @@ const styles = StyleSheet.create({
         borderTopWidth: 1,
     },
     updateProgressTitle: {
-        fontSize: 14,
+        fontSize: 16,
         fontFamily: FONTS.bodySemiBold,
         marginBottom: 8,
     },
@@ -1899,7 +1899,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
     },
     currentProgressValue: {
-        fontSize: 18,
+        fontSize: 19,
         fontFamily: FONTS.bodyBold,
         paddingHorizontal: 16,
     },
@@ -1917,7 +1917,7 @@ const styles = StyleSheet.create({
     },
     goalCardActionText: {
         fontFamily: FONTS.body,
-        fontSize: 14,
+        fontSize: 16,
         marginLeft: 4,
     },
     goalCardActionDelete: {
@@ -1951,7 +1951,7 @@ const styles = StyleSheet.create({
         gap: 4,
     },
     goalTimeText: {
-        fontSize: 11,
+        fontSize: 13,
         fontFamily: FONTS.bodyMedium,
     },
     goalStatusBadge: {
@@ -1988,7 +1988,7 @@ const styles = StyleSheet.create({
         gap: 10,
     },
     completedGoalsTitle: {
-        fontSize: 15,
+        fontSize: 16.5,
         fontFamily: FONTS.bodySemiBold,
     },
     completedGoalsList: {
@@ -2012,11 +2012,11 @@ const styles = StyleSheet.create({
     completedGoalName: {
         flex: 1,
         fontFamily: FONTS.body,
-        fontSize: 14,
+        fontSize: 16,
     },
     completedGoalValue: {
         fontFamily: FONTS.body,
-        fontSize: 13,
+        fontSize: 15,
     },
     // Goals Tab Styles
     goalsSummaryCard: {
@@ -2033,12 +2033,12 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     goalsSummaryValue: {
-        fontSize: 24,
+        fontSize: 25,
         fontFamily: FONTS.heading,
     },
     goalsSummaryLabel: {
         fontFamily: FONTS.body,
-        fontSize: 12,
+        fontSize: 14,
         marginTop: 4,
     },
     goalsSummaryDivider: {
@@ -2058,7 +2058,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     goalsToggleText: {
-        fontSize: 14,
+        fontSize: 16,
         fontFamily: FONTS.bodySemiBold,
     },
     goalsEmptyState: {
@@ -2068,16 +2068,16 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     goalsEmptyTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontFamily: FONTS.bodySemiBold,
         marginTop: 16,
         marginBottom: 8,
     },
     goalsEmptyText: {
         fontFamily: FONTS.body,
-        fontSize: 14,
+        fontSize: 16,
         textAlign: 'center',
-        lineHeight: 20,
+        lineHeight: 21,
         marginBottom: 20,
     },
     goalsAddButton: {
@@ -2090,7 +2090,7 @@ const styles = StyleSheet.create({
     },
     goalsAddButtonText: {
         color: '#FFF',
-        fontSize: 15,
+        fontSize: 16.5,
         fontFamily: FONTS.bodySemiBold,
     },
     goalCard: {
@@ -2116,12 +2116,12 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     goalCardTitle: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontFamily: FONTS.bodySemiBold,
     },
     goalCardCategory: {
         fontFamily: FONTS.body,
-        fontSize: 12,
+        fontSize: 14,
         marginTop: 2,
         textTransform: 'capitalize',
     },
@@ -2134,11 +2134,11 @@ const styles = StyleSheet.create({
         marginBottom: 6,
     },
     goalProgressValues: {
-        fontSize: 14,
+        fontSize: 16,
         fontFamily: FONTS.bodyMedium,
     },
     goalProgressPercent: {
-        fontSize: 14,
+        fontSize: 16,
         fontFamily: FONTS.bodySemiBold,
     },
     goalProgressBar: {
@@ -2152,8 +2152,8 @@ const styles = StyleSheet.create({
     },
     goalCardDescription: {
         fontFamily: FONTS.body,
-        fontSize: 13,
-        lineHeight: 18,
+        fontSize: 15,
+        lineHeight: 19,
         marginTop: 8,
     },
     viewAllGoalsButton: {
@@ -2168,7 +2168,7 @@ const styles = StyleSheet.create({
         gap: 8,
     },
     viewAllGoalsText: {
-        fontSize: 15,
+        fontSize: 16.5,
         fontFamily: FONTS.bodySemiBold,
     },
     floatingAddGoalButton: {
@@ -2184,7 +2184,7 @@ const styles = StyleSheet.create({
     },
     floatingAddGoalText: {
         color: '#FFF',
-        fontSize: 15,
+        fontSize: 16.5,
         fontFamily: FONTS.bodySemiBold,
     },
 
@@ -2217,14 +2217,14 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     recommendationTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontFamily: FONTS.heading,
         marginBottom: 6,
     },
     recommendationReason: {
         fontFamily: FONTS.body,
-        fontSize: 14,
-        lineHeight: 20,
+        fontSize: 16,
+        lineHeight: 21,
     },
     recommendationButton: {
         flexDirection: 'row',
@@ -2237,7 +2237,7 @@ const styles = StyleSheet.create({
     },
     recommendationButtonText: {
         color: '#FFF',
-        fontSize: 15,
+        fontSize: 16.5,
         fontFamily: FONTS.bodySemiBold,
     },
     alternativesSection: {
@@ -2247,7 +2247,7 @@ const styles = StyleSheet.create({
     },
     alternativesLabel: {
         fontFamily: FONTS.body,
-        fontSize: 13,
+        fontSize: 15,
         marginBottom: 10,
     },
     alternativesChips: {
@@ -2263,7 +2263,7 @@ const styles = StyleSheet.create({
         borderColor: '#8A1C22',
     },
     alternativeChipText: {
-        fontSize: 13,
+        fontSize: 15,
         color: '#8A1C22',
         fontFamily: FONTS.bodyMedium,
     },
@@ -2288,7 +2288,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     levelNumber: {
-        fontSize: 24,
+        fontSize: 25,
         fontFamily: FONTS.heading,
         color: '#FFF',
     },
@@ -2296,12 +2296,12 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     levelTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontFamily: FONTS.heading,
         marginBottom: 4,
     },
     xpText: {
-        fontSize: 14,
+        fontSize: 16,
         fontFamily: FONTS.bodyMedium,
     },
     achievementsTrophyIcon: {
@@ -2309,7 +2309,7 @@ const styles = StyleSheet.create({
         gap: 4,
     },
     achievementCount: {
-        fontSize: 12,
+        fontSize: 14,
         fontFamily: FONTS.bodySemiBold,
     },
     xpProgressSection: {
@@ -2326,7 +2326,7 @@ const styles = StyleSheet.create({
     },
     xpProgressText: {
         fontFamily: FONTS.body,
-        fontSize: 12,
+        fontSize: 14,
         textAlign: 'center',
     },
     achievementCategoryFilter: {
@@ -2351,7 +2351,7 @@ const styles = StyleSheet.create({
     // border); nothing static left to declare.
     achievementCategoryChipActive: {},
     achievementCategoryChipText: {
-        fontSize: 13,
+        fontSize: 15,
         fontFamily: FONTS.bodyMedium,
     },
     achievementCategoryChipTextActive: {
@@ -2367,7 +2367,7 @@ const styles = StyleSheet.create({
     },
     emptyAchievementsText: {
         fontFamily: FONTS.body,
-        fontSize: 14,
+        fontSize: 16,
         textAlign: 'center',
     },
     achievementCard: {
@@ -2407,15 +2407,15 @@ const styles = StyleSheet.create({
         gap: 4,
     },
     achievementTitle: {
-        fontSize: 15,
+        fontSize: 16.5,
         fontFamily: FONTS.heading,
     },
     achievementTitleLocked: {
     },
     achievementDescription: {
         fontFamily: FONTS.body,
-        fontSize: 13,
-        lineHeight: 18,
+        fontSize: 15,
+        lineHeight: 19,
     },
     achievementProgressSection: {
         marginTop: 8,
@@ -2431,7 +2431,7 @@ const styles = StyleSheet.create({
         borderRadius: 3,
     },
     achievementProgressText: {
-        fontSize: 11,
+        fontSize: 13,
         fontFamily: FONTS.bodyMedium,
     },
     achievementTierBadge: {
@@ -2440,12 +2440,12 @@ const styles = StyleSheet.create({
         gap: 2,
     },
     achievementTierText: {
-        fontSize: 12,
+        fontSize: 14,
         fontFamily: FONTS.bodyBold,
         textTransform: 'uppercase',
     },
     achievementXPText: {
-        fontSize: 11,
+        fontSize: 13,
         fontFamily: FONTS.bodySemiBold,
     },
 });

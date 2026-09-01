@@ -339,7 +339,7 @@ export default function SimCoachWhatIfScreen({ navigation, route }) {
 
           {quarterOptions.length > 0 && (
             <>
-              <Text style={[styles.prompt, { color: theme.text, fontSize: 13 }]}>— in this part of the game (optional)</Text>
+              <Text style={[styles.prompt, { color: theme.text, fontSize: 15 }]}>— in this part of the game (optional)</Text>
               <View style={styles.chipRow}>
                 <Chip label="All quarters" active={!quarter} onPress={() => { setQuarter(null); setRun(null); setFlagOpen(false); setShareOpen(false); }} theme={theme} />
                 {quarterOptions.map((q) => (
@@ -449,46 +449,46 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1 },
   backBtn: { padding: 4 },
-  headerTitle: { fontSize: 16, fontWeight: '700' },
-  headerSub: { fontSize: 12, marginTop: 1 },
+  headerTitle: { fontSize: 17.5, fontWeight: '700' },
+  headerSub: { fontSize: 14, marginTop: 1 },
 
   scroll: { padding: 16 },
-  prompt: { fontSize: 15, fontWeight: '700', marginBottom: 10 },
+  prompt: { fontSize: 16.5, fontWeight: '700', marginBottom: 10 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
   chip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5 },
-  chipText: { fontSize: 12, fontWeight: '600' },
+  chipText: { fontSize: 14, fontWeight: '600' },
 
   runBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 13, borderRadius: 12, marginBottom: 20 },
-  runBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  runBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 
-  sectionTitle: { fontSize: 14, fontWeight: '700', marginBottom: 8 },
+  sectionTitle: { fontSize: 16, fontWeight: '700', marginBottom: 8 },
   sectionCard: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 14, gap: 10 },
 
   tierTag: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
-  tierTagText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.6 },
+  tierTagText: { fontSize: 12, fontWeight: '800', letterSpacing: 0.6 },
 
   barRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  barLabel: { fontSize: 12, fontWeight: '600', width: 100 },
+  barLabel: { fontSize: 14, fontWeight: '600', width: 100 },
   barTrack: { flex: 1, height: 8, borderRadius: 4, overflow: 'hidden' },
   barFill: { height: 8, borderRadius: 4 },
-  barPct: { fontSize: 11, width: 34, textAlign: 'right' },
+  barPct: { fontSize: 13, width: 34, textAlign: 'right' },
 
   flagBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12, borderRadius: 12, borderWidth: 1.5 },
-  flagBtnText: { fontSize: 13, fontWeight: '700' },
+  flagBtnText: { fontSize: 15, fontWeight: '700' },
 
   shareBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, marginBottom: 10 },
-  shareBtnText: { fontSize: 13, fontWeight: '700' },
+  shareBtnText: { fontSize: 15, fontWeight: '700' },
 
-  modalLabel: { fontSize: 12, fontWeight: '600' },
-  textInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, minHeight: 70, textAlignVertical: 'top' },
+  modalLabel: { fontSize: 14, fontWeight: '600' },
+  textInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 16, minHeight: 70, textAlignVertical: 'top' },
   saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: 10 },
-  saveBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  modalTitle: { fontSize: 16, fontWeight: '800' },
+  modalTitle: { fontSize: 17.5, fontWeight: '800' },
   workoutRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1.5, borderRadius: 12, padding: 12, marginBottom: 8 },
-  workoutTitle: { fontSize: 13, fontWeight: '700', flex: 1 },
+  workoutTitle: { fontSize: 15, fontWeight: '700', flex: 1 },
 
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 12 },
-  deniedTitle: { fontSize: 20, fontWeight: '700' },
-  emptySub: { fontSize: 13, textAlign: 'center', lineHeight: 19 },
+  deniedTitle: { fontSize: 21, fontWeight: '700' },
+  emptySub: { fontSize: 15, textAlign: 'center', lineHeight: 20 },
 });

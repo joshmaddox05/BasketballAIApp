@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
         padding: 4,
     },
     headerTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: '600',
     },
     headerRight: {
@@ -332,11 +332,11 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     statValue: {
-        fontSize: 24,
+        fontSize: 25,
         fontWeight: 'bold',
     },
     statLabel: {
-        fontSize: 12,
+        fontSize: 14,
         marginTop: 4,
     },
     statDivider: {
@@ -361,15 +361,15 @@ const styles = StyleSheet.create({
         gap: 8,
     },
     levelTitle: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: '600',
     },
     levelName: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '500',
     },
     xpProgress: {
-        fontSize: 12,
+        fontSize: 14,
     },
     categoryScroll: {
         maxHeight: 50,
@@ -389,7 +389,7 @@ const styles = StyleSheet.create({
         gap: 6,
     },
     categoryText: {
-        fontSize: 13,
+        fontSize: 15,
         fontWeight: '500',
     },
     listContent: {
@@ -430,7 +430,7 @@ const styles = StyleSheet.create({
         marginBottom: 4,
     },
     achievementTitle: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: '600',
         flex: 1,
     },
@@ -441,12 +441,12 @@ const styles = StyleSheet.create({
         marginLeft: 8,
     },
     tierText: {
-        fontSize: 11,
+        fontSize: 13,
         fontWeight: '600',
     },
     achievementDescription: {
-        fontSize: 14,
-        lineHeight: 20,
+        fontSize: 16,
+        lineHeight: 21,
         marginBottom: 8,
     },
     achievementFooter: {
@@ -460,11 +460,11 @@ const styles = StyleSheet.create({
         gap: 4,
     },
     xpText: {
-        fontSize: 12,
+        fontSize: 14,
         fontWeight: '500',
     },
     unlockedDate: {
-        fontSize: 11,
+        fontSize: 13,
     },
     separator: {
         height: 12,
@@ -475,7 +475,7 @@ const styles = StyleSheet.create({
     },
     emptyText: {
         marginTop: 12,
-        fontSize: 14,
+        fontSize: 16,
     },
 });
 

@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     headerBadgeText: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '600',
         marginLeft: 8,
     },
@@ -204,15 +204,15 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     title: {
-        fontSize: 22,
+        fontSize: 23,
         fontWeight: 'bold',
         textAlign: 'center',
         marginBottom: 8,
     },
     description: {
-        fontSize: 15,
+        fontSize: 16.5,
         textAlign: 'center',
-        lineHeight: 22,
+        lineHeight: 23,
         marginBottom: 20,
     },
     metaContainer: {
@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
         borderRadius: 16,
     },
     metaText: {
-        fontSize: 13,
+        fontSize: 15,
         fontWeight: '500',
         marginLeft: 4,
     },
@@ -243,11 +243,11 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     targetLabel: {
-        fontSize: 13,
+        fontSize: 15,
         marginBottom: 4,
     },
     targetValue: {
-        fontSize: 24,
+        fontSize: 25,
         fontWeight: 'bold',
     },
     buttonContainer: {
@@ -263,7 +263,7 @@ const styles = StyleSheet.create({
     },
     primaryButtonText: {
         color: '#FFF',
-        fontSize: 17,
+        fontSize: 18,
         fontWeight: '600',
         marginLeft: 8,
     },
@@ -275,7 +275,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
     },
     secondaryButtonText: {
-        fontSize: 15,
+        fontSize: 16.5,
         fontWeight: '500',
     },
 });

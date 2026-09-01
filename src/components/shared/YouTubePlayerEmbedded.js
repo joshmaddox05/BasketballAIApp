@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { View, StyleSheet, Dimensions, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, ActivityIndicator, Alert } from 'react-native';
 import { WebView } from 'react-native-webview';
 
 const { width } = Dimensions.get('window');
@@ -299,7 +299,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 17.5,
     textAlign: 'center',
   },
 });

@@ -373,7 +373,7 @@ const styles = StyleSheet.create({
         paddingBottom: 10,
     },
     title: {
-        fontSize: 24,
+        fontSize: 25,
         fontWeight: 'bold',
     },
     closeButton: {
@@ -383,9 +383,9 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
     },
     subtitle: {
-        fontSize: 16,
+        fontSize: 17.5,
         marginBottom: 20,
-        lineHeight: 22,
+        lineHeight: 23,
     },
     planCard: {
         borderRadius: 12,
@@ -410,7 +410,7 @@ const styles = StyleSheet.create({
     },
     popularText: {
         color: '#FFF',
-        fontSize: 12,
+        fontSize: 14,
         fontWeight: 'bold',
     },
     planHeader: {
@@ -420,14 +420,14 @@ const styles = StyleSheet.create({
         marginBottom: 15,
     },
     planName: {
-        fontSize: 22,
+        fontSize: 23,
         fontWeight: 'bold',
     },
     planDescription: {
-        fontSize: 14,
+        fontSize: 16,
         fontStyle: 'italic',
         marginBottom: 10,
-        lineHeight: 20,
+        lineHeight: 21,
     },
     priceContainer: {
         alignItems: 'flex-end',
@@ -437,7 +437,7 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     billingCycle: {
-        fontSize: 14,
+        fontSize: 16,
     },
     featuresContainer: {
         marginTop: 10,
@@ -448,7 +448,7 @@ const styles = StyleSheet.create({
         marginBottom: 10,
     },
     featureText: {
-        fontSize: 14,
+        fontSize: 16,
         marginLeft: 10,
         flex: 1,
     },
@@ -461,7 +461,7 @@ const styles = StyleSheet.create({
     currentText: {
         color: '#FFF',
         fontWeight: 'bold',
-        fontSize: 14,
+        fontSize: 16,
     },
     upgradeButton: {
         marginTop: 15,
@@ -472,13 +472,13 @@ const styles = StyleSheet.create({
     upgradeButtonText: {
         color: '#FFF',
         fontWeight: 'bold',
-        fontSize: 16,
+        fontSize: 17.5,
     },
     disclaimer: {
-        fontSize: 12,
+        fontSize: 14,
         textAlign: 'center',
         marginTop: 20,
-        lineHeight: 18,
+        lineHeight: 19,
     },
     processingContainer: {
         flexDirection: 'row',

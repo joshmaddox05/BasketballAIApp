@@ -100,7 +100,7 @@ const styles = StyleSheet.create({
     borderColor: '#3A3A3A'
   },
   stepNumber: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
     color: '#888888'
   },
@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
   },
   stepLabel: {
     marginTop: 6,
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '500',
     color: '#888888'
   },

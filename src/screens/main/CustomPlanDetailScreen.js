@@ -368,7 +368,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     color: '#AAAAAA',
-    fontSize: 16,
+    fontSize: 17.5,
     marginTop: 16
   },
   errorContainer: {
@@ -378,7 +378,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: '#FF6B6B',
-    fontSize: 18,
+    fontSize: 19,
     marginBottom: 16
   },
   backButton: {
@@ -408,7 +408,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     flex: 1,
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: '700',
     color: '#FFFFFF',
     textAlign: 'center',
@@ -435,7 +435,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#2A1A1A'
   },
   statusText: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '600',
     marginLeft: 6
   },
@@ -452,12 +452,12 @@ const styles = StyleSheet.create({
     marginBottom: 16
   },
   progressTitle: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: '700',
     color: '#FFFFFF'
   },
   progressPercentage: {
-    fontSize: 24,
+    fontSize: 25,
     fontWeight: '800',
     color: '#8A1C22'
   },
@@ -482,14 +482,14 @@ const styles = StyleSheet.create({
   },
   progressStatText: {
     color: '#AAAAAA',
-    fontSize: 14,
+    fontSize: 16,
     marginLeft: 8
   },
   focusSection: {
     marginBottom: 20
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: '700',
     color: '#FFFFFF',
     marginBottom: 12
@@ -507,7 +507,7 @@ const styles = StyleSheet.create({
     borderRadius: 20
   },
   focusBadgeText: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '600',
     marginLeft: 6
   },
@@ -524,12 +524,12 @@ const styles = StyleSheet.create({
   },
   continueLabel: {
     color: 'rgba(255,255,255,0.7)',
-    fontSize: 13,
+    fontSize: 15,
     marginBottom: 4
   },
   continueTitle: {
     color: '#FFFFFF',
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: '700'
   },
   continueArrow: {
@@ -551,19 +551,19 @@ const styles = StyleSheet.create({
   },
   completedTitle: {
     color: '#FFD700',
-    fontSize: 22,
+    fontSize: 23,
     fontWeight: '800',
     marginTop: 12
   },
   completedSubtitle: {
     color: '#AAAAAA',
-    fontSize: 14,
+    fontSize: 16,
     marginTop: 8,
     textAlign: 'center'
   },
   completedScore: {
     color: '#4CAF50',
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: '700',
     marginTop: 12
   },
@@ -576,7 +576,7 @@ const styles = StyleSheet.create({
   },
   abandonButtonText: {
     color: '#FF6B6B',
-    fontSize: 15,
+    fontSize: 16.5,
     fontWeight: '600'
   }
 });

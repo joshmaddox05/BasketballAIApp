@@ -518,7 +518,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   loadingText: {
-    fontSize: 16,
+    fontSize: 17.5,
     color: '#666',
   },
   header: {
@@ -535,7 +535,7 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: 'bold',
     color: '#333',
     flex: 1,
@@ -555,7 +555,7 @@ const styles = StyleSheet.create({
   saveButtonText: {
     color: '#FFF',
     fontWeight: '600',
-    fontSize: 15,
+    fontSize: 16.5,
   },
   content: {
     flex: 1,
@@ -565,7 +565,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   label: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
     color: '#333',
     marginBottom: 8,
@@ -574,7 +574,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF',
     borderRadius: 8,
     padding: 12,
-    fontSize: 15,
+    fontSize: 16.5,
     color: '#333',
     borderWidth: 1,
     borderColor: '#E0E0E0',
@@ -601,7 +601,7 @@ const styles = StyleSheet.create({
     borderColor: '#E0E0E0',
   },
   pickerText: {
-    fontSize: 15,
+    fontSize: 16.5,
     color: '#333',
   },
   durationCard: {
@@ -616,7 +616,7 @@ const styles = StyleSheet.create({
     borderColor: '#8A1C2230',
   },
   durationText: {
-    fontSize: 15,
+    fontSize: 16.5,
     fontWeight: '600',
     color: '#333',
   },
@@ -627,7 +627,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: 'bold',
     color: '#333',
   },
@@ -637,7 +637,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   addStepText: {
-    fontSize: 15,
+    fontSize: 16.5,
     fontWeight: '600',
     color: '#8A1C22',
   },
@@ -649,12 +649,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   emptyStepsText: {
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: '600',
     color: '#666',
   },
   emptyStepsSubtext: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#999',
     textAlign: 'center',
   },
@@ -682,19 +682,19 @@ const styles = StyleSheet.create({
   stepNumberText: {
     color: '#FFF',
     fontWeight: 'bold',
-    fontSize: 14,
+    fontSize: 16,
   },
   stepInfo: {
     flex: 1,
   },
   stepName: {
-    fontSize: 15,
+    fontSize: 16.5,
     fontWeight: '600',
     color: '#333',
     marginBottom: 2,
   },
   stepMeta: {
-    fontSize: 13,
+    fontSize: 15,
     color: '#666',
   },
   stepActions: {
@@ -719,7 +719,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#E0E0E0',
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: 'bold',
     color: '#333',
   },
@@ -747,7 +747,7 @@ const styles = StyleSheet.create({
     borderColor: '#8A1C22',
   },
   filterChipText: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
     fontWeight: '500',
   },
@@ -774,13 +774,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   stepTemplateName: {
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: '600',
     color: '#333',
     marginBottom: 4,
   },
   stepTemplateDescription: {
-    fontSize: 13,
+    fontSize: 15,
     color: '#666',
     marginBottom: 8,
   },
@@ -796,7 +796,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   metaText: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#666',
   },
   categoryBadge: {
@@ -806,7 +806,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   categoryBadgeText: {
-    fontSize: 11,
+    fontSize: 13,
     color: '#8A1C22',
     fontWeight: '600',
   },
@@ -824,7 +824,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   pickerModalTitle: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 16,
@@ -838,7 +838,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F0F0F0',
   },
   pickerOptionText: {
-    fontSize: 16,
+    fontSize: 17.5,
     color: '#333',
   },
   pickerOptionTextActive: {

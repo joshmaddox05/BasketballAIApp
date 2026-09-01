@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     headerTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: 'bold',
         color: '#333',
     },
@@ -301,7 +301,7 @@ const styles = StyleSheet.create({
     },
     resetButtonText: {
         color: '#8A1C22',
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '500',
     },
     container: {
@@ -313,7 +313,7 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     sectionTitle: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: 'bold',
         color: '#333',
         marginBottom: 16,
@@ -335,7 +335,7 @@ const styles = StyleSheet.create({
     },
     optionChipText: {
         color: '#666',
-        fontSize: 14,
+        fontSize: 16,
     },
     selectedOptionChipText: {
         color: '#FFF',
@@ -372,7 +372,7 @@ const styles = StyleSheet.create({
         marginRight: 12,
     },
     equipmentText: {
-        fontSize: 16,
+        fontSize: 17.5,
         color: '#333',
     },
     switchItem: {
@@ -384,7 +384,7 @@ const styles = StyleSheet.create({
         borderBottomColor: '#F0F0F0',
     },
     switchLabel: {
-        fontSize: 16,
+        fontSize: 17.5,
         color: '#333',
     },
     footer: {
@@ -401,7 +401,7 @@ const styles = StyleSheet.create({
     },
     applyButtonText: {
         color: '#FFF',
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: 'bold',
     },
 });

@@ -5,11 +5,16 @@
 import { resolveDetectorForStep } from './movementRegistry.js';
 import { CrossoverDetector } from './detectors/crossoverDetector.js';
 import { PoundDribbleDetector } from './detectors/poundDribbleDetector.js';
+import { TwoBallDetector } from './detectors/twoBallDetector.js';
+import { LateralSlideDetector } from './detectors/lateralSlideDetector.js';
 
-// Detector types that actually have an implementation (Phase 1). Extend as detectors land.
+// Detector types that actually have an implementation. Every type the movement
+// registry can resolve now has one, so a keyword match always yields a tracker.
 const DETECTOR_REGISTRY = {
   crossover: CrossoverDetector,
   pound: PoundDribbleDetector,
+  two_ball: TwoBallDetector,
+  slide: LateralSlideDetector,
 };
 
 /**

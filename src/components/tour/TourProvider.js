@@ -5,15 +5,7 @@ import { InteractionManager, Dimensions } from 'react-native';
 import { TOUR_STEPS } from './tourConfig';
 import { useAppContext } from '../../context/AppContext';
 
-// expo-speech resolves its native module at import time, which throws on a dev
-// client that hasn't been rebuilt yet. Load it lazily so the tour still works
-// (just without narration) until the native rebuild ships.
-let Speech = null;
-try {
-    Speech = require('expo-speech');
-} catch (error) {
-    // native module absent until rebuild — narration disabled
-}
+import narration from '../../services/narrationService';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
@@ -21,13 +13,11 @@ const TourContext = createContext(null);
 
 const DEFAULT_TOUR_STORAGE_KEY = 'hasSeenTour';
 
-// Safely stop any in-progress narration (native module may be absent before a rebuild)
+// Stop any in-progress narration. narrationService owns both backends (generated
+// ElevenLabs audio, and the OS voice as a fallback) and its own lazy native-module
+// guards, so this cannot throw on a dev client that has not been rebuilt.
 const stopSpeech = () => {
-    try {
-        Speech?.stop();
-    } catch (error) {
-        // no-op: speech unavailable
-    }
+    narration.stop().catch(() => {});
 };
 
 // `steps` and `storageKey` let each role mount its own tour on the same engine.
@@ -110,17 +100,18 @@ export const TourProvider = ({
         }
     }, [currentTab, isTourActive, currentStepIndex, isTransitioning, steps]);
 
-    // Speak the current step aloud (unless muted); stop when tour ends / step changes
+    // Narrate the current step (unless muted); stop when the tour ends or the step
+    // changes. Prefers the generated ElevenLabs asset for `step.narrationId`; a
+    // step with no asset yet falls back to the OS voice, speaking `step.script`
+    // when one is authored and the old title+description concatenation otherwise —
+    // so no step ever goes silent just because narration has not been generated.
     useEffect(() => {
         stopSpeech();
         if (isTourActive && !voiceMuted && currentStepIndex != null) {
             const step = steps[currentStepIndex];
             if (step) {
-                try {
-                    Speech?.speak(`${step.title}. ${step.description}`, { rate: 0.95 });
-                } catch (error) {
-                    // no-op: speech unavailable
-                }
+                const spoken = step.script || `${step.title}. ${step.description}`;
+                narration.play(step.narrationId, spoken).catch(() => {});
             }
         }
         return () => stopSpeech();

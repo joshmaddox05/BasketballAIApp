@@ -22,6 +22,11 @@ import ReAnimated, {
 import { useAppContext } from '../../context/AppContext';
 import { SHAPE, MOTION } from '../../utils/typography';
 import { useReduceMotion } from '../../hooks/useReduceMotion';
+import {
+  initialSheetState,
+  resolveSheetTransition,
+  SHEET_TRANSITIONS,
+} from './logic/sheetTransition';
 
 // Reanimated needs its own Easing — RN core's is not a worklet.
 const EASE_OUT = Easing.out(Easing.cubic);
@@ -43,8 +48,10 @@ export function BottomSheet({
   const reduceMotion = useReduceMotion();
 
   // The Modal stays mounted through the exit animation — unmounting on `visible`
-  // alone makes the sheet vanish instead of leave.
-  const [mounted, setMounted] = useState(visible);
+  // alone makes the sheet vanish instead of leave. Initial state comes from the
+  // state machine in ./logic/sheetTransition, which is where the subtlety lives.
+  const initial = useRef(initialSheetState(visible)).current;
+  const [mounted, setMounted] = useState(initial.mounted);
   const [sheetH, setSheetH] = useState(0);
 
   const translateY = useSharedValue(screenH);
@@ -58,14 +65,19 @@ export function BottomSheet({
 
   const unmount = useCallback(() => setMounted(false), []);
 
-  // Animate only on an actual visible transition.
-  const wasVisible = useRef(visible);
+  // Animate only on an actual visible transition. `wasVisible` means "visible on
+  // the PREVIOUS render", so it must start false even when the sheet is mounted
+  // already-open — seeding it from `visible` made a sheet whose first render is
+  // visible={true} skip its own entrance, leaving an invisible full-screen Modal
+  // over the app with the sheet parked below the viewport.
+  const wasVisible = useRef(initial.wasVisible);
 
   useEffect(() => {
-    if (visible === wasVisible.current && mounted) return;
+    const action = resolveSheetTransition({ visible, wasVisible: wasVisible.current, mounted });
+    if (action === SHEET_TRANSITIONS.SKIP) return;
     wasVisible.current = visible;
 
-    if (visible) {
+    if (action === SHEET_TRANSITIONS.ENTER) {
       setMounted(true);
       if (reduceMotion) {
         translateY.value = 0;
@@ -77,7 +89,7 @@ export function BottomSheet({
       backdrop.value = withTiming(1, { duration: MOTION.quick, easing: EASE_OUT });
       return;
     }
-    if (!mounted) return;
+    if (action === SHEET_TRANSITIONS.IDLE) return;
     backdrop.value = withTiming(0, { duration: MOTION.quick, easing: EASE_OUT });
     translateY.value = withTiming(
       travelRef.current,

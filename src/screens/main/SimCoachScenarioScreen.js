@@ -12,94 +12,18 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
-import { saveSimCoachResult } from '../../services/firestoreService';
+import {
+  saveSimCoachResult,
+  updateAssignmentStatus,
+  submitAssignmentForCompletion,
+  ASSIGNMENT_STATUS,
+} from '../../services/firestoreService';
 import { getCurrentUser } from '../../services/authService';
 import { getScenarioById } from '../../data/simCoachScenarios';
-import BasketballHalfCourt from '../../components/features/BasketballHalfCourt';
+import CourtDiagram from '../../components/features/CourtDiagram';
+import { normalizePlaySteps } from '../../services/gamePlan/gamePlanSchema.js';
 import { TYPE, FONTS, SHAPE } from '../../utils/typography';
 import { ScreenHeader, Entrance, Float } from '../../components/dbe';
-
-// ─── Court Diagram ────────────────────────────────────────────────────────────
-const OFFENSIVE_POSITIONS = [
-  { id: 'o1', label: '1', x: 0.5, y: 0.58 },
-  { id: 'o2', label: '2', x: 0.17, y: 0.35 },
-  { id: 'o3', label: '3', x: 0.83, y: 0.35 },
-  { id: 'o4', label: '4', x: 0.25, y: 0.14 },
-  { id: 'o5', label: '5', x: 0.5, y: 0.18 },
-];
-
-const DEFENSIVE_POSITIONS = [
-  { id: 'd1', label: 'X', x: 0.5, y: 0.7 },
-  { id: 'd2', label: 'X', x: 0.2, y: 0.46 },
-  { id: 'd3', label: 'X', x: 0.8, y: 0.46 },
-  { id: 'd4', label: 'X', x: 0.32, y: 0.22 },
-  { id: 'd5', label: 'X', x: 0.68, y: 0.22 },
-];
-
-function CourtDiagram({ theme }) {
-  const W = 300;
-  const H = 170;
-
-  return (
-    <View
-      style={{
-        borderRadius: SHAPE.radiusCard,
-        backgroundColor: theme.surface2,
-        padding: 14,
-        alignItems: 'center',
-        marginTop: 14,
-      }}
-    >
-      <View style={{ width: W, height: H, borderRadius: 8, overflow: 'hidden' }}>
-        {/* Basketball half-court backdrop (SVG) */}
-        <BasketballHalfCourt width={W} height={H} style={styles.courtSvg} />
-
-        {/* Offense speaks steel, defense speaks burgundy (mock 11c). */}
-        {OFFENSIVE_POSITIONS.map((p) => (
-          <View
-            key={p.id}
-            style={[
-              styles.playerToken,
-              { backgroundColor: theme.steel, left: p.x * W - 12, top: p.y * H - 12 },
-            ]}
-          >
-            <Text style={[styles.tokenLabel, { color: theme.background }]}>{p.label}</Text>
-          </View>
-        ))}
-
-        {DEFENSIVE_POSITIONS.map((p) => (
-          <View
-            key={p.id}
-            style={[
-              styles.playerToken,
-              { backgroundColor: theme.primary, left: p.x * W - 12, top: p.y * H - 12 },
-            ]}
-          >
-            <Text style={[styles.tokenLabel, { color: '#FFFFFF' }]}>{p.label}</Text>
-          </View>
-        ))}
-
-        <Float style={[styles.ball, { left: 0.5 * W - 9, top: 0.58 * H - 9 }]}>
-          <Ionicons name="basketball" size={17} color={theme.primary} />
-        </Float>
-      </View>
-      <View style={styles.legendRow}>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: theme.steel }]} />
-          <Text style={[TYPE.chipSmall, { color: theme.textDim }]}>Offense</Text>
-        </View>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: theme.primary }]} />
-          <Text style={[TYPE.chipSmall, { color: theme.textDim }]}>Defense</Text>
-        </View>
-        <View style={styles.legendItem}>
-          <Ionicons name="basketball" size={10} color={theme.primary} />
-          <Text style={[TYPE.chipSmall, { color: theme.textDim }]}>Ball</Text>
-        </View>
-      </View>
-    </View>
-  );
-}
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 export default function SimCoachScenarioScreen({ navigation, route }) {
@@ -109,9 +33,15 @@ export default function SimCoachScenarioScreen({ navigation, route }) {
   // the static catalog by refId (assignment) or id (legacy card).
   const scenarioData = scenario.scenario || getScenarioById(scenario.refId || scenario.id);
 
+  // Handles both shapes: legacy string[] play steps and the new objects carrying
+  // their own token layout + arrows.
+  const playSteps = normalizePlaySteps(scenarioData?.playSteps);
+
   const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Which step's diagram is on the court — this is how a plan is stepped through.
+  const [stepIndex, setStepIndex] = useState(0);
 
   const handleSubmit = useCallback(async () => {
     if (selectedAnswer === null || submitted) return;
@@ -125,20 +55,57 @@ export default function SimCoachScenarioScreen({ navigation, route }) {
       title: scenarioData.title,
       category: scenarioData.category,
       correct: isCorrect,
+      // THE field the EvalRank engine reads. gatherEvalInputs maps
+      // `Number(r.iqScore)` over these documents and getSimCoachIQScore averages
+      // the same field — but nothing ever wrote it, so sessionCount was always 0
+      // and the IQ pillar could never become measured no matter how many
+      // scenarios were completed. One scenario is a single read: right or wrong,
+      // so 100 or 0; the mean across sessions is then percent-correct, which is
+      // exactly what `decisionAccuracy` expects as a 0–100 component.
+      iqScore: isCorrect ? 100 : 0,
       selectedAnswer,
       correctAnswer: scenarioData.correctIndex,
       explanation: scenarioData.explanation,
+      // Snapshot the question and both answers as TEXT. Indices alone are not
+      // reviewable — a coach opening this later would have to resolve them against
+      // a scenario catalog that may have been edited since, and for coach-authored
+      // game plans the payload lives on the assignment rather than here.
+      question: scenarioData.question || null,
+      selectedAnswerText: scenarioData.options?.[selectedAnswer]?.text || null,
+      correctAnswerText: scenarioData.options?.[scenarioData.correctIndex]?.text || null,
     };
 
     try {
       const user = getCurrentUser();
       if (user) {
         await saveSimCoachResult(user.uid, result);
+
+        // Close the coach's assignment. `assignmentId` was already being carried
+        // on the result object but nothing ever acted on it, so an assigned
+        // scenario stayed 'assigned' forever no matter how many times it was
+        // played. Prefer the explicit id; fall back to matching on scenario ref
+        // for scenarios opened outside the assignment card.
+        const score = isCorrect ? 100 : 0;
+        if (result.assignmentId) {
+          await updateAssignmentStatus(
+            user.uid,
+            result.assignmentId,
+            ASSIGNMENT_STATUS.SUBMITTED,
+            { completionPercentage: 100, score }
+          );
+        } else {
+          await submitAssignmentForCompletion(user.uid, {
+            refId: result.scenarioId,
+            type: 'scenario',
+            completionPercentage: 100,
+            score,
+          });
+        }
       }
     } catch (_) {}
 
     setSaving(false);
-  }, [selectedAnswer, submitted, scenarioData, scenario.id]);
+  }, [selectedAnswer, submitted, scenarioData, scenario.id, scenario.assignmentId]);
 
   const handleFinish = useCallback(() => {
     const isCorrect = selectedAnswer === scenarioData.correctIndex;
@@ -182,7 +149,7 @@ export default function SimCoachScenarioScreen({ navigation, route }) {
           <Text
             style={{
               fontFamily: FONTS.bodyBold,
-              fontSize: 10,
+              fontSize: 12,
               letterSpacing: 0.6,
               textTransform: 'uppercase',
               color: theme.accentText,
@@ -194,7 +161,7 @@ export default function SimCoachScenarioScreen({ navigation, route }) {
         <Text
           style={{
             fontFamily: FONTS.heading,
-            fontSize: 22,
+            fontSize: 23,
             lineHeight: 25,
             color: theme.text,
             marginTop: 9,
@@ -204,11 +171,52 @@ export default function SimCoachScenarioScreen({ navigation, route }) {
           {scenarioData.title}
         </Text>
 
-        {/* Court Diagram */}
-        <CourtDiagram theme={theme} />
+        {/* Court diagram — the coach's actual formation for the selected step.
+            Read-only here; the coach authors it in the game-plan builder. */}
+        <View
+          style={{
+            borderRadius: SHAPE.radiusCard,
+            backgroundColor: theme.surface2,
+            padding: 14,
+            alignItems: 'center',
+            marginTop: 14,
+          }}
+        >
+          <CourtDiagram
+            tokens={playSteps[stepIndex]?.tokens}
+            arrows={playSteps[stepIndex]?.arrows}
+            editable={false}
+          />
+          {playSteps.length > 1 ? (
+            <View style={styles.stepNav}>
+              <TouchableOpacity
+                onPress={() => setStepIndex((i) => Math.max(0, i - 1))}
+                disabled={stepIndex === 0}
+                style={[styles.stepNavBtn, { opacity: stepIndex === 0 ? 0.35 : 1 }]}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="chevron-back" size={18} color={theme.text} />
+              </TouchableOpacity>
+              <Text style={[TYPE.rowMeta, { color: theme.textDim }]}>
+                Step {stepIndex + 1} of {playSteps.length}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setStepIndex((i) => Math.min(playSteps.length - 1, i + 1))}
+                disabled={stepIndex === playSteps.length - 1}
+                style={[
+                  styles.stepNavBtn,
+                  { opacity: stepIndex === playSteps.length - 1 ? 0.35 : 1 },
+                ]}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="chevron-forward" size={18} color={theme.text} />
+              </TouchableOpacity>
+            </View>
+          ) : null}
+        </View>
 
         {/* Play Steps */}
-        {(scenarioData.playSteps || []).length > 0 && (
+        {playSteps.length > 0 && (
           <View
             style={{
               borderRadius: SHAPE.radiusTile,
@@ -220,23 +228,33 @@ export default function SimCoachScenarioScreen({ navigation, route }) {
             <Text style={[TYPE.sectionLabel, { color: theme.textDim, marginBottom: 10 }]}>
               Play breakdown
             </Text>
-            {scenarioData.playSteps.map((step, i) => (
-              <View key={i} style={styles.stepRow}>
-                <View style={[styles.stepNum, { backgroundColor: theme.badgeFill }]}>
+            {playSteps.map((step, i) => (
+              <TouchableOpacity
+                key={i}
+                onPress={() => setStepIndex(i)}
+                activeOpacity={0.75}
+                style={styles.stepRow}
+              >
+                <View
+                  style={[
+                    styles.stepNum,
+                    { backgroundColor: i === stepIndex ? theme.primary : theme.badgeFill },
+                  ]}
+                >
                   <Text style={[TYPE.chip, { color: theme.accentText }]}>{i + 1}</Text>
                 </View>
                 <Text
                   style={{
                     flex: 1,
                     fontFamily: FONTS.bodySemiBold,
-                    fontSize: 12.5,
-                    lineHeight: 17,
-                    color: theme.textMuted,
+                    fontSize: 14.5,
+                    lineHeight: 18,
+                    color: i === stepIndex ? theme.text : theme.textMuted,
                   }}
                 >
-                  {step}
+                  {step.text}
                 </Text>
-              </View>
+              </TouchableOpacity>
             ))}
           </View>
         )}
@@ -245,8 +263,8 @@ export default function SimCoachScenarioScreen({ navigation, route }) {
         <Text
           style={{
             fontFamily: FONTS.bodySemiBold,
-            fontSize: 13.5,
-            lineHeight: 20,
+            fontSize: 15,
+            lineHeight: 21,
             color: theme.text,
             marginTop: 16,
           }}
@@ -310,7 +328,7 @@ export default function SimCoachScenarioScreen({ navigation, route }) {
                       { backgroundColor: discBg, borderColor: discBorder },
                     ]}
                   >
-                    <Text style={{ fontFamily: FONTS.bodyExtraBold, fontSize: 11, color: discText }}>
+                    <Text style={{ fontFamily: FONTS.bodyExtraBold, fontSize: 13, color: discText }}>
                       {option.label}
                     </Text>
                   </View>
@@ -318,8 +336,8 @@ export default function SimCoachScenarioScreen({ navigation, route }) {
                     style={{
                       flex: 1,
                       fontFamily: FONTS.bodySemiBold,
-                      fontSize: 12.5,
-                      lineHeight: 17,
+                      fontSize: 14.5,
+                      lineHeight: 18,
                       color: textColor,
                     }}
                   >
@@ -355,7 +373,7 @@ export default function SimCoachScenarioScreen({ navigation, route }) {
               <Text
                 style={{
                   fontFamily: FONTS.heading,
-                  fontSize: 14,
+                  fontSize: 16,
                   color: isRight ? theme.success : theme.error,
                 }}
               >
@@ -365,8 +383,8 @@ export default function SimCoachScenarioScreen({ navigation, route }) {
             <Text
               style={{
                 fontFamily: FONTS.body,
-                fontSize: 12.5,
-                lineHeight: 18,
+                fontSize: 14.5,
+                lineHeight: 19,
                 color: theme.textMuted,
                 marginTop: 7,
               }}
@@ -409,6 +427,14 @@ export default function SimCoachScenarioScreen({ navigation, route }) {
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
+  stepNav: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 14,
+    marginTop: 10,
+  },
+  stepNavBtn: { padding: 4 },
   container: { flex: 1 },
 
   scrollContent: {
@@ -416,22 +442,6 @@ const styles = StyleSheet.create({
     paddingTop: 14,
     paddingBottom: 40,
   },
-
-  courtSvg: { position: 'absolute', top: 0, left: 0 },
-  playerToken: {
-    position: 'absolute',
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tokenLabel: { fontFamily: FONTS.bodyExtraBold, fontSize: 11 },
-  ball: { position: 'absolute', width: 18, height: 18 },
-
-  legendRow: { flexDirection: 'row', gap: 16, marginTop: 10 },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  legendDot: { width: 9, height: 9, borderRadius: 5 },
 
   stepRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 10 },
   stepNum: {
@@ -472,5 +482,5 @@ const styles = StyleSheet.create({
     borderRadius: SHAPE.radiusTile,
     marginTop: 16,
   },
-  actionBtnText: { color: '#FFFFFF', fontFamily: FONTS.bodyExtraBold, fontSize: 14.5 },
+  actionBtnText: { color: '#FFFFFF', fontFamily: FONTS.bodyExtraBold, fontSize: 16 },
 });

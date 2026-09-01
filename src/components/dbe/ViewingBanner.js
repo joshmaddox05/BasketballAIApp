@@ -30,7 +30,7 @@ export default function ViewingBanner({ name, style }) {
       accessibilityLabel={`Viewing ${name}. Read only.`}
     >
       <Ionicons name="eye-outline" size={15} color={theme.steel} />
-      <Text style={{ flex: 1, fontFamily: FONTS.bodySemiBold, fontSize: 12, color: theme.steel }}>
+      <Text style={{ flex: 1, fontFamily: FONTS.bodySemiBold, fontSize: 14, color: theme.steel }}>
         Viewing {name}
       </Text>
       <Text style={[TYPE.chip, { color: theme.steel }]}>READ ONLY</Text>

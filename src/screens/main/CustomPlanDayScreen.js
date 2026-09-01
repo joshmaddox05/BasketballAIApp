@@ -420,7 +420,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 12
   },
   headerTitle: {
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: '700',
     color: '#FFFFFF',
     textAlign: 'center',
@@ -445,7 +445,7 @@ const styles = StyleSheet.create({
   },
   progressText: {
     color: '#888888',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '600'
   },
   content: {
@@ -462,7 +462,7 @@ const styles = StyleSheet.create({
     marginBottom: 20
   },
   focusBadgeText: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '600',
     marginLeft: 6
   },
@@ -473,15 +473,15 @@ const styles = StyleSheet.create({
     marginBottom: 24
   },
   workoutTitle: {
-    fontSize: 22,
+    fontSize: 23,
     fontWeight: '800',
     color: '#FFFFFF',
     marginBottom: 8
   },
   workoutDescription: {
-    fontSize: 15,
+    fontSize: 16.5,
     color: '#AAAAAA',
-    lineHeight: 22,
+    lineHeight: 23,
     marginBottom: 16
   },
   workoutMeta: {
@@ -498,7 +498,7 @@ const styles = StyleSheet.create({
   },
   metaText: {
     color: '#888888',
-    fontSize: 14,
+    fontSize: 16,
     marginLeft: 6
   },
   stepsPreview: {
@@ -508,7 +508,7 @@ const styles = StyleSheet.create({
   },
   stepsTitle: {
     color: '#888888',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '600',
     marginBottom: 12,
     textTransform: 'uppercase'
@@ -529,17 +529,17 @@ const styles = StyleSheet.create({
   },
   stepNumberText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '700'
   },
   stepName: {
     flex: 1,
     color: '#FFFFFF',
-    fontSize: 14
+    fontSize: 16
   },
   moreSteps: {
     color: '#666666',
-    fontSize: 13,
+    fontSize: 15,
     fontStyle: 'italic',
     marginTop: 4
   },
@@ -556,7 +556,7 @@ const styles = StyleSheet.create({
   },
   startButtonText: {
     color: '#FFFFFF',
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: '700',
     marginLeft: 10
   },
@@ -570,7 +570,7 @@ const styles = StyleSheet.create({
   },
   quickCompleteText: {
     color: '#888888',
-    fontSize: 15,
+    fontSize: 16.5,
     fontWeight: '600',
     marginLeft: 8
   },
@@ -597,7 +597,7 @@ const styles = StyleSheet.create({
     marginBottom: 8
   },
   restDaySubtitle: {
-    fontSize: 16,
+    fontSize: 17.5,
     color: '#888888',
     textAlign: 'center',
     marginBottom: 32
@@ -611,7 +611,7 @@ const styles = StyleSheet.create({
   },
   suggestionsTitle: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: '700',
     marginBottom: 16
   },
@@ -622,7 +622,7 @@ const styles = StyleSheet.create({
   },
   suggestionText: {
     color: '#AAAAAA',
-    fontSize: 14,
+    fontSize: 16,
     marginLeft: 12
   },
   markCompleteButton: {
@@ -633,7 +633,7 @@ const styles = StyleSheet.create({
   },
   markCompleteText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: '700'
   },
   // Completion Styles
@@ -645,7 +645,7 @@ const styles = StyleSheet.create({
   },
   savingText: {
     color: '#AAAAAA',
-    fontSize: 16,
+    fontSize: 17.5,
     marginTop: 16
   },
   trophyContainer: {
@@ -664,7 +664,7 @@ const styles = StyleSheet.create({
     marginBottom: 8
   },
   completionSubtitle: {
-    fontSize: 16,
+    fontSize: 17.5,
     color: '#888888',
     marginBottom: 32
   },
@@ -683,7 +683,7 @@ const styles = StyleSheet.create({
     color: '#8A1C22'
   },
   completionStatLabel: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#888888',
     marginTop: 4
   },
@@ -695,7 +695,7 @@ const styles = StyleSheet.create({
   },
   doneButtonText: {
     color: '#FFFFFF',
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: '700'
   }
 });

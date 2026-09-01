@@ -449,7 +449,7 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: '700',
     color: '#FFFFFF'
   },
@@ -468,13 +468,13 @@ const styles = StyleSheet.create({
     paddingTop: 10
   },
   stepTitle: {
-    fontSize: 24,
+    fontSize: 25,
     fontWeight: '800',
     color: '#FFFFFF',
     marginBottom: 8
   },
   stepSubtitle: {
-    fontSize: 15,
+    fontSize: 16.5,
     color: '#888888',
     marginBottom: 24
   },
@@ -489,7 +489,7 @@ const styles = StyleSheet.create({
   },
   selectedText: {
     color: '#AAAAAA',
-    fontSize: 14
+    fontSize: 16
   },
   loadingContainer: {
     flex: 1,
@@ -498,7 +498,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     color: '#AAAAAA',
-    fontSize: 16,
+    fontSize: 17.5,
     marginTop: 16
   },
   errorContainer: {
@@ -508,7 +508,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: '#FF6B6B',
-    fontSize: 16,
+    fontSize: 17.5,
     marginBottom: 16
   },
   retryButton: {
@@ -526,7 +526,7 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     color: '#888888',
-    fontSize: 13,
+    fontSize: 15,
     marginBottom: 8,
     fontWeight: '500'
   },
@@ -534,7 +534,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#1A1A1A',
     borderRadius: 12,
     padding: 14,
-    fontSize: 16,
+    fontSize: 17.5,
     color: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#2A2A2A'
@@ -556,7 +556,7 @@ const styles = StyleSheet.create({
   },
   summaryValue: {
     color: '#FFFFFF',
-    fontSize: 15,
+    fontSize: 16.5,
     fontWeight: '600',
     marginLeft: 8
   },
@@ -574,7 +574,7 @@ const styles = StyleSheet.create({
     borderRadius: 20
   },
   focusBadgeText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '600',
     marginLeft: 6
   },
@@ -589,7 +589,7 @@ const styles = StyleSheet.create({
   },
   scheduleTitle: {
     color: '#FFFFFF',
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: '700'
   },
   regenerateButton: {
@@ -598,7 +598,7 @@ const styles = StyleSheet.create({
   },
   regenerateText: {
     color: '#8A1C22',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
     marginLeft: 4
   },
@@ -623,7 +623,7 @@ const styles = StyleSheet.create({
   },
   backStepButtonText: {
     color: '#AAAAAA',
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: '600'
   },
   nextButton: {
@@ -643,7 +643,7 @@ const styles = StyleSheet.create({
   },
   nextButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: '700',
     marginRight: 8
   },

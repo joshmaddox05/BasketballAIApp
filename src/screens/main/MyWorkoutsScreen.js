@@ -403,7 +403,7 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 21,
     fontWeight: 'bold',
     color: '#333',
     flex: 1,
@@ -432,7 +432,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#8A1C22',
   },
   tabText: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
     fontWeight: '500',
   },
@@ -476,15 +476,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   workoutName: {
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: '600',
     color: '#333',
     marginBottom: 4,
   },
   workoutDescription: {
-    fontSize: 13,
+    fontSize: 15,
     color: '#666',
-    lineHeight: 18,
+    lineHeight: 19,
   },
   workoutMeta: {
     flexDirection: 'row',
@@ -498,7 +498,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   metaText: {
-    fontSize: 13,
+    fontSize: 15,
     color: '#666',
   },
   difficultyBadge: {
@@ -508,7 +508,7 @@ const styles = StyleSheet.create({
     marginLeft: 'auto',
   },
   difficultyText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '600',
   },
   workoutActions: {
@@ -524,7 +524,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   actionButtonText: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '500',
   },
   templateCard: {
@@ -553,15 +553,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   templateName: {
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: '600',
     color: '#333',
     marginBottom: 4,
   },
   templateDescription: {
-    fontSize: 13,
+    fontSize: 15,
     color: '#666',
-    lineHeight: 18,
+    lineHeight: 19,
   },
   templateMeta: {
     flexDirection: 'row',
@@ -569,7 +569,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   templateMetaText: {
-    fontSize: 13,
+    fontSize: 15,
     color: '#666',
   },
   templateBadge: {
@@ -579,7 +579,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   templateBadgeText: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#8A1C22',
     fontWeight: '600',
   },
@@ -591,17 +591,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
   },
   emptyStateTitle: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: '600',
     color: '#333',
     marginTop: 16,
     marginBottom: 8,
   },
   emptyStateSubtitle: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 21,
   },
   emptyStateButton: {
     marginTop: 20,
@@ -612,7 +612,7 @@ const styles = StyleSheet.create({
   },
   emptyStateButtonText: {
     color: '#FFF',
-    fontSize: 15,
+    fontSize: 16.5,
     fontWeight: '600',
   },
 });

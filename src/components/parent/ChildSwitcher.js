@@ -30,7 +30,7 @@ export default function ChildSwitcher({ children = [], selectedUid, onSelect, on
           >
             <Text
               numberOfLines={1}
-              style={[TYPE.chip, { fontSize: 11, color: active ? theme.text : theme.textDim }]}
+              style={[TYPE.chip, { fontSize: 13, color: active ? theme.text : theme.textDim }]}
             >
               {(c.name || 'Child').split(' ')[0]}
             </Text>
@@ -47,7 +47,7 @@ export default function ChildSwitcher({ children = [], selectedUid, onSelect, on
         activeOpacity={0.8}
       >
         <Ionicons name="add" size={12} color={theme.accentText} />
-        <Text style={[TYPE.chip, { fontSize: 11, color: theme.textDim }]}>Add</Text>
+        <Text style={[TYPE.chip, { fontSize: 13, color: theme.textDim }]}>Add</Text>
       </TouchableOpacity>
     </ScrollView>
   );

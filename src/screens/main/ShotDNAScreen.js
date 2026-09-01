@@ -300,7 +300,7 @@ export default function ShotDNAScreen({ navigation }) {
           <View style={styles.mechHeader}>
             <Text style={[TYPE.sectionLabel, { color: theme.textDim }]}>Mechanics profile</Text>
             {shotDNAProfile ? (
-              <Text style={{ fontFamily: FONTS.bodyExtraBold, fontSize: 13, color: theme.accentText }}>
+              <Text style={{ fontFamily: FONTS.bodyExtraBold, fontSize: 15, color: theme.accentText }}>
                 {avg} avg
               </Text>
             ) : null}
@@ -338,7 +338,7 @@ export default function ShotDNAScreen({ navigation }) {
                   meta={p.era}
                   trailing={
                     p.similarity != null ? (
-                      <Text style={{ fontFamily: FONTS.bodyExtraBold, fontSize: 13, color: theme.accentText }}>
+                      <Text style={{ fontFamily: FONTS.bodyExtraBold, fontSize: 15, color: theme.accentText }}>
                         {p.similarity}%
                       </Text>
                     ) : null
@@ -361,7 +361,7 @@ export default function ShotDNAScreen({ navigation }) {
                   style={i > 0 ? { marginTop: 8 } : null}
                   leading={
                     <View style={[styles.scoreBadge, { backgroundColor: theme.badgeFill }]}>
-                      <Text style={[TYPE.statNumberMedium, { fontSize: 16, lineHeight: 18, color: theme.accentText }]}>
+                      <Text style={[TYPE.statNumberMedium, { fontSize: 17.5, lineHeight: 19, color: theme.accentText }]}>
                         {item.score}
                       </Text>
                     </View>
@@ -419,19 +419,19 @@ const styles = StyleSheet.create({
   },
   heroLabel: {
     fontFamily: FONTS.bodyBold,
-    fontSize: 9.5,
+    fontSize: 11.5,
     letterSpacing: 1.5,
     color: 'rgba(255,255,255,0.65)',
   },
   heroName: {
     fontFamily: FONTS.heading,
-    fontSize: 21,
+    fontSize: 22,
     lineHeight: 23,
     color: '#FFFFFF',
     marginTop: 4,
   },
   heroPositionRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6 },
-  heroPosition: { fontFamily: FONTS.bodySemiBold, fontSize: 11.5, color: 'rgba(255,255,255,0.85)' },
+  heroPosition: { fontFamily: FONTS.bodySemiBold, fontSize: 13.5, color: 'rgba(255,255,255,0.85)' },
   mechCard: {
     marginTop: 16,
     borderRadius: 20,
@@ -441,7 +441,7 @@ const styles = StyleSheet.create({
   },
   mechHeader: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
   radarWrap: { height: 190, marginTop: 2, alignItems: 'center', justifyContent: 'center' },
-  radarLabel: { position: 'absolute', fontFamily: FONTS.bodyBold, fontSize: 9.5 },
+  radarLabel: { position: 'absolute', fontFamily: FONTS.bodyBold, fontSize: 11.5 },
   scoreBadge: {
     width: 40,
     height: 40,
@@ -459,5 +459,5 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     overflow: 'hidden',
   },
-  ctaText: { fontFamily: FONTS.bodyExtraBold, fontSize: 14.5, color: '#FFFFFF' },
+  ctaText: { fontFamily: FONTS.bodyExtraBold, fontSize: 16, color: '#FFFFFF' },
 });

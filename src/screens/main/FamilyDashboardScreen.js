@@ -3,12 +3,12 @@
 // behavior are unchanged. One child's progress moves (sparkline draws, tiles
 // stagger in); nothing on this screen pulses.
 import React, { useState, useCallback, useEffect } from 'react';
-import { SafeAreaView, StyleSheet, View, Text, ScrollView, Dimensions } from 'react-native';
+import { SafeAreaView, StyleSheet, View, Text, ScrollView, Dimensions, Alert } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAppContext } from '../../context/AppContext';
-import { getLinkedPlayers, getLinkedPlayerSummary } from '../../services/firestoreService';
+import { getLinkedPlayers, getLinkedPlayerSummary, getCoachesForParent } from '../../services/firestoreService';
 import ChildSwitcher from '../../components/parent/ChildSwitcher';
 import { getLevelTitle } from '../../utils/constants';
 import { TYPE, SHAPE, FONTS } from '../../utils/typography';
@@ -295,13 +295,44 @@ export default function FamilyDashboardScreen({ navigation }) {
     }, [refreshChildren])
   );
 
-  const handleMessageCoach = useCallback(() => {
-    navigation.navigate('Messaging');
-  }, [navigation]);
+  // Messaging needs a concrete recipient — a bare navigate('Messaging') just opened
+  // an inbox that never listed the coach, because parent and coach are only ever
+  // co-linked through the child, never directly connected.
+  const handleMessageCoach = useCallback(async () => {
+    const coaches = await getCoachesForParent(parentUid, selectedChildUid);
 
+    if (coaches.length === 0) {
+      Alert.alert(
+        'No coach linked yet',
+        `${child?.name || 'Your athlete'} has not linked a coach yet. Once they do, you can message the coach here.`
+      );
+      return;
+    }
+
+    if (coaches.length === 1) {
+      navigation.navigate('Messaging', { otherUid: coaches[0].uid, otherName: coaches[0].name });
+      return;
+    }
+
+    Alert.alert(
+      'Message which coach?',
+      undefined,
+      [
+        ...coaches.map((c) => ({
+          text: c.name,
+          onPress: () => navigation.navigate('Messaging', { otherUid: c.uid, otherName: c.name }),
+        })),
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  }, [navigation, parentUid, selectedChildUid, child?.name]);
+
+  // 'Progress' is the parent tab whose initial route IS this screen, so navigating
+  // there did nothing visible. ProgressReport is the real report and was registered
+  // but unreachable.
   const handleViewFullProgress = useCallback(() => {
-    navigation.navigate('Progress');
-  }, [navigation]);
+    navigation.navigate('ProgressReport', { childUid: selectedChildUid });
+  }, [navigation, selectedChildUid]);
 
   const renderHeader = () => (
     <ScreenHeader
@@ -500,7 +531,7 @@ const styles = StyleSheet.create({
   },
   identityName: {
     fontFamily: FONTS.heading,
-    fontSize: 15,
+    fontSize: 16.5,
   },
 
   // Training volume card
@@ -515,16 +546,16 @@ const styles = StyleSheet.create({
   },
   volumeTitle: {
     fontFamily: FONTS.heading,
-    fontSize: 12.5,
+    fontSize: 14.5,
   },
   volumeRange: {
     fontFamily: FONTS.bodyMedium,
-    fontSize: 10,
+    fontSize: 12,
     marginTop: 3,
   },
   volumeDelta: {
     fontFamily: FONTS.heading,
-    fontSize: 12,
+    fontSize: 14,
   },
   volumeChart: {
     marginTop: 12,
@@ -536,7 +567,7 @@ const styles = StyleSheet.create({
   },
   volumeMonth: {
     fontFamily: FONTS.bodySemiBold,
-    fontSize: 9,
+    fontSize: 11,
   },
 
   // Stat tiles
@@ -582,11 +613,11 @@ const styles = StyleSheet.create({
   },
   activityTitle: {
     fontFamily: FONTS.bodyBold,
-    fontSize: 11.5,
+    fontSize: 13.5,
   },
   xpText: {
     fontFamily: FONTS.bodyBold,
-    fontSize: 11,
+    fontSize: 13,
   },
 
   // Achievements
@@ -610,7 +641,7 @@ const styles = StyleSheet.create({
   },
   achievementTitle: {
     fontFamily: FONTS.bodyBold,
-    fontSize: 12,
+    fontSize: 14,
     textAlign: 'center',
   },
   achievementDesc: {
@@ -619,7 +650,7 @@ const styles = StyleSheet.create({
   },
   achievementEarned: {
     fontFamily: FONTS.bodyMedium,
-    fontSize: 9.5,
+    fontSize: 11.5,
     marginTop: 5,
   },
 

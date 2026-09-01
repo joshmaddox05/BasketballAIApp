@@ -310,14 +310,14 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     welcomeText: {
-        fontSize: 24,
+        fontSize: 25,
         fontWeight: 'bold',
         color: '#FFF',
         textAlign: 'center',
         marginBottom: 8,
     },
     subtitle: {
-        fontSize: 16,
+        fontSize: 17.5,
         color: 'rgba(255, 255, 255, 0.8)',
         textAlign: 'center',
     },
@@ -338,21 +338,21 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
     summaryTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: 'bold',
         color: '#FFF',
         marginLeft: 8,
     },
     summaryText: {
-        fontSize: 16,
+        fontSize: 17.5,
         color: '#FFF',
-        lineHeight: 22,
+        lineHeight: 23,
         marginBottom: 8,
     },
     summaryDescription: {
-        fontSize: 14,
+        fontSize: 16,
         color: 'rgba(255, 255, 255, 0.7)',
-        lineHeight: 20,
+        lineHeight: 21,
     },
     bold: {
         fontWeight: 'bold',
@@ -367,7 +367,7 @@ const styles = StyleSheet.create({
         borderColor: 'rgba(255, 255, 255, 0.2)',
     },
     statsTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: 'bold',
         color: '#FFF',
         textAlign: 'center',
@@ -381,13 +381,13 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     statNumber: {
-        fontSize: 24,
+        fontSize: 25,
         fontWeight: 'bold',
         color: '#8A1C22',
         marginBottom: 4,
     },
     statLabel: {
-        fontSize: 14,
+        fontSize: 16,
         color: 'rgba(255, 255, 255, 0.7)',
     },
     buttonsContainer: {
@@ -404,7 +404,7 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     startTrainingButtonText: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: 'bold',
         color: '#FFF',
         marginLeft: 8,
@@ -418,7 +418,7 @@ const styles = StyleSheet.create({
         borderColor: 'rgba(255, 255, 255, 0.3)',
     },
     exploreButtonText: {
-        fontSize: 16,
+        fontSize: 17.5,
         color: '#FFF',
         fontWeight: '600',
     },

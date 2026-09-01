@@ -8,12 +8,22 @@ import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAppContext } from '../../context/AppContext';
 import { TourStep, useTour } from '../../components/tour';
-import { getLinkedPlayers, getLinkedPlayerSummary, getCoachSessions, getCoachListings } from '../../services/firestoreService';
+import {
+  getLinkedPlayers,
+  getRosterSummaries,
+  getCoachSessions,
+  getCoachListings,
+  getCoachAssignmentSummary,
+  listenToUnreadNotificationCount,
+} from '../../services/firestoreService';
 import { computeCoachRevenue } from '../../utils/coachRevenue';
 import { getModulesForRole } from '../../config/roleModules';
+import ModuleIntro from '../../components/modules/ModuleIntro';
+import { useModuleIntro } from '../../hooks/useModuleIntro';
 import { canAccessFeature } from '../../utils/subscription';
-import { TYPE, SHAPE } from '../../utils/typography';
+import { TYPE, SHAPE, FONTS } from '../../utils/typography';
 import {
+  HeaderIconButton,
   Entrance,
   Shimmer,
   AttentionDot,
@@ -81,40 +91,28 @@ const initialsOf = (name) =>
 // Org coaches are team-centric; skills trainers are marketplace-centric.
 // (Mock 13a: Assign leads as the solid burgundy tile; SimCoach/playbook lives
 // in the modules grid below, so it is not duplicated as a quick action.)
+// The row gives each action flex:1, so a fifth would squeeze all of them — these
+// are swaps, not additions. 'Review' replaces the storefront/browse shortcuts
+// because both roles still reach CoachMarket from the module grid, whereas
+// reviewing an athlete's submitted work previously had NO entry point at all for
+// a trainer (they have no Roster tab) and only a header icon for an org coach.
 const ORG_QUICK_ACTIONS = [
   { id: 'assign', label: 'Assign', icon: 'clipboard-outline', primary: true },
+  { id: 'review', label: 'Review', icon: 'checkmark-done-outline' },
   { id: 'add_athlete', label: 'Add', icon: 'person-add-outline' },
   { id: 'sessions', label: 'Sessions', icon: 'calendar-outline' },
-  { id: 'storefront', label: 'Storefront', icon: 'storefront-outline' },
 ];
 
 const TRAINER_QUICK_ACTIONS = [
   { id: 'create', label: 'Create', icon: 'add-circle-outline', primary: true },
+  { id: 'review', label: 'Review', icon: 'checkmark-done-outline' },
   { id: 'storefront', label: 'Storefront', icon: 'storefront-outline' },
   { id: 'withdraw', label: 'Withdraw', icon: 'cash-outline' },
-  { id: 'browse', label: 'Browse', icon: 'compass-outline' },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Sub-components
 // ─────────────────────────────────────────────────────────────────────────────
-
-function NotifButton({ theme }) {
-  return (
-    <TouchableOpacity
-      activeOpacity={0.7}
-      style={[styles.notifBtn, { borderColor: theme.hairline }]}
-    >
-      <Ionicons name="notifications-outline" size={17} color={theme.text} />
-      <AttentionDot
-        size={7}
-        color={theme.primary}
-        haloColor={theme.pulseDot}
-        style={styles.notifDot}
-      />
-    </TouchableOpacity>
-  );
-}
 
 function AttentionRow({ athlete, theme, delay, onPress }) {
   return (
@@ -177,6 +175,10 @@ function QuickActions({ theme, onAction, actions }) {
  * shimmer on the coach dashboard), the rest are quiet surface tiles.
  */
 function ModulesSection({ theme, navigation, modules, subscription, subtitleFor }) {
+  // Shares the module-intro gate with ModuleGrid and the scout home, so an intro
+  // cannot fire on one role's tiles and not another's. The hook must run before
+  // the early return below — hooks cannot be conditional.
+  const { openModule, introProps } = useModuleIntro(navigation);
   if (!modules.length) return null;
   return (
     <View style={{ marginTop: SHAPE.sectionGap }}>
@@ -211,7 +213,7 @@ function ModulesSection({ theme, navigation, modules, subscription, subtitleFor 
               </Text>
             </>
           );
-          const onPress = () => navigation.navigate(unlocked ? mod.key : 'Subscription');
+          const onPress = () => openModule(mod, unlocked);
           return hero ? (
             <TouchableOpacity key={mod.key} activeOpacity={0.85} onPress={onPress} style={styles.moduleTileWrap}>
               <LinearGradient
@@ -235,6 +237,8 @@ function ModulesSection({ theme, navigation, modules, subscription, subtitleFor 
           );
         })}
       </View>
+
+      <ModuleIntro {...introProps} />
     </View>
   );
 }
@@ -262,6 +266,8 @@ export default function CoachHomeScreen({ navigation }) {
   const [athletes, setAthletes] = useState([]);
   const [sessionsThisWeek, setSessionsThisWeek] = useState(0);
   const [listings, setListings] = useState([]);
+  const [reviewCount, setReviewCount] = useState(0);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const loadRoster = useCallback(async () => {
     if (!coachUid) {
@@ -270,19 +276,25 @@ export default function CoachHomeScreen({ navigation }) {
     }
     setLoading(true);
     try {
-      const [linkedPlayers, coachSessions, coachListings] = await Promise.all([
+      const [linkedPlayers, coachSessions, coachListings, tallies] = await Promise.all([
         getLinkedPlayers(coachUid),
         getCoachSessions(coachUid),
         getCoachListings(coachUid),
+        getCoachAssignmentSummary(coachUid).catch(() => ({})),
       ]);
       setListings(coachListings);
-      const mapped = await Promise.all(
-        linkedPlayers.map(async (linked) => {
-          const summary = await getLinkedPlayerSummary(linked.uid);
+      setReviewCount(
+        Object.values(tallies).reduce((sum, t) => sum + (t.submitted || 0), 0)
+      );
+      // Shares the batched, short-cached roster read with the roster screens, so
+      // bouncing between Home and Roster does not refetch every athlete twice.
+      const summaries = await getRosterSummaries(linkedPlayers.map((p) => p.uid));
+      setAthletes(
+        linkedPlayers.map((linked) => {
+          const summary = summaries[linked.uid] || {};
           return { athlete: mapAthlete(linked, summary), recent: countRecent(summary.activities) };
         })
       );
-      setAthletes(mapped);
       // Sessions scheduled within the next 7 days.
       const weekOut = Date.now() + 7 * 24 * 60 * 60 * 1000;
       setSessionsThisWeek(
@@ -301,6 +313,15 @@ export default function CoachHomeScreen({ navigation }) {
       loadRoster();
     }, [loadRoster])
   );
+
+  // The bell was previously a hand-rolled clone of HeaderIconButton with no
+  // onPress at all — a control that looked tappable and did nothing, and whose
+  // dot was decorative. Same real unread count the scout and parent homes use.
+  useEffect(() => {
+    if (!coachUid) return;
+    const unsubscribe = listenToUnreadNotificationCount(coachUid, setUnreadCount);
+    return () => unsubscribe();
+  }, [coachUid]);
 
   const { totalEarnings, totalSales } = computeCoachRevenue(listings);
   const liveListings = listings.filter((l) => (l.status || 'live') === 'live').length;
@@ -326,6 +347,8 @@ export default function CoachHomeScreen({ navigation }) {
         navigation.navigate('CoachMarketDashboard');
       } else if (actionId === 'assign') {
         navigation.navigate('AssignWorkout');
+      } else if (actionId === 'review') {
+        navigation.navigate('CoachAssignmentReview');
       }
     },
     [navigation, loadRoster],
@@ -345,7 +368,14 @@ export default function CoachHomeScreen({ navigation }) {
       <ScreenHeader
         title={isTrainer ? 'Trainer Studio' : 'Coach Dashboard'}
         subtitle={`Good morning, ${coachName?.split(' ')[0] || 'Coach'}`}
-        right={<NotifButton theme={theme} />}
+        right={
+          <HeaderIconButton
+            icon="notifications-outline"
+            accessibilityLabel="Notifications"
+            badge={unreadCount > 0}
+            onPress={() => navigation.navigate('Notifications')}
+          />
+        }
       />
       <ScrollView
         ref={scrollRef}
@@ -470,6 +500,38 @@ export default function CoachHomeScreen({ navigation }) {
           </View>
         )}
 
+        {/* Submitted work waiting on the coach. Surfaced as a banner rather than
+            only a quick-action icon because this is time-sensitive to the athlete:
+            until it is verified, the assignment sits on THEIR home screen. It
+            disappears at zero, so it is never decoration. */}
+        {reviewCount > 0 && (
+          <Entrance variant="cardIn" delay={60}>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => navigation.navigate('CoachAssignmentReview')}
+              style={[
+                styles.reviewBanner,
+                { backgroundColor: theme.attentionFill, borderColor: theme.attentionBorder },
+              ]}
+            >
+              <View style={[styles.reviewBannerIcon, { backgroundColor: theme.primary }]}>
+                <Ionicons name="checkmark-done-outline" size={18} color="#FFFFFF" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.reviewBannerTitle, { color: theme.accentText }]}>
+                  {reviewCount === 1
+                    ? '1 submission to review'
+                    : `${reviewCount} submissions to review`}
+                </Text>
+                <Text style={[styles.reviewBannerSub, { color: theme.accentText }]}>
+                  Verify to clear it from their home
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={theme.accentText} />
+            </TouchableOpacity>
+          </Entrance>
+        )}
+
         {/* Quick Actions */}
         <TourStep stepId="coach-quick-actions">
           <View style={{ marginTop: SHAPE.sectionGap }}>
@@ -507,19 +569,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  notifBtn: {
-    width: SHAPE.iconButton,
-    height: SHAPE.iconButton,
-    borderRadius: SHAPE.iconButtonRadius,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  notifDot: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-  },
   scrollView: {
     flex: 1,
   },
@@ -547,11 +596,11 @@ const styles = StyleSheet.create({
   },
   adherencePct: {
     fontFamily: TYPE.cardTitle.fontFamily,
-    fontSize: 15,
+    fontSize: 16.5,
   },
   adherenceCaption: {
     fontFamily: TYPE.statCaption.fontFamily,
-    fontSize: 9.5,
+    fontSize: 11.5,
     marginTop: 1,
   },
   okIcon: {
@@ -562,6 +611,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   // Quick actions
+  reviewBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: SHAPE.radiusCard,
+    borderWidth: 1,
+    padding: 14,
+    marginBottom: SHAPE.sectionGap,
+  },
+  reviewBannerIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reviewBannerTitle: { fontFamily: FONTS.bodyBold, fontSize: 16 },
+  reviewBannerSub: { fontFamily: FONTS.body, fontSize: 14, marginTop: 2, opacity: 0.85 },
   quickActionsRow: {
     flexDirection: 'row',
     gap: SHAPE.cardGap,
@@ -582,7 +649,7 @@ const styles = StyleSheet.create({
   },
   quickActionLabel: {
     fontFamily: TYPE.chip.fontFamily,
-    fontSize: 10,
+    fontSize: 12,
   },
   // Modules
   moduleGrid: {

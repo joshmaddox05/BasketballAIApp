@@ -504,7 +504,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#4CAF50',
     },
     stepNumber: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: 'bold',
         color: '#666',
     },
@@ -515,7 +515,7 @@ const styles = StyleSheet.create({
         marginHorizontal: 8,
     },
     headerTitle: {
-        fontSize: 20,
+        fontSize: 21,
         fontWeight: 'bold',
         color: '#333',
         textAlign: 'center',
@@ -525,22 +525,22 @@ const styles = StyleSheet.create({
         padding: 24,
     },
     subtitle: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#666',
         marginBottom: 24,
-        lineHeight: 20,
+        lineHeight: 21,
     },
     section: {
         marginBottom: 32,
     },
     sectionTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: 'bold',
         color: '#333',
         marginBottom: 8,
     },
     sectionSubtitle: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#666',
         marginBottom: 16,
     },
@@ -564,7 +564,7 @@ const styles = StyleSheet.create({
         borderColor: '#8A1C22',
     },
     dayButtonText: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '500',
         color: '#666',
     },
@@ -589,7 +589,7 @@ const styles = StyleSheet.create({
         borderColor: '#8A1C22',
     },
     durationButtonText: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#666',
     },
     selectedDurationButtonText: {
@@ -614,7 +614,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#8A1C22',
     },
     timeButtonText: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#666',
         marginLeft: 8,
     },
@@ -648,7 +648,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     focusAreaTitle: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#333',
         marginTop: 8,
         textAlign: 'center',
@@ -682,7 +682,7 @@ const styles = StyleSheet.create({
         marginRight: 8,
     },
     skipButtonText: {
-        fontSize: 16,
+        fontSize: 17.5,
         color: '#666',
         fontWeight: '600',
     },
@@ -696,7 +696,7 @@ const styles = StyleSheet.create({
         marginLeft: 8,
     },
     continueButtonText: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: 'bold',
         color: '#FFF',
     },

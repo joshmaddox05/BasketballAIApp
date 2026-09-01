@@ -423,7 +423,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   pageTitle: { fontSize: 26, fontWeight: '800' },
-  pageSubtitle: { fontSize: 13, marginTop: 2 },
+  pageSubtitle: { fontSize: 15, marginTop: 2 },
   pageHeader: { paddingHorizontal: 20, paddingTop: 16, marginBottom: 8 },
   headerBadge: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
 
@@ -433,7 +433,7 @@ const styles = StyleSheet.create({
   tabBar: { flexDirection: 'row', borderBottomWidth: 1 },
   tabBtn: { flex: 1, alignItems: 'center', paddingVertical: 14, borderBottomWidth: 2, borderBottomColor: 'transparent' },
   tabBtnActive: {},
-  tabBtnText: { fontSize: 14, fontWeight: '700' },
+  tabBtnText: { fontSize: 16, fontWeight: '700' },
 
   // CTA card
   ctaCard: {
@@ -444,10 +444,10 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginBottom: 20,
   },
-  ctaCardTitle: { color: '#fff', fontSize: 15, fontWeight: '800' },
-  ctaCardSub: { color: 'rgba(255,255,255,0.75)', fontSize: 12, marginTop: 2 },
+  ctaCardTitle: { color: '#fff', fontSize: 16.5, fontWeight: '800' },
+  ctaCardSub: { color: 'rgba(255,255,255,0.75)', fontSize: 14, marginTop: 2 },
 
-  sectionTitle: { fontSize: 16, fontWeight: '700', marginBottom: 10 },
+  sectionTitle: { fontSize: 17.5, fontWeight: '700', marginBottom: 10 },
 
   planCard: {
     flexDirection: 'row',
@@ -459,8 +459,8 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   planIconWrap: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  planTitle: { fontSize: 14, fontWeight: '700' },
-  planMeta: { fontSize: 11, marginTop: 2 },
+  planTitle: { fontSize: 16, fontWeight: '700' },
+  planMeta: { fontSize: 13, marginTop: 2 },
 
   // IQ card (athlete)
   iqCard: { borderRadius: 16, padding: 16, borderWidth: 1, marginBottom: 20 },
@@ -474,11 +474,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   iqScore: { fontSize: 28, fontWeight: '900', lineHeight: 32 },
-  iqScoreLabel: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
-  iqClassification: { fontSize: 17, fontWeight: '800', marginBottom: 2 },
-  iqSubtitle: { fontSize: 12, marginBottom: 8 },
+  iqScoreLabel: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
+  iqClassification: { fontSize: 18, fontWeight: '800', marginBottom: 2 },
+  iqSubtitle: { fontSize: 14, marginBottom: 8 },
   xpLabelRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
-  xpLabel: { fontSize: 11 },
+  xpLabel: { fontSize: 13 },
   xpTrack: { height: 7, borderRadius: 4, overflow: 'hidden' },
   xpFill: { height: 7, borderRadius: 4 },
 
@@ -492,10 +492,10 @@ const styles = StyleSheet.create({
   },
   scenarioTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   scenarioIcon: { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  scenarioTitle: { fontSize: 14, fontWeight: '700', marginBottom: 3 },
-  scenarioMeta: { fontSize: 12 },
+  scenarioTitle: { fontSize: 16, fontWeight: '700', marginBottom: 3 },
+  scenarioMeta: { fontSize: 14 },
   scenarioStatus: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
-  scenarioStatusText: { fontSize: 11, fontWeight: '700' },
+  scenarioStatusText: { fontSize: 13, fontWeight: '700' },
   startScenarioBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -504,14 +504,14 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 10,
   },
-  startScenarioBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  startScenarioBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 
   emptyState: { alignItems: 'center', paddingTop: 40, gap: 10 },
-  emptyText: { fontSize: 13, textAlign: 'center', lineHeight: 19, maxWidth: 280 },
+  emptyText: { fontSize: 15, textAlign: 'center', lineHeight: 20, maxWidth: 280 },
   // Renamed from `comingSoonTitle`: this styles the heading of the explanatory
   // blurb under each tab's CTA card, and none of those tabs are "coming soon"
   // any more — Film Library, Your-Team Model, and Opponent Scouting are all
   // real screens now. The stale name was the last trace of the Phase 0
   // placeholder reconciliation (§10 item 1).
-  ctaBlurbTitle: { fontSize: 16, fontWeight: '800', marginTop: 4 },
+  ctaBlurbTitle: { fontSize: 17.5, fontWeight: '800', marginTop: 4 },
 });

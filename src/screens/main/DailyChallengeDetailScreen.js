@@ -322,7 +322,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     headerTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: '600',
     },
     scrollView: {
@@ -347,18 +347,18 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
     categoryText: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '600',
         marginLeft: 6,
     },
     title: {
-        fontSize: 24,
+        fontSize: 25,
         fontWeight: 'bold',
         marginBottom: 8,
     },
     description: {
-        fontSize: 16,
-        lineHeight: 24,
+        fontSize: 17.5,
+        lineHeight: 25,
         marginBottom: 16,
     },
     metaRow: {
@@ -371,7 +371,7 @@ const styles = StyleSheet.create({
         marginRight: 20,
     },
     metaText: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '500',
         marginLeft: 6,
     },
@@ -381,7 +381,7 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     sectionTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: '600',
         marginBottom: 16,
     },
@@ -403,10 +403,10 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     progressTarget: {
-        fontSize: 18,
+        fontSize: 19,
     },
     progressMetric: {
-        fontSize: 14,
+        fontSize: 16,
     },
     progressBarContainer: {
         height: 8,
@@ -419,7 +419,7 @@ const styles = StyleSheet.create({
         borderRadius: 4,
     },
     progressPercentage: {
-        fontSize: 14,
+        fontSize: 16,
         textAlign: 'center',
         marginBottom: 20,
     },
@@ -450,7 +450,7 @@ const styles = StyleSheet.create({
     },
     startButtonText: {
         color: '#FFF',
-        fontSize: 17,
+        fontSize: 18,
         fontWeight: '600',
         marginLeft: 8,
     },
@@ -462,7 +462,7 @@ const styles = StyleSheet.create({
         borderRadius: 12,
     },
     completedText: {
-        fontSize: 17,
+        fontSize: 18,
         fontWeight: '600',
         marginLeft: 8,
     },
@@ -477,8 +477,8 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
     tipText: {
-        fontSize: 15,
-        lineHeight: 22,
+        fontSize: 16.5,
+        lineHeight: 23,
         marginLeft: 10,
         flex: 1,
     },
@@ -497,7 +497,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     rewardValue: {
-        fontSize: 15,
+        fontSize: 16.5,
         fontWeight: '500',
         marginLeft: 8,
     },

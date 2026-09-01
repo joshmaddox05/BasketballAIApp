@@ -464,7 +464,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontFamily: TYPE.greeting.fontFamily,
-    fontSize: 13,
+    fontSize: 15,
     padding: 0,
   },
 
@@ -483,7 +483,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-end',
     marginTop: 2,
   },
-  clearFiltersText: { fontFamily: TYPE.buttonSecondary.fontFamily, fontSize: 11 },
+  clearFiltersText: { fontFamily: TYPE.buttonSecondary.fontFamily, fontSize: 13 },
 
   savedRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 10 },
   savedChip: {
@@ -498,7 +498,7 @@ const styles = StyleSheet.create({
     maxWidth: 200,
   },
   savedChipMain: { flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1 },
-  savedChipText: { fontFamily: TYPE.chip.fontFamily, fontSize: 10.5 },
+  savedChipText: { fontFamily: TYPE.chip.fontFamily, fontSize: 12.5 },
 
   resultsRow: {
     paddingHorizontal: SHAPE.screenPadding,
@@ -521,12 +521,12 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: SHAPE.radiusBadge,
   },
-  gradeBadgeText: { fontFamily: TYPE.buttonPrimary.fontFamily, fontSize: 11 },
+  gradeBadgeText: { fontFamily: TYPE.buttonPrimary.fontFamily, fontSize: 13 },
 
   consentNote: {
     fontFamily: TYPE.cardBody.fontFamily,
-    fontSize: 10.5,
-    lineHeight: 16,
+    fontSize: 12.5,
+    lineHeight: 17.5,
     paddingTop: 14,
     paddingBottom: 6,
   },

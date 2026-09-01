@@ -28,6 +28,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { canAccessFeature } from '../../utils/subscription';
 import { TYPE, SHAPE } from '../../utils/typography';
 import { Entrance, HeroTile, HERO_FG, HERO_FG_MUTED } from '../dbe';
+import ModuleIntro from '../modules/ModuleIntro';
+import { useModuleIntro } from '../../hooks/useModuleIntro';
 
 export default function ModuleGrid({
   modules = [],
@@ -57,10 +59,11 @@ export default function ModuleGrid({
     return { lead: modules[at], rest: modules.filter((_, i) => i !== at) };
   }, [modules, subscription, leadKey]);
 
-  if (!modules.length) return null;
+  // First-open explainer, shared with the coach and scout homes so an intro
+  // cannot fire on one role's tiles and not another's.
+  const { openModule: handlePress, introProps } = useModuleIntro(navigation, navParams);
 
-  const handlePress = (mod, unlocked) =>
-    navigation.navigate(unlocked ? mod.key : 'Subscription', unlocked ? navParams : undefined);
+  if (!modules.length) return null;
 
   const subFor = (mod) => (subtitleFor && subtitleFor(mod)) || mod.description;
 
@@ -156,6 +159,10 @@ export default function ModuleGrid({
           );
         })}
       </View>
+
+      {/* First-open explainer. Dismissing marks it seen; "Open <module>" also
+          navigates, so the intro is a doorway rather than a detour. */}
+      <ModuleIntro {...introProps} />
     </View>
   );
 }

@@ -19,7 +19,9 @@ import {
   publishScoutLabProfile,
   unpublishScoutLabProfile,
   isHighSchoolGrade,
+  getSharedReportsForPlayer,
 } from '../../services/firestoreService';
+import SharedReportsSection from '../../components/features/SharedReportsSection';
 import {
   Entrance,
   PulseHalo,
@@ -68,16 +70,16 @@ const BOOST_ACTIONS = [
     done: true,
   },
   {
-    id: 'highlights',
-    label: 'Upload highlights',
-    description: 'Add game film to stand out',
-    icon: 'cloud-upload-outline',
+    id: 'gates',
+    label: 'Clear your exposure gates',
+    description: 'See exactly what is holding your visibility back',
+    icon: 'shield-checkmark-outline',
     done: false,
   },
   {
     id: 'evaluation',
-    label: 'Request evaluation',
-    description: 'Get scored by a certified scout',
+    label: 'Run your evaluation',
+    description: 'The platform grade is what scouts actually see',
     icon: 'star-outline',
     done: false,
   },
@@ -135,14 +137,22 @@ export default function ScoutLabScreen({ navigation }) {
   const playerUid = user?.uid;
   const [directoryVisible, setDirectoryVisible] = useState(false);
   const [toggling, setToggling] = useState(false);
+  // Reports a scout has explicitly shared with this athlete.
+  const [sharedReports, setSharedReports] = useState([]);
 
   // Load the player's current directory visibility on mount.
   useEffect(() => {
     let active = true;
     (async () => {
       if (!playerUid) return;
-      const profile = await getScoutLabProfile(playerUid);
-      if (active) setDirectoryVisible(!!profile?.directoryVisible);
+      const [profile, reports] = await Promise.all([
+        getScoutLabProfile(playerUid),
+        getSharedReportsForPlayer(playerUid).catch(() => []),
+      ]);
+      if (active) {
+        setDirectoryVisible(!!profile?.directoryVisible);
+        setSharedReports(reports);
+      }
     })();
     return () => {
       active = false;
@@ -189,14 +199,22 @@ export default function ScoutLabScreen({ navigation }) {
     [playerUid, toggling, name, userData, evalRankScore, shotDNAProfile]
   );
 
+  // These previously pointed at 'UploadHighlights' and 'RequestEvaluation', neither
+  // of which is registered anywhere — both threw at runtime. They now go to real
+  // screens, and the labels match what those screens do:
+  //  - the platform's own ranking IS the authoritative evaluation (COO policy: a
+  //    scout's manual grade never alters it), so "request an evaluation" was the
+  //    wrong mental model — running your own EvalRank is the real action;
+  //  - the exposure gates are the concrete thing blocking a player's visibility,
+  //    which is what the old "upload highlights" CTA was gesturing at.
   const handleBoostAction = useCallback(
     (actionId) => {
-      if (actionId === 'highlights') {
-        navigation.navigate('UploadHighlights');
-      } else if (actionId === 'profile') {
+      if (actionId === 'profile') {
         navigation.navigate('EditProfile');
+      } else if (actionId === 'gates') {
+        navigation.navigate('EvalRankBadges');
       } else if (actionId === 'evaluation') {
-        navigation.navigate('RequestEvaluation');
+        navigation.navigate('EvalRank');
       }
     },
     [navigation],
@@ -360,6 +378,13 @@ export default function ScoutLabScreen({ navigation }) {
           </TouchableOpacity>
         </Entrance>
 
+        {/* ── Reports scouts have shared with this athlete ─────────────────── */}
+        <SharedReportsSection
+          reports={sharedReports}
+          theme={theme}
+          onOpen={(report) => navigation.navigate('ScoutReportDetail', { report })}
+        />
+
         {/* ── Scout activity ──────────────────────────────────────────────── */}
         <View style={{ marginTop: SHAPE.sectionGap }}>
           <SectionLabel>Scout activity</SectionLabel>
@@ -418,10 +443,10 @@ export default function ScoutLabScreen({ navigation }) {
                   <View style={[styles.checkOff, { borderColor: theme.hairline }]} />
                 )}
                 <View style={{ flex: 1 }}>
-                  <Text style={[TYPE.rowTitle, { color: theme.text, fontSize: 12.5 }]}>
+                  <Text style={[TYPE.rowTitle, { color: theme.text, fontSize: 14.5 }]}>
                     {action.label}
                   </Text>
-                  <Text style={[TYPE.rowMeta, { color: theme.textDim, fontSize: 10.5 }]}>
+                  <Text style={[TYPE.rowMeta, { color: theme.textDim, fontSize: 12.5 }]}>
                     {action.description}
                   </Text>
                 </View>
@@ -465,7 +490,7 @@ const styles = StyleSheet.create({
   },
   dotWrap: { width: 6, height: 6 },
   dot: { width: 6, height: 6, borderRadius: 3 },
-  statusPillText: { fontFamily: FONTS.bodyBold, fontSize: 10, letterSpacing: 0.7 },
+  statusPillText: { fontFamily: FONTS.bodyBold, fontSize: 12, letterSpacing: 0.7 },
 
   scrollContent: { paddingHorizontal: SHAPE.screenPadding, paddingTop: 16 },
   lockedScrollContent: {
@@ -477,7 +502,7 @@ const styles = StyleSheet.create({
   // Score / readiness
   scoreRow: { flexDirection: 'row', alignItems: 'center', gap: 18 },
   scoreNumber: { fontFamily: FONTS.heading, fontSize: 38, lineHeight: 40 },
-  scoreOutOf: { fontFamily: FONTS.bodySemiBold, fontSize: 10, marginTop: 2 },
+  scoreOutOf: { fontFamily: FONTS.bodySemiBold, fontSize: 12, marginTop: 2 },
   tierChip: {
     borderRadius: SHAPE.radiusPill,
     borderWidth: 1,
@@ -485,7 +510,7 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     marginTop: 8,
   },
-  tierChipText: { fontFamily: FONTS.bodyExtraBold, fontSize: 11.5, letterSpacing: 0.5 },
+  tierChipText: { fontFamily: FONTS.bodyExtraBold, fontSize: 13.5, letterSpacing: 0.5 },
   viewsRow: { flexDirection: 'row', alignItems: 'center', gap: 9, marginTop: 14 },
   viewsIcon: {
     width: 32,
@@ -494,7 +519,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  viewsNumber: { fontFamily: FONTS.heading, fontSize: 17, lineHeight: 18 },
+  viewsNumber: { fontFamily: FONTS.heading, fontSize: 18, lineHeight: 19 },
 
   visibilityCard: {
     flexDirection: 'row',
@@ -527,7 +552,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  editLink: { fontFamily: FONTS.bodyBold, fontSize: 11 },
+  editLink: { fontFamily: FONTS.bodyBold, fontSize: 13 },
 
   // Activity
   activityRow: {
@@ -543,7 +568,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  activityText: { fontFamily: FONTS.bodySemiBold, fontSize: 12.5 },
+  activityText: { fontFamily: FONTS.bodySemiBold, fontSize: 14.5 },
 
   // Boost
   boostRow: {
@@ -578,7 +603,7 @@ const styles = StyleSheet.create({
     borderRadius: SHAPE.radiusTile,
     marginTop: SHAPE.sectionGap,
   },
-  primaryCtaText: { fontFamily: FONTS.bodyExtraBold, fontSize: 14.5, color: '#FFFFFF' },
+  primaryCtaText: { fontFamily: FONTS.bodyExtraBold, fontSize: 16, color: '#FFFFFF' },
 
   // Locked / Upgrade
   lockedCard: {

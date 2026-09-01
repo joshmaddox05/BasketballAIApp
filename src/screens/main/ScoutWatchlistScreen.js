@@ -5,12 +5,34 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAppContext } from '../../context/AppContext';
 import { EmptyState } from '../../components/dbe';
-import { getWatchlist, removeWatchlistEntry, updateWatchlistStatus, WATCHLIST_STATUSES } from '../../services/firestoreService';
+import {
+  getWatchlist,
+  removeWatchlistEntry,
+  updateWatchlistStatus,
+  getScoutAccessStatuses,
+  WATCHLIST_STATUSES,
+} from '../../services/firestoreService';
 
 const GRADE_COLOR = { 'A+': '#22C55E', 'A': '#22C55E', 'A-': '#22C55E', 'B+': '#8A1C22', 'B': '#F59E0B', 'B-': '#F59E0B', 'C+': '#EF4444', 'C': '#EF4444' };
 const GRADE_LABEL = { 9: '9th', 10: '10th', 11: '11th', 12: '12th' };
 const STATUS_LABEL = { watching: 'Watching', contacted: 'Contacted', offer: 'Offer', committed: 'Committed', pass: 'Pass' };
 const STATUS_COLOR = { watching: '#3B82F6', contacted: '#F59E0B', offer: '#A855F7', committed: '#22C55E', pass: '#EF4444' };
+
+// Parent-consent state, distinct from the recruiting status above. Without this
+// on the row, an approved prospect looked exactly like one never requested — the
+// scout had to open each detail screen to find out they had been granted access.
+const ACCESS_LABEL = {
+  approved: 'ACCESS GRANTED',
+  pending: 'AWAITING PARENT',
+  denied: 'ACCESS DECLINED',
+  revoked: 'ACCESS REVOKED',
+};
+const ACCESS_COLOR = {
+  approved: '#22C55E',
+  pending: '#F59E0B',
+  denied: '#EF4444',
+  revoked: '#EF4444',
+};
 
 const toDate = (value) => {
   if (!value) return null;
@@ -41,18 +63,29 @@ export default function ScoutWatchlistScreen({ navigation }) {
     setLoading(true);
     try {
       const saved = await getWatchlist(scoutUid);
+      // One batched consent lookup for the whole list, so every row can show
+      // where its access request actually stands.
+      const accessByUid = await getScoutAccessStatuses(
+        saved.map((w) => w.prospectUid || w.id),
+        scoutUid
+      ).catch(() => ({}));
+
       setWatchlist(
-        saved.map((w) => ({
-          id: w.prospectUid || w.id,
-          name: w.name || 'Unknown',
-          position: w.position || '—',
-          grade: GRADE_LABEL[w.gradeLevel] || w.classYear || '—',
-          region: w.region || '—',
-          evalGrade: w.evaluationScore || w.evalGrade || '—',
-          status: w.status || 'watching',
-          addedDate: shortDate(w.savedAt),
-          note: w.note || 'No notes added.',
-        }))
+        saved.map((w) => {
+          const id = w.prospectUid || w.id;
+          return {
+            id,
+            name: w.name || 'Unknown',
+            position: w.position || '—',
+            grade: GRADE_LABEL[w.gradeLevel] || w.classYear || '—',
+            region: w.region || '—',
+            evalGrade: w.evaluationScore || w.evalGrade || '—',
+            status: w.status || 'watching',
+            accessStatus: accessByUid[String(id)] || 'none',
+            addedDate: shortDate(w.savedAt),
+            note: w.note || 'No notes added.',
+          };
+        })
       );
     } finally {
       setLoading(false);
@@ -117,8 +150,19 @@ export default function ScoutWatchlistScreen({ navigation }) {
                 <View style={styles.info}>
                   <Text style={[styles.name, { color: theme.text }]}>{p.name}</Text>
                   <Text style={[styles.meta, { color: theme.textSecondary }]}>{p.position} · {p.grade} grade · {p.region}</Text>
-                  <View style={[styles.statusPill, { backgroundColor: (STATUS_COLOR[p.status] || '#888') + '18' }]}>
-                    <Text style={[styles.statusPillText, { color: STATUS_COLOR[p.status] || '#888' }]}>{STATUS_LABEL[p.status] || 'Watching'}</Text>
+                  <View style={styles.pillRow}>
+                    <View style={[styles.statusPill, { backgroundColor: (STATUS_COLOR[p.status] || '#888') + '18' }]}>
+                      <Text style={[styles.statusPillText, { color: STATUS_COLOR[p.status] || '#888' }]}>{STATUS_LABEL[p.status] || 'Watching'}</Text>
+                    </View>
+                    {/* Where the parent-consent request stands, visible without
+                        opening the prospect. */}
+                    {ACCESS_LABEL[p.accessStatus] ? (
+                      <View style={[styles.statusPill, { backgroundColor: ACCESS_COLOR[p.accessStatus] + '18' }]}>
+                        <Text style={[styles.statusPillText, { color: ACCESS_COLOR[p.accessStatus] }]}>
+                          {ACCESS_LABEL[p.accessStatus]}
+                        </Text>
+                      </View>
+                    ) : null}
                   </View>
                 </View>
                 <View style={[styles.gradeBadge, { backgroundColor: (GRADE_COLOR[p.evalGrade] || '#888') + '22' }]}>
@@ -170,36 +214,37 @@ export default function ScoutWatchlistScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1 },
-  headerTitle: { fontSize: 20, fontWeight: '800' },
+  headerTitle: { fontSize: 21, fontWeight: '800' },
   countBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
-  countText: { fontSize: 12, fontWeight: '700' },
+  countText: { fontSize: 14, fontWeight: '700' },
   scroll: { padding: 16, gap: 12 },
   card: { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
   cardTop: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
   avatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 15, fontWeight: '700' },
+  avatarText: { fontSize: 16.5, fontWeight: '700' },
   info: { flex: 1 },
-  name: { fontSize: 15, fontWeight: '700' },
-  meta: { fontSize: 12, marginTop: 2 },
+  name: { fontSize: 16.5, fontWeight: '700' },
+  meta: { fontSize: 14, marginTop: 2 },
   gradeBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  gradeText: { fontSize: 14, fontWeight: '800' },
+  gradeText: { fontSize: 16, fontWeight: '800' },
   statusPill: { alignSelf: 'flex-start', marginTop: 4, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
-  statusPillText: { fontSize: 10, fontWeight: '700' },
-  statusHeader: { fontSize: 11, fontWeight: '600', marginBottom: 8 },
+  statusPillText: { fontSize: 12, fontWeight: '700' },
+  statusHeader: { fontSize: 13, fontWeight: '600', marginBottom: 8 },
   statusRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 },
   statusChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 14, borderWidth: 1 },
-  statusChipText: { fontSize: 11, fontWeight: '700' },
+  statusChipText: { fontSize: 13, fontWeight: '700' },
   expanded: { borderTopWidth: 1, padding: 14, gap: 12 },
   statsRow: { flexDirection: 'row', justifyContent: 'space-around' },
   stat: { alignItems: 'center' },
-  statVal: { fontSize: 18, fontWeight: '800' },
-  statLabel: { fontSize: 11, marginTop: 2 },
+  statVal: { fontSize: 19, fontWeight: '800' },
+  statLabel: { fontSize: 13, marginTop: 2 },
   noteBox: { borderRadius: 10, padding: 12, gap: 4 },
-  noteLabel: { fontSize: 11, fontWeight: '700' },
-  noteText: { fontSize: 13, lineHeight: 18 },
+  noteLabel: { fontSize: 13, fontWeight: '700' },
+  noteText: { fontSize: 15, lineHeight: 19 },
   actionRow: { flexDirection: 'row', gap: 10 },
   actionBtn: { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 10 },
-  actionBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  actionBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
   removeBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10, borderWidth: 1 },
-  removeBtnText: { fontSize: 13, fontWeight: '600' },
+  removeBtnText: { fontSize: 15, fontWeight: '600' },
 });

@@ -216,9 +216,9 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     subtitle: {
-        fontSize: 16,
+        fontSize: 17.5,
         color: '#666',
-        lineHeight: 24,
+        lineHeight: 25,
     },
     form: {
         marginBottom: 24,
@@ -237,7 +237,7 @@ const styles = StyleSheet.create({
     input: {
         flex: 1,
         height: 50,
-        fontSize: 16,
+        fontSize: 17.5,
         color: '#333',
     },
     resetButton: {
@@ -247,7 +247,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     resetButtonText: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: 'bold',
         color: '#FFF',
     },
@@ -257,10 +257,10 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     helpText: {
-        fontSize: 14,
+        fontSize: 16,
     },
     helpLink: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: 'bold',
     },
     successContainer: {
@@ -279,29 +279,29 @@ const styles = StyleSheet.create({
         marginBottom: 30,
     },
     successTitle: {
-        fontSize: 24,
+        fontSize: 25,
         fontWeight: 'bold',
         color: '#333',
         marginBottom: 16,
         textAlign: 'center',
     },
     successMessage: {
-        fontSize: 16,
+        fontSize: 17.5,
         color: '#666',
         textAlign: 'center',
         marginBottom: 8,
     },
     emailText: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: 'bold',
         color: '#8A1C22',
         marginBottom: 20,
     },
     instructionsText: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#666',
         textAlign: 'center',
-        lineHeight: 20,
+        lineHeight: 21,
         marginBottom: 40,
     },
     backToLoginButton: {
@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     backToLoginButtonText: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: 'bold',
         color: '#FFF',
     },
@@ -323,7 +323,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 24,
     },
     resendButtonText: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#8A1C22',
         fontWeight: '600',
     },

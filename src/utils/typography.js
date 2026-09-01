@@ -19,36 +19,43 @@ export const FONTS = {
 
 // Type presets from the handoff table. Colors come from the theme at the
 // call site (e.g. { ...TYPE.screenTitle, color: theme.text }).
+// SCALE: bumped app-wide for readability (2026-08-31) — roughly +2pt at the small
+// end tapering to +1 at heading sizes; display numbers above 24pt were left alone
+// because they already read fine and are the likeliest to overflow. lineHeight was
+// moved with fontSize so larger text is not crowded by the old leading.
+//
+// These presets are the design system's voice — prefer them over inline fontSize,
+// and if you add one, size it against the values here rather than the old scale.
 export const TYPE = {
-  screenTitle: { fontFamily: FONTS.heading, fontSize: 22, lineHeight: 22 },
-  subScreenTitle: { fontFamily: FONTS.heading, fontSize: 17 },
-  greeting: { fontFamily: FONTS.bodyMedium, fontSize: 12, marginTop: 3 },
+  screenTitle: { fontFamily: FONTS.heading, fontSize: 23, lineHeight: 23 },
+  subScreenTitle: { fontFamily: FONTS.heading, fontSize: 18 },
+  greeting: { fontFamily: FONTS.bodyMedium, fontSize: 14, marginTop: 3 },
   sectionLabel: {
     fontFamily: FONTS.bodyBold,
-    fontSize: 10.5,
+    fontSize: 12.5,
     letterSpacing: 1.4,
     textTransform: 'uppercase',
   },
-  statNumber: { fontFamily: FONTS.heading, fontSize: 24, lineHeight: 24 },
-  statNumberMedium: { fontFamily: FONTS.heading, fontSize: 21, lineHeight: 21 },
+  statNumber: { fontFamily: FONTS.heading, fontSize: 25, lineHeight: 25 },
+  statNumberMedium: { fontFamily: FONTS.heading, fontSize: 22, lineHeight: 22 },
   statCaption: {
     fontFamily: FONTS.bodyBold,
-    fontSize: 9.5,
+    fontSize: 11.5,
     letterSpacing: 1.1,
     textTransform: 'uppercase',
   },
-  rowTitle: { fontFamily: FONTS.bodyBold, fontSize: 13.5 },
-  rowMeta: { fontFamily: FONTS.body, fontSize: 11, marginTop: 2 },
-  cardTitle: { fontFamily: FONTS.heading, fontSize: 13.5 },
-  cardBody: { fontFamily: FONTS.body, fontSize: 10.5, lineHeight: 15 },
-  buttonPrimary: { fontFamily: FONTS.bodyExtraBold, fontSize: 13.5 },
-  buttonSecondary: { fontFamily: FONTS.bodyBold, fontSize: 13 },
-  chip: { fontFamily: FONTS.bodyBold, fontSize: 10 },
-  chipSmall: { fontFamily: FONTS.bodyBold, fontSize: 9 },
-  tooltipTitle: { fontFamily: FONTS.heading, fontSize: 16 },
-  tooltipBody: { fontFamily: FONTS.body, fontSize: 11.5, lineHeight: 18 },
-  tooltipStep: { fontFamily: FONTS.bodyBold, fontSize: 9.5, letterSpacing: 1.3 },
-  tabLabel: { fontFamily: FONTS.bodySemiBold, fontSize: 9 },
+  rowTitle: { fontFamily: FONTS.bodyBold, fontSize: 15 },
+  rowMeta: { fontFamily: FONTS.body, fontSize: 13, marginTop: 2 },
+  cardTitle: { fontFamily: FONTS.heading, fontSize: 15 },
+  cardBody: { fontFamily: FONTS.body, fontSize: 12.5, lineHeight: 16.5 },
+  buttonPrimary: { fontFamily: FONTS.bodyExtraBold, fontSize: 15 },
+  buttonSecondary: { fontFamily: FONTS.bodyBold, fontSize: 15 },
+  chip: { fontFamily: FONTS.bodyBold, fontSize: 12 },
+  chipSmall: { fontFamily: FONTS.bodyBold, fontSize: 11 },
+  tooltipTitle: { fontFamily: FONTS.heading, fontSize: 17.5 },
+  tooltipBody: { fontFamily: FONTS.body, fontSize: 13.5, lineHeight: 19 },
+  tooltipStep: { fontFamily: FONTS.bodyBold, fontSize: 11.5, letterSpacing: 1.3 },
+  tabLabel: { fontFamily: FONTS.bodySemiBold, fontSize: 11 },
 };
 
 // Motion constants. Durations and easings were previously hand-typed at ~13 distinct

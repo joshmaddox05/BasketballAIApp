@@ -383,7 +383,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     flex: 1,
-    fontSize: 20,
+    fontSize: 21,
     fontWeight: '800',
     letterSpacing: -0.2,
   },
@@ -405,7 +405,7 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   tabLabel: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
   },
   tabUnderline: {
@@ -431,7 +431,7 @@ const styles = StyleSheet.create({
   },
   tabCountText: {
     color: '#FFFFFF',
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '700',
   },
   scroll: {
@@ -459,7 +459,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 16,
     padding: 0,
   },
   sectionLabelRow: {
@@ -469,7 +469,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sectionLabel: {
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: '700',
   },
   availLegend: {
@@ -486,7 +486,7 @@ const styles = StyleSheet.create({
     borderRadius: 3.5,
   },
   legendText: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '600',
   },
   grid: {
@@ -515,7 +515,7 @@ const styles = StyleSheet.create({
   mentorCardAvatarText: {
     color: '#FFFFFF',
     fontWeight: '700',
-    fontSize: 20,
+    fontSize: 21,
   },
   availDot: {
     position: 'absolute',
@@ -527,7 +527,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   mentorCardName: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '700',
     textAlign: 'center',
     marginBottom: 5,
@@ -540,13 +540,13 @@ const styles = StyleSheet.create({
   },
   rolePillText: {
     color: '#8A1C22',
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.3,
   },
   mentorCardSpecialty: {
-    fontSize: 11,
+    fontSize: 13,
     textAlign: 'center',
     marginBottom: 8,
   },
@@ -557,11 +557,11 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   ratingText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '700',
   },
   sessionsText: {
-    fontSize: 11,
+    fontSize: 13,
   },
   connectBtn: {
     width: '100%',
@@ -570,7 +570,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   connectBtnText: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '700',
   },
   noResults: {
@@ -579,7 +579,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   noResultsText: {
-    fontSize: 14,
+    fontSize: 16,
   },
   myMentorRow: {
     flexDirection: 'row',
@@ -600,7 +600,7 @@ const styles = StyleSheet.create({
   myMentorAvatarText: {
     color: '#FFFFFF',
     fontWeight: '700',
-    fontSize: 17,
+    fontSize: 18,
   },
   myMentorInfo: {
     flex: 1,
@@ -613,19 +613,19 @@ const styles = StyleSheet.create({
     marginBottom: 1,
   },
   myMentorName: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '700',
   },
   myMentorLastSeen: {
-    fontSize: 11,
+    fontSize: 13,
   },
   myMentorRole: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '600',
     marginBottom: 3,
   },
   myMentorLastMsg: {
-    fontSize: 12,
+    fontSize: 14,
   },
   myMentorActions: {
     alignItems: 'flex-end',
@@ -642,7 +642,7 @@ const styles = StyleSheet.create({
   },
   unreadBadgeText: {
     color: '#FFFFFF',
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '700',
   },
   messageBtn: {
@@ -655,7 +655,7 @@ const styles = StyleSheet.create({
   },
   messageBtnText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '700',
   },
   bottomPad: {

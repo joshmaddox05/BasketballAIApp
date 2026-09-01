@@ -31,7 +31,11 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAppContext } from '../../context/AppContext';
-import { getLinkedPlayers, getLinkedPlayerSummary } from '../../services/firestoreService';
+import {
+  getLinkedPlayers,
+  getRosterSummaries,
+  getCoachAssignmentSummary,
+} from '../../services/firestoreService';
 import { ARCHETYPES } from '../../services/blueprint/archetypes';
 
 // Display order + accent color per archetype family (services/blueprint/archetypes.js
@@ -88,16 +92,19 @@ const mapPlayer = (linked, summary) => {
   };
 };
 
-// Deliberately not tappable into a per-player detail view: neither
-// EvalRankDetailScreen (still on hardcoded mock data) nor Blueprint360Screen
-// (ignores the playerUid param CoachAthletesScreen already passes it) can
-// actually show another athlete's data yet. Wiring a tap here would silently
-// open the coach's own EvalRank/Blueprint instead of the tapped athlete's —
-// worse than no affordance. Revisit once one of those screens supports
-// viewing a linked player's data (a real, separate gap from this feature).
-function PlayerRow({ player, theme }) {
+// Rows are tappable again. This was previously blocked because Blueprint360 and
+// EvalRank could not render another athlete's data, so a tap would silently show
+// the COACH's own — worse than no affordance. Both now read through
+// useModuleSubject, which resolves `playerUid` into a read-only subject and
+// surfaces an explicit error rather than falling back to the viewer, and the
+// sub-screens forward that param instead of dropping it.
+function PlayerRow({ player, theme, onPress }) {
+  const Wrapper = onPress ? TouchableOpacity : View;
   return (
-    <View style={[styles.playerRow, { backgroundColor: theme.card, borderColor: theme.border }]}>
+    <Wrapper
+      {...(onPress ? { onPress, activeOpacity: 0.8 } : {})}
+      style={[styles.playerRow, { backgroundColor: theme.card, borderColor: theme.border }]}
+    >
       <View style={[styles.avatar, { backgroundColor: theme.primary + '22' }]}>
         <Text style={[styles.avatarText, { color: theme.primary }]}>
           {player.name.split(' ').map((n) => n[0]).join('').slice(0, 2)}
@@ -123,7 +130,7 @@ function PlayerRow({ player, theme }) {
       <View style={[styles.workloadPill, { backgroundColor: player.workload.color + '18' }]}>
         <Text style={[styles.workloadText, { color: player.workload.color }]}>{player.workload.label}</Text>
       </View>
-    </View>
+    </Wrapper>
   );
 }
 
@@ -134,22 +141,56 @@ export default function SimCoachTeamModelScreen({ navigation }) {
 
   const [loading, setLoading] = useState(true);
   const [players, setPlayers] = useState([]);
+  const [assignmentTallies, setAssignmentTallies] = useState({});
 
   const loadTeam = useCallback(async () => {
     if (!coachUid) { setLoading(false); return; }
     setLoading(true);
     try {
       const linked = await getLinkedPlayers(coachUid);
-      const mapped = await Promise.all(
-        linked.map(async (l) => mapPlayer(l, await getLinkedPlayerSummary(l.uid)))
-      );
-      setPlayers(mapped);
+      // Shares the batched, short-cached roster read with CoachAthletesScreen, so
+      // opening both in sequence no longer re-fetches the whole roster twice.
+      const [summaries, tallies] = await Promise.all([
+        getRosterSummaries(linked.map((l) => l.uid)),
+        getCoachAssignmentSummary(coachUid).catch(() => ({})),
+      ]);
+      setPlayers(linked.map((l) => mapPlayer(l, summaries[l.uid] || {})));
+      setAssignmentTallies(tallies);
     } finally {
       setLoading(false);
     }
   }, [coachUid]);
 
   useFocusEffect(useCallback(() => { loadTeam(); }, [loadTeam]));
+
+  // Team-level rollups, computed from data the roster read already returned — no
+  // extra reads. The screen previously showed only per-player rows, so a coach had
+  // no read on the squad as a whole.
+  const teamStats = useMemo(() => {
+    if (!players.length) return null;
+    const graded = players.filter((p) => typeof p.composite === 'number');
+    const meanComposite = graded.length
+      ? Math.round(graded.reduce((sum, p) => sum + p.composite, 0) / graded.length)
+      : null;
+
+    const tallies = Object.values(assignmentTallies);
+    const totals = tallies.reduce(
+      (acc, t) => ({
+        total: acc.total + t.total,
+        done: acc.done + t.submitted + t.verified,
+        awaiting: acc.awaiting + t.submitted,
+      }),
+      { total: 0, done: 0, awaiting: 0 }
+    );
+
+    return {
+      meanComposite,
+      gradedCount: graded.length,
+      offPlan: players.filter((p) => !p.hasBlueprint).length,
+      assignmentRate: totals.total ? Math.round((totals.done / totals.total) * 100) : null,
+      awaitingReview: totals.awaiting,
+    };
+  }, [players, assignmentTallies]);
 
   const groups = useMemo(() => {
     const byFamily = {};
@@ -203,6 +244,37 @@ export default function SimCoachTeamModelScreen({ navigation }) {
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+          {teamStats ? (
+            <View style={styles.teamStatsRow}>
+              <View style={[styles.teamStat, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                <Text style={[styles.teamStatValue, { color: theme.text }]}>
+                  {teamStats.meanComposite != null ? teamStats.meanComposite : '—'}
+                </Text>
+                <Text style={[styles.teamStatLabel, { color: theme.textSecondary }]}>
+                  {teamStats.meanComposite != null
+                    ? `Mean EvalRank · ${teamStats.gradedCount} graded`
+                    : 'No evaluations yet'}
+                </Text>
+              </View>
+              <View style={[styles.teamStat, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                <Text style={[styles.teamStatValue, { color: theme.text }]}>
+                  {teamStats.assignmentRate != null ? `${teamStats.assignmentRate}%` : '—'}
+                </Text>
+                <Text style={[styles.teamStatLabel, { color: theme.textSecondary }]}>
+                  {teamStats.assignmentRate != null
+                    ? teamStats.awaitingReview > 0
+                      ? `Assigned work · ${teamStats.awaitingReview} to review`
+                      : 'Assigned work completed'
+                    : 'Nothing assigned yet'}
+                </Text>
+              </View>
+              <View style={[styles.teamStat, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                <Text style={[styles.teamStatValue, { color: theme.text }]}>{teamStats.offPlan}</Text>
+                <Text style={[styles.teamStatLabel, { color: theme.textSecondary }]}>Without a plan</Text>
+              </View>
+            </View>
+          ) : null}
+
           {groups.map((g) => (
             <View key={g.family} style={{ marginBottom: 20 }}>
               <View style={styles.groupHeader}>
@@ -211,7 +283,12 @@ export default function SimCoachTeamModelScreen({ navigation }) {
                 <Text style={[styles.groupCount, { color: theme.textSecondary }]}>{g.players.length}</Text>
               </View>
               {g.players.map((p) => (
-                <PlayerRow key={p.id} player={p} theme={theme} />
+                <PlayerRow
+                  key={p.id}
+                  player={p}
+                  theme={theme}
+                  onPress={() => navigation.navigate('EvalRank', { playerUid: p.id })}
+                />
               ))}
             </View>
           ))}
@@ -223,32 +300,43 @@ export default function SimCoachTeamModelScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
+  teamStatsRow: { flexDirection: 'row', gap: 8, marginBottom: 20 },
+  teamStat: {
+    flex: 1,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+  },
+  teamStatValue: { fontSize: 21, fontWeight: '800' },
+  teamStatLabel: { fontSize: 12, marginTop: 4, textAlign: 'center', lineHeight: 15 },
   container: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1 },
   backBtn: { padding: 4 },
-  headerTitle: { fontSize: 18, fontWeight: '700' },
-  headerSub: { fontSize: 12, marginTop: 1 },
+  headerTitle: { fontSize: 19, fontWeight: '700' },
+  headerSub: { fontSize: 14, marginTop: 1 },
 
   scroll: { padding: 16 },
   groupHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
   groupDot: { width: 8, height: 8, borderRadius: 4 },
-  groupTitle: { fontSize: 15, fontWeight: '700' },
-  groupCount: { fontSize: 12, marginLeft: 'auto' },
+  groupTitle: { fontSize: 16.5, fontWeight: '700' },
+  groupCount: { fontSize: 14, marginLeft: 'auto' },
 
   playerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, borderWidth: 1, padding: 12, marginBottom: 10 },
   avatar: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 14, fontWeight: '700' },
-  playerName: { fontSize: 14, fontWeight: '700' },
-  playerMeta: { fontSize: 12, marginTop: 1 },
+  avatarText: { fontSize: 16, fontWeight: '700' },
+  playerName: { fontSize: 16, fontWeight: '700' },
+  playerMeta: { fontSize: 14, marginTop: 1 },
   metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
-  metaChip: { fontSize: 11 },
+  metaChip: { fontSize: 13 },
   workloadPill: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-  workloadText: { fontSize: 11, fontWeight: '700' },
+  workloadText: { fontSize: 13, fontWeight: '700' },
 
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 10 },
-  emptyTitle: { fontSize: 18, fontWeight: '700' },
-  emptySub: { fontSize: 13, textAlign: 'center', lineHeight: 19 },
+  emptyTitle: { fontSize: 19, fontWeight: '700' },
+  emptySub: { fontSize: 15, textAlign: 'center', lineHeight: 20 },
 
   accessDenied: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 },
-  deniedTitle: { fontSize: 20, fontWeight: '700' },
+  deniedTitle: { fontSize: 21, fontWeight: '700' },
 });

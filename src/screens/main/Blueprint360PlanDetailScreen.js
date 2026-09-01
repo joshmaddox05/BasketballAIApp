@@ -54,7 +54,7 @@ function WeekTab({ weekNum, active, theme, onPress }) {
       <Text
         style={{
           fontFamily: active ? FONTS.bodyExtraBold : FONTS.bodyBold,
-          fontSize: 12,
+          fontSize: 14,
           color: active ? '#FFFFFF' : theme.textMuted,
         }}
       >
@@ -97,7 +97,7 @@ function DayCell({ entry, completed, accentCategories, theme, onPress, delay }) 
         <Text
           style={{
             fontFamily: FONTS.bodyBold,
-            fontSize: 9.5,
+            fontSize: 11.5,
             letterSpacing: 0.6,
             textTransform: 'uppercase',
             color: theme.textDim,
@@ -109,7 +109,7 @@ function DayCell({ entry, completed, accentCategories, theme, onPress, delay }) 
           <Text
             style={{
               fontFamily: FONTS.bodyMedium,
-              fontSize: 12,
+              fontSize: 14,
               fontStyle: 'italic',
               color: theme.textDim,
               marginTop: 4,
@@ -122,8 +122,8 @@ function DayCell({ entry, completed, accentCategories, theme, onPress, delay }) 
             <Text
               style={{
                 fontFamily: FONTS.bodyBold,
-                fontSize: 12.5,
-                lineHeight: 16,
+                fontSize: 14.5,
+                lineHeight: 17.5,
                 color: theme.text,
                 marginTop: 5,
               }}
@@ -144,7 +144,7 @@ function DayCell({ entry, completed, accentCategories, theme, onPress, delay }) 
               <Text
                 style={{
                   fontFamily: FONTS.bodyBold,
-                  fontSize: 10,
+                  fontSize: 12,
                   color: accent ? theme.accentText : theme.steel,
                 }}
               >
@@ -168,7 +168,7 @@ function WorkloadBar({ week, workload, maxWorkload, theme, delay }) {
       <Text
         style={{
           fontFamily: FONTS.bodySemiBold,
-          fontSize: 11.5,
+          fontSize: 13.5,
           color: theme.textMuted,
           width: 34,
         }}
@@ -186,7 +186,7 @@ function WorkloadBar({ week, workload, maxWorkload, theme, delay }) {
       <Text
         style={{
           fontFamily: FONTS.bodyBold,
-          fontSize: 11.5,
+          fontSize: 13.5,
           color: theme.text,
           width: 32,
           textAlign: 'right',
@@ -318,7 +318,7 @@ export default function Blueprint360PlanDetailScreen({ navigation, route }) {
                     style={{
                       flex: 1,
                       fontFamily: FONTS.bodySemiBold,
-                      fontSize: 12.5,
+                      fontSize: 14.5,
                       lineHeight: 17.5,
                       color: theme.text,
                     }}
@@ -380,7 +380,7 @@ const styles = StyleSheet.create({
   // Section title (Archivo 15/800 per mock 11b)
   sectionTitle: {
     fontFamily: FONTS.heading,
-    fontSize: 15,
+    fontSize: 16.5,
     marginTop: 20,
     marginBottom: 10,
   },
@@ -408,6 +408,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  contentGapNote: { fontFamily: FONTS.body, fontSize: 11, lineHeight: 16, marginTop: 12 },
+  contentGapNote: { fontFamily: FONTS.body, fontSize: 13, lineHeight: 17.5, marginTop: 12 },
   bottomSpacer: { height: 20 },
 });

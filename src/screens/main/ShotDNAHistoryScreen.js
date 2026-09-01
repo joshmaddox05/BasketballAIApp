@@ -165,7 +165,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  navTitle: { fontSize: 17, fontWeight: '700' },
+  navTitle: { fontSize: 18, fontWeight: '700' },
   filtersRow: { maxHeight: 52, flexGrow: 0 },
   filtersContent: { paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
   filterChip: {
@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginRight: 4,
   },
-  filterText: { fontSize: 13, fontWeight: '600' },
+  filterText: { fontSize: 15, fontWeight: '600' },
   listContent: { padding: 16, paddingBottom: 40 },
   historyCard: {
     flexDirection: 'row',
@@ -200,19 +200,19 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 4,
   },
-  cardType: { fontSize: 15, fontWeight: '600' },
+  cardType: { fontSize: 16.5, fontWeight: '600' },
   scoreBadge: {
     paddingHorizontal: 10,
     paddingVertical: 3,
     borderRadius: 8,
   },
-  scoreText: { fontSize: 14, fontWeight: '800' },
+  scoreText: { fontSize: 16, fontWeight: '800' },
   cardMetricRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     marginBottom: 3,
   },
-  cardMetric: { fontSize: 12, fontWeight: '600' },
-  cardDate: { fontSize: 11 },
+  cardMetric: { fontSize: 14, fontWeight: '600' },
+  cardDate: { fontSize: 13 },
 });

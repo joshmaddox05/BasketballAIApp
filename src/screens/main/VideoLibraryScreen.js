@@ -331,7 +331,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 16,
-    fontSize: 16,
+    fontSize: 17.5,
     color: '#666',
   },
   header: {
@@ -352,7 +352,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: 'bold',
     color: '#333',
   },
@@ -379,7 +379,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 17.5,
     color: '#333',
     marginLeft: 8,
   },
@@ -411,7 +411,7 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   categoryChipText: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
     fontWeight: '500',
   },
@@ -422,7 +422,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: 'bold',
     color: '#333',
     paddingHorizontal: 16,
@@ -456,17 +456,17 @@ const styles = StyleSheet.create({
     marginTop: 60,
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: 'bold',
     color: '#333',
     marginTop: 16,
     marginBottom: 8,
   },
   emptyMessage: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 21,
   },
   clearSearchButton: {
     marginTop: 16,
@@ -477,7 +477,7 @@ const styles = StyleSheet.create({
   },
   clearSearchText: {
     color: '#FFF',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '500',
   },
 });

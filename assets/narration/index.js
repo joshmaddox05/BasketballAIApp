@@ -1,0 +1,66 @@
+// assets/narration/index.js — the generated-audio manifest.
+//
+// Metro requires static `require()` paths, so this map cannot be built at
+// runtime from a directory listing. scripts/generateNarration.mjs rewrites the
+// block below whenever narration is regenerated; do not hand-edit that region.
+//
+// An id absent from this map is not an error: narrationService falls back to
+// expo-speech for it, so a newly authored line is spoken by the OS voice until
+// the next generation run.
+//
+// GENERATED-START
+export const NARRATION_ASSETS = {
+  'intro.blueprint360.1': require('./intro.blueprint360.1.mp3'),
+  'intro.blueprint360.2': require('./intro.blueprint360.2.mp3'),
+  'intro.blueprint360.3': require('./intro.blueprint360.3.mp3'),
+  'intro.coachmarket.1': require('./intro.coachmarket.1.mp3'),
+  'intro.coachmarket.2': require('./intro.coachmarket.2.mp3'),
+  'intro.coachmarket.3': require('./intro.coachmarket.3.mp3'),
+  'intro.evalrank.1': require('./intro.evalrank.1.mp3'),
+  'intro.evalrank.2': require('./intro.evalrank.2.mp3'),
+  'intro.evalrank.3': require('./intro.evalrank.3.mp3'),
+  'intro.hoopcommunity.1': require('./intro.hoopcommunity.1.mp3'),
+  'intro.hoopcommunity.2': require('./intro.hoopcommunity.2.mp3'),
+  'intro.hoopcommunity.3': require('./intro.hoopcommunity.3.mp3'),
+  'intro.legacyvault.1': require('./intro.legacyvault.1.mp3'),
+  'intro.legacyvault.2': require('./intro.legacyvault.2.mp3'),
+  'intro.legacyvault.3': require('./intro.legacyvault.3.mp3'),
+  'intro.parentscout.1': require('./intro.parentscout.1.mp3'),
+  'intro.parentscout.2': require('./intro.parentscout.2.mp3'),
+  'intro.parentscout.3': require('./intro.parentscout.3.mp3'),
+  'intro.scoutlab.1': require('./intro.scoutlab.1.mp3'),
+  'intro.scoutlab.2': require('./intro.scoutlab.2.mp3'),
+  'intro.scoutlab.3': require('./intro.scoutlab.3.mp3'),
+  'intro.scoutreports.1': require('./intro.scoutreports.1.mp3'),
+  'intro.scoutreports.2': require('./intro.scoutreports.2.mp3'),
+  'intro.scoutreports.3': require('./intro.scoutreports.3.mp3'),
+  'intro.scoutsearch.1': require('./intro.scoutsearch.1.mp3'),
+  'intro.scoutsearch.2': require('./intro.scoutsearch.2.mp3'),
+  'intro.scoutsearch.3': require('./intro.scoutsearch.3.mp3'),
+  'intro.shotdna.1': require('./intro.shotdna.1.mp3'),
+  'intro.shotdna.2': require('./intro.shotdna.2.mp3'),
+  'intro.shotdna.3': require('./intro.shotdna.3.mp3'),
+  'intro.simcoach.1': require('./intro.simcoach.1.mp3'),
+  'intro.simcoach.2': require('./intro.simcoach.2.mp3'),
+  'intro.simcoach.3': require('./intro.simcoach.3.mp3'),
+  'tour.ai-analysis': require('./tour.ai-analysis.mp3'),
+  'tour.build-workout': require('./tour.build-workout.mp3'),
+  'tour.coach-middle-tab': require('./tour.coach-middle-tab.mp3'),
+  'tour.coach-profile-tab': require('./tour.coach-profile-tab.mp3'),
+  'tour.coach-quick-actions': require('./tour.coach-quick-actions.mp3'),
+  'tour.coach-stats': require('./tour.coach-stats.mp3'),
+  'tour.coach-tools': require('./tour.coach-tools.mp3'),
+  'tour.parent-child-switcher': require('./tour.parent-child-switcher.mp3'),
+  'tour.parent-profile-tab': require('./tour.parent-profile-tab.mp3'),
+  'tour.parent-progress': require('./tour.parent-progress.mp3'),
+  'tour.parent-progress-tab': require('./tour.parent-progress-tab.mp3'),
+  'tour.parent-tools': require('./tour.parent-tools.mp3'),
+  'tour.progress-tab': require('./tour.progress-tab.mp3'),
+  'tour.shooting-accuracy': require('./tour.shooting-accuracy.mp3'),
+  'tour.skill-progress': require('./tour.skill-progress.mp3'),
+  'tour.training-summary': require('./tour.training-summary.mp3'),
+  'tour.training-tab': require('./tour.training-tab.mp3'),
+};
+// GENERATED-END
+
+export default NARRATION_ASSETS;

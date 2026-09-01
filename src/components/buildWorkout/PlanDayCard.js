@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
     marginRight: 14
   },
   dayNumber: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: '800',
     marginBottom: 2
   },
@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
     marginBottom: 4
   },
   title: {
-    fontSize: 15,
+    fontSize: 16.5,
     fontWeight: '600',
     color: '#FFFFFF',
     flex: 1
@@ -183,7 +183,7 @@ const styles = StyleSheet.create({
     marginLeft: 8
   },
   themeText: {
-    fontSize: 10,
+    fontSize: 12,
     color: '#888888',
     fontWeight: '500'
   },
@@ -191,24 +191,24 @@ const styles = StyleSheet.create({
     marginBottom: 6
   },
   workoutName: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#888888',
     marginTop: 2
   },
   moreWorkouts: {
-    fontSize: 11,
+    fontSize: 13,
     color: '#666666',
     fontStyle: 'italic',
     marginTop: 2
   },
   restText: {
-    fontSize: 13,
+    fontSize: 15,
     color: '#9C27B0',
     fontStyle: 'italic',
     marginBottom: 6
   },
   assessmentText: {
-    fontSize: 13,
+    fontSize: 15,
     color: '#FFD700',
     fontWeight: '500',
     marginBottom: 6
@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
     marginRight: 16
   },
   durationText: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#888888',
     marginLeft: 4
   },
@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   focusText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '500',
     marginLeft: 4
   },
@@ -261,7 +261,7 @@ const styles = StyleSheet.create({
     marginBottom: 2
   },
   dayBadgeText: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700'
   }
 });

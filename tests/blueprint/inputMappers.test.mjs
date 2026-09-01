@@ -105,13 +105,58 @@ test('range consistency needs two populated ranges', () => {
   assert.ok(twoRanges.meta.sps.rangeConsistency.value < 100);
 });
 
-test('movement shooting is permanently unmeasured — it is a content gap', () => {
+test('movement shooting is unmeasured until the drill is actually logged', () => {
+  // It used to be a CONTENT gap: movementShootingPct carries 25% of SPS and no
+  // drill in the catalog produced it, so SPS was capped at 75% coverage for
+  // everyone. The MOVEMENT_SHOOTING step template closed that, so this is now an
+  // ordinary unmeasured component — it needs shots, not a new drill.
   const { meta } = buildPillarComponents({
     ...EMPTY,
     workouts: [shootingWorkout([['Catch and Shoot', 30, 40]])],
   });
   assert.equal(meta.sps.movementShootingPct.measured, false);
-  assert.match(meta.sps.movementShootingPct.note, /content gap/i);
+  assert.doesNotMatch(meta.sps.movementShootingPct.note, /content gap/i);
+});
+
+test('movement shooting becomes measured once the drill is logged', () => {
+  const withMovement = buildPillarComponents({
+    ...EMPTY,
+    workouts: [
+      shootingWorkout([
+        ['Catch and Shoot', 30, 40],
+        ['Movement Shooting', 18, 30],
+      ]),
+    ],
+  });
+  assert.equal(withMovement.meta.sps.movementShootingPct.measured, true);
+  assert.equal(withMovement.meta.sps.movementShootingPct.value, 60); // 18/30
+
+  // The component that used to be permanently absent now contributes coverage.
+  const withoutMovement = buildPillarComponents({
+    ...EMPTY,
+    workouts: [shootingWorkout([['Catch and Shoot', 30, 40]])],
+  });
+  assert.ok(
+    withMovement.coverage.SPS > withoutMovement.coverage.SPS,
+    'logging the movement drill must raise SPS coverage'
+  );
+});
+
+test('SPS can now reach full coverage — it previously could not', () => {
+  const { coverage, measuredPillars } = buildPillarComponents({
+    ...EMPTY,
+    workouts: [
+      shootingWorkout([
+        ['Catch and Shoot', 24, 40],
+        ['Off the Dribble', 16, 40],
+        ['Free Throws', 30, 40],
+        ['Movement Shooting', 20, 40],
+        ['Three-Point Shooting', 14, 40],
+      ]),
+    ],
+  });
+  assert.equal(coverage.SPS, 1);
+  assert.equal(measuredPillars.SPS, true);
 });
 
 // ── SimCoach → IQS ───────────────────────────────────────────────────────────
@@ -329,4 +374,207 @@ test('toDate accepts Dates, Firestore Timestamps, strings and rejects junk', () 
 test('isoWeekKey is stable and sortable', () => {
   assert.equal(isoWeekKey(new Date('2026-01-05T12:00:00Z')), '2026-W02');
   assert.ok(isoWeekKey(new Date('2026-03-01T00:00:00Z')) < isoWeekKey(new Date('2026-08-01T00:00:00Z')));
+});
+
+// ── Camera-tracked movement drills → SRS ─────────────────────────────────────
+// SRS had no producer at all before this: all four components were permanently
+// unmeasured. Live pose tracking supplies a declared PROXY for two of them —
+// camera-verified completion, which measures work done, not technique. These
+// tests pin the honesty properties, which are the easy thing to regress.
+
+const trackedWorkout = (steps) => ({
+  category: 'dribbling',
+  completionPercentage: 100,
+  durationMinutes: 30,
+  completedAt: new Date(),
+  stepPerformance: steps.map(([stepTitle, completionPercentage, trackingMode = 'live', avgPoseConfidence = 0.8]) => ({
+    stepTitle,
+    completionPercentage,
+    trackingMode,
+    avgPoseConfidence,
+  })),
+});
+
+test('SRS stays unmeasured below the tracked-step threshold', () => {
+  const { meta, measuredPillars } = buildPillarComponents({
+    ...EMPTY,
+    workouts: [trackedWorkout([['Crossovers', 100], ['Crossovers', 90]])], // only 2
+  });
+  assert.equal(meta.srs.ballHandlingEfficiency.measured, false);
+  assert.equal(measuredPillars.SRS, false);
+});
+
+test('camera-tracked ball-handling drills measure ballHandlingEfficiency', () => {
+  const { meta } = buildPillarComponents({
+    ...EMPTY,
+    workouts: [
+      trackedWorkout([
+        ['Crossovers', 100],
+        ['Stationary Dribbling', 80],
+        ['Two-Ball Dribbling', 90],
+      ]),
+    ],
+  });
+  const c = meta.srs.ballHandlingEfficiency;
+  assert.equal(c.measured, true);
+  assert.equal(c.value, 90); // (100 + 80 + 90) / 3
+  // It is a proxy for execution, and must say so rather than pose as technique.
+  assert.equal(c.confidence, 'low');
+  assert.match(c.note, /not technique/i);
+});
+
+test('manual reps are never treated as execution evidence', () => {
+  // A manual tally is the athlete's own claim. Counting it here would be exactly
+  // the unmeasured-reported-as-real failure the coverage rules exist to prevent.
+  const { meta } = buildPillarComponents({
+    ...EMPTY,
+    workouts: [
+      trackedWorkout([
+        ['Crossovers', 100, 'manual'],
+        ['Stationary Dribbling', 100, 'manual'],
+        ['Two-Ball Dribbling', 100, 'manual'],
+        ['Crossovers', 100, 'manual'],
+      ]),
+    ],
+  });
+  assert.equal(meta.srs.ballHandlingEfficiency.measured, false);
+});
+
+test('defensive drills feed defensiveTechnique, not ball handling', () => {
+  const { meta } = buildPillarComponents({
+    ...EMPTY,
+    workouts: [
+      trackedWorkout([
+        ['Defensive Slides', 100],
+        ['Zigzag Defense', 70],
+        ['Mirror Drill', 100],
+      ]),
+    ],
+  });
+  assert.equal(meta.srs.defensiveTechnique.measured, true);
+  assert.equal(meta.srs.defensiveTechnique.value, 90);
+  // Skills must not bleed into each other.
+  assert.equal(meta.srs.ballHandlingEfficiency.measured, false);
+});
+
+test('passing and finishing stay unmeasured — they still have no producer', () => {
+  const { meta } = buildPillarComponents({
+    ...EMPTY,
+    workouts: [
+      trackedWorkout([
+        ['Crossovers', 100],
+        ['Stationary Dribbling', 100],
+        ['Two-Ball Dribbling', 100],
+      ]),
+    ],
+  });
+  assert.equal(meta.srs.passingAccuracy.measured, false);
+  assert.equal(meta.srs.finishingEfficiency.measured, false);
+});
+
+test('a partially measured SRS is not a low SRS', () => {
+  // Invariant 3: measured components are scaled by 1/coverage, so two perfect
+  // components out of four must not read as a 50% pillar.
+  const { components, coverage } = buildPillarComponents({
+    ...EMPTY,
+    workouts: [
+      trackedWorkout([
+        ['Crossovers', 100],
+        ['Stationary Dribbling', 100],
+        ['Two-Ball Dribbling', 100],
+        ['Defensive Slides', 100],
+        ['Zigzag Defense', 100],
+        ['Mirror Drill', 100],
+      ]),
+    ],
+  });
+  assert.ok(coverage.SRS > 0 && coverage.SRS < 1, 'expected partial SRS coverage');
+  const total = Object.values(components.srs).reduce((a, b) => a + b, 0);
+  assert.ok(total > 90, `partial coverage should still read ~100, got ${total}`);
+});
+
+test('an over-counting detector cannot push a component above 100', () => {
+  const { meta } = buildPillarComponents({
+    ...EMPTY,
+    workouts: [
+      trackedWorkout([
+        ['Crossovers', 250],
+        ['Crossovers', 300],
+        ['Crossovers', 400],
+      ]),
+    ],
+  });
+  assert.equal(meta.srs.ballHandlingEfficiency.value, 100);
+});
+
+test('unknown or malformed tracked steps are ignored, not counted as zero', () => {
+  const { meta } = buildPillarComponents({
+    ...EMPTY,
+    workouts: [
+      trackedWorkout([
+        ['Some Custom Drill', 100],
+        ['Crossovers', NaN],
+        ['Free Throws', 100],
+      ]),
+    ],
+  });
+  assert.equal(meta.srs.ballHandlingEfficiency.measured, false);
+  // Invariant 1: an unmeasured component contributes exactly zero, never a
+  // free pass — and never throws on junk input.
+  assert.doesNotThrow(() => buildPillarComponents({ ...EMPTY, workouts: [{ stepPerformance: null }] }));
+});
+
+// ── SimCoach → IQS, and the write/read contract behind it ───────────────────
+// REGRESSION: `gatherEvalInputs` maps `Number(r.iqScore)` over simCoachResults and
+// `getSimCoachIQScore` averages the same field, but the only writer recorded
+// `correct: true/false` and never wrote `iqScore`. sessionCount was therefore
+// always 0, decisionAccuracy stayed unmeasured, and no amount of completed IQ
+// work could move the EvalRank composite.
+//
+// The engine takes {meanIQScore, sessionCount}, so these test that contract at
+// the mapper boundary; the derivation itself is asserted below it.
+
+test('SimCoach sessions measure decision accuracy once past the threshold', () => {
+  const { meta, measuredPillars } = buildPillarComponents({
+    ...EMPTY,
+    simCoach: { meanIQScore: 67, sessionCount: MIN_SIMCOACH_SESSIONS },
+  });
+  assert.equal(meta.iqs.decisionAccuracy.measured, true);
+  assert.equal(meta.iqs.decisionAccuracy.value, 67);
+  assert.equal(measuredPillars.IQS, true);
+});
+
+test('a zero sessionCount can never measure IQ, whatever the mean says', () => {
+  // The exact shape the bug produced: results existed, but none carried a score
+  // the reader recognised, so the engine saw no sessions at all.
+  const { meta, measuredPillars } = buildPillarComponents({
+    ...EMPTY,
+    simCoach: { meanIQScore: null, sessionCount: 0 },
+  });
+  assert.equal(meta.iqs.decisionAccuracy.measured, false);
+  assert.equal(measuredPillars.IQS, false);
+  assert.match(meta.iqs.decisionAccuracy.note, /SimCoach sessions/i);
+});
+
+test('IQ stays unmeasured below the session threshold', () => {
+  const { meta } = buildPillarComponents({
+    ...EMPTY,
+    simCoach: { meanIQScore: 100, sessionCount: MIN_SIMCOACH_SESSIONS - 1 },
+  });
+  // Deliberate: two right answers is not an IQ measurement. This is why a player
+  // sees nothing move until their third scenario.
+  assert.equal(meta.iqs.decisionAccuracy.measured, false);
+});
+
+test('percent-correct is what reaches the engine as decision accuracy', () => {
+  // 2 of 4 correct -> 100,0,100,0 -> mean 50.
+  const scores = [true, false, true, false].map((c) => (c ? 100 : 0));
+  const mean = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+  assert.equal(mean, 50);
+
+  const { meta } = buildPillarComponents({
+    ...EMPTY,
+    simCoach: { meanIQScore: mean, sessionCount: scores.length },
+  });
+  assert.equal(meta.iqs.decisionAccuracy.value, 50);
 });

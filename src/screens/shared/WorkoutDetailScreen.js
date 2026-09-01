@@ -33,7 +33,10 @@ const formatStepDuration = (seconds) => {
 };
 
 const WorkoutDetailScreen = ({ route, navigation }) => {
-    const { workoutId, workout: passedWorkout, isCustom } = route.params;
+    // assignmentRefId is threaded through from a coach-assignment card so the
+    // completion flow closes that exact assignment. It is optional — completion
+    // also matches on the workout template id.
+    const { workoutId, workout: passedWorkout, isCustom, assignmentRefId } = route.params;
     const { workouts, theme, userData, addActivity } = useAppContext();
     const [currentStep, setCurrentStep] = useState(0);
     const [customWorkout, setCustomWorkout] = useState(passedWorkout || null);
@@ -112,12 +115,14 @@ const WorkoutDetailScreen = ({ route, navigation }) => {
                         if (isCustom) {
                             navigation.navigate('ActiveWorkout', {
                                 workout: workout,
-                                isCustom: true
+                                isCustom: true,
+                                assignmentRefId
                             });
                         } else {
                             navigation.navigate('ActiveWorkout', {
                                 workoutId: workout.id,
-                                workout: workout
+                                workout: workout,
+                                assignmentRefId
                             });
                         }
                     }
@@ -359,7 +364,7 @@ const styles = StyleSheet.create({
         gap: 10,
     },
     headerTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: 'bold',
     },
     placeholder: {
@@ -393,27 +398,27 @@ const styles = StyleSheet.create({
         elevation: 2,
     },
     metaLabel: {
-        fontSize: 12,
+        fontSize: 14,
         marginTop: 8,
         marginBottom: 4,
         textTransform: 'uppercase',
         letterSpacing: 0.5,
     },
     metaValue: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: 'bold',
     },
     descriptionContainer: {
         marginBottom: 24,
     },
     descriptionTitle: {
-        fontSize: 20,
+        fontSize: 21,
         fontWeight: 'bold',
         marginBottom: 12,
     },
     description: {
-        fontSize: 16,
-        lineHeight: 24,
+        fontSize: 17.5,
+        lineHeight: 25,
     },
     stepsSection: {
         marginBottom: 20,
@@ -425,13 +430,13 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     sectionTitle: {
-        fontSize: 22,
+        fontSize: 23,
         fontWeight: 'bold',
     },
     sectionSubtitle: {
-        fontSize: 14,
+        fontSize: 16,
         marginBottom: 16,
-        lineHeight: 20,
+        lineHeight: 21,
     },
     stepCard: {
         padding: 18,
@@ -460,13 +465,13 @@ const styles = StyleSheet.create({
     stepNumberText: {
         color: '#FFF',
         fontWeight: 'bold',
-        fontSize: 16,
+        fontSize: 17.5,
     },
     stepTitleContainer: {
         flex: 1,
     },
     stepTitle: {
-        fontSize: 17,
+        fontSize: 18,
         fontWeight: 'bold',
         marginBottom: 4,
     },
@@ -502,20 +507,20 @@ const styles = StyleSheet.create({
     },
     instructionBulletText: {
         color: '#FFF',
-        fontSize: 11,
+        fontSize: 13,
         fontWeight: '700',
     },
     instructionText: {
         flex: 1,
-        fontSize: 14,
-        lineHeight: 20,
+        fontSize: 16,
+        lineHeight: 21,
     },
     stepDurationText: {
-        fontSize: 13,
+        fontSize: 15,
     },
     stepInstructions: {
-        fontSize: 15,
-        lineHeight: 22,
+        fontSize: 16.5,
+        lineHeight: 23,
         marginBottom: 12,
     },
     tipContainer: {
@@ -535,9 +540,9 @@ const styles = StyleSheet.create({
         marginTop: 2,
     },
     tipText: {
-        fontSize: 14,
+        fontSize: 16,
         flex: 1,
-        lineHeight: 20,
+        lineHeight: 21,
     },
     equipmentSection: {
         marginBottom: 24,
@@ -567,7 +572,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     equipmentText: {
-        fontSize: 15,
+        fontSize: 16.5,
         fontWeight: '500',
     },
     coachSection: {
@@ -594,8 +599,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     coachNotes: {
-        fontSize: 15,
-        lineHeight: 22,
+        fontSize: 16.5,
+        lineHeight: 23,
         flex: 1,
     },
     footer: {
@@ -637,17 +642,17 @@ const styles = StyleSheet.create({
     },
     startButtonText: {
         color: '#FFF',
-        fontSize: 19,
+        fontSize: 20,
         fontWeight: 'bold',
         marginBottom: 2,
     },
     startButtonSubtext: {
         color: 'rgba(255, 255, 255, 0.85)',
-        fontSize: 13,
+        fontSize: 15,
         fontWeight: '500',
     },
     errorText: {
-        fontSize: 16,
+        fontSize: 17.5,
         textAlign: 'center',
         marginTop: 50,
     },
@@ -663,7 +668,7 @@ const styles = StyleSheet.create({
     },
     lockHeaderText: {
         color: '#FFF',
-        fontSize: 12,
+        fontSize: 14,
         fontWeight: 'bold',
         letterSpacing: 0.5,
     },

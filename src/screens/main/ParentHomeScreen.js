@@ -19,6 +19,7 @@ import { getLevelTitle } from '../../utils/constants';
 import ModuleGrid from '../../components/features/ModuleGrid';
 import { getModulesForRole } from '../../config/roleModules';
 import ChildSwitcher from '../../components/parent/ChildSwitcher';
+import { TourStep, useTour } from '../../components/tour';
 import { TYPE, SHAPE, FONTS, MOTION } from '../../utils/typography';
 import { useReduceMotion } from '../../hooks/useReduceMotion';
 import {
@@ -367,6 +368,14 @@ function ScoutRequestCard({ req, theme, onDecision }) {
 
 export default function ParentHomeScreen({ navigation }) {
   const { user, userData, theme, isDarkMode, selectedChildUid, setSelectedChildUid } = useAppContext();
+
+  // Register this scroll view so the tour can auto-scroll below-the-fold targets
+  const { registerScrollRef, unregisterScrollRef, updateScrollY } = useTour();
+  const scrollRef = useRef(null);
+  useEffect(() => {
+    registerScrollRef('ParentHome', scrollRef);
+    return () => unregisterScrollRef('ParentHome');
+  }, [registerScrollRef, unregisterScrollRef]);
   const parentUid = user?.uid;
 
   const name = userData?.displayName || userData?.name || 'Parent';
@@ -498,11 +507,15 @@ export default function ParentHomeScreen({ navigation }) {
       <StatusBar style={isDarkMode ? 'light' : 'dark'} />
       {renderHeader()}
       <ScrollView
+        ref={scrollRef}
+        onScroll={(e) => updateScrollY('ParentHome', e.nativeEvent.contentOffset.y)}
+        scrollEventThrottle={16}
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         {/* Child switcher — Family Hub supports multiple children */}
+        <TourStep stepId="parent-child-switcher">
         <ChildSwitcher
           children={children}
           selectedUid={selectedChildUid}
@@ -510,6 +523,7 @@ export default function ParentHomeScreen({ navigation }) {
           onAddChild={() => navigation.navigate('LinkAccount', { onLinked: refreshChildren })}
           theme={theme}
         />
+        </TourStep>
 
         {/* Child Summary Card */}
         {child && <ChildSummaryCard child={child} theme={theme} />}
@@ -540,6 +554,7 @@ export default function ParentHomeScreen({ navigation }) {
 
         {/* Family Tools — Module Hub is the primary surface */}
         <View style={styles.section}>
+          <TourStep stepId="parent-tools">
           <ModuleGrid
             title="Family Tools"
             modules={getModulesForRole('parent')}
@@ -548,6 +563,7 @@ export default function ParentHomeScreen({ navigation }) {
             navigation={navigation}
             navParams={{ childUid: selectedChildUid }}
           />
+          </TourStep>
         </View>
 
         {/* Recent Activity */}
@@ -573,9 +589,10 @@ export default function ParentHomeScreen({ navigation }) {
         </View>
 
         {/* Progress Report CTA */}
+        <TourStep stepId="parent-progress-cta">
         <TouchableOpacity
           style={[styles.progressReportBtn, { backgroundColor: theme.primary }]}
-          onPress={() => navigation.navigate('FamilyDashboard')}
+          onPress={() => navigation.navigate('ProgressReport', { childUid: selectedChildUid })}
           activeOpacity={0.85}
         >
           <View>
@@ -584,6 +601,7 @@ export default function ParentHomeScreen({ navigation }) {
           </View>
           <Ionicons name="chevron-forward" size={18} color="#FFFFFF" />
         </TouchableOpacity>
+        </TourStep>
 
         {/* Recruiting + Edit Athlete for the selected child */}
         <View style={styles.childActionRow}>
@@ -643,7 +661,7 @@ const styles = StyleSheet.create({
   },
   childAvatarText: {
     fontFamily: FONTS.bodyExtraBold,
-    fontSize: 17,
+    fontSize: 18,
     color: '#FFFFFF',
   },
   streakBadge: {
@@ -660,20 +678,20 @@ const styles = StyleSheet.create({
   },
   streakBadgeText: {
     fontFamily: FONTS.bodyExtraBold,
-    fontSize: 9,
+    fontSize: 11,
   },
   childInfo: {
     flex: 1,
   },
   childName: {
     fontFamily: FONTS.heading,
-    fontSize: 19,
-    lineHeight: 21,
+    fontSize: 20,
+    lineHeight: 22,
     color: '#FFFFFF',
   },
   childTeam: {
     fontFamily: FONTS.bodyMedium,
-    fontSize: 11,
+    fontSize: 13,
     color: 'rgba(255,255,255,0.72)',
     marginTop: 3,
   },
@@ -691,7 +709,7 @@ const styles = StyleSheet.create({
   },
   childMetaText: {
     fontFamily: FONTS.bodyBold,
-    fontSize: 9,
+    fontSize: 11,
     color: '#FFFFFF',
   },
   levelBarContainer: {
@@ -699,7 +717,7 @@ const styles = StyleSheet.create({
   },
   levelBarLabel: {
     fontFamily: FONTS.bodySemiBold,
-    fontSize: 10,
+    fontSize: 12,
     color: 'rgba(255,255,255,0.75)',
     marginTop: 6,
   },
@@ -714,7 +732,7 @@ const styles = StyleSheet.create({
   },
   achievementText: {
     fontFamily: FONTS.bodySemiBold,
-    fontSize: 10.5,
+    fontSize: 12.5,
     color: 'rgba(255,255,255,0.85)',
     flex: 1,
   },
@@ -741,7 +759,7 @@ const styles = StyleSheet.create({
   },
   weekStatDenominator: {
     fontFamily: FONTS.heading,
-    fontSize: 12,
+    fontSize: 14,
   },
   weekStatLabel: {
     marginTop: 5,
@@ -764,7 +782,7 @@ const styles = StyleSheet.create({
   },
   nextSessionText: {
     fontFamily: FONTS.bodyMedium,
-    fontSize: 11,
+    fontSize: 13,
   },
 
   // Scout access request (consent) card
@@ -787,11 +805,11 @@ const styles = StyleSheet.create({
   },
   scoutReqName: {
     fontFamily: FONTS.bodyBold,
-    fontSize: 12.5,
+    fontSize: 14.5,
   },
   scoutReqSub: {
     fontFamily: FONTS.body,
-    fontSize: 10.5,
+    fontSize: 12.5,
     marginTop: 2,
   },
   scoutReqActions: {
@@ -829,11 +847,11 @@ const styles = StyleSheet.create({
   },
   activityTitle: {
     fontFamily: FONTS.bodyBold,
-    fontSize: 11.5,
+    fontSize: 13.5,
   },
   activityTime: {
     fontFamily: FONTS.bodyMedium,
-    fontSize: 9.5,
+    fontSize: 11.5,
   },
   emptyFeedText: {
     paddingVertical: 12,
@@ -850,12 +868,12 @@ const styles = StyleSheet.create({
   },
   progressReportTitle: {
     fontFamily: FONTS.heading,
-    fontSize: 13.5,
+    fontSize: 15,
     color: '#FFFFFF',
   },
   progressReportSub: {
     fontFamily: FONTS.body,
-    fontSize: 10.5,
+    fontSize: 12.5,
     color: 'rgba(255,255,255,0.72)',
     marginTop: 3,
   },

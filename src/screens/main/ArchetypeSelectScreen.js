@@ -71,7 +71,7 @@ function ShotMenuRow({ tone, shots, theme }) {
 
   return (
     <View style={{ marginTop: 8 }}>
-      <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 10.5, color: text }}>
+      <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 12.5, color: text }}>
         {PERMISSION_TONE[tone].label}
       </Text>
       <View style={styles.chipWrap}>
@@ -85,7 +85,7 @@ function ShotMenuRow({ tone, shots, theme }) {
               backgroundColor: fill,
             }}
           >
-            <Text style={{ fontFamily: FONTS.bodyMedium, fontSize: 10.5, color: text }}>
+            <Text style={{ fontFamily: FONTS.bodyMedium, fontSize: 12.5, color: text }}>
               {shotName(s)}
             </Text>
           </View>
@@ -144,8 +144,8 @@ function ArchetypeCard({ archetypeId, selected, recommended, reasons, onSelect, 
                   style={{
                     flex: 1,
                     fontFamily: FONTS.body,
-                    fontSize: 11.5,
-                    lineHeight: 16,
+                    fontSize: 13.5,
+                    lineHeight: 17.5,
                     color: theme.textMuted,
                   }}
                 >
@@ -158,7 +158,7 @@ function ArchetypeCard({ archetypeId, selected, recommended, reasons, onSelect, 
 
         {selected ? (
           <View style={{ marginTop: 12, borderTopWidth: 1, borderTopColor: theme.hairline, paddingTop: 10 }}>
-            <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 11, color: theme.text }}>
+            <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 13, color: theme.text }}>
               Must master: {d.coreSkills.map((s) => s.label).join(', ')}
             </Text>
             {d.restrictedSkills.length ? (
@@ -173,7 +173,7 @@ function ArchetypeCard({ archetypeId, selected, recommended, reasons, onSelect, 
             <Text
               style={{
                 fontFamily: FONTS.bodySemiBold,
-                fontSize: 11,
+                fontSize: 13,
                 color: theme.text,
                 marginTop: 10,
               }}
@@ -292,7 +292,7 @@ export default function ArchetypeSelectScreen({ navigation }) {
             padding: 14,
           }}
         >
-          <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 12, color: theme.text }}>
+          <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 14, color: theme.text }}>
             {derived.ambiguous ? 'Two archetypes fit you equally well' : 'Best match'}
           </Text>
           <Text style={[TYPE.statCaption, { color: theme.textMuted, marginTop: 4 }]}>

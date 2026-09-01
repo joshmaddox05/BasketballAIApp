@@ -122,7 +122,7 @@ const ScanTile = ({ theme }) => {
                 }}
             >
                 <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: theme.primary }} />
-                <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 10.5, letterSpacing: 0.4, color: '#FFFFFF' }}>
+                <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 12.5, letterSpacing: 0.4, color: '#FFFFFF' }}>
                     Analyzing mechanics
                 </Text>
             </View>
@@ -347,7 +347,7 @@ const ShootingAnalysisScreen = ({ navigation }) => {
                             backgroundColor: `${statusColor}20`,
                         }}
                     >
-                        <Text style={{ fontFamily: FONTS.bodyExtraBold, fontSize: 11, color: statusColor }}>
+                        <Text style={{ fontFamily: FONTS.bodyExtraBold, fontSize: 13, color: statusColor }}>
                             {item.score}/10
                         </Text>
                     </View>
@@ -356,13 +356,13 @@ const ShootingAnalysisScreen = ({ navigation }) => {
                 <View style={{ flexDirection: 'row', marginTop: 8, gap: 14 }}>
                     <View style={{ flex: 1 }}>
                         <Text style={[TYPE.statCaption, { color: theme.textDim }]}>Yours</Text>
-                        <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 13, color: theme.text, marginTop: 2 }}>
+                        <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 15, color: theme.text, marginTop: 2 }}>
                             {item.value}
                         </Text>
                     </View>
                     <View style={{ flex: 1 }}>
                         <Text style={[TYPE.statCaption, { color: theme.textDim }]}>Ideal</Text>
-                        <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 13, color: theme.text, marginTop: 2 }}>
+                        <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 15, color: theme.text, marginTop: 2 }}>
                             {item.ideal}
                         </Text>
                     </View>
@@ -370,7 +370,7 @@ const ShootingAnalysisScreen = ({ navigation }) => {
 
                 <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 8 }}>
                     <Ionicons name={statusIcon} size={14} color={statusColor} style={{ marginTop: 1 }} />
-                    <Text style={[TYPE.rowMeta, { color: theme.textMuted, flex: 1, marginTop: 0, lineHeight: 15 }]}>
+                    <Text style={[TYPE.rowMeta, { color: theme.textMuted, flex: 1, marginTop: 0, lineHeight: 16.5 }]}>
                         {item.feedback}
                     </Text>
                 </View>
@@ -427,8 +427,8 @@ const ShootingAnalysisScreen = ({ navigation }) => {
                         <Text
                             style={{
                                 fontFamily: FONTS.body,
-                                fontSize: 12.5,
-                                lineHeight: 18,
+                                fontSize: 14.5,
+                                lineHeight: 19,
                                 color: theme.textMuted,
                                 textAlign: 'center',
                                 marginTop: 8,
@@ -463,7 +463,7 @@ const ShootingAnalysisScreen = ({ navigation }) => {
                         >
                             <Ionicons name="bulb" size={15} color={theme.accentText} />
                         </View>
-                        <Text style={[TYPE.rowMeta, { color: theme.textMuted, flex: 1, marginTop: 0, lineHeight: 16 }]}>
+                        <Text style={[TYPE.rowMeta, { color: theme.textMuted, flex: 1, marginTop: 0, lineHeight: 17.5 }]}>
                             Well-lit space, clear background, 90° side angle. Full body in frame.
                         </Text>
                     </Entrance>
@@ -616,7 +616,7 @@ const ShootingAnalysisScreen = ({ navigation }) => {
                             </SectionLabel>
 
                             {!!analysisResults.summary && (
-                                <Text style={[TYPE.rowMeta, { color: theme.textMuted, marginBottom: 10, lineHeight: 16 }]}>
+                                <Text style={[TYPE.rowMeta, { color: theme.textMuted, marginBottom: 10, lineHeight: 17.5 }]}>
                                     {analysisResults.summary}
                                 </Text>
                             )}
@@ -634,7 +634,7 @@ const ShootingAnalysisScreen = ({ navigation }) => {
                                     }}
                                 >
                                     <Ionicons name="warning-outline" size={14} color={theme.warning} />
-                                    <Text style={[TYPE.rowMeta, { color: theme.textMuted, flex: 1, marginTop: 0, lineHeight: 15 }]}>
+                                    <Text style={[TYPE.rowMeta, { color: theme.textMuted, flex: 1, marginTop: 0, lineHeight: 16.5 }]}>
                                         {analysisResults.quality.warning}
                                     </Text>
                                 </View>
@@ -778,8 +778,8 @@ const ShootingAnalysisScreen = ({ navigation }) => {
                                     <Text
                                         style={{
                                             fontFamily: FONTS.bodySemiBold,
-                                            fontSize: 12.5,
-                                            lineHeight: 17,
+                                            fontSize: 14.5,
+                                            lineHeight: 18,
                                             color: theme.text,
                                             flex: 1,
                                             marginTop: 3,

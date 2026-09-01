@@ -59,6 +59,12 @@ import CoachMarketListingScreen from '../screens/main/CoachMarketListingScreen';
 import CoachMarketDashboardScreen from '../screens/main/CoachMarketDashboardScreen';
 import CoachSessionsScreen from '../screens/main/CoachSessionsScreen';
 import AssignWorkoutScreen from '../screens/main/AssignWorkoutScreen';
+import CoachAssignmentReviewScreen from '../screens/main/CoachAssignmentReviewScreen';
+import PlayerAssignmentsScreen from '../screens/main/PlayerAssignmentsScreen';
+import CoachSubmissionDetailScreen from '../screens/main/CoachSubmissionDetailScreen';
+import ScoutReportDetailScreen from '../screens/main/ScoutReportDetailScreen';
+import MyWorkoutsScreen from '../screens/main/MyWorkoutsScreen';
+import CustomWorkoutCreatorScreen from '../screens/main/CustomWorkoutCreatorScreen';
 import CreateDrillScreen from '../screens/main/CreateDrillScreen';
 import EditDrillScreen from '../screens/main/EditDrillScreen';
 import CoachPublicProfileScreen from '../screens/main/CoachPublicProfileScreen';
@@ -169,6 +175,10 @@ export const sharedScreens = [
     { name: 'CoachMarketDashboard', component: CoachMarketDashboardScreen, options: { headerShown: false } },
     { name: 'CoachSessions', component: CoachSessionsScreen, options: { headerShown: false } },
     { name: 'AssignWorkout', component: AssignWorkoutScreen, options: { headerShown: false } },
+    { name: 'CoachAssignmentReview', component: CoachAssignmentReviewScreen, options: { headerShown: false } },
+    { name: 'PlayerAssignments', component: PlayerAssignmentsScreen, options: { headerShown: false } },
+    { name: 'CoachSubmissionDetail', component: CoachSubmissionDetailScreen, options: { headerShown: false } },
+    { name: 'ScoutReportDetail', component: ScoutReportDetailScreen, options: { headerShown: false } },
     { name: 'CreateDrill', component: CreateDrillScreen, options: { headerShown: false } },
     { name: 'EditDrill', component: EditDrillScreen, options: { headerShown: false } },
     { name: 'CoachPublicProfile', component: CoachPublicProfileScreen, options: { headerShown: false } },
@@ -194,6 +204,12 @@ export const sharedScreens = [
     // Connections (role linking)
     { name: 'LinkAccount', component: LinkAccountScreen, options: { headerShown: false } },
     { name: 'Connections', component: ConnectionsScreen, options: { headerShown: false } },
+    // Custom workout authoring. Both screens existed but were registered nowhere,
+    // so TrainingScreen's "My Workouts" button and every CustomWorkoutCreator
+    // entry point threw at runtime. Training is a primary tab again, which puts
+    // that crash one tap from the tab bar.
+    { name: 'MyWorkouts', component: MyWorkoutsScreen, options: { headerShown: false } },
+    { name: 'CustomWorkoutCreator', component: CustomWorkoutCreatorScreen, options: { headerShown: false } },
     // Training experience (folded into Blueprint360) — reachable app-wide
     { name: 'Training', component: TrainingScreen, options: { headerShown: false } },
     { name: 'TrainingCategory', component: TrainingCategoryScreen, options: { headerShown: false } },

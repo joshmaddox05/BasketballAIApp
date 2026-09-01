@@ -312,7 +312,7 @@ const styles = StyleSheet.create({
   counterTarget: { fontFamily: FONTS.heading, fontSize: 34, color: 'rgba(255,255,255,0.7)' },
   counterLabel: {
     fontFamily: FONTS.bodySemiBold,
-    fontSize: 12,
+    fontSize: 14,
     color: 'rgba(255,255,255,0.85)',
     marginTop: 4,
   },
@@ -343,7 +343,7 @@ const styles = StyleSheet.create({
   celebrationTitle: { fontFamily: FONTS.heading, fontSize: 26, color: '#FFFFFF' },
   celebrationSubtitle: {
     fontFamily: FONTS.bodySemiBold,
-    fontSize: 12,
+    fontSize: 14,
     color: 'rgba(255,255,255,0.8)',
     marginTop: 6,
   },

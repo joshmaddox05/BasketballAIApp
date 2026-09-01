@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   headerTitle: {
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: '600',
   },
   headerIconBtn: {
@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   heroLabel: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '700',
     letterSpacing: 1.2,
     textTransform: 'uppercase',
@@ -325,11 +325,11 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   chipText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '600',
   },
   articleTitle: {
-    fontSize: 22,
+    fontSize: 23,
     fontWeight: '800',
     lineHeight: 30,
     letterSpacing: -0.3,
@@ -350,18 +350,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   authorName: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
   },
   authorRole: {
-    fontSize: 12,
+    fontSize: 14,
     marginTop: 1,
   },
   articleDateBlock: {
     alignItems: 'flex-end',
   },
   articleDate: {
-    fontSize: 12,
+    fontSize: 14,
   },
   readTimeRow: {
     flexDirection: 'row',
@@ -370,7 +370,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   readTime: {
-    fontSize: 12,
+    fontSize: 14,
   },
   // Divider
   divider: {
@@ -383,7 +383,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   bodyText: {
-    fontSize: 16,
+    fontSize: 17.5,
     lineHeight: 26,
     fontWeight: '400',
   },
@@ -402,7 +402,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   saveCtaText: {
-    fontSize: 15,
+    fontSize: 16.5,
     fontWeight: '700',
   },
   // Related
@@ -412,7 +412,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: '700',
     marginBottom: 4,
   },
@@ -443,13 +443,13 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   relatedChipText: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '600',
   },
   relatedCardTitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
-    lineHeight: 20,
+    lineHeight: 21,
   },
   bottomPad: {
     height: 24,

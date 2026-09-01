@@ -74,7 +74,7 @@ function OverallGradeCard({ ui, theme }) {
         <Entrance variant="count" delay={300}>
           <Text style={[TYPE.statNumber, { color: theme.text }]}>
             {Number.isFinite(numeric) ? `${numeric}` : NO_VALUE}
-            <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 13, color: theme.textDim }}>
+            <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 15, color: theme.textDim }}>
               /100
             </Text>
           </Text>
@@ -124,7 +124,7 @@ function ArchetypeCard({ archetypeId, label, gate, theme, onPress }) {
           color={assigned ? theme.accentText : theme.primary}
         />
         <View style={{ flex: 1 }}>
-          <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 12.5, color: theme.text }}>
+          <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 14.5, color: theme.text }}>
             {assigned ? label || archetypeId : 'Set your archetype'}
           </Text>
           <Text style={[TYPE.statCaption, { color: theme.textMuted, marginTop: 2 }]}>
@@ -148,7 +148,7 @@ function SkillRow({ skill, theme, delay }) {
       <View style={{ width: 88 }}>
         <Text
           numberOfLines={1}
-          style={{ fontFamily: FONTS.bodySemiBold, fontSize: 11.5, color: theme.textMuted }}
+          style={{ fontFamily: FONTS.bodySemiBold, fontSize: 13.5, color: theme.textMuted }}
         >
           {skill.label}
         </Text>
@@ -171,7 +171,7 @@ function SkillRow({ skill, theme, delay }) {
           backgroundColor: tone.fill,
         }}
       >
-        <Text style={{ fontFamily: FONTS.bodyExtraBold, fontSize: 11, color: tone.text }}>
+        <Text style={{ fontFamily: FONTS.bodyExtraBold, fontSize: 13, color: tone.text }}>
           {skill.grade}
         </Text>
       </View>
@@ -186,7 +186,7 @@ export default function EvalRankScreen({ navigation, route }) {
   // that athlete, read-only. Access is still evaluated against the VIEWER's
   // subscription — the athlete's tier is not the viewer's entitlement.
   const subject = useModuleSubject(route);
-  const { readOnly, evalRankScore } = subject;
+  const { readOnly, evalRankScore, subjectParams } = subject;
   const showToast = useToast();
 
   const subscription = userData?.subscription || 'free';
@@ -347,7 +347,7 @@ export default function EvalRankScreen({ navigation, route }) {
                 accent
                 delay={160}
                 value={ui.certification?.earnedLabel || 'None yet'}
-                onPress={() => navigation.navigate('EvalRankBadges')}
+                onPress={() => navigation.navigate('EvalRankBadges', subjectParams)}
               />
             </View>
 
@@ -370,12 +370,12 @@ export default function EvalRankScreen({ navigation, route }) {
               <OutlineButton
                 icon="document-text-outline"
                 label="View Full Report"
-                onPress={() => navigation.navigate('EvalRankDetail')}
+                onPress={() => navigation.navigate('EvalRankDetail', subjectParams)}
               />
               <OutlineButton
                 icon="medal-outline"
                 label="View Certifications"
-                onPress={() => navigation.navigate('EvalRankBadges')}
+                onPress={() => navigation.navigate('EvalRankBadges', subjectParams)}
               />
               {readOnly ? null : (
                 <OutlineButton

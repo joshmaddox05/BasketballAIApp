@@ -108,7 +108,7 @@ function FeaturedCard({ item, theme, onPress, delay }) {
         </LinearGradient>
 
         <View style={styles.featuredBody}>
-          <Text style={[TYPE.cardTitle, { color: theme.text, fontSize: 14, lineHeight: 18 }]} numberOfLines={2}>
+          <Text style={[TYPE.cardTitle, { color: theme.text, fontSize: 16, lineHeight: 19 }]} numberOfLines={2}>
             {item.title}
           </Text>
           <Text style={[TYPE.rowMeta, { color: theme.textDim, marginTop: 4 }]} numberOfLines={1}>
@@ -116,7 +116,7 @@ function FeaturedCard({ item, theme, onPress, delay }) {
           </Text>
           <View style={styles.featuredBottom}>
             <RatingLine rating={item.rating} count={item.reviewCount} theme={theme} />
-            <Text style={[TYPE.statNumberMedium, { color: theme.text, fontSize: 14 }]}>{item.price}</Text>
+            <Text style={[TYPE.statNumberMedium, { color: theme.text, fontSize: 16 }]}>{item.price}</Text>
           </View>
         </View>
       </TouchableOpacity>
@@ -135,7 +135,7 @@ function ListingRow({ item, theme, onPress, delay, accent }) {
       >
         <Avatar initials={item.initials} size={44} tone={accent ? 'accent' : 'steel'} />
         <View style={styles.listRowInfo}>
-          <Text style={[TYPE.rowTitle, { color: theme.text, fontSize: 13 }]} numberOfLines={1}>
+          <Text style={[TYPE.rowTitle, { color: theme.text, fontSize: 15 }]} numberOfLines={1}>
             {item.drillName}
           </Text>
           <Text style={[TYPE.rowMeta, { color: theme.textDim }]} numberOfLines={1}>
@@ -148,7 +148,7 @@ function ListingRow({ item, theme, onPress, delay, accent }) {
             style={{ marginTop: 3 }}
           />
         </View>
-        <Text style={[TYPE.statNumberMedium, { color: theme.text, fontSize: 15 }]}>{item.price}</Text>
+        <Text style={[TYPE.statNumberMedium, { color: theme.text, fontSize: 16.5 }]}>{item.price}</Text>
       </TouchableOpacity>
     </Entrance>
   );

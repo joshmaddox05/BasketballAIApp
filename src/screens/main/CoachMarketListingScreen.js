@@ -400,7 +400,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   headerTitle: {
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: '600',
     flex: 1,
     textAlign: 'center',
@@ -444,12 +444,12 @@ const styles = StyleSheet.create({
   },
   drillRowTitle: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
     marginLeft: 4,
   },
   drillRowMeta: {
-    fontSize: 12,
+    fontSize: 14,
   },
   videoThumbnailOverlay: {
     position: 'absolute',
@@ -486,7 +486,7 @@ const styles = StyleSheet.create({
   },
   durationText: {
     color: '#FFF',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '600',
     marginLeft: 4,
   },
@@ -495,7 +495,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   videoActiveText: {
-    fontSize: 13,
+    fontSize: 15,
     marginTop: 8,
   },
 
@@ -515,13 +515,13 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   categoryChipText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   listingTitle: {
-    fontSize: 20,
+    fontSize: 21,
     fontWeight: '700',
     lineHeight: 28,
     marginBottom: 10,
@@ -536,12 +536,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   ratingValue: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '700',
     marginLeft: 4,
   },
   ratingCount: {
-    fontSize: 13,
+    fontSize: 15,
   },
 
   // Coach card
@@ -564,7 +564,7 @@ const styles = StyleSheet.create({
   },
   coachAvatarInitials: {
     color: '#FFF',
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: '700',
   },
   coachInfo: {
@@ -577,7 +577,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   coachName: {
-    fontSize: 15,
+    fontSize: 16.5,
     fontWeight: '700',
   },
   verifiedBadge: {
@@ -587,18 +587,18 @@ const styles = StyleSheet.create({
   },
   verifiedText: {
     color: '#4CAF50',
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '600',
   },
   coachTitle: {
-    fontSize: 12,
+    fontSize: 14,
     marginBottom: 2,
   },
   coachMeta: {
-    fontSize: 11,
+    fontSize: 13,
   },
   viewProfileLink: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '700',
     textDecorationLine: 'underline',
   },
@@ -612,13 +612,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: '700',
     marginBottom: 12,
   },
   descriptionText: {
-    fontSize: 14,
-    lineHeight: 22,
+    fontSize: 16,
+    lineHeight: 23,
   },
   bulletRow: {
     flexDirection: 'row',
@@ -636,8 +636,8 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   bulletText: {
-    fontSize: 14,
-    lineHeight: 22,
+    fontSize: 16,
+    lineHeight: 23,
     flex: 1,
   },
 
@@ -657,7 +657,7 @@ const styles = StyleSheet.create({
   },
   priceLabelCol: {},
   priceLabel: {
-    fontSize: 12,
+    fontSize: 14,
     marginBottom: 2,
   },
   priceValue: {
@@ -673,7 +673,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   accessBadgeText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '600',
     marginLeft: 4,
   },
@@ -687,7 +687,7 @@ const styles = StyleSheet.create({
   },
   purchaseButtonText: {
     color: '#FFF',
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: '700',
     marginLeft: 6,
   },
@@ -701,7 +701,7 @@ const styles = StyleSheet.create({
   },
   purchasedButtonText: {
     color: '#FFF',
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: '700',
     marginLeft: 6,
   },
@@ -713,7 +713,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   previewLink: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
     textDecorationLine: 'underline',
     marginLeft: 4,

@@ -4,7 +4,7 @@
 const { onCall } = require('firebase-functions/v2/https');
 const { onRequest } = require('firebase-functions/v2/https');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
-const { onDocumentCreated } = require('firebase-functions/v2/firestore');
+const { onDocumentCreated, onDocumentUpdated } = require('firebase-functions/v2/firestore');
 const { setGlobalOptions } = require('firebase-functions/v2');
 const { defineSecret } = require('firebase-functions/params');
 const admin = require('firebase-admin');
@@ -1242,6 +1242,287 @@ exports.onMessageCreated = onDocumentCreated('conversations/{convId}/messages/{m
   } catch (e) {
     console.error(`Failed to push message for conversation ${convId}:`, e);
   }
+});
+
+// ============================================================================
+// Role-loop notifications (assignments, scout consent)
+// ============================================================================
+// Every write path below already existed; none of them told anyone. These
+// triggers close that gap. They all go through notifyUser(), which mirrors the
+// onProspectPublished pattern: an in-app doc in users/{uid}/notifications plus
+// a push, honoring the same notificationSettings.enabled opt-out that
+// onMessageCreated uses. In-app docs are written even when push is unavailable,
+// so the Notifications screen is always the complete record.
+
+/**
+ * Write an in-app notification and (best-effort) send a push.
+ * @param {string} uid recipient
+ * @param {{type:string,title:string,body:string,data?:object,channelId?:string}} payload
+ */
+const notifyUser = async (uid, payload) => {
+  if (!uid || !payload || !payload.type) return;
+  const { type, title, body, data = {}, channelId = 'default' } = payload;
+
+  try {
+    const userDoc = await admin.firestore().collection('users').doc(uid).get();
+    const user = userDoc.data() || {};
+
+    // The in-app record is unconditional — opting out of push should not make
+    // the app forget that something happened.
+    await admin.firestore().collection('users').doc(uid).collection('notifications').add({
+      type,
+      title,
+      body,
+      data: { type, ...data },
+      sentAt: admin.firestore.FieldValue.serverTimestamp(),
+      readAt: null,
+    });
+
+    if (user.notificationSettings && user.notificationSettings.enabled === false) return;
+    if (!user.pushToken || !Expo.isExpoPushToken(user.pushToken)) return;
+
+    await expo.sendPushNotificationsAsync([{
+      to: user.pushToken,
+      sound: 'default',
+      title,
+      body,
+      data: { type, ...data },
+      channelId,
+    }]);
+  } catch (e) {
+    console.error(`Failed to notify ${uid} (${type}):`, e);
+  }
+};
+
+/** Uids linked to this player in the given role (reads the player's connections). */
+const linkedUidsWithRole = async (playerUid, role) => {
+  try {
+    const snap = await admin.firestore()
+      .collection('users').doc(playerUid)
+      .collection('connections')
+      .where('role', '==', role)
+      .get();
+    return snap.docs
+      .filter((d) => (d.data() || {}).status !== 'removed')
+      .map((d) => d.id);
+  } catch (e) {
+    console.error(`Failed to read ${role} connections for ${playerUid}:`, e);
+    return [];
+  }
+};
+
+/** A coach assigned work — tell the athlete. */
+exports.onAssignmentCreated = onDocumentCreated('users/{athleteUid}/assignments/{assignmentId}', async (event) => {
+  const snap = event.data;
+  if (!snap) return;
+  const assignment = snap.data() || {};
+  const { athleteUid, assignmentId } = event.params;
+
+  const coachName = assignment.coachName || 'Your coach';
+  const label = assignment.title || (assignment.type === 'scenario' ? 'a game scenario' : 'a workout');
+
+  await notifyUser(athleteUid, {
+    type: 'assignment',
+    title: `New assignment from ${coachName}`,
+    body: `${coachName} assigned you ${label}.`,
+    data: { assignmentId, assignmentType: assignment.type || 'workout', route: 'PlayerAssignments' },
+    channelId: 'reminders',
+  });
+});
+
+/**
+ * Assignment status moved. Two directions:
+ *   assigned  -> submitted : tell the coach there is something to verify
+ *   submitted -> verified  : tell the athlete their coach signed it off
+ */
+exports.onAssignmentStatusChanged = onDocumentUpdated('users/{athleteUid}/assignments/{assignmentId}', async (event) => {
+  const before = event.data && event.data.before && event.data.before.data();
+  const after = event.data && event.data.after && event.data.after.data();
+  if (!before || !after) return;
+  if (before.status === after.status) return;
+
+  const { athleteUid, assignmentId } = event.params;
+  const label = after.title || 'their assignment';
+
+  if (after.status === 'submitted' || after.status === 'completed') {
+    if (!after.coachUid) return;
+    let athleteName = 'Your athlete';
+    try {
+      const athleteDoc = await admin.firestore().collection('users').doc(athleteUid).get();
+      athleteName = (athleteDoc.data() || {}).displayName || (athleteDoc.data() || {}).name || athleteName;
+    } catch (e) {
+      // fall back to the generic label
+    }
+    const pct = Number(after.completionPercentage);
+    const detail = Number.isFinite(pct) && pct < 100 ? ` (${Math.round(pct)}% complete)` : '';
+
+    await notifyUser(after.coachUid, {
+      type: 'assignment_completed',
+      title: 'Assignment submitted',
+      body: `${athleteName} finished ${label}${detail}.`,
+      // Route straight to the review screen. 'CoachAthletes' was not a registered
+      // route name at all (the tab is 'Roster', the screen 'CoachAthletesMain'),
+      // so tapping this notification fell through to the Notifications list.
+      // CoachAssignmentReview is in the shared registry, so it resolves from any
+      // stack and from either coach sub-type.
+      data: {
+        assignmentId,
+        athleteUid,
+        route: 'CoachAssignmentReview',
+        params: { athleteUid },
+      },
+      channelId: 'default',
+    });
+    return;
+  }
+
+  if (after.status === 'verified') {
+    const coachName = after.coachName || 'Your coach';
+    await notifyUser(athleteUid, {
+      type: 'assignment_verified',
+      title: 'Assignment verified',
+      body: `${coachName} verified ${label}. Nice work.`,
+      data: { assignmentId, route: 'PlayerAssignments' },
+      channelId: 'default',
+    });
+    return;
+  }
+
+  // Work sent back for another attempt. Silence here would be the worst case:
+  // the assignment quietly reappears on the athlete's home with no explanation.
+  if (after.status === 'returned') {
+    const coachName = after.coachName || 'Your coach';
+    const note = after.result && after.result.coachNote;
+    await notifyUser(athleteUid, {
+      type: 'assignment_returned',
+      title: 'Another look needed',
+      body: note
+        ? `${coachName} sent ${label} back: ${note}`
+        : `${coachName} asked you to have another go at ${label}.`,
+      data: { assignmentId, route: 'PlayerAssignments' },
+      channelId: 'default',
+    });
+  }
+});
+
+/**
+ * A scout asked for access to a minor. Policy (COO): the PARENT is the one who
+ * decides, so the parent is notified and the player deliberately is not.
+ */
+exports.onScoutAccessRequested = onDocumentCreated('users/{playerUid}/scoutAccessRequests/{scoutUid}', async (event) => {
+  const snap = event.data;
+  if (!snap) return;
+  const request = snap.data() || {};
+  if (request.status && request.status !== 'pending') return;
+
+  const { playerUid, scoutUid } = event.params;
+  const scoutName = request.scoutName || 'A scout';
+  const prospectName = request.prospectName || 'your athlete';
+
+  const parents = await linkedUidsWithRole(playerUid, 'parent');
+  if (!parents.length) {
+    console.log(`Scout request for ${playerUid} has no linked parent to notify.`);
+    return;
+  }
+
+  await Promise.all(parents.map((parentUid) => notifyUser(parentUid, {
+    type: 'scout_request',
+    title: 'Scout access request',
+    body: `${scoutName} is requesting access to ${prospectName}'s profile.`,
+    data: { playerUid, scoutUid, route: 'ParentScoutLab', params: { childUid: playerUid } },
+    channelId: 'default',
+  })));
+});
+
+/**
+ * The parent decided. Tell the SCOUT — today they get nothing and have to
+ * remember to re-open the one prospect screen that reads access status.
+ * Watching the request doc (rather than scoutConnections) covers denial too,
+ * since approveScoutAccess and denyScoutAccess both resolve it.
+ */
+exports.onScoutAccessResolved = onDocumentUpdated('users/{playerUid}/scoutAccessRequests/{scoutUid}', async (event) => {
+  const before = event.data && event.data.before && event.data.before.data();
+  const after = event.data && event.data.after && event.data.after.data();
+  if (!before || !after) return;
+  if (before.status === after.status) return;
+  if (after.status !== 'approved' && after.status !== 'denied') return;
+
+  const { playerUid, scoutUid } = event.params;
+  const prospectName = after.prospectName || 'A prospect';
+  const approved = after.status === 'approved';
+
+  await notifyUser(scoutUid, {
+    type: approved ? 'scout_approved' : 'scout_denied',
+    title: approved ? 'Access approved' : 'Access declined',
+    body: approved
+      ? `You now have access to ${prospectName}'s profile.`
+      : `Your access request for ${prospectName} was declined.`,
+    data: { prospectId: playerUid, route: 'ScoutProspectDetail', params: { prospectId: playerUid } },
+    channelId: 'default',
+  });
+});
+
+/**
+ * A scout shared a report with the athlete it is about. Tell the athlete AND
+ * their guardian — under the consent model the parent is a party to every
+ * scout↔minor interaction, and a report landing in a minor's app is one.
+ *
+ * Watches updates because sharing is a deliberate act taken after the report was
+ * written, never part of its creation.
+ */
+exports.onScoutReportShared = onDocumentUpdated('users/{scoutUid}/scoutingReports/{reportId}', async (event) => {
+  const before = event.data && event.data.before && event.data.before.data();
+  const after = event.data && event.data.after && event.data.after.data();
+  if (!before || !after) return;
+
+  // Only the false -> true transition; edits to an already-shared report should
+  // not re-notify on every save.
+  if (before.sharedWithPlayer === true || after.sharedWithPlayer !== true) return;
+
+  const playerUid = after.prospectUid;
+  if (!playerUid) return;
+
+  const scoutName = after.scoutName || 'A scout';
+  const title = 'New scout report';
+  const body = `${scoutName} shared a scouting report with you.`;
+
+  await notifyUser(playerUid, {
+    type: 'scout_report',
+    title,
+    body,
+    // ScoutLab, not ScoutReportDetail: the detail screen takes the full report
+    // object as a param, and a push can only carry an id. The list is one tap away
+    // and is where the report actually lives.
+    data: { reportId: event.params.reportId, route: 'ScoutLab' },
+    channelId: 'default',
+  });
+
+  const parents = await linkedUidsWithRole(playerUid, 'parent');
+  await Promise.all(parents.map((parentUid) => notifyUser(parentUid, {
+    type: 'scout_report',
+    title,
+    body: `${scoutName} shared a scouting report with your athlete.`,
+    data: { route: 'ParentScoutLab', params: { childUid: playerUid } },
+    channelId: 'default',
+  })));
+});
+
+/** A coach booked or changed a session — tell the athlete. */
+exports.onCoachingSessionCreated = onDocumentCreated('coachingSessions/{sessionId}', async (event) => {
+  const snap = event.data;
+  if (!snap) return;
+  const session = snap.data() || {};
+  const { sessionId } = event.params;
+  if (!session.athleteUid) return;
+
+  const coachName = session.coachName || 'Your coach';
+  await notifyUser(session.athleteUid, {
+    type: 'session',
+    title: 'New session scheduled',
+    body: `${coachName} scheduled a session with you.`,
+    data: { sessionId, route: 'Home' },
+    channelId: 'reminders',
+  });
 });
 
 // ============================================================================

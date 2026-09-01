@@ -5,10 +5,11 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { View, Text } from 'react-native';
 import { useAppContext } from '../context/AppContext';
+import { STORAGE_KEYS } from '../utils/constants';
 import FriendRequestModal from '../components/shared/FriendRequestModal';
 import DailyChallengeModal from '../components/shared/DailyChallengeModal';
 import { listenToFriendRequests } from '../services/firestoreService';
-import { TourProvider, TourOverlay, useTour, getCoachTourSteps } from '../components/tour';
+import { TourProvider, TourOverlay, useTour, getCoachTourSteps, PARENT_TOUR_STEPS } from '../components/tour';
 import { navigationRef } from './AppNavigator';
 
 // Import your main app screens
@@ -62,11 +63,12 @@ const dbeTabBarOptions = (theme) => ({
         paddingTop: 6,
         paddingBottom: 5,
     },
-    tabBarLabelStyle: { fontFamily: FONTS.bodySemiBold, fontSize: 9 },
+    tabBarLabelStyle: { fontFamily: FONTS.bodySemiBold, fontSize: 11 },
 });
 
 // For nested navigation within tabs
 const HomeStack = createStackNavigator();
+const TrainingStack = createStackNavigator();
 const ProgressStack = createStackNavigator();
 const ProfileStack = createStackNavigator();
 
@@ -84,6 +86,19 @@ function HomeStackNavigator() {
             {/* Add shared screens to Home stack */}
             {addSharedScreensToStack(HomeStack)}
         </HomeStack.Navigator>
+    );
+}
+
+// Training tab-root stack. Training and its sub-screens already live in the shared
+// registry (they were promoted there when the Training tab was folded into
+// Blueprint360), so this reuses them via initialRouteName and adds no new imports —
+// the same pattern as CoachPlaybookStackNavigator. Registering TrainingScreen
+// locally as well would collide on the route name.
+function TrainingStackNavigator() {
+    return (
+        <TrainingStack.Navigator screenOptions={{ headerShown: false }} initialRouteName="Training">
+            {addSharedScreensToStack(TrainingStack)}
+        </TrainingStack.Navigator>
     );
 }
 
@@ -127,9 +142,10 @@ function ProfileStackNavigator() {
 // Create the tab navigator
 const Tab = createBottomTabNavigator();
 
-// Map route names to tour step IDs for tab icons. Training & Challenges are no longer tabs
-// (folded into the Blueprint360 / HoopCommunity modules), so only Progress remains tour-linked.
+// Map route names to tour step IDs for tab icons. Training is a tab again; Challenges
+// remains folded into the HoopCommunity module and so has no tab step.
 const TAB_TO_TOUR_STEP = {
+    'Training': 'training-tab',
     'Progress': 'progress-tab',
 };
 
@@ -164,6 +180,8 @@ const TabBarIcon = ({ route, focused, color, size }) => {
     let iconName;
     if (route.name === 'Home') {
         iconName = focused ? 'home' : 'home-outline';
+    } else if (route.name === 'Training') {
+        iconName = focused ? 'basketball' : 'basketball-outline';
     } else if (route.name === 'Progress') {
         iconName = focused ? 'stats-chart' : 'stats-chart-outline';
     } else if (route.name === 'Profile') {
@@ -257,6 +275,7 @@ function MainNavigatorContent() {
             }}
         >
             <Tab.Screen name="Home" component={HomeStackNavigator} />
+            <Tab.Screen name="Training" component={TrainingStackNavigator} />
             <Tab.Screen name="Progress" component={ProgressStackNavigator} />
             <Tab.Screen name="Profile" component={ProfileStackNavigator} />
         </Tab.Navigator>
@@ -577,20 +596,65 @@ function ParentProfileStackNavigator() {
     );
 }
 
+// Parent tab-bar icon, mirroring CoachTabBarIcon: registers the tab as a tour
+// target so a tab step can spotlight it and advance when the parent taps.
+const PARENT_TAB_TO_TOUR_STEP = {
+    Progress: 'parent-progress-tab',
+    ParentProfile: 'parent-profile-tab',
+};
+
+const ParentTabBarIcon = ({ route, focused, color, size }) => {
+    const { registerTarget, unregisterTarget, isTourActive, currentStep, measureTarget } = useTour();
+    const ref = React.useRef(null);
+    const stepId = PARENT_TAB_TO_TOUR_STEP[route.name];
+
+    React.useEffect(() => {
+        if (stepId) registerTarget(stepId, ref);
+        return () => {
+            if (stepId) unregisterTarget(stepId);
+        };
+    }, [stepId, registerTarget, unregisterTarget]);
+
+    React.useEffect(() => {
+        if (isTourActive && currentStep?.id === stepId) {
+            const timer = setTimeout(() => measureTarget(stepId), 100);
+            return () => clearTimeout(timer);
+        }
+    }, [isTourActive, currentStep, stepId, measureTarget]);
+
+    const icons = {
+        ParentHome: focused ? 'home' : 'home-outline',
+        Progress: focused ? 'stats-chart' : 'stats-chart-outline',
+        ParentProfile: focused ? 'person' : 'person-outline',
+    };
+    const iconName = icons[route.name] || 'ellipse';
+
+    if (stepId) {
+        return (
+            <View ref={ref} collapsable={false}>
+                <Ionicons name={iconName} size={size} color={color} />
+            </View>
+        );
+    }
+    return <Ionicons name={iconName} size={size} color={color} />;
+};
+
 export function ParentMainNavigator() {
     const { theme } = useAppContext();
     return (
-        <TourProvider navigationRef={navigationRef}>
+        // Was mounting the PLAYER's steps and the player's storage key, so it
+        // targeted element ids that only exist on player screens — a tour that
+        // could never run for a parent.
+        <TourProvider
+            navigationRef={navigationRef}
+            steps={PARENT_TOUR_STEPS}
+            storageKey={STORAGE_KEYS.HAS_SEEN_PARENT_TOUR}
+        >
         <ParentTab.Navigator
             screenOptions={({ route }) => ({
-                tabBarIcon: ({ focused, color }) => {
-                    const icons = {
-                        ParentHome: focused ? 'home' : 'home-outline',
-                        Progress: focused ? 'stats-chart' : 'stats-chart-outline',
-                        ParentProfile: focused ? 'person' : 'person-outline',
-                    };
-                    return <Ionicons name={icons[route.name] || 'ellipse'} size={20} color={color} />;
-                },
+                tabBarIcon: ({ focused, color }) => (
+                    <ParentTabBarIcon route={route} focused={focused} color={color} size={20} />
+                ),
                 ...dbeTabBarOptions(theme),
             })}
         >

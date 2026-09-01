@@ -298,7 +298,7 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     subtitle: {
-        fontSize: 16,
+        fontSize: 17.5,
         color: '#666',
     },
     form: {
@@ -318,7 +318,7 @@ const styles = StyleSheet.create({
     input: {
         flex: 1,
         height: 50,
-        fontSize: 16,
+        fontSize: 17.5,
         color: '#333',
     },
     visibilityToggle: {
@@ -344,11 +344,11 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     rememberMeText: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#666',
     },
     forgotPasswordText: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#8A1C22',
     },
     loginButton: {
@@ -358,7 +358,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     loginButtonText: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: 'bold',
         color: '#FFF',
     },
@@ -367,7 +367,7 @@ const styles = StyleSheet.create({
         marginBottom: 30,
     },
     orText: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#999',
         marginBottom: 16,
     },
@@ -390,11 +390,11 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     signupPromptText: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#666',
     },
     signupPromptLink: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: 'bold',
         color: '#8A1C22',
     },

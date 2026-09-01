@@ -461,12 +461,12 @@ const styles = StyleSheet.create({
         marginLeft: 12,
     },
     headerTitle: {
-        fontSize: 20,
+        fontSize: 21,
         fontWeight: '700',
         color: '#1F2937',
     },
     headerSubtitle: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#6B7280',
         marginTop: 2,
     },
@@ -474,11 +474,11 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     scoreText: {
-        fontSize: 24,
+        fontSize: 25,
         fontWeight: '800',
     },
     gradeText: {
-        fontSize: 11,
+        fontSize: 13,
         color: '#6B7280',
         fontWeight: '600',
     },
@@ -503,7 +503,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#EEF2FF',
     },
     tabText: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#6B7280',
         fontWeight: '600',
         marginLeft: 6,
@@ -522,13 +522,13 @@ const styles = StyleSheet.create({
         gap: 20,
     },
     sectionTitle: {
-        fontSize: 20,
+        fontSize: 21,
         fontWeight: '700',
         color: '#1F2937',
         marginBottom: 4,
     },
     sectionSubtitle: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#6B7280',
         marginBottom: 16,
     },
@@ -549,7 +549,7 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
     videoLabel: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: '700',
         color: '#1F2937',
     },
@@ -566,7 +566,7 @@ const styles = StyleSheet.create({
         gap: 4,
     },
     orientationText: {
-        fontSize: 11,
+        fontSize: 13,
         fontWeight: '600',
         color: '#374151',
     },
@@ -592,7 +592,7 @@ const styles = StyleSheet.create({
     loadingText: {
         color: '#fff',
         marginTop: 12,
-        fontSize: 14,
+        fontSize: 16,
     },
     playButton: {
         position: 'absolute',
@@ -617,7 +617,7 @@ const styles = StyleSheet.create({
     },
     playBothText: {
         color: '#fff',
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: '700',
     },
     metricsCategory: {
@@ -630,7 +630,7 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
     categoryTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: '700',
         color: '#1F2937',
     },
@@ -641,7 +641,7 @@ const styles = StyleSheet.create({
         borderRadius: 12,
     },
     categoryScoreText: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '700',
         color: '#6366F1',
     },
@@ -663,7 +663,7 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
     metricName: {
-        fontSize: 15,
+        fontSize: 16.5,
         fontWeight: '600',
         color: '#1F2937',
         flex: 1,
@@ -677,7 +677,7 @@ const styles = StyleSheet.create({
     },
     gradeLabel: {
         color: '#fff',
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '800',
     },
     metricComparison: {
@@ -690,13 +690,13 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     comparisonLabel: {
-        fontSize: 11,
+        fontSize: 13,
         color: '#6B7280',
         fontWeight: '600',
         marginBottom: 2,
     },
     comparisonValue: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: '700',
         color: '#1F2937',
     },
@@ -712,7 +712,7 @@ const styles = StyleSheet.create({
         borderRadius: 4,
     },
     similarityText: {
-        fontSize: 12,
+        fontSize: 14,
         color: '#6B7280',
         textAlign: 'right',
     },
@@ -744,19 +744,19 @@ const styles = StyleSheet.create({
     },
     priorityText: {
         color: '#fff',
-        fontSize: 13,
+        fontSize: 15,
         fontWeight: '800',
     },
     recommendationTitle: {
         flex: 1,
     },
     recommendationName: {
-        fontSize: 15,
+        fontSize: 16.5,
         fontWeight: '700',
         color: '#1F2937',
     },
     recommendationCategory: {
-        fontSize: 12,
+        fontSize: 14,
         color: '#6B7280',
         marginTop: 2,
     },
@@ -770,9 +770,9 @@ const styles = StyleSheet.create({
     },
     tipText: {
         flex: 1,
-        fontSize: 14,
+        fontSize: 16,
         color: '#374151',
-        lineHeight: 20,
+        lineHeight: 21,
     },
     drillBox: {
         flexDirection: 'row',
@@ -783,9 +783,9 @@ const styles = StyleSheet.create({
     },
     drillText: {
         flex: 1,
-        fontSize: 13,
+        fontSize: 15,
         color: '#065F46',
-        lineHeight: 18,
+        lineHeight: 19,
     },
     footer: {
         backgroundColor: '#fff',
@@ -804,7 +804,7 @@ const styles = StyleSheet.create({
     },
     tryAgainText: {
         color: '#6366F1',
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: '700',
     },
 });

@@ -432,15 +432,15 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   backBtn: { padding: 4, marginRight: 8 },
-  headerTitle: { flex: 1, fontSize: 18, fontWeight: '600' },
+  headerTitle: { flex: 1, fontSize: 19, fontWeight: '600' },
   stepIndicator: { flexDirection: 'row', gap: 6 },
   stepDot: { width: 8, height: 8, borderRadius: 4 },
 
   scrollView: { flex: 1 },
   scrollContent: { padding: 20 },
 
-  stepTitle: { fontSize: 20, fontWeight: '700', marginBottom: 6 },
-  stepSubtitle: { fontSize: 14, lineHeight: 20, marginBottom: 20 },
+  stepTitle: { fontSize: 21, fontWeight: '700', marginBottom: 6 },
+  stepSubtitle: { fontSize: 16, lineHeight: 21, marginBottom: 20 },
 
   // Template cards
   templateCard: {
@@ -460,15 +460,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   templateInfo: { flex: 1 },
-  templateTitle: { fontSize: 15, fontWeight: '600', marginBottom: 3 },
-  templateDesc: { fontSize: 13, lineHeight: 18, marginBottom: 8 },
+  templateTitle: { fontSize: 16.5, fontWeight: '600', marginBottom: 3 },
+  templateDesc: { fontSize: 15, lineHeight: 19, marginBottom: 8 },
   templateMeta: { flexDirection: 'row' },
   categoryPill: {
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 20,
   },
-  categoryPillText: { fontSize: 11, fontWeight: '600', textTransform: 'capitalize' },
+  categoryPillText: { fontSize: 13, fontWeight: '600', textTransform: 'capitalize' },
 
   // Selected preview
   selectedPreview: {
@@ -480,7 +480,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: 24,
   },
-  selectedTitle: { fontSize: 16, fontWeight: '600', flex: 1 },
+  selectedTitle: { fontSize: 17.5, fontWeight: '600', flex: 1 },
 
   // Target input
   targetRow: {
@@ -514,7 +514,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     minWidth: 60,
   },
-  targetUnit: { fontSize: 15 },
+  targetUnit: { fontSize: 16.5 },
 
   // Quick targets
   quickTargets: { flexDirection: 'row', gap: 10, marginBottom: 4 },
@@ -525,7 +525,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
   },
-  quickTargetText: { fontSize: 16, fontWeight: '600' },
+  quickTargetText: { fontSize: 17.5, fontWeight: '600' },
 
   // Timeframe
   timeframeRow: { flexDirection: 'row', gap: 10, marginTop: 12, marginBottom: 28 },
@@ -536,7 +536,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
   },
-  timeframeBtnText: { fontSize: 13, fontWeight: '600' },
+  timeframeBtnText: { fontSize: 15, fontWeight: '600' },
 
   // Save
   saveBtn: {
@@ -547,5 +547,5 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 14,
   },
-  saveBtnText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
+  saveBtnText: { color: '#FFF', fontSize: 17.5, fontWeight: '700' },
 });

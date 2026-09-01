@@ -44,7 +44,7 @@ function GateRow({ label, detail, unlocks, kind, theme, delay }) {
         <Ionicons name={tone.icon} size={13} color={tone.text} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 13, color: theme.text }}>{label}</Text>
+        <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 15, color: theme.text }}>{label}</Text>
         {detail ? (
           <Text style={[TYPE.statCaption, { color: theme.textMuted, marginTop: 3 }]}>{detail}</Text>
         ) : null}

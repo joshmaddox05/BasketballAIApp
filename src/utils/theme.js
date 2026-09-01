@@ -74,7 +74,7 @@ export const lightTheme = {
   surface: '#FFFFFF',           // cards, rows, tiles
   surface2: '#FFFFFF',          // raised surface: tooltips, film thumbs, spotlit tiles
   textMuted: '#50505A',         // body copy, secondary labels
-  textDim: '#8A8A94',           // meta, captions, uppercase section labels
+  textDim: '#707078',           // meta, captions, uppercase section labels — 4.55:1 on background, 4.91:1 on surface
   hairline: 'rgba(16, 16, 19, 0.12)',
   steel: '#6E7683',             // second voice — neutral icons, "view only" tags
   accentText: '#8A1C22',        // accent text/icons (primary reads fine on light)
@@ -166,7 +166,7 @@ export const darkTheme = {
   surface: '#1C1C21',           // cards, rows, tiles
   surface2: '#242427',          // raised surface: tooltips, film thumbs, spotlit tiles
   textMuted: '#B4B4BB',         // body copy, secondary labels
-  textDim: '#7C7C86',           // meta, captions, uppercase section labels
+  textDim: '#83838D',           // meta, captions, uppercase section labels — 4.52:1 on surface, 5.06:1 on background
   hairline: 'rgba(233, 233, 237, 0.12)',
   steel: '#9AA0AC',             // second voice — neutral icons, "view only" tags
   accentText: '#D4707A',        // accent text/icons on dark (primary too dark for text)

@@ -34,7 +34,8 @@ import {
   addXP,
   checkAndUnlockAchievements,
   getWorkoutHistory,
-  setUserStats
+  setUserStats,
+  submitAssignmentForCompletion
 } from '../../services/firestoreService';
 import { recomputeEvalRank } from '../../services/evalRankService';
 import { markPlanDayForWorkout } from '../../services/blueprint360Service';
@@ -109,7 +110,17 @@ const WorkoutVideoPlayer = ({ videoSource, style }) => {
 };
 
 const ActiveWorkoutScreen = ({ route, navigation }) => {
-  const { workoutId, resumeStep = 0, workout: passedWorkout, isCustom, fromCustomPlan, onWorkoutComplete } = route.params;
+  const {
+    workoutId,
+    resumeStep = 0,
+    workout: passedWorkout,
+    isCustom,
+    fromCustomPlan,
+    onWorkoutComplete,
+    // Set when this session was launched from a coach assignment, so completion
+    // can close that specific assignment rather than guessing from the template.
+    assignmentRefId,
+  } = route.params;
   const {
     userData,
     theme: contextTheme,
@@ -635,6 +646,26 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
         if (record && !skipped) setEvalRankScore(record);
       })().catch((error) => logger.error('Post-workout plan/EvalRank update failed', error));
 
+      // ============ COACH ASSIGNMENT ============
+      // Close the coach's loop. Until now nothing here touched the assignment, so
+      // the only way one was ever marked done was the athlete remembering to tap a
+      // checkbox on Home — and no coach screen read it back either way.
+      // If this workout was assigned (explicitly via route params, or matched by
+      // template id), flip it to submitted/partial and attach the result.
+      // Fire-and-forget: assignment bookkeeping must never fail a finished workout.
+      (async () => {
+        const pct = Math.round(avgCompletion);
+        const closed = await submitAssignmentForCompletion(userData.uid, {
+          refId: assignmentRefId || workout.id,
+          type: 'workout',
+          activityId,
+          completionPercentage: pct,
+        });
+        if (closed) {
+          logger.info('Assignment submitted for coach review', { id: closed.id, status: closed.status });
+        }
+      })().catch((error) => logger.error('Assignment completion update failed', error));
+
       // ==================== GAMIFICATION ====================
       // Initialize gamification if needed
       await initializeGamification(userData.uid);
@@ -750,7 +781,12 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
     const stepTitle = (currentStepData?.title || currentStepData?.name || '').toLowerCase();
     const stepCategory = (currentStepData?.category || '').toLowerCase();
 
-    const isShootingDrill = category === 'shooting' ||
+    // STEP_TEMPLATES now declares this via `tracker`, so a catalog drill no longer
+    // depends on its display name containing the right word. The keyword checks
+    // below remain for user-authored custom workouts, which carry no tracker.
+    const isShootingDrill = currentStepData?.tracker
+      ? currentStepData.tracker === 'shooting'
+      : category === 'shooting' ||
            stepCategory === 'shooting' ||
            title.includes('shooting') ||
            title.includes('shot') ||
@@ -1417,12 +1453,12 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     ...TYPE.cardTitle,
-    fontSize: 14,
+    fontSize: 16,
     flex: 1,
   },
   stepCounter: {
     fontFamily: FONTS.bodyBold,
-    fontSize: 11,
+    fontSize: 13,
   },
   segmentRow: {
     flexDirection: 'row',
@@ -1446,13 +1482,13 @@ const styles = StyleSheet.create({
   },
   stepTitle: {
     fontFamily: FONTS.heading,
-    fontSize: 19,
+    fontSize: 20,
     lineHeight: 23,
   },
   stepInstructions: {
     fontFamily: FONTS.body,
-    fontSize: 12.5,
-    lineHeight: 19,
+    fontSize: 14.5,
+    lineHeight: 20,
     marginTop: 6,
   },
   timerWrapper: {
@@ -1472,7 +1508,7 @@ const styles = StyleSheet.create({
   },
   timerLabel: {
     fontFamily: FONTS.bodyBold,
-    fontSize: 10,
+    fontSize: 12,
     letterSpacing: 1.6,
     marginTop: 5,
   },
@@ -1486,7 +1522,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   statusDot: { width: 5, height: 5, borderRadius: 3 },
-  statusPillText: { fontFamily: FONTS.bodyBold, fontSize: 10, letterSpacing: 0.6 },
+  statusPillText: { fontFamily: FONTS.bodyBold, fontSize: 12, letterSpacing: 0.6 },
   repWrapper: {
     marginTop: 12,
   },
@@ -1509,7 +1545,7 @@ const styles = StyleSheet.create({
   },
   repTargetText: {
     fontFamily: FONTS.bodySemiBold,
-    fontSize: 10.5,
+    fontSize: 12.5,
     marginTop: 2,
   },
   repButton: {
@@ -1546,12 +1582,12 @@ const styles = StyleSheet.create({
   },
   statTileNum: {
     fontFamily: FONTS.heading,
-    fontSize: 24,
-    lineHeight: 24,
+    fontSize: 25,
+    lineHeight: 25,
   },
   statTileCaption: {
     fontFamily: FONTS.bodyBold,
-    fontSize: 10,
+    fontSize: 12,
     letterSpacing: 1.2,
     marginTop: 4,
   },
@@ -1615,8 +1651,8 @@ const styles = StyleSheet.create({
   tipsText: {
     flex: 1,
     fontFamily: FONTS.body,
-    fontSize: 11.5,
-    lineHeight: 17,
+    fontSize: 13.5,
+    lineHeight: 18,
   },
   repProgressContainer: {
     marginTop: 14,
@@ -1665,7 +1701,7 @@ const styles = StyleSheet.create({
   },
   completeButtonText: {
     fontFamily: FONTS.bodyExtraBold,
-    fontSize: 15,
+    fontSize: 16.5,
     color: '#FFFFFF',
   },
   completedContainer: {

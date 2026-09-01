@@ -34,6 +34,7 @@ import { canAccessFeature } from '../../utils/subscription';
 import {
   getScoutingReports,
   saveScoutingReport,
+  shareScoutingReport,
   deleteScoutingReport,
   getWatchlist,
   SCOUTING_RUBRIC,
@@ -67,8 +68,9 @@ const initialsOf = (name) =>
 
 // ─── List mode: report row ────────────────────────────────────────────────────
 
-function ReportRow({ report, theme, onEdit, onDelete, style }) {
+function ReportRow({ report, theme, onEdit, onDelete, onShare, style }) {
   const isSubmitted = report.status === 'submitted';
+  const shared = !!report.sharedWithPlayer;
   const gradeColor = evalColorFor(report.evalGrade, theme);
   return (
     <Row
@@ -80,7 +82,9 @@ function ReportRow({ report, theme, onEdit, onDelete, style }) {
         </View>
       }
       title={report.athleteName}
-      meta={[report.recommendation, report.position, report.date].filter(Boolean).join(' · ')}
+      meta={[report.recommendation, report.position, report.date, shared ? 'Shared with athlete' : null]
+        .filter(Boolean)
+        .join(' · ')}
       trailing={
         <View style={styles.rowTrailing}>
           <View
@@ -98,6 +102,20 @@ function ReportRow({ report, theme, onEdit, onDelete, style }) {
               {isSubmitted ? 'SUBMITTED' : 'DRAFT'}
             </Text>
           </View>
+          {/* Sharing is deliberate and reversible. Only offered on a submitted
+              report — a draft must never reach the athlete. */}
+          {isSubmitted ? (
+            <TouchableOpacity
+              onPress={() => onShare(report)}
+              hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+            >
+              <Ionicons
+                name={shared ? 'eye' : 'eye-off-outline'}
+                size={17}
+                color={shared ? theme.primary : theme.textDim}
+              />
+            </TouchableOpacity>
+          ) : null}
           <TouchableOpacity
             onPress={() => onDelete(report.id)}
             hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
@@ -391,6 +409,36 @@ export default function ScoutReportsScreen({ navigation, route }) {
     setPresetProspect(null);
   }, []);
 
+  // Sharing needs the guardian's approval for that athlete — the service refuses
+  // otherwise, and the message explains why rather than failing silently.
+  const handleShare = useCallback(
+    (report) => {
+      const turningOn = !report.sharedWithPlayer;
+      Alert.alert(
+        turningOn ? `Share with ${report.athleteName}?` : 'Stop sharing?',
+        turningOn
+          ? 'They and their guardian will be able to read this report.'
+          : 'They will no longer be able to read it.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: turningOn ? 'Share' : 'Stop sharing',
+            style: turningOn ? 'default' : 'destructive',
+            onPress: async () => {
+              try {
+                await shareScoutingReport(scoutUid, report.id, report, turningOn, userData);
+                loadReports();
+              } catch (e) {
+                Alert.alert('Cannot share', e.message || 'Could not update sharing.');
+              }
+            },
+          },
+        ]
+      );
+    },
+    [scoutUid, userData, loadReports]
+  );
+
   const handleDelete = useCallback((id) => {
     Alert.alert('Delete Report', 'Are you sure?', [
       { text: 'Cancel', style: 'cancel' },
@@ -483,6 +531,7 @@ export default function ScoutReportsScreen({ navigation, route }) {
                   theme={theme}
                   onEdit={handleEdit}
                   onDelete={handleDelete}
+                  onShare={handleShare}
                   style={i > 0 ? { marginTop: 8 } : null}
                 />
               ))
@@ -511,7 +560,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  gradeSquareText: { fontFamily: TYPE.cardTitle.fontFamily, fontSize: 13 },
+  gradeSquareText: { fontFamily: TYPE.cardTitle.fontFamily, fontSize: 15 },
   rowTrailing: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   statusChip: {
     paddingHorizontal: 9,
@@ -519,7 +568,7 @@ const styles = StyleSheet.create({
     borderRadius: SHAPE.radiusBadge,
   },
   headerStatusChip: { alignSelf: 'center' },
-  statusChipText: { fontFamily: TYPE.chip.fontFamily, fontSize: 9.5, letterSpacing: 0.4 },
+  statusChipText: { fontFamily: TYPE.chip.fontFamily, fontSize: 11.5, letterSpacing: 0.4 },
 
   // Composer
   composerScroll: {
@@ -528,8 +577,8 @@ const styles = StyleSheet.create({
   },
   section: { marginTop: SHAPE.sectionGap },
 
-  changeLink: { fontFamily: TYPE.buttonSecondary.fontFamily, fontSize: 12 },
-  emptyPicker: { fontFamily: TYPE.tooltipBody.fontFamily, fontSize: 12, lineHeight: 18 },
+  changeLink: { fontFamily: TYPE.buttonSecondary.fontFamily, fontSize: 14 },
+  emptyPicker: { fontFamily: TYPE.tooltipBody.fontFamily, fontSize: 14, lineHeight: 19 },
 
   segmentRow: { flexDirection: 'row', gap: 7 },
   segmentBtn: {
@@ -539,7 +588,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  segmentText: { fontFamily: TYPE.buttonSecondary.fontFamily, fontSize: 10.5 },
+  segmentText: { fontFamily: TYPE.buttonSecondary.fontFamily, fontSize: 12.5 },
 
   ratingBlock: {},
   ratingHead: {
@@ -548,8 +597,8 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
     marginBottom: 6,
   },
-  ratingLabel: { fontFamily: TYPE.greeting.fontFamily, fontSize: 11.5 },
-  ratingValue: { fontFamily: TYPE.cardTitle.fontFamily, fontSize: 11.5 },
+  ratingLabel: { fontFamily: TYPE.greeting.fontFamily, fontSize: 13.5 },
+  ratingValue: { fontFamily: TYPE.cardTitle.fontFamily, fontSize: 13.5 },
   ratingSegments: { flexDirection: 'row', gap: 4 },
   ratingSegmentTap: { flex: 1 },
   ratingSegment: { height: 5, borderRadius: 3 },
@@ -562,15 +611,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  gradeChipText: { fontFamily: TYPE.chip.fontFamily, fontSize: 10.5 },
+  gradeChipText: { fontFamily: TYPE.chip.fontFamily, fontSize: 12.5 },
 
   notesInput: {
     borderRadius: SHAPE.radiusTile,
     padding: 13,
     minHeight: 96,
     fontFamily: TYPE.tooltipBody.fontFamily,
-    fontSize: 11.5,
-    lineHeight: 18,
+    fontSize: 13.5,
+    lineHeight: 19,
   },
 
   footer: {

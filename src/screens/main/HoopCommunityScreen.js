@@ -255,7 +255,7 @@ const HoopCommunityScreen = ({ navigation }) => {
             initials={post.user.initials}
           />
           <View style={styles.postMeta}>
-            <Text style={[TYPE.rowTitle, { color: theme.text, fontSize: 13 }]}>{post.user.name}</Text>
+            <Text style={[TYPE.rowTitle, { color: theme.text, fontSize: 15 }]}>{post.user.name}</Text>
             <Text style={[styles.timeAgo, { color: theme.textDim }]}>
               {post.timeAgo}
               {post.badge ? '' : ` · ${typeConfig.label}`}
@@ -418,7 +418,7 @@ const styles = StyleSheet.create({
   },
   tickerText: {
     fontFamily: FONTS.bodySemiBold,
-    fontSize: 11,
+    fontSize: 13,
   },
   tabRow: {
     flexDirection: 'row',
@@ -432,11 +432,11 @@ const styles = StyleSheet.create({
   },
   tabLabel: {
     fontFamily: FONTS.bodySemiBold,
-    fontSize: 12.5,
+    fontSize: 14.5,
   },
   tabLabelActive: {
     fontFamily: FONTS.bodyExtraBold,
-    fontSize: 12.5,
+    fontSize: 14.5,
   },
   tabUnderline: {
     position: 'absolute',
@@ -467,7 +467,7 @@ const styles = StyleSheet.create({
   },
   timeAgo: {
     fontFamily: FONTS.body,
-    fontSize: 10.5,
+    fontSize: 12.5,
     marginTop: 2,
   },
   badgePill: {
@@ -480,13 +480,13 @@ const styles = StyleSheet.create({
   },
   badgePillText: {
     fontFamily: FONTS.bodyBold,
-    fontSize: 9.5,
+    fontSize: 11.5,
     letterSpacing: 0.5,
   },
   postText: {
     fontFamily: FONTS.body,
-    fontSize: 12.5,
-    lineHeight: 19,
+    fontSize: 14.5,
+    lineHeight: 20,
     marginTop: 10,
   },
   actionsRow: {
@@ -504,7 +504,7 @@ const styles = StyleSheet.create({
   },
   actionCount: {
     fontFamily: FONTS.bodySemiBold,
-    fontSize: 11.5,
+    fontSize: 13.5,
   },
   bottomPad: {
     height: 30,

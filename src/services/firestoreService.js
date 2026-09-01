@@ -23,6 +23,14 @@ import { db } from '../config/firebaseConfig';
 // Storage cleanup for film deletion/retention (spec §6) — deleting the video
 // object is what actually revokes access to footage, since playback uses a
 // rules-bypassing download-token URL. See deleteFilm below.
+import {
+  ASSIGNMENT_STATUS,
+  isSubmittedStatus,
+  normalizeCompletion,
+  resultFieldUpdates,
+  selectOpenAssignmentFor,
+  statusForCompletion,
+} from './assignments/assignmentLifecycle';
 import { deleteFile } from './storageService';
 import { ACHIEVEMENTS, getLevelFromXP } from '../data/achievements';
 
@@ -209,6 +217,25 @@ export const getUserActivities = async (uid, limitCount = 20) => {
   } catch (error) {
     console.error('Error getting user activities:', error);
     throw error;
+  }
+};
+
+/**
+ * A single activity by id — the workout result behind a submitted assignment.
+ * Rules allow a connected coach/parent (canViewPlayerData), so a coach can read
+ * their athlete's activity without the athlete's own session.
+ * @param {string} uid
+ * @param {string} activityId
+ * @returns {Promise<Object|null>}
+ */
+export const getActivityById = async (uid, activityId) => {
+  if (!uid || !activityId) return null;
+  try {
+    const snap = await getDoc(doc(db, 'users', uid, 'activities', activityId));
+    return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+  } catch (error) {
+    console.error('Error getting activity:', error);
+    return null;
   }
 };
 
@@ -3375,7 +3402,19 @@ export const getSimCoachIQScore = async (uid) => {
   try {
     const results = await getSimCoachResults(uid, 10);
     if (results.length === 0) return null;
-    const avg = results.reduce((sum, r) => sum + (r.iqScore || 0), 0) / results.length;
+    // `|| 0` silently scored every pre-iqScore result as zero, so the displayed IQ
+    // was dragged toward 0 by history rather than reflecting it. Fall back to the
+    // boolean `correct` those documents do carry, and ignore anything with neither.
+    const scored = results
+      .map((r) => {
+        const explicit = Number(r?.iqScore);
+        if (Number.isFinite(explicit)) return explicit;
+        if (typeof r?.correct === 'boolean') return r.correct ? 100 : 0;
+        return null;
+      })
+      .filter((n) => n !== null);
+    if (scored.length === 0) return null;
+    const avg = scored.reduce((sum, n) => sum + n, 0) / scored.length;
     return Math.round(avg);
   } catch (error) {
     console.error('Error computing SimCoach IQ score:', error);
@@ -3427,6 +3466,12 @@ export const publishScoutLabProfile = async (uid, profileData = {}) => {
     if (!isHighSchoolGrade(profileData.gradeLevel)) {
       throw new Error('Only high-school athletes (grades 9–12) can be listed for scouts.');
     }
+    // Category consent gates what reaches the PUBLIC directory entry. Withholding
+    // 'stats' must actually remove the evaluation score from the public doc —
+    // storing the preference without enforcing it would be consent theatre.
+    const consent = profileData.consent || {};
+    const shareStats = consent.stats !== false;
+
     const entry = {
       uid,
       name: profileData.name || 'Athlete',
@@ -3434,8 +3479,8 @@ export const publishScoutLabProfile = async (uid, profileData = {}) => {
       position: profileData.position || null,
       height: profileData.height || null,           // "size"
       archetype: profileData.archetype || null,
-      mainAttributes: profileData.mainAttributes || null,
-      evaluationScore: profileData.evaluationScore || null, // platform ranking (authoritative)
+      mainAttributes: shareStats ? (profileData.mainAttributes || null) : null,
+      evaluationScore: shareStats ? (profileData.evaluationScore || null) : null, // platform ranking (authoritative)
       region: profileData.region || null,           // coarse geo — for filtering only, not exact location
       updatedAt: serverTimestamp(),
     };
@@ -3445,12 +3490,33 @@ export const publishScoutLabProfile = async (uid, profileData = {}) => {
       // Mirror into the player's own subcollection + mark as visible
       setDoc(
         doc(db, 'users', uid, 'scoutLabProfile', 'main'),
-        { ...entry, directoryVisible: true },
+        { ...entry, directoryVisible: true, consent: profileData.consent || {} },
         { merge: true }
       ),
     ]);
   } catch (error) {
     console.error('Error publishing ScoutLab profile:', error);
+    throw error;
+  }
+};
+
+/**
+ * Persist per-category sharing consent without touching directory visibility.
+ * Used when the child is NOT listed — there is no public entry to republish, but
+ * the preference must survive so the next publish honors it.
+ * @param {string} uid
+ * @param {{stats?:boolean, film?:boolean, academics?:boolean}} consent
+ * @returns {Promise<void>}
+ */
+export const updateScoutLabConsent = async (uid, consent = {}) => {
+  try {
+    await setDoc(
+      doc(db, 'users', uid, 'scoutLabProfile', 'main'),
+      { consent, consentUpdatedAt: serverTimestamp() },
+      { merge: true }
+    );
+  } catch (error) {
+    console.error('Error updating ScoutLab consent:', error);
     throw error;
   }
 };
@@ -3879,21 +3945,91 @@ export const removeConnection = async (playerUid, roleHolderUid) => {
  * @param {string} playerUid
  * @returns {Promise<Object>}
  */
-export const getLinkedPlayerSummary = async (playerUid) => {
+export const getLinkedPlayerSummary = async (playerUid, options = {}) => {
+  // Roster cards only need a handful of activities; trend charts need months of
+  // them. The default keeps every existing caller on the cheap read.
+  const activityLimit = options.activityLimit || 10;
   const [profile, evalRank, blueprint, activities, achievements] = await Promise.all([
     getUserProfile(playerUid).catch(() => null),
     getLatestEvalRankScore(playerUid).catch(() => null),
     getBlueprint360Plan(playerUid).catch(() => null),
-    getUserActivities(playerUid, 10).catch(() => []),
+    getUserActivities(playerUid, activityLimit).catch(() => []),
     getUserAchievements(playerUid).catch(() => []),
   ]);
   return { uid: playerUid, profile, evalRank, blueprint, activities, achievements };
 };
 
+/**
+ * Roster-wide summaries, batched with a short in-memory cache.
+ *
+ * getLinkedPlayerSummary is five reads per athlete, and both coach roster screens
+ * called it once per athlete on EVERY focus — a 15-player roster re-read 75
+ * documents each time the tab was touched. The cache collapses the repeat focus
+ * (navigating away and back, or the two roster screens in sequence) without
+ * making the data stale enough to matter for a dashboard.
+ *
+ * @param {Array<string>} playerUids
+ * @param {{activityLimit?:number, maxAgeMs?:number}} [options]
+ * @returns {Promise<Object>} { [playerUid]: summary }
+ */
+const rosterSummaryCache = new Map(); // playerUid -> { at:number, summary:Object }
+const ROSTER_CACHE_TTL_MS = 30 * 1000;
+
+export const getRosterSummaries = async (playerUids = [], options = {}) => {
+  const { activityLimit = 10, maxAgeMs = ROSTER_CACHE_TTL_MS } = options;
+  const unique = Array.from(new Set((playerUids || []).filter(Boolean)));
+  const now = Date.now();
+
+  const results = await Promise.all(
+    unique.map(async (uid) => {
+      const cached = rosterSummaryCache.get(uid);
+      if (cached && now - cached.at < maxAgeMs && cached.activityLimit >= activityLimit) {
+        return [uid, cached.summary];
+      }
+      const summary = await getLinkedPlayerSummary(uid, { activityLimit }).catch(() => null);
+      if (summary) rosterSummaryCache.set(uid, { at: now, summary, activityLimit });
+      return [uid, summary];
+    })
+  );
+
+  return Object.fromEntries(results.filter(([, v]) => v));
+};
+
+/** Drop cached roster summaries — call after a write that changes athlete data. */
+export const invalidateRosterSummaries = (playerUid = null) => {
+  if (playerUid) rosterSummaryCache.delete(playerUid);
+  else rosterSummaryCache.clear();
+};
+
 // ==================== COACH: Assignments (coach → athlete) ====================
 // A linked coach assigns a workout or SimCoach scenario to an athlete. Stored on
-// the athlete so it surfaces on their side; the athlete flips status to
-// 'completed'. Firestore rules gate writes to the athlete or a connected coach.
+// the athlete so it surfaces on their side. Firestore rules gate writes to the
+// athlete or a connected coach.
+//
+// Lifecycle:
+//   assigned  -> the coach has issued it, nothing done yet
+//   submitted -> the athlete finished the work (written automatically when the
+//                workout/scenario completes; carries the result payload)
+//   partial   -> the athlete started and bailed out before the end
+//   verified  -> the coach reviewed the submission and signed it off
+//
+// 'completed' is the pre-existing status written by the athlete's manual
+// checkbox. It is still accepted everywhere as an alias for 'submitted' so old
+// documents keep working; nothing writes it for automatic completion.
+
+// The status vocabulary and the two decisions that were getting made wrong here
+// now live in a pure module so they can be tested under Node — see
+// src/services/assignments/assignmentLifecycle.js and tests/assignments/.
+// Re-exported unchanged, so every existing
+// `import { ASSIGNMENT_STATUS } from '../services/firestoreService'` still works.
+export {
+  ASSIGNMENT_STATUS,
+  SUBMITTED_STATUSES,
+  OPEN_STATUSES,
+  isSubmittedStatus,
+  isOpenStatus,
+  attemptNumber,
+} from './assignments/assignmentLifecycle';
 
 /**
  * Assign a workout or scenario to a linked athlete.
@@ -3906,6 +4042,9 @@ export const assignToAthlete = async (athleteUid, coach, assignment) => {
   try {
     if (!athleteUid) throw new Error('Missing athlete.');
     const ref = await addDoc(collection(db, 'users', athleteUid, 'assignments'), {
+      // Denormalized so a collectionGroup query over every athlete's assignments
+      // can tell whose it is without walking back up the document path.
+      athleteUid,
       coachUid: coach?.uid || null,
       coachName: coach?.displayName || 'Coach',
       type: assignment?.type || 'workout',
@@ -3948,17 +4087,197 @@ export const getAthleteAssignments = async (athleteUid, { status, type } = {}) =
   }
 };
 
-export const updateAssignmentStatus = async (athleteUid, assignmentId, status) => {
+/**
+ * Move an assignment along its lifecycle, optionally attaching the result.
+ * @param {string} athleteUid
+ * @param {string} assignmentId
+ * @param {string} status one of ASSIGNMENT_STATUS
+ * @param {Object} [result] - { activityId, completionPercentage, score, stepsCompleted, totalSteps }
+ * @returns {Promise<void>}
+ */
+export const updateAssignmentStatus = async (
+  athleteUid,
+  assignmentId,
+  status,
+  result = null,
+  extraFields = null,
+) => {
   try {
-    await updateDoc(doc(db, 'users', athleteUid, 'assignments', assignmentId), {
+    const payload = {
       status,
       updatedAt: serverTimestamp(),
-    });
+    };
+
+    // MERGE the result, never replace it. `updateDoc({ result: {...} })` overwrites
+    // the whole map, which is how a send-back carrying only { coachNote } used to
+    // delete result.activityId — the field CoachSubmissionDetailScreen reads to
+    // render the work being judged. The coach reopened work they had just looked at
+    // and was told the athlete never started. resultFieldUpdates returns dotted
+    // paths ('result.coachNote') so siblings survive.
+    Object.assign(payload, resultFieldUpdates(result));
+    if (extraFields) Object.assign(payload, extraFields);
+
+    if (isSubmittedStatus(status)) payload.submittedAt = serverTimestamp();
+    if (status === ASSIGNMENT_STATUS.VERIFIED) payload.verifiedAt = serverTimestamp();
+    if (status === ASSIGNMENT_STATUS.RETURNED) payload.returnedAt = serverTimestamp();
+
+    await updateDoc(doc(db, 'users', athleteUid, 'assignments', assignmentId), payload);
   } catch (error) {
     console.error('Error updating assignment status:', error);
     throw error;
   }
 };
+
+/**
+ * Every assignment this coach has issued, across all their athletes.
+ *
+ * Assignments live under users/{athleteUid}/assignments, so there is no
+ * coach-owned collection to read. A collectionGroup query on `coachUid` is the
+ * way to invert that without duplicating documents on write (which would need a
+ * second write path and could drift). Requires the collectionGroup index on
+ * assignments(coachUid, createdAt) — see firestore.indexes.json.
+ *
+ * @param {string} coachUid
+ * @param {Object} [filters] - { status, athleteUid, max }
+ * @returns {Promise<Array>}
+ */
+export const getCoachAssignments = async (coachUid, { status, athleteUid, max = 200 } = {}) => {
+  if (!coachUid) return [];
+  try {
+    const q = query(
+      collectionGroup(db, 'assignments'),
+      where('coachUid', '==', coachUid),
+      orderBy('createdAt', 'desc'),
+      limit(max)
+    );
+    const snapshot = await getDocs(q);
+    let items = snapshot.docs.map((d) => ({
+      id: d.id,
+      // Older docs predate the denormalized athleteUid; recover it from the path.
+      athleteUid: d.ref.parent.parent ? d.ref.parent.parent.id : null,
+      ...d.data(),
+    }));
+    if (status) items = items.filter((a) => a.status === status);
+    if (athleteUid) items = items.filter((a) => a.athleteUid === athleteUid);
+    return items;
+  } catch (error) {
+    // A missing index surfaces here; fail soft so the roster still renders.
+    console.error('Error fetching coach assignments:', error);
+    return [];
+  }
+};
+
+/**
+ * Per-athlete assignment tallies for a coach's roster.
+ * @param {string} coachUid
+ * @returns {Promise<Object>} { [athleteUid]: {assigned, submitted, verified, total} }
+ */
+export const getCoachAssignmentSummary = async (coachUid) => {
+  const assignments = await getCoachAssignments(coachUid);
+  const byAthlete = {};
+  assignments.forEach((a) => {
+    if (!a.athleteUid) return;
+    const bucket = byAthlete[a.athleteUid] || { assigned: 0, submitted: 0, verified: 0, total: 0 };
+    bucket.total += 1;
+    if (a.status === ASSIGNMENT_STATUS.VERIFIED) bucket.verified += 1;
+    else if (isSubmittedStatus(a.status)) bucket.submitted += 1;
+    else bucket.assigned += 1;
+    byAthlete[a.athleteUid] = bucket;
+  });
+  return byAthlete;
+};
+
+/**
+ * Mark the athlete's open assignment for a given workout/scenario as done.
+ *
+ * Called from the completion flows, which know the template that was just
+ * finished but not which assignment (if any) it satisfies. Matching is
+ * deliberately narrow — refId equality on an OPEN assignment — so finishing a
+ * workout you happened to like does not silently close a coach's assignment for
+ * a different drill. Returns the assignment it closed, or null.
+ *
+ * @param {string} athleteUid
+ * @param {Object} opts - { refId, type, activityId, completionPercentage, score }
+ * @returns {Promise<Object|null>}
+ */
+export const submitAssignmentForCompletion = async (
+  athleteUid,
+  { refId, type = 'workout', activityId = null, completionPercentage = 100, score = null } = {}
+) => {
+  if (!athleteUid || !refId) return null;
+  try {
+    // Read every status, not just 'assigned'. Filtering the query to ASSIGNED meant
+    // a RETURNED workout matched nothing: the athlete complied with the send-back,
+    // submitted into the void, and the row stayed under "Needs another look"
+    // forever. selectOpenAssignmentFor spans ASSIGNED and RETURNED.
+    const all = await getAthleteAssignments(athleteUid);
+    const match = selectOpenAssignmentFor(all, { refId, type });
+    if (!match) return null;
+
+    const pct = normalizeCompletion(completionPercentage);
+    const status = statusForCompletion(pct);
+
+    await updateAssignmentStatus(athleteUid, match.id, status, {
+      activityId,
+      completionPercentage: pct,
+      score,
+    });
+    return { ...match, status, completionPercentage: pct };
+  } catch (error) {
+    // Never let assignment bookkeeping fail a completed workout.
+    console.error('Error submitting assignment completion:', error);
+    return null;
+  }
+};
+
+/** Coach signs off a submitted assignment. */
+export const verifyAssignment = async (athleteUid, assignmentId) =>
+  updateAssignmentStatus(athleteUid, assignmentId, ASSIGNMENT_STATUS.VERIFIED);
+
+/**
+ * Coach undoes a sign-off. Verifying used to be permanent in both the UI and the
+ * model, so a mis-tap on a phone held one-handed courtside was unrecoverable.
+ * Returns the assignment to the review queue rather than to the athlete.
+ */
+export const unverifyAssignment = async (athleteUid, assignmentId) =>
+  updateAssignmentStatus(athleteUid, assignmentId, ASSIGNMENT_STATUS.SUBMITTED);
+
+/**
+ * Coach sends work back for another attempt, with an optional reason.
+ * @param {string} athleteUid
+ * @param {string} assignmentId
+ * @param {string} [note] shown to the athlete alongside the returned assignment
+ */
+export const returnAssignment = async (athleteUid, assignmentId, note = '') =>
+  updateAssignmentStatus(
+    athleteUid,
+    assignmentId,
+    ASSIGNMENT_STATUS.RETURNED,
+    { coachNote: (note || '').trim() || null },
+    // So a second attempt reads as a second attempt rather than as a first one
+    // that the coach mysteriously already has an opinion about.
+    { returnCount: increment(1) },
+  );
+
+/**
+ * Coach takes back a send-back inside the undo window.
+ *
+ * Not the same as unverifyAssignment: a send-back also wrote a reason and bumped
+ * the attempt counter, and undoing it has to undo those too — otherwise the athlete
+ * briefly saw a rejection that is now denied ever happening, and the next real
+ * send-back would be labelled "Attempt 3".
+ *
+ * @param {string} athleteUid
+ * @param {string} assignmentId
+ */
+export const cancelReturn = async (athleteUid, assignmentId) =>
+  updateAssignmentStatus(
+    athleteUid,
+    assignmentId,
+    ASSIGNMENT_STATUS.SUBMITTED,
+    { coachNote: null },
+    { returnCount: increment(-1) },
+  );
 
 // ==================== COACH: SimCoach Game Plans ====================
 // A coach authors a custom scenario ("game plan") — same shape as the static
@@ -5017,8 +5336,31 @@ export const markConversationRead = async (convId, uid) => {
 };
 
 /**
+ * Role-holders attached to a player, excluding the caller — i.e. the OTHER adults
+ * around a shared athlete. This is what connects a parent to their child's coach:
+ * the link model only ever writes player↔role-holder edges, so a parent and a
+ * coach are never directly linked, only co-linked through the child.
+ * @param {string} playerUid
+ * @param {string} excludeUid the caller, who is already a connection of this player
+ * @returns {Promise<Array<{uid,name,photoURL,role}>>}
+ */
+export const getCoLinkedRoleHolders = async (playerUid, excludeUid) => {
+  const connections = await getConnections(playerUid).catch(() => []);
+  return connections
+    .filter((c) => c?.uid && c.uid !== excludeUid)
+    .map((c) => ({
+      uid: c.uid,
+      name: c.name || 'User',
+      photoURL: c.photoURL || null,
+      role: c.role || null,
+    }));
+};
+
+/**
  * People this user can message: their roster (linked players) + their connections
- * (linked coaches/parents), de-duped. Works for every role, both directions.
+ * (linked coaches/parents) + the other role-holders around each of their linked
+ * players. That last group is what makes parent↔coach work — those two are never
+ * directly linked, only co-linked through the athlete.
  * @returns {Promise<Array<{uid,name,photoURL,role}>>}
  */
 export const getMessageableContacts = async (uid) => {
@@ -5027,9 +5369,20 @@ export const getMessageableContacts = async (uid) => {
       getLinkedPlayers(uid).catch(() => []),
       getConnections(uid).catch(() => []),
     ]);
+
+    // Co-linked adults, one query per linked player. Fails soft per player so a
+    // single denied read cannot empty the whole picker.
+    const coLinked = (
+      await Promise.all(
+        players
+          .filter((p) => p?.uid)
+          .map((p) => getCoLinkedRoleHolders(p.uid, uid).catch(() => []))
+      )
+    ).flat();
+
     const byUid = new Map();
-    [...players, ...connections].forEach((c) => {
-      if (c?.uid && !byUid.has(c.uid)) {
+    [...players, ...connections, ...coLinked].forEach((c) => {
+      if (c?.uid && c.uid !== uid && !byUid.has(c.uid)) {
         byUid.set(c.uid, { uid: c.uid, name: c.name || 'User', photoURL: c.photoURL || null, role: c.role || null });
       }
     });
@@ -5037,6 +5390,163 @@ export const getMessageableContacts = async (uid) => {
   } catch (error) {
     console.error('Error getting messageable contacts:', error);
     return [];
+  }
+};
+
+/**
+ * The coaches attached to a parent's children, tagged with which child they coach.
+ * Powers the parent's "Message Coach" buttons, which need a concrete recipient.
+ * @param {string} parentUid
+ * @param {string} [childUid] restrict to one child; defaults to all children
+ * @returns {Promise<Array<{uid,name,photoURL,role,childUid,childName}>>}
+ */
+export const getCoachesForParent = async (parentUid, childUid = null) => {
+  try {
+    const children = await getLinkedPlayers(parentUid).catch(() => []);
+    const scoped = childUid ? children.filter((c) => c.uid === childUid) : children;
+
+    const perChild = await Promise.all(
+      scoped
+        .filter((c) => c?.uid)
+        .map(async (c) => {
+          const holders = await getCoLinkedRoleHolders(c.uid, parentUid).catch(() => []);
+          return holders
+            .filter((h) => h.role === 'coach')
+            .map((h) => ({ ...h, childUid: c.uid, childName: c.name || 'your athlete' }));
+        })
+    );
+
+    const byUid = new Map();
+    perChild.flat().forEach((coach) => {
+      if (!byUid.has(coach.uid)) byUid.set(coach.uid, coach);
+    });
+    return Array.from(byUid.values());
+  } catch (error) {
+    console.error('Error getting coaches for parent:', error);
+    return [];
+  }
+};
+
+// ==================== IN-APP NOTIFICATIONS ====================
+// `users/{uid}/notifications` is written by Cloud Function triggers (assignments,
+// scout requests/approvals, prospect matches, session changes) and read here.
+// Owner-only by rules, so no consent plumbing is needed. Docs carry:
+//   { type, title, body, data:{route, params, ...}, sentAt, readAt }
+// `data.route`/`data.params` drive tap-through; a doc without them is inert copy.
+
+/** Real-time listener for a user's in-app notifications (newest first). Returns unsub. */
+export const listenToNotifications = (uid, callback, max = 50) => {
+  if (!uid) return () => {};
+  const q = query(
+    collection(db, 'users', uid, 'notifications'),
+    orderBy('sentAt', 'desc'),
+    limit(max)
+  );
+  return onSnapshot(
+    q,
+    (snapshot) => callback(snapshot.docs.map((d) => ({ id: d.id, ...d.data() }))),
+    (error) => {
+      // Fail soft: the screen still renders its synthesized entries.
+      console.error('Error listening to notifications:', error);
+      callback([]);
+    }
+  );
+};
+
+/** One-shot read, for callers that only need a count or a snapshot. */
+export const getNotifications = async (uid, max = 50) => {
+  if (!uid) return [];
+  try {
+    const q = query(
+      collection(db, 'users', uid, 'notifications'),
+      orderBy('sentAt', 'desc'),
+      limit(max)
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  } catch (error) {
+    console.error('Error getting notifications:', error);
+    return [];
+  }
+};
+
+/** Mark a single notification read. Best-effort — never throws to the UI. */
+export const markNotificationRead = async (uid, notificationId) => {
+  if (!uid || !notificationId) return;
+  try {
+    await updateDoc(doc(db, 'users', uid, 'notifications', notificationId), {
+      readAt: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error('Error marking notification read:', error);
+  }
+};
+
+/** Mark every unread notification read. Best-effort. */
+export const markAllNotificationsRead = async (uid) => {
+  if (!uid) return;
+  try {
+    const q = query(
+      collection(db, 'users', uid, 'notifications'),
+      where('readAt', '==', null),
+      limit(200)
+    );
+    const snap = await getDocs(q);
+    await Promise.all(
+      snap.docs.map((d) =>
+        updateDoc(d.ref, { readAt: serverTimestamp() }).catch(() => null)
+      )
+    );
+  } catch (error) {
+    console.error('Error marking all notifications read:', error);
+  }
+};
+
+/**
+ * Unread count for badge rendering. Returns 0 on any failure so a badge never
+ * blocks a screen. Capped — a badge does not need an exact count past 99.
+ */
+export const getUnreadNotificationCount = async (uid) => {
+  if (!uid) return 0;
+  try {
+    const q = query(
+      collection(db, 'users', uid, 'notifications'),
+      where('readAt', '==', null),
+      limit(100)
+    );
+    const snap = await getDocs(q);
+    return snap.size;
+  } catch (error) {
+    console.error('Error counting unread notifications:', error);
+    return 0;
+  }
+};
+
+/** Real-time unread count. Returns unsub. */
+export const listenToUnreadNotificationCount = (uid, callback) => {
+  if (!uid) return () => {};
+  const q = query(
+    collection(db, 'users', uid, 'notifications'),
+    where('readAt', '==', null),
+    limit(100)
+  );
+  return onSnapshot(
+    q,
+    (snapshot) => callback(snapshot.size),
+    (error) => {
+      console.error('Error listening to unread count:', error);
+      callback(0);
+    }
+  );
+};
+
+/** Delete a notification the user dismissed. Best-effort. */
+export const deleteNotification = async (uid, notificationId) => {
+  if (!uid || !notificationId) return;
+  try {
+    await deleteDoc(doc(db, 'users', uid, 'notifications', notificationId));
+  } catch (error) {
+    console.error('Error deleting notification:', error);
   }
 };
 
@@ -5173,6 +5683,95 @@ export const saveScoutingReport = async (scoutUid, report) => {
 };
 
 /**
+ * Share (or unshare) a submitted report with the athlete it is about.
+ *
+ * POLICY: sharing is a deliberate act, never automatic on submit — a scout's
+ * working notes are theirs until they choose otherwise, and a draft must never
+ * reach the athlete. `sharedWithPlayer` is what the player/parent read rule keys
+ * on; the write rule additionally refuses to set it on anything but a submitted
+ * report, so "shared implies submitted" holds even if a client misbehaves.
+ *
+ * Sharing also requires parent-approved access to that athlete. Every scout↔minor
+ * interaction is parent-authorized (COO), and a report landing in a minor's app is
+ * exactly such an interaction — so consent is checked here rather than assumed.
+ *
+ * @param {string} scoutUid
+ * @param {string} reportId
+ * @param {Object} report - the report being shared (needs prospectUid + status)
+ * @param {boolean} shared
+ * @param {Object} [scout] - { displayName } stamped onto the report so the athlete sees who wrote it
+ * @returns {Promise<void>}
+ */
+export const shareScoutingReport = async (scoutUid, reportId, report, shared = true, scout = {}) => {
+  if (!scoutUid || !reportId) throw new Error('Missing report.');
+
+  if (shared) {
+    if (report?.status !== 'submitted') {
+      throw new Error('Only a submitted report can be shared with the athlete.');
+    }
+    const access = await getScoutAccessStatus(report.prospectUid, scoutUid).catch(() => 'none');
+    if (access !== 'approved') {
+      throw new Error(
+        "You need the guardian's approval for this athlete before sharing a report with them."
+      );
+    }
+  }
+
+  try {
+    await updateDoc(doc(db, 'users', scoutUid, 'scoutingReports', reportId), {
+      sharedWithPlayer: !!shared,
+      sharedAt: shared ? serverTimestamp() : null,
+      // Stamped at share time so the athlete sees WHO wrote it. Reports carry no
+      // scoutName otherwise, and the athlete cannot read the scout's profile — a
+      // report from "Scout" would be worse than useless to them.
+      ...(shared && { scoutName: scout.displayName || scout.name || 'Scout' }),
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error('Error sharing scouting report:', error);
+    throw error;
+  }
+};
+
+/**
+ * Reports shared WITH this player, across every scout who wrote one.
+ *
+ * Reports live under the scout who authored them, so this inverts that with a
+ * collectionGroup query — the same approach as getCoachAssignments, and for the
+ * same reason: a mirrored copy would go stale the moment the scout edited or
+ * unshared it. Requires the collectionGroup index on
+ * scoutingReports(prospectUid, sharedWithPlayer, updatedAt).
+ *
+ * Readable by the player themselves and by their linked parent (see rules).
+ *
+ * @param {string} playerUid
+ * @returns {Promise<Array>}
+ */
+export const getSharedReportsForPlayer = async (playerUid, max = 50) => {
+  if (!playerUid) return [];
+  try {
+    const q = query(
+      collectionGroup(db, 'scoutingReports'),
+      where('prospectUid', '==', playerUid),
+      where('sharedWithPlayer', '==', true),
+      orderBy('updatedAt', 'desc'),
+      limit(max)
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((d) => ({
+      id: d.id,
+      // The authoring scout is the grandparent doc; reports carry no scoutUid.
+      scoutUid: d.ref.parent.parent ? d.ref.parent.parent.id : null,
+      ...d.data(),
+    }));
+  } catch (error) {
+    // A missing index surfaces here; fail soft so the screen still renders.
+    console.error('Error getting shared reports:', error);
+    return [];
+  }
+};
+
+/**
  * Get a scout's scouting reports.
  * @param {string} scoutUid
  * @param {number} [limitCount]
@@ -5270,6 +5869,30 @@ export const getScoutAccessStatus = async (playerUid, scoutUid) => {
 };
 
 /**
+ * Access status for many prospects at once.
+ *
+ * getScoutAccessStatus was imported by exactly one screen, so an approved
+ * prospect looked identical to one never requested everywhere else — the scout
+ * had to remember what they had asked for and re-open that one detail screen.
+ * Batched here so the watchlist, search results and Discover can all show it.
+ *
+ * @param {Array<string>} prospectUids
+ * @param {string} scoutUid
+ * @returns {Promise<Object>} { [prospectUid]: 'approved'|'pending'|'denied'|'revoked'|'none' }
+ */
+export const getScoutAccessStatuses = async (prospectUids = [], scoutUid) => {
+  if (!scoutUid || !prospectUids.length) return {};
+  const unique = Array.from(new Set(prospectUids.filter(Boolean).map(String)));
+  const entries = await Promise.all(
+    unique.map(async (uid) => {
+      const status = await getScoutAccessStatus(uid, scoutUid).catch(() => 'none');
+      return [uid, status];
+    })
+  );
+  return Object.fromEntries(entries);
+};
+
+/**
  * Pending scout-access requests across all of a parent's linked children.
  * @param {string} parentUid
  * @returns {Promise<Array>} requests annotated with childUid
@@ -5349,6 +5972,70 @@ export const denyScoutAccess = async (childUid, scoutUid) => {
     throw error;
   }
 };
+/**
+ * Scouts currently holding parent-approved access to this child. The approval
+ * path wrote these docs from day one but nothing ever read them back, so a parent
+ * could not see — let alone revoke — who had access.
+ * @param {string} childUid
+ * @returns {Promise<Array<{scoutUid,scoutName,tier,approvedAt}>>}
+ */
+export const getApprovedScouts = async (childUid) => {
+  try {
+    const snapshot = await getDocs(collection(db, 'users', childUid, 'scoutConnections'));
+    return snapshot.docs
+      .map((d) => ({ scoutUid: d.id, ...d.data() }))
+      .filter((c) => c.status !== 'revoked')
+      .sort((a, b) => (b.approvedAt?.seconds || 0) - (a.approvedAt?.seconds || 0));
+  } catch (error) {
+    console.error('Error getting approved scouts:', error);
+    return [];
+  }
+};
+
+/**
+ * Parent revokes a scout's previously-granted access. Deletes the connection
+ * (which is what the security rules key on) and resolves the request doc to
+ * 'revoked' so the consent history keeps the full story.
+ * @param {string} childUid
+ * @param {string} scoutUid
+ * @returns {Promise<void>}
+ */
+export const revokeScoutAccess = async (childUid, scoutUid) => {
+  try {
+    await deleteDoc(doc(db, 'users', childUid, 'scoutConnections', scoutUid));
+    // Best-effort: the request doc may have been cleaned up independently.
+    await updateDoc(doc(db, 'users', childUid, 'scoutAccessRequests', scoutUid), {
+      status: 'revoked',
+      resolvedAt: serverTimestamp(),
+    }).catch(() => null);
+  } catch (error) {
+    console.error('Error revoking scout access:', error);
+    throw error;
+  }
+};
+
+/**
+ * Full consent history for a child — every scout access request and how it was
+ * resolved. The data was always written; only the query was missing.
+ * @param {string} childUid
+ * @returns {Promise<Array<{scoutUid,scoutName,tier,status,requestedAt,resolvedAt}>>}
+ */
+export const getScoutConsentHistory = async (childUid) => {
+  try {
+    const snapshot = await getDocs(collection(db, 'users', childUid, 'scoutAccessRequests'));
+    return snapshot.docs
+      .map((d) => ({ scoutUid: d.id, ...d.data() }))
+      .sort((a, b) => {
+        const at = a.resolvedAt?.seconds || a.requestedAt?.seconds || 0;
+        const bt = b.resolvedAt?.seconds || b.requestedAt?.seconds || 0;
+        return bt - at;
+      });
+  } catch (error) {
+    console.error('Error getting scout consent history:', error);
+    return [];
+  }
+};
+
 // ==================== SCOUT: Saved searches + alerts ====================
 // A scout saves search criteria; a Cloud Function matches newly-published
 // prospects against saved searches and pushes an alert + in-app notification.

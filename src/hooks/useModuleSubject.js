@@ -29,7 +29,13 @@ const EMPTY = {
  *   uid: string|null, isSelf: boolean, readOnly: boolean, displayName: string|null,
  *   profile: object|null, evalRankScore: object|null, blueprint360Plan: object|null,
  *   goals: Array, loading: boolean, error: string|null, reload: Function,
+ *   subjectParams: object|undefined,
  * }}
+ *
+ * ALWAYS spread `subjectParams` into navigate() when pushing a sub-screen that
+ * also calls this hook (plan detail, milestones, eval detail, badges). Omitting
+ * it silently drops the viewer back onto their OWN data — the exact failure this
+ * hook exists to prevent.
  */
 export const useModuleSubject = (route) => {
   const context = useAppContext();
@@ -93,6 +99,10 @@ export const useModuleSubject = (route) => {
       uid: viewerUid,
       isSelf: true,
       readOnly: false,
+      // Spread into navigation params when pushing a sub-screen, so the subject
+      // travels with the navigation. Undefined for self so the sub-screen takes
+      // the live-context path rather than re-fetching the viewer as a "subject".
+      subjectParams: undefined,
       displayName: userData?.displayName || userData?.name || null,
       profile: userData || null,
       evalRankScore,
@@ -108,6 +118,7 @@ export const useModuleSubject = (route) => {
     uid: requestedUid,
     isSelf: false,
     readOnly: true,
+    subjectParams: { playerUid: requestedUid },
     displayName: subject.profile?.displayName || subject.profile?.name || 'this athlete',
     profile: subject.profile,
     evalRankScore: subject.evalRankScore,

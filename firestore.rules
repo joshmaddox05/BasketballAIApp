@@ -145,8 +145,14 @@ service cloud.firestore {
 
       // Connections - role-holders linked to this player (player owns consent).
       // Mirrors the friends rule: either side may write (redeem / revoke).
+      // A linked parent may also READ (list) the child's connections. Guardianship
+      // means knowing which coaches/role-holders are attached to a minor, and it is
+      // what lets the parent message the child's coach — a per-doc-only read rule
+      // makes the list query fail, since the parent owns just their own entry.
+      // Writes stay restricted to the two parties on the connection.
       match /connections/{otherUid} {
-        allow read, write: if isOwner(uid) || isOwner(otherUid);
+        allow read: if isOwner(uid) || isOwner(otherUid) || isParentOfPlayer(uid);
+        allow write: if isOwner(uid) || isOwner(otherUid);
       }
 
       // Linked players - this role-holder's roster / child list.
@@ -272,8 +278,15 @@ service cloud.firestore {
       match /watchlist/{prospectId} {
         allow read, write: if isOwner(uid);
       }
+      // The scout owns their reports. `sharedWithPlayer` may only ever be set on a
+      // SUBMITTED report — that invariant is enforced here rather than only in the
+      // client, so the player-facing read rule below can key on one field and a
+      // draft can never reach an athlete.
       match /scoutingReports/{reportId} {
-        allow read, write: if isOwner(uid);
+        allow read: if isOwner(uid);
+        allow write: if isOwner(uid)
+          && (request.resource.data.get('sharedWithPlayer', false) == false
+              || request.resource.data.get('status', '') == 'submitted');
       }
       match /savedSearches/{searchId} {
         allow read, write: if isOwner(uid);
@@ -509,6 +522,51 @@ service cloud.firestore {
         allow read: if isSignedIn();
         allow create, delete: if isSignedIn() && likeId == request.auth.uid;
       }
+    }
+
+    // Collection-group read of scouting reports, so an athlete (or their linked
+    // parent) can see reports written ABOUT them. Reports live under the scout who
+    // authored them, so there is no player-owned path to read; subcollection rules
+    // do not apply to collectionGroup queries, hence this separate match.
+    //
+    // Only explicitly shared reports are visible, and the write rule above
+    // guarantees shared implies submitted — a scout's draft is never exposed.
+    // The matching query MUST filter on both prospectUid and sharedWithPlayer, or
+    // Firestore rejects it as not provably safe.
+    match /{path=**}/scoutingReports/{reportId} {
+      allow read: if isSignedIn()
+        && resource.data.sharedWithPlayer == true
+        && (request.auth.uid == resource.data.prospectUid
+            || isParentOfPlayer(resource.data.prospectUid));
+    }
+
+    // Collection-group read of assignments, so a coach can query every assignment
+    // they issued across all their athletes in one go. Subcollection rules do NOT
+    // apply to collectionGroup queries, so this match is required in addition to
+    // the per-athlete rule under /users/{uid}/assignments — without it
+    // getCoachAssignments fails outright.
+    // Scoped to the issuing coach: a coach only ever sees their own assignments.
+    // Writes stay on the per-athlete path.
+    match /{path=**}/assignments/{assignmentId} {
+      allow read: if isSignedIn() && resource.data.coachUid == request.auth.uid;
+    }
+
+    // Collection-group read of simulation sessions, so a participant can see every
+    // session shared with them across all coaches. Sessions live under the coach
+    // who owns them (users/{coachUid}/simulationSessions), so there is no
+    // participant-owned path to read; subcollection rules do NOT apply to
+    // collectionGroup queries, so this match is required in addition to the
+    // per-coach rule above - without it getSharedSimulationSessions fails outright.
+    //
+    // Matches the denormalized `participantUids` array, NOT the `participants` map
+    // the per-coach rule uses. A collectionGroup query must be provably safe from
+    // its own constraints, and getSharedSimulationSessions filters with
+    // array-contains on participantUids; a rule keyed on `participants` could not
+    // be satisfied by that constraint, so Firestore would reject the whole query.
+    // Read-only - participants write through the responses subcollection, which is
+    // governed by the per-coach rule on the nested path.
+    match /{path=**}/simulationSessions/{sessionId} {
+      allow read: if isSignedIn() && request.auth.uid in resource.data.participantUids;
     }
 
     // User challenges (joined challenges) - users can read their own and update progress

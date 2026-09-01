@@ -52,7 +52,9 @@ export function ScreenHeader({ title, subtitle, onBack, right, style }) {
           ) : null}
         </View>
       </View>
-      {right ? <View style={{ flexDirection: 'row', gap: 8 }}>{right}</View> : null}
+      {/* gap 10 (on the spacing scale; 8 was drift) is also exactly what two
+          44pt touch targets need to sit adjacent without their hitSlop overlapping. */}
+      {right ? <View style={{ flexDirection: 'row', gap: 10 }}>{right}</View> : null}
     </View>
   );
 }
@@ -65,6 +67,12 @@ export function HeaderIconButton({ icon, onPress, badge, style, accessibilityLab
   return (
     <TouchableOpacity
       onPress={onPress}
+      // The drawn size is 34 (DESIGN.md's header spec) but the iOS floor is 44,
+      // so the touch target is grown by 5 on every side and the visual is left
+      // alone. 5 is the largest value that does not overlap a neighbour: the
+      // header's right slot gaps siblings by 10, so two slop regions meet
+      // exactly rather than fighting over the pixels between them.
+      hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
       accessibilityRole="button"
       // Icon-only control: without an explicit label VoiceOver announces nothing.
       // Fall back to the icon name so it is never silent.
@@ -120,7 +128,7 @@ export function SectionLabel({ children, action, onAction, style }) {
       <Text style={[TYPE.sectionLabel, { color: theme.textDim }]}>{children}</Text>
       {action ? (
         <TouchableOpacity onPress={onAction} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Text style={{ fontFamily: TYPE.rowTitle.fontFamily, fontSize: 11, color: theme.accentText }}>
+          <Text style={{ fontFamily: TYPE.rowTitle.fontFamily, fontSize: 13, color: theme.accentText }}>
             {action}
           </Text>
         </TouchableOpacity>
@@ -250,10 +258,17 @@ export function Row({ leading, title, meta, trailing, onPress, style }) {
  */
 export function Chip({ label, active, onPress, style, small }) {
   const { theme } = useAppContext();
+  // A chip draws at ~26pt tall (16 for the small variant) — well under the 44pt
+  // floor. Grow the target VERTICALLY only: chip rows sit side by side with small
+  // gaps, so horizontal slop would have neighbours competing for the same taps,
+  // which is worse than a short target. Chips are wide enough horizontally that
+  // the deficit is only ever vertical.
+  const slop = small ? 14 : 9;
   return (
     <TouchableOpacity
       disabled={!onPress}
       onPress={onPress}
+      hitSlop={onPress ? { top: slop, bottom: slop, left: 0, right: 0 } : undefined}
       accessibilityRole={onPress ? 'button' : 'text'}
       accessibilityLabel={label}
       accessibilityState={onPress ? { selected: !!active } : undefined}

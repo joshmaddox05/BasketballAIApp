@@ -53,8 +53,18 @@ export const gatherEvalInputs = async (uid) => {
     getBlueprint360Plan(uid).catch(() => null),
   ]);
 
+  // `iqScore` is the current field. Results written before it existed carry only
+  // the boolean `correct`, which is the same measurement — derive from it so the
+  // player's existing SimCoach history counts instead of needing a migration.
+  const iqScoreOf = (r) => {
+    const explicit = Number(r?.iqScore);
+    if (Number.isFinite(explicit)) return explicit;
+    if (typeof r?.correct === 'boolean') return r.correct ? 100 : 0;
+    return NaN;
+  };
+
   const iqScores = (simCoachResults || [])
-    .map((r) => Number(r?.iqScore))
+    .map(iqScoreOf)
     .filter((n) => Number.isFinite(n));
 
   return {

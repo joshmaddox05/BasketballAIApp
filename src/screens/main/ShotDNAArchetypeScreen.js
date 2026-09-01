@@ -160,7 +160,7 @@ export default function ShotDNAArchetypeScreen({ navigation, route }) {
                 trailing={
                   player.similarity != null ? (
                     <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={{ fontFamily: FONTS.bodyExtraBold, fontSize: 14, color: theme.accentText }}>
+                      <Text style={{ fontFamily: FONTS.bodyExtraBold, fontSize: 16, color: theme.accentText }}>
                         {player.similarity}%
                       </Text>
                       <Text style={[TYPE.chipSmall, { color: theme.textDim, marginTop: 1 }]}>
@@ -208,22 +208,22 @@ const styles = StyleSheet.create({
   },
   badgeLabel: {
     fontFamily: FONTS.bodyBold,
-    fontSize: 9.5,
+    fontSize: 11.5,
     letterSpacing: 1.5,
     color: 'rgba(255,255,255,0.65)',
     marginBottom: 5,
   },
   badgeName: {
     fontFamily: FONTS.heading,
-    fontSize: 24,
+    fontSize: 25,
     color: '#FFFFFF',
     textAlign: 'center',
     marginBottom: 10,
   },
   badgeRole: {
     fontFamily: FONTS.body,
-    fontSize: 11.5,
-    lineHeight: 18,
+    fontSize: 13.5,
+    lineHeight: 19,
     color: 'rgba(255,255,255,0.88)',
     textAlign: 'center',
   },

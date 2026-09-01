@@ -2,6 +2,8 @@
 // DBE burgundy redesign (mock 11e) — presentation only: every handler,
 // permission check and dev tool is unchanged.
 import React, { useState, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { MODULE_INTROS, introSeenKey } from '../../config/moduleIntros';
 import {
     StyleSheet,
     Text,
@@ -97,13 +99,41 @@ const SettingsScreen = ({ navigation }) => {
     };
 
     const handleStartTour = async () => {
-        // Navigate back to Home first, then start the tour
-        navigation.navigate('Home');
+        // Navigate to the role's home first, then start the tour. This used to
+        // hardcode 'Home', a route that does not exist in the coach or parent
+        // stacks — so the replay threw for every non-player role.
+        const role = userData?.role;
+        const homeRoute =
+            role === 'coach' ? 'CoachHome'
+            : role === 'parent' ? 'ParentHome'
+            : role === 'scout' ? 'Discover'
+            : 'Home';
+        try {
+            navigation.navigate(homeRoute);
+        } catch (error) {
+            // Not reachable from this stack — start where we are rather than crash.
+        }
         // Small delay to allow navigation to complete
         setTimeout(async () => {
             await resetTour();
             startTour();
         }, 500);
+    };
+
+    // Clears every module's "seen" marker, so each module explains itself again on
+    // its next open. One control rather than a row per module: eleven toggles for
+    // something you use once would be worse than the feature.
+    const handleResetModuleIntros = async () => {
+        try {
+            const keys = Object.keys(MODULE_INTROS).map(introSeenKey);
+            await AsyncStorage.multiRemove(keys);
+            Alert.alert(
+                'Module intros reset',
+                'Each module will introduce itself again the next time you open it.'
+            );
+        } catch (error) {
+            Alert.alert('Error', 'Could not reset the module intros.');
+        }
     };
 
     const handleTestNotification = async () => {
@@ -230,14 +260,14 @@ const SettingsScreen = ({ navigation }) => {
                     style={{
                         flex: 1,
                         fontFamily: FONTS.bodySemiBold,
-                        fontSize: 13.5,
+                        fontSize: 15,
                         color: theme.text,
                     }}
                 >
                     {title}
                 </Text>
                 {value ? (
-                    <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 12.5, color: theme.textMuted }}>
+                    <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 14.5, color: theme.textMuted }}>
                         {value}
                     </Text>
                 ) : null}
@@ -344,9 +374,14 @@ const SettingsScreen = ({ navigation }) => {
                             onPress={() => navigation.navigate('Notifications')}
                         />
 
-                        {(!userData?.role || userData?.role === 'player') && (
+                        {(!userData?.role
+                            || userData?.role === 'player'
+                            || userData?.role === 'coach'
+                            || userData?.role === 'parent') && (
                             <SettingRow title="App Tour" onPress={handleStartTour} />
                         )}
+
+                        <SettingRow title="Replay Module Intros" onPress={handleResetModuleIntros} />
 
                         <SettingRow
                             title="Help & Support"

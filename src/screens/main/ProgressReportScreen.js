@@ -177,9 +177,12 @@ function EmptyHint({ text, theme }) {
 // Screen
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function ProgressReportScreen({ navigation }) {
+export default function ProgressReportScreen({ navigation, route }) {
   const { user, theme, isDarkMode, selectedChildUid } = useAppContext();
   const parentUid = user?.uid;
+  // An explicit childUid from navigation wins over the context selection, so a
+  // caller can open the report for a specific child without mutating app state.
+  const childUid = route?.params?.childUid || selectedChildUid;
 
   const [loading, setLoading] = useState(true);
   const [child, setChild] = useState(null);
@@ -196,12 +199,14 @@ export default function ProgressReportScreen({ navigation }) {
     setLoading(true);
     try {
       const linkedPlayers = await getLinkedPlayers(parentUid);
-      const linked = linkedPlayers.find((c) => c.uid === selectedChildUid) || linkedPlayers[0];
+      const linked = linkedPlayers.find((c) => c.uid === childUid) || linkedPlayers[0];
       if (!linked) {
         setChild(null);
         return;
       }
-      const summary = await getLinkedPlayerSummary(linked.uid);
+      // The 4-week trend and 6-month volume charts need months of activities,
+      // not the roster-card default of 10.
+      const summary = await getLinkedPlayerSummary(linked.uid, { activityLimit: 200 });
       const profile = summary.profile || {};
       setChild({
         uid: linked.uid,
@@ -217,7 +222,7 @@ export default function ProgressReportScreen({ navigation }) {
     } finally {
       setLoading(false);
     }
-  }, [parentUid, selectedChildUid]);
+  }, [parentUid, childUid]);
 
   useFocusEffect(
     useCallback(() => {
@@ -448,35 +453,35 @@ const styles = StyleSheet.create({
   scroll: { paddingHorizontal: SHAPE.screenPadding, paddingTop: 14 },
 
   identityRow: { flexDirection: 'row', alignItems: 'center', gap: 13 },
-  childName: { fontFamily: FONTS.heading, fontSize: 19, lineHeight: 21 },
-  childMeta: { fontFamily: FONTS.bodyMedium, fontSize: 11.5, marginTop: 4 },
+  childName: { fontFamily: FONTS.heading, fontSize: 20, lineHeight: 22 },
+  childMeta: { fontFamily: FONTS.bodyMedium, fontSize: 13.5, marginTop: 4 },
   gradeBlock: { alignItems: 'flex-end' },
   gradeValue: { fontFamily: FONTS.heading, fontSize: 26, lineHeight: 26 },
   gradeCaption: {
     fontFamily: FONTS.bodySemiBold,
-    fontSize: 9.5,
+    fontSize: 11.5,
     letterSpacing: 1,
     marginTop: 2,
   },
 
   trendCard: { marginTop: 16, borderRadius: 20, padding: 14 },
   trendHeader: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
-  trendDelta: { fontFamily: FONTS.bodyBold, fontSize: 11 },
+  trendDelta: { fontFamily: FONTS.bodyBold, fontSize: 13 },
   weekLabels: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
-  weekLabel: { fontFamily: FONTS.bodySemiBold, fontSize: 9.5 },
+  weekLabel: { fontFamily: FONTS.bodySemiBold, fontSize: 11.5 },
 
   statRow: { flexDirection: 'row', gap: SHAPE.cardGap, marginTop: 16 },
   statCell: { flex: 1, borderRadius: SHAPE.radiusCard, padding: SHAPE.cardPadding },
   statCellLabel: {
     fontFamily: FONTS.bodySemiBold,
-    fontSize: 9.5,
+    fontSize: 11.5,
     letterSpacing: 1,
     marginTop: 5,
   },
 
   skillRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
-  skillLabel: { fontFamily: FONTS.bodySemiBold, fontSize: 11.5, width: 86 },
-  skillValue: { fontFamily: FONTS.bodyBold, fontSize: 11, width: 32, textAlign: 'right' },
+  skillLabel: { fontFamily: FONTS.bodySemiBold, fontSize: 13.5, width: 86 },
+  skillValue: { fontFamily: FONTS.bodyBold, fontSize: 13, width: 32, textAlign: 'right' },
 
   card: { borderRadius: SHAPE.radiusCard, padding: 13 },
   divider: { height: 1, marginVertical: 10 },
@@ -493,7 +498,7 @@ const styles = StyleSheet.create({
   weekRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   dots: { flexDirection: 'row', gap: 6 },
   dot: { width: 11, height: 11, borderRadius: 6 },
-  weekCount: { fontFamily: FONTS.bodyBold, fontSize: 12 },
+  weekCount: { fontFamily: FONTS.bodyBold, fontSize: 14 },
 
   milestoneRow: { flexDirection: 'row', alignItems: 'center', gap: 11 },
   milestoneIcon: {

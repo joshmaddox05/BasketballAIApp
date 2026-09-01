@@ -359,22 +359,22 @@ export default function DrillListingForm({ initial = {}, submitting, onSubmit })
 
 const styles = StyleSheet.create({
   scroll: { padding: 16 },
-  label: { fontSize: 14, fontWeight: '700', marginBottom: 8, marginTop: 8 },
-  helper: { fontSize: 12, marginBottom: 8, marginTop: 2 },
+  label: { fontSize: 16, fontWeight: '700', marginBottom: 8, marginTop: 8 },
+  helper: { fontSize: 14, marginBottom: 8, marginTop: 2 },
   input: {
     borderRadius: 12,
     borderWidth: 1,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    fontSize: 15,
+    fontSize: 16.5,
     marginBottom: 8,
   },
   multiline: { minHeight: 90, textAlignVertical: 'top' },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
   chip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, borderWidth: 1.5 },
-  chipText: { fontSize: 13, fontWeight: '600' },
+  chipText: { fontSize: 15, fontWeight: '600' },
   typeChip: { flex: 1, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, alignItems: 'center' },
-  typeHint: { fontSize: 11, marginTop: 3 },
+  typeHint: { fontSize: 13, marginTop: 3 },
 
   videoBtn: {
     flexDirection: 'row',
@@ -387,20 +387,20 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     marginBottom: 8,
   },
-  videoBtnText: { fontSize: 14, fontWeight: '600', marginLeft: 6 },
+  videoBtnText: { fontSize: 16, fontWeight: '600', marginLeft: 6 },
 
   drillsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   addRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  addText: { fontSize: 13, fontWeight: '700', marginLeft: 2 },
+  addText: { fontSize: 15, fontWeight: '700', marginLeft: 2 },
   drillCard: { borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 10 },
   drillTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-  drillNum: { fontSize: 13, fontWeight: '700' },
+  drillNum: { fontSize: 15, fontWeight: '700' },
 
   pointRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
 
   footer: { flexDirection: 'row', gap: 10, padding: 16, borderTopWidth: 1 },
   draftBtn: { flex: 1, paddingVertical: 15, borderRadius: 14, alignItems: 'center', borderWidth: 1.5 },
-  draftBtnText: { fontSize: 16, fontWeight: '700' },
+  draftBtnText: { fontSize: 17.5, fontWeight: '700' },
   publishBtn: { flex: 1.4, paddingVertical: 15, borderRadius: 14, alignItems: 'center' },
-  publishBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  publishBtnText: { color: '#fff', fontSize: 17.5, fontWeight: '700' },
 });

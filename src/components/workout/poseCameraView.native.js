@@ -107,5 +107,5 @@ export default function PoseCameraView({ facing = 'front', onPose, onError, styl
 
 const styles = StyleSheet.create({
   center: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#000' },
-  text: { color: '#FFF', fontSize: 15 },
+  text: { color: '#FFF', fontSize: 16.5 },
 });

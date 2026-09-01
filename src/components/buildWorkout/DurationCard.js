@@ -89,7 +89,7 @@ const styles = StyleSheet.create({
     marginBottom: 6
   },
   name: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: '700',
     color: '#FFFFFF'
   },
@@ -99,11 +99,11 @@ const styles = StyleSheet.create({
     borderRadius: 12
   },
   daysText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '600'
   },
   description: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#AAAAAA',
     marginBottom: 8
   },
@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
   },
   timeText: {
     marginLeft: 4,
-    fontSize: 12,
+    fontSize: 14,
     color: '#888888'
   },
   checkmark: {

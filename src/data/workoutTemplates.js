@@ -18,11 +18,20 @@ export const WORKOUT_DIFFICULTIES = {
 };
 
 // Predefined step templates that users can add to their workouts
+// `tracker` is the structured replacement for the drill-name string-sniffing that
+// three separate places used to do independently (the pose movement registry, the
+// shooting-UI check in ActiveWorkoutScreen, and the SPS mapper). Values:
+//   'shooting'                       -> makes/misses UI; SPS shooting input
+//   'crossover'|'pound'|'two_ball'|'slide' -> the live pose rep detector to use
+//   (absent)                         -> manual rep entry
+// Keyword matching remains as a fallback so user-authored custom workouts, which
+// have no tracker field, still behave exactly as before.
 export const STEP_TEMPLATES = {
   // Shooting steps
   FORM_SHOOTING: {
     name: 'Form Shooting',
     category: WORKOUT_CATEGORIES.SHOOTING,
+    tracker: 'shooting',
     description: 'Focus on shooting form close to the basket',
     duration: 300, // 5 minutes
     reps: 20,
@@ -36,6 +45,7 @@ export const STEP_TEMPLATES = {
   FREE_THROWS: {
     name: 'Free Throws',
     category: WORKOUT_CATEGORIES.SHOOTING,
+    tracker: 'shooting',
     description: 'Practice free throw shooting',
     duration: 300,
     reps: 25,
@@ -49,6 +59,7 @@ export const STEP_TEMPLATES = {
   THREE_POINTERS: {
     name: 'Three-Point Shooting',
     category: WORKOUT_CATEGORIES.SHOOTING,
+    tracker: 'shooting',
     description: 'Practice shooting from beyond the arc',
     duration: 600,
     reps: 30,
@@ -62,6 +73,7 @@ export const STEP_TEMPLATES = {
   SPOT_SHOOTING: {
     name: 'Spot Shooting',
     category: WORKOUT_CATEGORIES.SHOOTING,
+    tracker: 'shooting',
     description: 'Shoot from designated spots around the court',
     duration: 480,
     reps: 50,
@@ -75,6 +87,7 @@ export const STEP_TEMPLATES = {
   MID_RANGE_SHOOTING: {
     name: 'Mid-Range Mastery',
     category: WORKOUT_CATEGORIES.SHOOTING,
+    tracker: 'shooting',
     description: 'Develop consistent mid-range jump shots',
     duration: 420,
     reps: 40,
@@ -88,6 +101,7 @@ export const STEP_TEMPLATES = {
   CATCH_AND_SHOOT: {
     name: 'Catch and Shoot',
     category: WORKOUT_CATEGORIES.SHOOTING,
+    tracker: 'shooting',
     description: 'Practice quick release off the catch',
     duration: 360,
     reps: 35,
@@ -98,9 +112,28 @@ export const STEP_TEMPLATES = {
       'Follow through on every shot',
     ],
   },
+  // Feeds `movementShootingPct`, which carries 25% of the SPS pillar. Until this
+  // drill existed no workout produced that input, so shooting coverage was capped
+  // at 75% for every player — a content gap, not a measurement failure. The `name`
+  // is load-bearing: inputMappers.STEP_TITLE_TO_SHOT keys on the exact string.
+  MOVEMENT_SHOOTING: {
+    name: 'Movement Shooting',
+    category: WORKOUT_CATEGORIES.SHOOTING,
+    tracker: 'shooting',
+    description: 'Shoot coming off movement — curls, flares and relocations',
+    duration: 360, // 6 minutes
+    reps: 20,
+    instructions: [
+      'Start from the corner and sprint off an imaginary screen',
+      'Square your feet and shoulders to the rim as you catch',
+      'Alternate curling to the middle and flaring to the wing',
+      'Reset to the corner after every shot — no stationary reps',
+    ],
+  },
   OFF_DRIBBLE_SHOOTING: {
     name: 'Off the Dribble',
     category: WORKOUT_CATEGORIES.SHOOTING,
+    tracker: 'shooting',
     description: 'Shooting after dribble moves',
     duration: 480,
     reps: 30,
@@ -116,6 +149,7 @@ export const STEP_TEMPLATES = {
   STATIONARY_DRIBBLING: {
     name: 'Stationary Dribbling',
     category: WORKOUT_CATEGORIES.DRIBBLING,
+    tracker: 'pound',
     description: 'Practice ball handling in place',
     duration: 300,
     reps: 50,
@@ -129,6 +163,7 @@ export const STEP_TEMPLATES = {
   CROSSOVERS: {
     name: 'Crossover Dribbles',
     category: WORKOUT_CATEGORIES.DRIBBLING,
+    tracker: 'crossover',
     description: 'Practice crossover moves',
     duration: 300,
     reps: 40,
@@ -194,6 +229,7 @@ export const STEP_TEMPLATES = {
   TWO_BALL_DRIBBLING: {
     name: 'Two Ball Dribbling',
     category: WORKOUT_CATEGORIES.DRIBBLING,
+    tracker: 'two_ball',
     description: 'Advanced ball handling with two basketballs',
     duration: 360,
     reps: 40,
@@ -209,6 +245,7 @@ export const STEP_TEMPLATES = {
   DEFENSIVE_SLIDES: {
     name: 'Defensive Slides',
     category: WORKOUT_CATEGORIES.PHYSICAL,
+    tracker: 'slide',
     description: 'Lateral defensive movement drills',
     duration: 180,
     reps: 20,
@@ -328,6 +365,7 @@ export const STEP_TEMPLATES = {
   ZIGZAG_DEFENSE: {
     name: 'Zigzag Defense',
     category: WORKOUT_CATEGORIES.DEFENSE,
+    tracker: 'slide',
     description: 'Defensive movement drill',
     duration: 240,
     reps: 10,
@@ -354,6 +392,7 @@ export const STEP_TEMPLATES = {
   MIRROR_DRILL: {
     name: 'Mirror Drill',
     category: WORKOUT_CATEGORIES.DEFENSE,
+    tracker: 'slide',
     description: 'Defensive reaction and movement training',
     duration: 300,
     reps: 12,
@@ -513,6 +552,11 @@ export const WORKOUT_TEMPLATES = {
       STEP_TEMPLATES.FORM_SHOOTING,
       STEP_TEMPLATES.FREE_THROWS,
       STEP_TEMPLATES.SPOT_SHOOTING,
+      // Included at the FREE tier deliberately: blueprint360Service.buildCatalogFor
+      // filters the plan catalog by subscription, so a drill that only appears in
+      // paid workouts would leave every free player's SPS capped at 75% coverage —
+      // the precise gap this drill exists to close.
+      STEP_TEMPLATES.MOVEMENT_SHOOTING,
     ],
   },
   FREE_THROW_MASTER: {
@@ -540,6 +584,7 @@ export const WORKOUT_TEMPLATES = {
       STEP_TEMPLATES.FORM_SHOOTING,
       STEP_TEMPLATES.MID_RANGE_SHOOTING,
       STEP_TEMPLATES.CATCH_AND_SHOOT,
+      STEP_TEMPLATES.MOVEMENT_SHOOTING,
       STEP_TEMPLATES.FREE_THROWS,
     ],
   },
@@ -571,6 +616,7 @@ export const WORKOUT_TEMPLATES = {
       STEP_TEMPLATES.SPOT_SHOOTING,
       STEP_TEMPLATES.THREE_POINTERS,
       STEP_TEMPLATES.MID_RANGE_SHOOTING,
+      STEP_TEMPLATES.MOVEMENT_SHOOTING,
       STEP_TEMPLATES.FREE_THROWS,
     ],
   },
@@ -588,6 +634,7 @@ export const WORKOUT_TEMPLATES = {
       STEP_TEMPLATES.CATCH_AND_SHOOT,
       STEP_TEMPLATES.THREE_POINTERS,
       STEP_TEMPLATES.MID_RANGE_SHOOTING,
+      STEP_TEMPLATES.MOVEMENT_SHOOTING,
       STEP_TEMPLATES.FREE_THROWS,
     ],
   },

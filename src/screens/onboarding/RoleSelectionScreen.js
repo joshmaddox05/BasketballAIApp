@@ -258,7 +258,7 @@ const styles = StyleSheet.create({
   topSection: { alignItems: 'center', marginBottom: 24 },
   iconWrap: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
   title: { fontSize: 26, fontWeight: '800', textAlign: 'center', marginBottom: 8 },
-  subtitle: { fontSize: 14, textAlign: 'center', lineHeight: 20, maxWidth: 300 },
+  subtitle: { fontSize: 16, textAlign: 'center', lineHeight: 21, maxWidth: 300 },
 
   roleCard: {
     borderRadius: 16,
@@ -268,8 +268,8 @@ const styles = StyleSheet.create({
   roleTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   roleIcon: { width: 50, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   roleLabel: { flex: 1 },
-  roleName: { fontSize: 16, fontWeight: '700', marginBottom: 4 },
-  roleDesc: { fontSize: 13, lineHeight: 18 },
+  roleName: { fontSize: 17.5, fontWeight: '700', marginBottom: 4 },
+  roleDesc: { fontSize: 15, lineHeight: 19 },
   radioOuter: {
     width: 22,
     height: 22,
@@ -299,10 +299,10 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
   },
-  perkText: { fontSize: 11, fontWeight: '600' },
+  perkText: { fontSize: 13, fontWeight: '600' },
 
   coachTypeBlock: { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)' },
-  coachTypeLabel: { fontSize: 12, fontWeight: '600', marginBottom: 8 },
+  coachTypeLabel: { fontSize: 14, fontWeight: '600', marginBottom: 8 },
   coachTypeRow: { flexDirection: 'row', gap: 8 },
   coachTypeChip: {
     flex: 1,
@@ -312,12 +312,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     gap: 3,
   },
-  coachTypeChipLabel: { fontSize: 13, fontWeight: '700', marginTop: 2 },
-  coachTypeChipHint: { fontSize: 11 },
+  coachTypeChipLabel: { fontSize: 15, fontWeight: '700', marginTop: 2 },
+  coachTypeChipHint: { fontSize: 13 },
   coachFeaturesPanel: { marginTop: 10, borderRadius: 12, borderWidth: 1, padding: 12, gap: 8 },
-  coachFeaturesFocus: { fontSize: 12, fontWeight: '600', lineHeight: 17, marginBottom: 2 },
+  coachFeaturesFocus: { fontSize: 14, fontWeight: '600', lineHeight: 18, marginBottom: 2 },
   coachFeatureRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  coachFeatureText: { fontSize: 12, lineHeight: 17, flex: 1 },
+  coachFeatureText: { fontSize: 14, lineHeight: 18, flex: 1 },
 
   continueBtn: {
     flexDirection: 'row',
@@ -333,5 +333,5 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 6,
   },
-  continueBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  continueBtnText: { color: '#fff', fontSize: 17.5, fontWeight: '800' },
 });

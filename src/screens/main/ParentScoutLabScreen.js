@@ -18,7 +18,15 @@ import {
   publishScoutLabProfile,
   unpublishScoutLabProfile,
   isHighSchoolGrade,
+  updateScoutLabConsent,
+  getApprovedScouts,
+  revokeScoutAccess,
+  getScoutConsentHistory,
+  approveScoutAccess,
+  denyScoutAccess,
+  getSharedReportsForPlayer,
 } from '../../services/firestoreService';
+import SharedReportsSection from '../../components/features/SharedReportsSection';
 import { TYPE, SHAPE, FONTS } from '../../utils/typography';
 import {
   Entrance,
@@ -31,6 +39,22 @@ import {
 import { evalGradeOf } from '../../services/blueprint/evalRankPresenter';
 
 const GRADE_LABEL = { 9: '9th', 10: '10th', 11: '11th', 12: '12th' };
+
+const CONSENT_STATUS_LABEL = {
+  pending: 'Awaiting decision',
+  approved: 'Approved',
+  denied: 'Denied',
+  revoked: 'Access revoked',
+};
+
+/** Firestore Timestamp | Date | millis -> short date, tolerant of all three. */
+const formatConsentDate = (value) => {
+  if (!value) return 'date unknown';
+  const d = typeof value.toDate === 'function' ? value.toDate() : new Date(value);
+  return Number.isNaN(d.getTime())
+    ? 'date unknown'
+    : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+};
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -118,13 +142,22 @@ export default function ParentScoutLabScreen({ navigation, route }) {
   const [visible, setVisible] = useState(false);
   const [toggling, setToggling] = useState(false);
 
-  // TODO(product): per-category consent as drawn in 14f is global (one switch per
-  // category, not per-scout) and is presentation-only for now — there is no
-  // Firestore field for category-level consent yet, so these toggles do not
-  // persist. Open question: whether categories should be per-scout instead.
+  // Per-category consent is global (one switch per category, not per-scout) and
+  // now persists to users/{childUid}/scoutLabProfile/main.consent. publishScoutLabProfile
+  // enforces it: withholding stats actually strips the evaluation score from the
+  // public directory entry rather than only remembering the preference.
+  // Open question (product): whether categories should become per-scout.
   const [shareStats, setShareStats] = useState(true);
   const [shareFilm, setShareFilm] = useState(true);
   const [shareAcademics, setShareAcademics] = useState(false); // Academics defaults OFF
+  const [savingConsent, setSavingConsent] = useState(false);
+
+  const [approvedScouts, setApprovedScouts] = useState([]);
+  const [pendingRequests, setPendingRequests] = useState([]);
+  const [history, setHistory] = useState([]);
+  const [showHistory, setShowHistory] = useState(false);
+  // Guardianship: anything a scout shares with the athlete is visible here too.
+  const [sharedReports, setSharedReports] = useState([]);
 
   const load = useCallback(async () => {
     if (!childUid) {
@@ -133,16 +166,30 @@ export default function ParentScoutLabScreen({ navigation, route }) {
     }
     setLoading(true);
     try {
-      const [prof, scoutLab, er, dna] = await Promise.all([
+      const [prof, scoutLab, er, dna, approved, log, reports] = await Promise.all([
         getUserProfile(childUid),
         getScoutLabProfile(childUid),
         getLatestEvalRankScore(childUid).catch(() => null),
         getLatestShotDNAProfile(childUid).catch(() => null),
+        getApprovedScouts(childUid).catch(() => []),
+        getScoutConsentHistory(childUid).catch(() => []),
+        getSharedReportsForPlayer(childUid).catch(() => []),
       ]);
       setProfile(prof);
       setEvalRank(er);
       setArchetype(dna?.archetype || null);
       setVisible(!!scoutLab?.directoryVisible);
+      setApprovedScouts(approved);
+      setHistory(log);
+      setSharedReports(reports);
+      // Pending decisions belong on the screen where the parent manages consent,
+      // not only on the home tab.
+      setPendingRequests(log.filter((r) => r.status === 'pending'));
+
+      const consent = scoutLab?.consent || {};
+      if (consent.stats !== undefined) setShareStats(consent.stats !== false);
+      if (consent.film !== undefined) setShareFilm(consent.film !== false);
+      if (consent.academics !== undefined) setShareAcademics(consent.academics === true);
     } finally {
       setLoading(false);
     }
@@ -154,6 +201,25 @@ export default function ParentScoutLabScreen({ navigation, route }) {
   const firstName = childName.split(' ')[0];
   const gradeLabel = GRADE_LABEL[profile?.gradeLevel] || null;
   const evalScore = evalGradeOf(evalRank);
+
+  // One payload builder shared by the visibility switch and the category knobs, so
+  // a consent change republishes with the same shape the master switch uses.
+  const buildPublishPayload = useCallback(
+    (consent) => ({
+      name: childName,
+      gradeLevel: profile?.gradeLevel,
+      position: profile?.position || null,
+      height: profile?.height || null,
+      archetype: profile?.archetypeLabel || archetype || null,
+      mainAttributes: profile?.preferences?.focusAreas || null,
+      evaluationScore: evalScore || null,
+      region: profile?.region || null,
+      consent,
+    }),
+    [childName, profile, archetype, evalScore]
+  );
+
+  const currentConsent = { stats: shareStats, film: shareFilm, academics: shareAcademics };
 
   const handleToggle = useCallback(
     async (next) => {
@@ -169,16 +235,7 @@ export default function ParentScoutLabScreen({ navigation, route }) {
       setVisible(next);
       try {
         if (next) {
-          await publishScoutLabProfile(childUid, {
-            name: childName,
-            gradeLevel: profile.gradeLevel,
-            position: profile.position || null,
-            height: profile.height || null,
-            archetype: profile?.archetypeLabel || archetype || null,
-            mainAttributes: profile.preferences?.focusAreas || null,
-            evaluationScore: evalScore || null,
-            region: profile.region || null,
-          });
+          await publishScoutLabProfile(childUid, buildPublishPayload(currentConsent));
         } else {
           await unpublishScoutLabProfile(childUid);
         }
@@ -189,7 +246,82 @@ export default function ParentScoutLabScreen({ navigation, route }) {
         setToggling(false);
       }
     },
-    [childUid, toggling, profile, childName, archetype, evalScore]
+    [childUid, toggling, profile, childName, buildPublishPayload, shareStats, shareFilm, shareAcademics]
+  );
+
+  /**
+   * Persist a category consent change. While the child is listed we republish, so
+   * the public directory entry reflects the new consent immediately; while hidden
+   * we only need to remember the preference for the next publish.
+   */
+  const persistConsent = useCallback(
+    async (key, value) => {
+      const setters = { stats: setShareStats, film: setShareFilm, academics: setShareAcademics };
+      const previous = { stats: shareStats, film: shareFilm, academics: shareAcademics }[key];
+      setters[key](value);
+
+      if (!childUid || !profile) return;
+      const nextConsent = { ...currentConsent, [key]: value };
+
+      setSavingConsent(true);
+      try {
+        if (visible) {
+          await publishScoutLabProfile(childUid, buildPublishPayload(nextConsent));
+        } else {
+          await updateScoutLabConsent(childUid, nextConsent);
+        }
+      } catch (e) {
+        setters[key](previous);
+        Alert.alert('Error', e.message || 'Could not update sharing settings.');
+      } finally {
+        setSavingConsent(false);
+      }
+    },
+    [childUid, profile, visible, buildPublishPayload, shareStats, shareFilm, shareAcademics]
+  );
+
+  const handleRevoke = useCallback(
+    (scout) => {
+      Alert.alert(
+        `Revoke ${scout.scoutName || 'this scout'}'s access?`,
+        `They will immediately lose access to ${firstName}'s profile data. This is logged in the consent history.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Revoke',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                await revokeScoutAccess(childUid, scout.scoutUid);
+                await load();
+              } catch (e) {
+                Alert.alert('Error', e.message || 'Could not revoke access.');
+              }
+            },
+          },
+        ]
+      );
+    },
+    [childUid, firstName, load]
+  );
+
+  const handleDecision = useCallback(
+    async (request, approve) => {
+      try {
+        if (approve) {
+          await approveScoutAccess(childUid, request.scoutUid, {
+            tier: request.tier || 'free',
+            scoutName: request.scoutName || null,
+          });
+        } else {
+          await denyScoutAccess(childUid, request.scoutUid);
+        }
+        await load();
+      } catch (e) {
+        Alert.alert('Error', e.message || 'Could not record your decision.');
+      }
+    },
+    [childUid, load]
   );
 
   const openPublicProfile = useCallback(() => {
@@ -275,6 +407,50 @@ export default function ParentScoutLabScreen({ navigation, route }) {
           </View>
         </Entrance>
 
+        {/* Pending access requests — the decision belongs here, where the parent
+            manages consent, not only behind the home-tab bell. */}
+        {pendingRequests.length > 0 ? (
+          <View style={styles.section}>
+            <Text style={[TYPE.sectionLabel, styles.sectionLabel, { color: theme.textDim }]}>
+              Awaiting your decision
+            </Text>
+            <View style={[styles.card, { backgroundColor: theme.surface }]}>
+              {pendingRequests.map((req, i) => (
+                <View
+                  key={req.scoutUid}
+                  style={[
+                    styles.consentRow,
+                    i < pendingRequests.length - 1 && { borderBottomWidth: 1, borderBottomColor: theme.border },
+                  ]}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.consentName, { color: theme.text }]}>
+                      {req.scoutName || 'A scout'}
+                    </Text>
+                    <Text style={[styles.consentMeta, { color: theme.textDim }]}>
+                      Requesting access
+                    </Text>
+                  </View>
+                  <View style={styles.consentActions}>
+                    <TouchableOpacity
+                      onPress={() => handleDecision(req, true)}
+                      style={[styles.miniBtn, { backgroundColor: theme.primary }]}
+                    >
+                      <Text style={styles.miniBtnText}>Approve</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => handleDecision(req, false)}
+                      style={[styles.miniBtn, { borderWidth: 1, borderColor: theme.border }]}
+                    >
+                      <Text style={[styles.miniBtnText, { color: theme.textDim }]}>Deny</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : null}
+
         {/* What scouts can see — global per-category consent (as drawn in 14f) */}
         <View style={styles.section}>
           <Text style={[TYPE.sectionLabel, styles.sectionLabel, { color: theme.textDim }]}>
@@ -282,13 +458,28 @@ export default function ParentScoutLabScreen({ navigation, route }) {
           </Text>
           <View style={[styles.card, { backgroundColor: theme.surface }]}>
             <CategoryRow title="Stats & EvalRank" meta="Grade, trend, ShotDNA score" theme={theme}>
-              <Knob value={shareStats} onToggle={setShareStats} theme={theme} />
+              <Knob
+                value={shareStats}
+                onToggle={(v) => persistConsent('stats', v)}
+                disabled={savingConsent}
+                theme={theme}
+              />
             </CategoryRow>
             <CategoryRow title="Film clips" meta="Highlight clips" theme={theme}>
-              <Knob value={shareFilm} onToggle={setShareFilm} theme={theme} />
+              <Knob
+                value={shareFilm}
+                onToggle={(v) => persistConsent('film', v)}
+                disabled={savingConsent}
+                theme={theme}
+              />
             </CategoryRow>
             <CategoryRow title="Academics" meta="GPA, transcript, test scores" theme={theme}>
-              <Knob value={shareAcademics} onToggle={setShareAcademics} theme={theme} />
+              <Knob
+                value={shareAcademics}
+                onToggle={(v) => persistConsent('academics', v)}
+                disabled={savingConsent}
+                theme={theme}
+              />
             </CategoryRow>
             <CategoryRow title="Direct contact" meta="Per-scout approval only" theme={theme} isLast>
               <View style={[styles.byRequestBadge, { backgroundColor: theme.steelFill }]}>
@@ -314,17 +505,101 @@ export default function ParentScoutLabScreen({ navigation, route }) {
           </View>
         </View>
 
-        {/* Audit note. TODO(product): consent audit log — no audit-log data path
-            exists yet, so the "View consent history" link is disabled. */}
+        {/* Reports a scout has shared with this athlete — the parent sees the same
+            thing their child does. */}
+        <SharedReportsSection
+          reports={sharedReports}
+          theme={theme}
+          childName={firstName}
+          onOpen={(report) =>
+            navigation.navigate('ScoutReportDetail', { report, childName: firstName })
+          }
+        />
+
+        {/* Who currently has access — read from scoutConnections, which the approval
+            path always wrote but nothing ever read back. */}
+        <View style={styles.section}>
+          <Text style={[TYPE.sectionLabel, styles.sectionLabel, { color: theme.textDim }]}>
+            Scouts with access
+          </Text>
+          <View style={[styles.card, { backgroundColor: theme.surface }]}>
+            {approvedScouts.length === 0 ? (
+              <Text style={[styles.consentMeta, { color: theme.textDim, padding: 14 }]}>
+                No scout has access to {firstName} right now.
+              </Text>
+            ) : (
+              approvedScouts.map((scout, i) => (
+                <View
+                  key={scout.scoutUid}
+                  style={[
+                    styles.consentRow,
+                    i < approvedScouts.length - 1 && { borderBottomWidth: 1, borderBottomColor: theme.border },
+                  ]}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.consentName, { color: theme.text }]}>
+                      {scout.scoutName || 'Scout'}
+                    </Text>
+                    <Text style={[styles.consentMeta, { color: theme.textDim }]}>
+                      Approved {formatConsentDate(scout.approvedAt)}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => handleRevoke(scout)}
+                    style={[styles.miniBtn, { borderWidth: 1, borderColor: theme.border }]}
+                  >
+                    <Text style={[styles.miniBtnText, { color: theme.textDim }]}>Revoke</Text>
+                  </TouchableOpacity>
+                </View>
+              ))
+            )}
+          </View>
+        </View>
+
+        {/* Consent history — the audit trail was always being written to
+            scoutAccessRequests (status + resolvedAt); only the query was missing. */}
         <View style={[styles.auditCard, { backgroundColor: theme.steelFill }]}>
           <Ionicons name="shield-outline" size={15} color={theme.steel} style={styles.auditIcon} />
           <Text style={[styles.auditText, { color: theme.textMuted }]}>
             Every approval, denial and revoke is logged with a timestamp.{' '}
-            <Text style={[styles.auditLink, { color: theme.steel, opacity: 0.5 }]}>
-              View consent history
+            <Text
+              style={[styles.auditLink, { color: theme.steel }]}
+              onPress={() => setShowHistory((v) => !v)}
+            >
+              {showHistory ? 'Hide consent history' : 'View consent history'}
             </Text>
           </Text>
         </View>
+
+        {showHistory ? (
+          <View style={[styles.card, { backgroundColor: theme.surface, marginTop: 10 }]}>
+            {history.length === 0 ? (
+              <Text style={[styles.consentMeta, { color: theme.textDim, padding: 14 }]}>
+                Nothing logged yet.
+              </Text>
+            ) : (
+              history.map((entry, i) => (
+                <View
+                  key={entry.scoutUid}
+                  style={[
+                    styles.consentRow,
+                    i < history.length - 1 && { borderBottomWidth: 1, borderBottomColor: theme.border },
+                  ]}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.consentName, { color: theme.text }]}>
+                      {entry.scoutName || 'Scout'}
+                    </Text>
+                    <Text style={[styles.consentMeta, { color: theme.textDim }]}>
+                      {CONSENT_STATUS_LABEL[entry.status] || entry.status} ·{' '}
+                      {formatConsentDate(entry.resolvedAt || entry.requestedAt)}
+                    </Text>
+                  </View>
+                </View>
+              ))
+            )}
+          </View>
+        ) : null}
 
         <OutlineButton
           label="View Public Profile"
@@ -348,6 +623,36 @@ export default function ParentScoutLabScreen({ navigation, route }) {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
+  consentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 10,
+  },
+  consentName: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 16,
+  },
+  consentMeta: {
+    fontFamily: FONTS.body,
+    fontSize: 14,
+    marginTop: 2,
+  },
+  consentActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  miniBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: SHAPE.radiusPill,
+  },
+  miniBtnText: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 14,
+    color: '#FFFFFF',
+  },
   container: { flex: 1 },
   scroll: { paddingHorizontal: SHAPE.screenPadding, paddingTop: 14 },
   emptyWrap: { flex: 1, justifyContent: 'center' },
@@ -366,12 +671,12 @@ const styles = StyleSheet.create({
   },
   visibilityTitle: {
     fontFamily: FONTS.heading,
-    fontSize: 15,
+    fontSize: 16.5,
   },
   visibilityBody: {
     fontFamily: FONTS.body,
-    fontSize: 10.5,
-    lineHeight: 15,
+    fontSize: 12.5,
+    lineHeight: 16.5,
     marginTop: 4,
   },
 
@@ -389,7 +694,7 @@ const styles = StyleSheet.create({
   },
   categoryTitle: {
     fontFamily: FONTS.bodyBold,
-    fontSize: 12,
+    fontSize: 14,
   },
   byRequestBadge: {
     paddingHorizontal: 9,
@@ -398,7 +703,7 @@ const styles = StyleSheet.create({
   },
   byRequestText: {
     fontFamily: FONTS.bodyBold,
-    fontSize: 9.5,
+    fontSize: 11.5,
     letterSpacing: 0.5,
   },
 
@@ -411,7 +716,7 @@ const styles = StyleSheet.create({
   previewLabel: { marginTop: 0 },
   previewValue: {
     fontFamily: FONTS.bodySemiBold,
-    fontSize: 12.5,
+    fontSize: 14.5,
   },
 
   // Audit note
@@ -427,8 +732,8 @@ const styles = StyleSheet.create({
   auditText: {
     flex: 1,
     fontFamily: FONTS.body,
-    fontSize: 10.5,
-    lineHeight: 16,
+    fontSize: 12.5,
+    lineHeight: 17.5,
   },
   auditLink: {
     fontFamily: FONTS.bodyBold,

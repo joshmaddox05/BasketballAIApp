@@ -18,10 +18,12 @@ import { getCurrentUser } from '../../services/authService';
 import logger from '../../utils/logger';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-function scoreBadgeColor(score) {
-  if (score >= 80) return '#22C55E';
-  if (score >= 60) return '#F59E0B';
-  return '#EF4444';
+// Reads from the theme so one green means one thing across the product and both
+// appearances re-contrast (the old #22C55E was 2.4:1 on the light background).
+function scoreBadgeColor(score, theme) {
+  if (score >= 80) return theme.success;
+  if (score >= 60) return theme.warning;
+  return theme.error;
 }
 
 function computeIQDelta(correctCount, totalQuestions) {
@@ -30,7 +32,7 @@ function computeIQDelta(correctCount, totalQuestions) {
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 function ScoreSummaryCard({ sessionScore, correctCount, totalQuestions, theme }) {
-  const color = scoreBadgeColor(sessionScore);
+  const color = scoreBadgeColor(sessionScore, theme);
   return (
     <View style={[styles.summaryCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
       <View style={[styles.scoreCircle, { borderColor: color, backgroundColor: color + '18' }]}>
@@ -39,7 +41,7 @@ function ScoreSummaryCard({ sessionScore, correctCount, totalQuestions, theme })
       </View>
       <View style={styles.summaryStats}>
         <View style={styles.statRow}>
-          <Ionicons name="checkmark-circle-outline" size={18} color="#22C55E" />
+          <Ionicons name="checkmark-circle-outline" size={18} color={theme.success} />
           <Text style={[styles.statText, { color: theme.text }]}>
             {correctCount} / {totalQuestions} Correct
           </Text>
@@ -57,11 +59,11 @@ function IQDeltaBadge({ delta, theme }) {
   const isPositive = delta > 0;
   return (
     <View style={[styles.iqDeltaBadge, {
-      backgroundColor: isPositive ? '#22C55E18' : '#EF444418',
-      borderColor: isPositive ? '#22C55E' : '#EF4444',
+      backgroundColor: isPositive ? theme.success + '18' : theme.error + '18',
+      borderColor: isPositive ? theme.success : theme.error,
     }]}>
-      <Ionicons name={isPositive ? 'trending-up' : 'trending-down'} size={22} color={isPositive ? '#22C55E' : '#EF4444'} />
-      <Text style={[styles.iqDeltaText, { color: isPositive ? '#22C55E' : '#EF4444' }]}>
+      <Ionicons name={isPositive ? 'trending-up' : 'trending-down'} size={22} color={isPositive ? theme.success : theme.error} />
+      <Text style={[styles.iqDeltaText, { color: isPositive ? theme.success : theme.error }]}>
         {isPositive ? '+' : ''}{delta} IQ Points
       </Text>
       <Text style={[styles.iqDeltaSubtitle, { color: theme.textSecondary }]}>
@@ -75,15 +77,15 @@ function QuestionBreakdownRow({ item, theme }) {
   const { questionNum, category, correct, explanation } = item;
   return (
     <View style={[styles.breakdownRow, { borderBottomColor: theme.border }]}>
-      <View style={[styles.breakdownIcon, { backgroundColor: correct ? '#22C55E18' : '#EF444418' }]}>
-        <Ionicons name={correct ? 'checkmark-circle' : 'close-circle'} size={20} color={correct ? '#22C55E' : '#EF4444'} />
+      <View style={[styles.breakdownIcon, { backgroundColor: correct ? theme.success + '18' : theme.error + '18' }]}>
+        <Ionicons name={correct ? 'checkmark-circle' : 'close-circle'} size={20} color={correct ? theme.success : theme.error} />
       </View>
       <View style={styles.breakdownInfo}>
         <View style={styles.breakdownTitleRow}>
           <Text style={[styles.breakdownQ, { color: theme.textSecondary }]}>Q{questionNum}</Text>
           <Text style={[styles.breakdownCategory, { color: theme.text }]}>{category}</Text>
-          <View style={[styles.breakdownResultPill, { backgroundColor: correct ? '#22C55E20' : '#EF444420' }]}>
-            <Text style={[styles.breakdownResultText, { color: correct ? '#22C55E' : '#EF4444' }]}>
+          <View style={[styles.breakdownResultPill, { backgroundColor: correct ? theme.success + '20' : theme.error + '20' }]}>
+            <Text style={[styles.breakdownResultText, { color: correct ? theme.success : theme.error }]}>
               {correct ? 'Correct' : 'Incorrect'}
             </Text>
           </View>
@@ -189,9 +191,9 @@ export default function SimCoachResultsScreen({ navigation, route }) {
 
         {/* EvalRank note */}
         {iqSaved && (
-          <View style={[styles.evalNote, { backgroundColor: '#22C55E12', borderColor: '#22C55E30' }]}>
-            <Ionicons name="stats-chart" size={16} color="#22C55E" />
-            <Text style={[styles.evalNoteText, { color: '#22C55E' }]}>
+          <View style={[styles.evalNote, { backgroundColor: theme.success + '12', borderColor: theme.success + '30' }]}>
+            <Ionicons name="stats-chart" size={16} color={theme.success} />
+            <Text style={[styles.evalNoteText, { color: theme.success }]}>
               EvalRank Basketball IQ updated with this session.
             </Text>
           </View>
@@ -254,7 +256,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   backBtn: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
-  navTitle: { fontSize: 17, fontWeight: '700' },
+  navTitle: { fontSize: 18, fontWeight: '700' },
 
   scrollContent: { padding: 16, paddingBottom: 40 },
 
@@ -268,7 +270,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     marginBottom: 16,
   },
-  categoryPillText: { fontSize: 13, fontWeight: '700' },
+  categoryPillText: { fontSize: 15, fontWeight: '700' },
 
   summaryCard: {
     borderRadius: 18,
@@ -288,10 +290,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   scoreCircleValue: { fontSize: 32, fontWeight: '900', lineHeight: 36 },
-  scoreCircleLabel: { fontSize: 11, fontWeight: '600' },
+  scoreCircleLabel: { fontSize: 13, fontWeight: '600' },
   summaryStats: { flex: 1, gap: 8 },
   statRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  statText: { fontSize: 14, fontWeight: '500' },
+  statText: { fontSize: 16, fontWeight: '500' },
 
   iqDeltaBadge: {
     borderRadius: 14,
@@ -301,8 +303,8 @@ const styles = StyleSheet.create({
     gap: 4,
     marginBottom: 14,
   },
-  iqDeltaText: { fontSize: 24, fontWeight: '900' },
-  iqDeltaSubtitle: { fontSize: 12 },
+  iqDeltaText: { fontSize: 25, fontWeight: '900' },
+  iqDeltaSubtitle: { fontSize: 14 },
 
   evalNote: {
     flexDirection: 'row',
@@ -314,30 +316,30 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: 16,
   },
-  evalNoteText: { fontSize: 13, fontWeight: '600', flex: 1 },
+  evalNoteText: { fontSize: 15, fontWeight: '600', flex: 1 },
 
-  sectionTitle: { fontSize: 16, fontWeight: '700', marginBottom: 12 },
+  sectionTitle: { fontSize: 17.5, fontWeight: '700', marginBottom: 12 },
   breakdownCard: { borderRadius: 14, borderWidth: 1, marginBottom: 20, overflow: 'hidden' },
   breakdownRow: { flexDirection: 'row', alignItems: 'flex-start', padding: 14, gap: 12, borderBottomWidth: 1 },
   breakdownIcon: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
   breakdownInfo: { flex: 1 },
   breakdownTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 5, flexWrap: 'wrap' },
-  breakdownQ: { fontSize: 11, fontWeight: '700' },
-  breakdownCategory: { fontSize: 13, fontWeight: '600', flex: 1 },
+  breakdownQ: { fontSize: 13, fontWeight: '700' },
+  breakdownCategory: { fontSize: 15, fontWeight: '600', flex: 1 },
   breakdownResultPill: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },
-  breakdownResultText: { fontSize: 11, fontWeight: '700' },
-  breakdownExplanation: { fontSize: 12, lineHeight: 17 },
+  breakdownResultText: { fontSize: 13, fontWeight: '700' },
+  breakdownExplanation: { fontSize: 14, lineHeight: 18 },
 
   shareBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 8, paddingVertical: 15, borderRadius: 14, borderWidth: 2, marginBottom: 12,
   },
-  shareBtnText: { fontSize: 15, fontWeight: '700' },
+  shareBtnText: { fontSize: 16.5, fontWeight: '700' },
   primaryBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 8, paddingVertical: 16, borderRadius: 14, marginBottom: 12,
   },
-  primaryBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  primaryBtnText: { color: '#fff', fontSize: 16.5, fontWeight: '700' },
   outlineBtn: { paddingVertical: 14, borderRadius: 14, borderWidth: 1, alignItems: 'center', marginBottom: 12 },
-  outlineBtnText: { fontSize: 14, fontWeight: '600' },
+  outlineBtnText: { fontSize: 16, fontWeight: '600' },
 });

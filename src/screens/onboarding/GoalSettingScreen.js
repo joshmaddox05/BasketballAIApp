@@ -448,7 +448,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#4CAF50',
     },
     stepNumber: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: 'bold',
         color: '#666',
     },
@@ -459,7 +459,7 @@ const styles = StyleSheet.create({
         marginHorizontal: 8,
     },
     headerTitle: {
-        fontSize: 20,
+        fontSize: 21,
         fontWeight: 'bold',
         color: '#333',
         textAlign: 'center',
@@ -469,10 +469,10 @@ const styles = StyleSheet.create({
         padding: 24,
     },
     subtitle: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#666',
         marginBottom: 24,
-        lineHeight: 20,
+        lineHeight: 21,
     },
     recommendedSection: {
         marginBottom: 24,
@@ -484,7 +484,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 4,
     },
     recommendedTitle: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: 'bold',
         color: '#8A1C22',
         marginLeft: 8,
@@ -498,7 +498,7 @@ const styles = StyleSheet.create({
         marginBottom: 24,
     },
     allGoalsTitle: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: 'bold',
         color: '#333',
         marginBottom: 16,
@@ -556,7 +556,7 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     goalTitle: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: '600',
         color: '#333',
         marginBottom: 4,
@@ -565,7 +565,7 @@ const styles = StyleSheet.create({
         color: '#8A1C22',
     },
     goalDescription: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#666',
     },
     customGoalContainer: {
@@ -575,7 +575,7 @@ const styles = StyleSheet.create({
         marginBottom: 32,
     },
     customGoalTitle: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: '600',
         color: '#333',
         marginBottom: 16,
@@ -592,7 +592,7 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         paddingHorizontal: 16,
         paddingVertical: 12,
-        fontSize: 14,
+        fontSize: 16,
         marginRight: 12,
     },
     addCustomGoalButton: {
@@ -607,7 +607,7 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     customGoalCategoryLabel: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#666',
         marginBottom: 8,
     },
@@ -630,7 +630,7 @@ const styles = StyleSheet.create({
         borderColor: '#8A1C22',
     },
     categoryOptionText: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#666',
     },
     selectedCategoryOptionText: {
@@ -650,14 +650,14 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     reminderTitle: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: '600',
         color: '#333',
     },
     reminderDescription: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#666',
-        lineHeight: 20,
+        lineHeight: 21,
     },
     actionButtonsContainer: {
         flexDirection: 'row',
@@ -675,7 +675,7 @@ const styles = StyleSheet.create({
         marginRight: 8,
     },
     skipButtonText: {
-        fontSize: 16,
+        fontSize: 17.5,
         color: '#666',
         fontWeight: '600',
     },
@@ -689,7 +689,7 @@ const styles = StyleSheet.create({
         marginLeft: 8,
     },
     continueButtonText: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: 'bold',
         color: '#FFF',
     },

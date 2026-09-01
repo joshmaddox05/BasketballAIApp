@@ -111,14 +111,14 @@ const ProfileScreen = ({ navigation }) => {
                     style={{
                         flex: 1,
                         fontFamily: FONTS.bodySemiBold,
-                        fontSize: 13.5,
+                        fontSize: 15,
                         color: danger ? theme.accentText : theme.text,
                     }}
                 >
                     {label}
                 </Text>
                 {value ? (
-                    <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 12.5, color: theme.textMuted }}>
+                    <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 14.5, color: theme.textMuted }}>
                         {value}
                     </Text>
                 ) : null}
@@ -149,7 +149,7 @@ const ProfileScreen = ({ navigation }) => {
                             <Image source={{ uri: userData.photoURL }} style={styles.profileImage} />
                         ) : (
                             <View style={[styles.profileImagePlaceholder, { backgroundColor: theme.surface2 }]}>
-                                <Text style={{ fontFamily: FONTS.heading, fontSize: 22, color: theme.accentText }}>
+                                <Text style={{ fontFamily: FONTS.heading, fontSize: 23, color: theme.accentText }}>
                                     {getInitials(displayName)}
                                 </Text>
                             </View>
@@ -167,7 +167,7 @@ const ProfileScreen = ({ navigation }) => {
                         </TouchableOpacity>
                     </View>
 
-                    <Text style={{ fontFamily: FONTS.heading, fontSize: 18, color: theme.text, marginTop: 12 }}>
+                    <Text style={{ fontFamily: FONTS.heading, fontSize: 19, color: theme.text, marginTop: 12 }}>
                         {displayName}
                     </Text>
 
@@ -205,7 +205,7 @@ const ProfileScreen = ({ navigation }) => {
                                 <Text
                                     style={{
                                         fontFamily: FONTS.bodyBold,
-                                        fontSize: 10.5,
+                                        fontSize: 12.5,
                                         letterSpacing: 0.5,
                                         textTransform: 'uppercase',
                                         color: theme.accentText,
@@ -214,7 +214,7 @@ const ProfileScreen = ({ navigation }) => {
                                     {currentPlan}
                                 </Text>
                             </View>
-                            <Text style={{ fontFamily: FONTS.bodyMedium, fontSize: 12, color: theme.textDim }}>
+                            <Text style={{ fontFamily: FONTS.bodyMedium, fontSize: 14, color: theme.textDim }}>
                                 {metaLine}
                             </Text>
                         </View>
@@ -314,11 +314,21 @@ const ProfileScreen = ({ navigation }) => {
                             onPress={() => Alert.alert('Help', 'Contact: support@basketballai.com')}
                         />
 
-                        {(!userData?.role || userData?.role === 'player' || userData?.role === 'coach') && (
+                        {/* Parent is included now that PARENT_TOUR_STEPS exists and the
+                            parent navigator mounts it. Scout still has no tour of its
+                            own, so the row stays hidden there rather than starting a
+                            tour that targets screens a scout never mounts. */}
+                        {(!userData?.role
+                            || userData?.role === 'player'
+                            || userData?.role === 'coach'
+                            || userData?.role === 'parent') && (
                             <SettingRow
                                 label="Take a Tour"
                                 onPress={() => {
-                                    const homeRoute = userData?.role === 'coach' ? 'CoachHome' : 'Home';
+                                    const homeRoute =
+                                        userData?.role === 'coach' ? 'CoachHome'
+                                        : userData?.role === 'parent' ? 'ParentHome'
+                                        : 'Home';
                                     Alert.alert(
                                         'Take a Tour',
                                         'Would you like to take the app tour again?',

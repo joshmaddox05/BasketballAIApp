@@ -413,8 +413,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   backBtn: { padding: 4 },
-  headerTitle: { fontSize: 18, fontWeight: '700' },
-  headerSub: { fontSize: 12, marginTop: 1 },
+  headerTitle: { fontSize: 19, fontWeight: '700' },
+  headerSub: { fontSize: 14, marginTop: 1 },
   uploadBtn: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
 
   uploadProgress: {
@@ -422,7 +422,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderBottomWidth: 1,
   },
-  uploadLabel: { fontSize: 13, marginBottom: 6 },
+  uploadLabel: { fontSize: 15, marginBottom: 6 },
   progressTrack: { height: 6, borderRadius: 3, overflow: 'hidden' },
   progressFill: { height: 6, borderRadius: 3 },
 
@@ -438,9 +438,9 @@ const styles = StyleSheet.create({
   filmTop: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
   filmIcon: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   filmInfo: { flex: 1 },
-  filmOpponent: { fontSize: 15, fontWeight: '700' },
-  filmDate: { fontSize: 12, marginTop: 1 },
-  filmNote: { fontSize: 13, lineHeight: 18, marginBottom: 12 },
+  filmOpponent: { fontSize: 16.5, fontWeight: '700' },
+  filmDate: { fontSize: 14, marginTop: 1 },
+  filmNote: { fontSize: 15, lineHeight: 19, marginBottom: 12 },
   statusPill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -449,11 +449,11 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 8,
   },
-  statusText: { fontSize: 11, fontWeight: '700' },
+  statusText: { fontSize: 13, fontWeight: '700' },
 
   retentionRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
-  retentionText: { fontSize: 11, fontWeight: '600' },
-  retentionAction: { fontSize: 11, fontWeight: '700', marginLeft: 'auto' },
+  retentionText: { fontSize: 13, fontWeight: '600' },
+  retentionAction: { fontSize: 13, fontWeight: '700', marginLeft: 'auto' },
 
   filmActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   actionBtn: {
@@ -465,7 +465,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 10,
   },
-  actionBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  actionBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   actionBtnSecondary: {
     flex: 1,
     flexDirection: 'row',
@@ -476,7 +476,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1.5,
   },
-  actionBtnSecondaryText: { fontSize: 13, fontWeight: '700' },
+  actionBtnSecondaryText: { fontSize: 15, fontWeight: '700' },
   deleteBtn: {
     width: 40,
     height: 40,
@@ -488,15 +488,15 @@ const styles = StyleSheet.create({
 
 
   accessDenied: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 },
-  deniedTitle: { fontSize: 22, fontWeight: '700' },
-  deniedSub: { fontSize: 14, textAlign: 'center', lineHeight: 20 },
-  modalTitle: { fontSize: 18, fontWeight: '700', marginBottom: 14 },
-  modalLabel: { fontSize: 12, fontWeight: '600', marginBottom: 6, marginTop: 8 },
-  modalInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15 },
+  deniedTitle: { fontSize: 23, fontWeight: '700' },
+  deniedSub: { fontSize: 16, textAlign: 'center', lineHeight: 21 },
+  modalTitle: { fontSize: 19, fontWeight: '700', marginBottom: 14 },
+  modalLabel: { fontSize: 14, fontWeight: '600', marginBottom: 6, marginTop: 8 },
+  modalInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 16.5 },
   modalTextArea: { height: 80, textAlignVertical: 'top' },
   modalActions: { flexDirection: 'row', gap: 10, marginTop: 18 },
   modalCancel: { flex: 1, borderWidth: 1, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
-  modalCancelText: { fontSize: 15, fontWeight: '600' },
+  modalCancelText: { fontSize: 16.5, fontWeight: '600' },
   modalConfirm: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 10, paddingVertical: 12 },
-  modalConfirmText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  modalConfirmText: { color: '#fff', fontSize: 16.5, fontWeight: '700' },
 });

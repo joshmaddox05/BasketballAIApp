@@ -366,21 +366,21 @@ const styles = StyleSheet.create({
   hero: { borderRadius: SHAPE.radiusHero, padding: 15, overflow: 'hidden' },
   heroLabel: {
     fontFamily: FONTS.bodyBold,
-    fontSize: 9.5,
+    fontSize: 11.5,
     letterSpacing: 1.5,
     color: 'rgba(255,255,255,0.65)',
   },
   heroTitle: {
     fontFamily: FONTS.heading,
-    fontSize: 18,
-    lineHeight: 21,
+    fontSize: 19,
+    lineHeight: 22,
     color: '#FFFFFF',
     marginTop: 5,
   },
   heroFacts: { flexDirection: 'row', gap: 14, marginTop: 9 },
   heroFact: {
     fontFamily: FONTS.bodySemiBold,
-    fontSize: 11,
+    fontSize: 13,
     color: 'rgba(255,255,255,0.8)',
   },
 
@@ -395,7 +395,7 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     borderRadius: SHAPE.radiusTile,
   },
-  typeChipText: { fontFamily: FONTS.bodyBold, fontSize: 12.5 },
+  typeChipText: { fontFamily: FONTS.bodyBold, fontSize: 14.5 },
 
   // Select rows
   selectRow: {
@@ -414,14 +414,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  selectTitle: { fontFamily: FONTS.bodyBold, fontSize: 12.5 },
-  selectMeta: { fontFamily: FONTS.body, fontSize: 10.5, marginTop: 2 },
+  selectTitle: { fontFamily: FONTS.bodyBold, fontSize: 14.5 },
+  selectMeta: { fontFamily: FONTS.body, fontSize: 12.5, marginTop: 2 },
 
   noteInput: {
     borderRadius: SHAPE.radiusTile,
     padding: 12,
     fontFamily: FONTS.body,
-    fontSize: 13,
+    fontSize: 15,
     minHeight: 72,
     textAlignVertical: 'top',
   },
@@ -436,5 +436,5 @@ const styles = StyleSheet.create({
     borderRadius: SHAPE.radiusTile,
     overflow: 'hidden',
   },
-  assignBtnText: { fontFamily: FONTS.bodyExtraBold, fontSize: 14.5 },
+  assignBtnText: { fontFamily: FONTS.bodyExtraBold, fontSize: 16 },
 });

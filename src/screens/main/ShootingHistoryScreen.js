@@ -394,7 +394,7 @@ const styles = StyleSheet.create({
     },
     loadingText: {
         marginTop: 12,
-        fontSize: 16,
+        fontSize: 17.5,
     },
     header: {
         flexDirection: 'row',
@@ -408,7 +408,7 @@ const styles = StyleSheet.create({
         padding: 4,
     },
     headerTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: '600',
     },
     placeholder: {
@@ -428,7 +428,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
     },
     rangeText: {
-        fontSize: 13,
+        fontSize: 15,
         fontWeight: '600',
     },
     statsCard: {
@@ -450,7 +450,7 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     mainStatLabel: {
-        fontSize: 12,
+        fontSize: 14,
         marginTop: 4,
     },
     statDivider: {
@@ -464,7 +464,7 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     chartTitle: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: '600',
         marginBottom: 12,
     },
@@ -479,7 +479,7 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     sectionTitle: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: '600',
         marginBottom: 12,
     },
@@ -494,19 +494,19 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     breakdownType: {
-        fontSize: 15,
+        fontSize: 16.5,
         fontWeight: '500',
         textTransform: 'capitalize',
     },
     breakdownStats: {
-        fontSize: 12,
+        fontSize: 14,
         marginTop: 2,
     },
     breakdownAccuracy: {
         alignItems: 'flex-end',
     },
     breakdownPercent: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: '600',
     },
     miniProgressBar: {
@@ -545,18 +545,18 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     sessionTitle: {
-        fontSize: 15,
+        fontSize: 16.5,
         fontWeight: '600',
     },
     sessionDate: {
-        fontSize: 12,
+        fontSize: 14,
         marginTop: 2,
     },
     sessionAccuracy: {
         marginLeft: 8,
     },
     sessionAccuracyValue: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: 'bold',
     },
     sessionStats: {
@@ -571,11 +571,11 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     sessionStatValue: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: '600',
     },
     sessionStatLabel: {
-        fontSize: 11,
+        fontSize: 13,
         marginTop: 2,
     },
     bottomPadding: {

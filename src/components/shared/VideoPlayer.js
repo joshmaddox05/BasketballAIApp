@@ -293,7 +293,7 @@ const styles = StyleSheet.create({
   },
   durationText: {
     color: '#FFF',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '500',
   },
   featuredBadge: {
@@ -309,7 +309,7 @@ const styles = StyleSheet.create({
   },
   featuredText: {
     color: '#FFF',
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '500',
     marginLeft: 4,
   },
@@ -317,14 +317,14 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   title: {
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: '600',
     color: '#333',
     marginBottom: 6,
-    lineHeight: 22,
+    lineHeight: 23,
   },
   channelName: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
     marginBottom: 4,
   },
@@ -333,7 +333,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   metaText: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#999',
   },
   levelText: {
@@ -341,7 +341,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   metaDot: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#999',
     marginHorizontal: 4,
   },
@@ -360,7 +360,7 @@ const styles = StyleSheet.create({
     marginRight: 16,
   },
   controlText: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
     marginLeft: 6,
   },
@@ -380,7 +380,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F0F0F0',
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: 'bold',
     color: '#333',
   },
@@ -396,12 +396,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0F0F0',
   },
   modalVideoTitle: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: 'bold',
     color: '#333',
     padding: 16,
     paddingBottom: 8,
-    lineHeight: 24,
+    lineHeight: 25,
   },
   channelInfo: {
     paddingHorizontal: 16,
@@ -410,7 +410,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F0F0F0',
   },
   channelNameLarge: {
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: '500',
     color: '#666',
     marginBottom: 4,
@@ -420,22 +420,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statsText: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#999',
   },
   descriptionContainer: {
     padding: 16,
   },
   descriptionTitle: {
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 8,
   },
   description: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
-    lineHeight: 20,
+    lineHeight: 21,
   },
   actionButtons: {
     padding: 16,
@@ -451,7 +451,7 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     color: '#FFF',
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: 'bold',
     marginLeft: 8,
   },

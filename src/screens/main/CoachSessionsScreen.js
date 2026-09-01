@@ -563,7 +563,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   tabItem: { paddingBottom: 9 },
-  tabText: { fontFamily: FONTS.bodySemiBold, fontSize: 12.5 },
+  tabText: { fontFamily: FONTS.bodySemiBold, fontSize: 14.5 },
   tabBar: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 2 },
 
   scroll: { paddingHorizontal: SHAPE.screenPadding, paddingTop: 12 },
@@ -582,7 +582,7 @@ const styles = StyleSheet.create({
   timeLabel: {
     width: TIME_COL,
     fontFamily: FONTS.bodyBold,
-    fontSize: 10,
+    fontSize: 12,
     textAlign: 'right',
     paddingRight: 12,
     paddingTop: 14,
@@ -604,7 +604,7 @@ const styles = StyleSheet.create({
     paddingLeft: NOW_PAD,
     marginBottom: 14,
   },
-  nowText: { fontFamily: FONTS.bodyExtraBold, fontSize: 9, letterSpacing: 0.6 },
+  nowText: { fontFamily: FONTS.bodyExtraBold, fontSize: 11, letterSpacing: 0.6 },
   nowLine: { flex: 1, height: 1 },
 
   // Session card
@@ -620,18 +620,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 8,
   },
-  cardTitle: { fontFamily: FONTS.bodyBold, fontSize: 13, flexShrink: 1 },
-  cardMeta: { fontFamily: FONTS.body, fontSize: 11, marginTop: 5 },
+  cardTitle: { fontFamily: FONTS.bodyBold, fontSize: 15, flexShrink: 1 },
+  cardMeta: { fontFamily: FONTS.body, fontSize: 13, marginTop: 5 },
   badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
-  badgeText: { fontFamily: FONTS.bodyBold, fontSize: 9, letterSpacing: 0.3 },
+  badgeText: { fontFamily: FONTS.bodyBold, fontSize: 11, letterSpacing: 0.3 },
   miniPrimary: {
     marginTop: 11,
     borderRadius: 10,
     paddingVertical: 9,
     alignItems: 'center',
   },
-  miniPrimaryText: { fontFamily: FONTS.bodyExtraBold, fontSize: 11.5, color: '#FFFFFF' },
-  completeLink: { fontFamily: FONTS.bodyBold, fontSize: 12, marginTop: 9 },
+  miniPrimaryText: { fontFamily: FONTS.bodyExtraBold, fontSize: 13.5, color: '#FFFFFF' },
+  completeLink: { fontFamily: FONTS.bodyBold, fontSize: 14, marginTop: 9 },
 
   // FAB
   fabWrap: { position: 'absolute', right: 20, bottom: 24 },
@@ -664,6 +664,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontFamily: FONTS.body,
-    fontSize: 14,
+    fontSize: 16,
   },
 });

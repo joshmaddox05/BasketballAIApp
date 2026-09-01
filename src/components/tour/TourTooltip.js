@@ -80,7 +80,7 @@ const TourTooltip = ({ step, stepIndex, totalSteps, targetMeasurement, theme, on
     const surface2 = theme?.surface2 || '#242427';
     const textColor = theme?.text || '#E9E9ED';
     const mutedColor = theme?.textMuted || '#B4B4BB';
-    const dimColor = theme?.textDim || '#7C7C86';
+    const dimColor = theme?.textDim || '#83838D';
     const steelColor = theme?.steel || '#9AA0AC';
     const accentText = theme?.accentText || '#D4707A';
     const trackColor = theme?.track || 'rgba(233, 233, 237, 0.10)';
@@ -221,7 +221,7 @@ const styles = StyleSheet.create({
     },
     skipText: {
         fontFamily: FONTS.bodySemiBold,
-        fontSize: 10.5,
+        fontSize: 12.5,
     },
     title: {
         marginTop: 9,

@@ -42,7 +42,7 @@ export default function Blueprint360Screen({ navigation, route }) {
   // A coach or parent may arrive with a `playerUid` — this screen then shows that
   // athlete's plan, read-only.
   const subject = useModuleSubject(route);
-  const { readOnly, blueprint360Plan, evalRankScore } = subject;
+  const { readOnly, blueprint360Plan, evalRankScore, subjectParams } = subject;
 
   // Entitlement is always the VIEWER's, never the subject's: a coach on a paid plan
   // may view a free athlete, and a free coach may not view a paid one for free.
@@ -343,7 +343,7 @@ export default function Blueprint360Screen({ navigation, route }) {
         {plan ? (
           <TouchableOpacity
             style={[styles.primaryBtn, { backgroundColor: theme.primary }]}
-            onPress={() => navigation.navigate('Blueprint360PlanDetail')}
+            onPress={() => navigation.navigate('Blueprint360PlanDetail', subjectParams)}
           >
             <Text style={styles.primaryBtnText}>View Full Plan</Text>
             <Ionicons name="calendar-outline" size={18} color="#fff" />
@@ -354,7 +354,7 @@ export default function Blueprint360Screen({ navigation, route }) {
         <TouchableOpacity
           style={[styles.outlineBtn, { borderColor: theme.primary }]}
           activeOpacity={0.8}
-          onPress={() => navigation.navigate('Blueprint360Milestones')}
+          onPress={() => navigation.navigate('Blueprint360Milestones', subjectParams)}
         >
           <Ionicons name="flag-outline" size={16} color={theme.primary} />
           <Text style={[styles.outlineBtnText, { color: theme.primary }]}>Milestones</Text>
@@ -398,37 +398,37 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1 },
   backBtn: { padding: 4 },
-  headerTitle: { fontSize: 18, fontWeight: '700' },
-  headerSub: { fontSize: 12, marginTop: 1 },
+  headerTitle: { fontSize: 19, fontWeight: '700' },
+  headerSub: { fontSize: 14, marginTop: 1 },
   scroll: { padding: 16, gap: 16 },
   lockCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 16 },
-  lockTitle: { fontSize: 22, fontWeight: '700' },
-  lockSubtitle: { fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  lockTitle: { fontSize: 23, fontWeight: '700' },
+  lockSubtitle: { fontSize: 16, textAlign: 'center', lineHeight: 21 },
   upgradeBtn: { paddingHorizontal: 28, paddingVertical: 14, borderRadius: 14, marginTop: 8 },
-  upgradeBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  upgradeBtnText: { color: '#fff', fontSize: 17.5, fontWeight: '700' },
   emptyCard: { borderRadius: 20, borderWidth: 1, padding: 24, alignItems: 'center', gap: 14 },
   todayCard: { borderRadius: 20, padding: 20 },
-  todayLabel: { color: 'rgba(255,255,255,0.75)', fontSize: 11, fontWeight: '700', letterSpacing: 1, marginBottom: 6 },
-  todayTitle: { color: '#fff', fontSize: 20, fontWeight: '800', marginBottom: 12 },
+  todayLabel: { color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: '700', letterSpacing: 1, marginBottom: 6 },
+  todayTitle: { color: '#fff', fontSize: 21, fontWeight: '800', marginBottom: 12 },
   todayMeta: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   todayChip: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  todayChipText: { color: '#fff', fontSize: 12, fontWeight: '600' },
-  todayWhy: { color: 'rgba(255,255,255,0.85)', fontSize: 12.5, lineHeight: 18, marginBottom: 16 },
+  todayChipText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  todayWhy: { color: 'rgba(255,255,255,0.85)', fontSize: 14.5, lineHeight: 19, marginBottom: 16 },
   startBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#fff', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12, alignSelf: 'flex-start' },
-  startBtnText: { fontSize: 14, fontWeight: '700' },
+  startBtnText: { fontSize: 16, fontWeight: '700' },
   weekCard: { borderRadius: 16, borderWidth: 1, padding: 16 },
-  cardTitle: { fontSize: 15, fontWeight: '700', marginBottom: 12 },
+  cardTitle: { fontSize: 16.5, fontWeight: '700', marginBottom: 12 },
   daysRow: { flexDirection: 'row', gap: 7, marginBottom: 8 },
   dayDot: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  dayLabel: { fontSize: 13, fontWeight: '700' },
-  weekNote: { fontSize: 12, lineHeight: 17 },
+  dayLabel: { fontSize: 15, fontWeight: '700' },
+  weekNote: { fontSize: 14, lineHeight: 18 },
   objectiveCard: { borderRadius: 16, borderWidth: 1, padding: 16 },
   objectiveHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   objectiveRow: { flexDirection: 'row', gap: 8, alignItems: 'flex-start', marginBottom: 8 },
-  objectiveText: { fontSize: 13.5, lineHeight: 19 },
-  basedOn: { fontSize: 11.5, marginTop: 4 },
+  objectiveText: { fontSize: 15, lineHeight: 20 },
+  basedOn: { fontSize: 13.5, marginTop: 4 },
   primaryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 15, borderRadius: 14 },
-  primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  primaryBtnText: { color: '#fff', fontSize: 17.5, fontWeight: '700' },
   outlineBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 14, borderWidth: 1.5 },
-  outlineBtnText: { fontSize: 15, fontWeight: '600' },
+  outlineBtnText: { fontSize: 16.5, fontWeight: '600' },
 });

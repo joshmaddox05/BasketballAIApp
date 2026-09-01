@@ -428,13 +428,13 @@ const styles = StyleSheet.create({
         alignItems: 'center'
     },
     exerciseName: {
-        fontSize: 22,
+        fontSize: 23,
         fontWeight: 'bold',
         textAlign: 'center',
         marginBottom: 4
     },
     exerciseTarget: {
-        fontSize: 14
+        fontSize: 16
     },
     progressSection: {
         marginBottom: 24
@@ -450,7 +450,7 @@ const styles = StyleSheet.create({
         borderRadius: 4
     },
     progressText: {
-        fontSize: 12,
+        fontSize: 14,
         textAlign: 'center'
     },
     statsContainer: {
@@ -477,7 +477,7 @@ const styles = StyleSheet.create({
         marginTop: 4
     },
     statLabel: {
-        fontSize: 12,
+        fontSize: 14,
         marginTop: 2
     },
     undoSmall: {
@@ -496,7 +496,7 @@ const styles = StyleSheet.create({
         fontWeight: 'bold'
     },
     percentageLabel: {
-        fontSize: 12
+        fontSize: 14
     },
     buttonContainer: {
         flexDirection: 'row',
@@ -528,7 +528,7 @@ const styles = StyleSheet.create({
     },
     actionButtonText: {
         color: '#FFF',
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: 'bold',
         marginTop: 4
     },
@@ -547,7 +547,7 @@ const styles = StyleSheet.create({
         marginRight: 8
     },
     performanceText: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: 'bold'
     },
     finalStats: {
@@ -562,11 +562,11 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16
     },
     finalStatValue: {
-        fontSize: 24,
+        fontSize: 25,
         fontWeight: 'bold'
     },
     finalStatLabel: {
-        fontSize: 12
+        fontSize: 14
     },
     finalStatDivider: {
         width: 1,
@@ -588,14 +588,14 @@ const styles = StyleSheet.create({
     },
     completeButtonText: {
         color: '#FFF',
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: 'bold'
     },
     continueButton: {
         paddingVertical: 12
     },
     continueButtonText: {
-        fontSize: 14
+        fontSize: 16
     },
     instructions: {
         flexDirection: 'row',
@@ -607,7 +607,7 @@ const styles = StyleSheet.create({
         marginRight: 6
     },
     instructionText: {
-        fontSize: 12
+        fontSize: 14
     }
 });
 

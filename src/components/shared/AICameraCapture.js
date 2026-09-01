@@ -627,7 +627,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   permissionTitle: {
-    fontSize: 20,
+    fontSize: 21,
     fontWeight: 'bold',
     color: '#333',
     marginTop: 20,
@@ -635,7 +635,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   permissionText: {
-    fontSize: 16,
+    fontSize: 17.5,
     color: '#666',
     textAlign: 'center',
     marginBottom: 30,
@@ -648,7 +648,7 @@ const styles = StyleSheet.create({
   },
   permissionButtonText: {
     color: '#FFF',
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: 'bold',
   },
   poseOverlay: {
@@ -678,7 +678,7 @@ const styles = StyleSheet.create({
     maxWidth: 300,
   },
   guideTitle: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: 'bold',
     color: '#333',
     textAlign: 'center',
@@ -700,12 +700,12 @@ const styles = StyleSheet.create({
   },
   guideBulletText: {
     color: '#FFF',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: 'bold',
   },
   guideText: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 16,
     color: '#333',
   },
   readyButton: {
@@ -716,7 +716,7 @@ const styles = StyleSheet.create({
   },
   readyButtonText: {
     color: '#FFF',
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: 'bold',
   },
   recordingStats: {
@@ -740,12 +740,12 @@ const styles = StyleSheet.create({
   },
   recordingText: {
     color: '#FFF',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: 'bold',
   },
   durationText: {
     color: '#FFF',
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: 'bold',
     marginBottom: 8,
   },
@@ -772,7 +772,7 @@ const styles = StyleSheet.create({
   },
   processingText: {
     color: '#FFF',
-    fontSize: 16,
+    fontSize: 17.5,
     marginTop: 16,
   },
   controls: {
@@ -806,7 +806,7 @@ const styles = StyleSheet.create({
   },
   analysisTypeText: {
     color: '#FFF',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: 'bold',
   },
   overlayToggle: {
@@ -890,14 +890,14 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   positioningText: {
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: 'bold',
     color: '#333',
     textAlign: 'center',
     marginBottom: 4,
   },
   positioningSubtext: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
     textAlign: 'center',
   },
@@ -918,7 +918,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   portraitNoticeText: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#333',
     marginLeft: 8,
   },
@@ -949,13 +949,13 @@ const styles = StyleSheet.create({
   },
   countdownText: {
     color: '#FFF',
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: 'bold',
     marginBottom: 8,
   },
   countdownSubtext: {
     color: '#FFF',
-    fontSize: 14,
+    fontSize: 16,
     textAlign: 'center',
   },
 });

@@ -68,12 +68,36 @@ export const STEP_TITLE_TO_SHOT = {
   'Mid-Range Mastery': { sps: null, shotType: 'pullupMid', range: 'mid' },
   'Spot Shooting': { sps: null, shotType: 'catchAndShoot', range: 'mid' },
   'Form Shooting': { sps: null, shotType: null, range: 'close' },
+  // The MOVEMENT_SHOOTING step template feeds this. Before that drill existed,
+  // `movementShootingPct` had no producer at all and SPS was capped at 75%
+  // coverage for every player.
+  'Movement Shooting': { sps: 'movementShootingPct', shotType: 'offScreen', range: 'mid' },
 };
 
-// CONTENT GAP: `movementShootingPct` carries 25% of SPS and no drill produces it.
-// Authoring a "Movement Shooting" / "Off-Screen Shooting" STEP_TEMPLATE is the
-// cheapest remaining unlock for shooting measurement — it is a content task, not
-// an engineering one. Until then SPS tops out at 75% coverage.
+// ─── Live-tracked movement drills → SRS ──────────────────────────────────────
+// Maps the exact STEP_TEMPLATES `name` of a camera-trackable movement drill to the
+// SRS component it informs. Same keying convention as STEP_TITLE_TO_SHOT above.
+//
+// WHAT THIS IS, PRECISELY: a camera-tracked step records reps that a pose detector
+// counted, not reps the athlete claimed. So the completion rate on those steps is
+// OBSERVED rather than self-reported, which is a real difference in evidence
+// quality — but it measures whether the work was DONE, not how well it was
+// executed. It is therefore a declared proxy (like `finishing -> 'Physical'`),
+// carries LOW confidence, and its note says so. Nothing here should be read as
+// technique grading; genuine technique measurement still waits on ShotDNA / a real
+// CV pipeline (readiness C-2).
+export const STEP_TITLE_TO_SKILL = {
+  Crossovers: 'ballHandlingEfficiency',
+  'Stationary Dribbling': 'ballHandlingEfficiency',
+  'Two-Ball Dribbling': 'ballHandlingEfficiency',
+  'Defensive Slides': 'defensiveTechnique',
+  'Zigzag Defense': 'defensiveTechnique',
+  'Mirror Drill': 'defensiveTechnique',
+};
+
+// A single camera-tracked step is an anecdote. Require a few before the component
+// counts as measured at all.
+export const MIN_TRACKED_STEPS_PER_SKILL = 3;
 
 // ─── Group specs: which components form a score, and which are inverted ──────
 // `weights` are the score-forming (positive) weights. `inverted` components are
@@ -161,27 +185,30 @@ const renormalizeGroup = (spec, meta) => {
  */
 export const buildPillarComponents = (sources = {}) => {
   const shooting = summarizeShootingByDrill(sources.workouts);
+  const tracked = summarizeTrackedSkills(sources.workouts);
   const simCoach = sources.simCoach || {};
 
   const meta = {
     srs: {
-      // No per-skill execution data exists anywhere in the app. ShotDNA is empty
+      // Ball handling and defensive technique are now informed by CAMERA-TRACKED
+      // drills — reps a pose detector counted, not reps the athlete claimed. That
+      // is a declared proxy for execution (see STEP_TITLE_TO_SKILL): it measures
+      // work verifiably done, at low confidence, not technique quality.
+      //
+      // Passing and finishing still have no producer at all. ShotDNA is empty
       // (saveShotDNAAnalysis has no callers) and the CV pipeline is simulated
-      // (readiness C-2), so inventing these would be inventing the whole pillar.
-      ballHandlingEfficiency: unmeasured('none', 'No ball-handling execution data yet'),
+      // (readiness C-2), so inventing those would be inventing them.
+      ballHandlingEfficiency: fromTrackedSkill(tracked, 'ballHandlingEfficiency', 'ball-handling'),
       passingAccuracy: unmeasured('none', 'No passing execution data yet'),
       finishingEfficiency: unmeasured('none', 'No finishing execution data yet'),
-      defensiveTechnique: unmeasured('none', 'No defensive execution data yet'),
+      defensiveTechnique: fromTrackedSkill(tracked, 'defensiveTechnique', 'defensive'),
     },
     sps: {
       catchAndShootPct: fromDrill(shooting, 'catchAndShootPct', 'Catch and Shoot', 'high'),
       offDribblePct: fromDrill(shooting, 'offDribblePct', 'Off the Dribble', 'medium'),
       freeThrowPct: fromDrill(shooting, 'freeThrowPct', 'Free Throws', 'high'),
       rangeConsistency: shooting.rangeConsistency,
-      movementShootingPct: unmeasured(
-        'none',
-        'No movement-shooting drill exists yet — content gap, not a player gap'
-      ),
+      movementShootingPct: fromDrill(shooting, 'movementShootingPct', 'Movement Shooting', 'medium'),
     },
     iqs: {
       decisionAccuracy:
@@ -411,6 +438,68 @@ export const summarizeCoverage = (measuredPillars = {}, measuredDims = {}, parti
 // ─── Derivations from workout history ────────────────────────────────────────
 
 /** Aggregate persisted per-drill shooting into SPS components + range buckets. */
+/**
+ * Aggregate CAMERA-TRACKED movement steps per SRS skill.
+ *
+ * Only steps with `trackingMode === 'live'` count: a manual rep tally is the
+ * athlete's own claim, and treating it as execution evidence is exactly the kind
+ * of unmeasured-reported-as-real that the coverage rules exist to prevent.
+ *
+ * @returns {Object} skill -> { completionSum, steps, confSum, confCount }
+ */
+const summarizeTrackedSkills = (workouts) => {
+  const bySkill = {};
+
+  for (const workout of asArray(workouts)) {
+    for (const step of asArray(workout?.stepPerformance)) {
+      if (step?.trackingMode !== 'live') continue;
+      const skill = STEP_TITLE_TO_SKILL[step?.stepTitle];
+      if (!skill) continue;
+
+      const pct = Number(step.completionPercentage);
+      if (!Number.isFinite(pct)) continue;
+
+      const bucket = (bySkill[skill] ||= { completionSum: 0, steps: 0, confSum: 0, confCount: 0 });
+      // Clamp: a detector that over-counts must not push a component above 100.
+      bucket.completionSum += Math.max(0, Math.min(100, pct));
+      bucket.steps += 1;
+
+      const conf = Number(step.avgPoseConfidence);
+      if (Number.isFinite(conf)) {
+        bucket.confSum += conf;
+        bucket.confCount += 1;
+      }
+    }
+  }
+  return bySkill;
+};
+
+/**
+ * Build the SRS component for one skill from camera-tracked steps.
+ * Unmeasured until MIN_TRACKED_STEPS_PER_SKILL steps exist, so a single session
+ * cannot establish a pillar.
+ */
+const fromTrackedSkill = (bySkill, skill, label) => {
+  const bucket = bySkill[skill];
+  if (!bucket || bucket.steps < MIN_TRACKED_STEPS_PER_SKILL) {
+    return unmeasured(
+      'activities.stepPerformance',
+      `Complete ${MIN_TRACKED_STEPS_PER_SKILL} camera-tracked ${label} drills to measure this`
+    );
+  }
+  const avgConf = bucket.confCount > 0 ? bucket.confSum / bucket.confCount : null;
+  return component(bucket.completionSum / bucket.steps, {
+    source: 'activities.stepPerformance',
+    // Declared proxy: camera-VERIFIED completion, not technique quality.
+    confidence: 'low',
+    note:
+      `Camera-verified completion across ${bucket.steps} ${label} drills` +
+      (avgConf !== null ? ` (pose confidence ${avgConf.toFixed(2)})` : '') +
+      ' — measures work done, not technique',
+    sample: bucket.steps,
+  });
+};
+
 const summarizeShootingByDrill = (workouts) => {
   const byDrill = {}; // stepTitle → {makes, shots}
   const byRange = {}; // range → {makes, shots}

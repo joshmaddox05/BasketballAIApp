@@ -179,15 +179,15 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     title: {
-        fontSize: 24,
+        fontSize: 25,
         fontWeight: 'bold',
         marginBottom: 12,
         textAlign: 'center',
     },
     message: {
-        fontSize: 16,
+        fontSize: 17.5,
         textAlign: 'center',
-        lineHeight: 22,
+        lineHeight: 23,
         marginBottom: 20,
     },
     featureBox: {
@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     featureName: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: '600',
         marginLeft: 8,
     },
@@ -214,11 +214,11 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     planLabel: {
-        fontSize: 12,
+        fontSize: 14,
         marginBottom: 4,
     },
     planName: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: 'bold',
     },
     benefitsBox: {
@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
         marginBottom: 24,
     },
     benefitsTitle: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: '600',
         marginBottom: 12,
     },
@@ -238,11 +238,11 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     benefitText: {
-        fontSize: 14,
+        fontSize: 16,
         marginLeft: 8,
     },
     moreFeatures: {
-        fontSize: 12,
+        fontSize: 14,
         marginTop: 8,
         fontStyle: 'italic',
     },
@@ -257,12 +257,12 @@ const styles = StyleSheet.create({
     },
     upgradeButtonText: {
         color: '#FFF',
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: 'bold',
     },
     upgradePrice: {
         color: '#FFF',
-        fontSize: 14,
+        fontSize: 16,
         marginTop: 4,
         opacity: 0.9,
     },
@@ -273,7 +273,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     cancelButtonText: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: '600',
     },
 });

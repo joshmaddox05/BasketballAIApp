@@ -11,7 +11,7 @@ colors:
   steel: "#9AA0AC"
   text: "#E9E9ED"
   text-muted: "#B4B4BB"
-  text-dim: "#7C7C86"
+  text-dim: "#83838D"
   hairline: "rgba(233, 233, 237, 0.12)"
   track: "rgba(233, 233, 237, 0.10)"
   attention-fill: "rgba(138, 28, 34, 0.14)"
@@ -208,7 +208,13 @@ a derivation.
   spotlit tiles. There is no third step.
 - **Text** (`#E9E9ED`): primary reading color.
 - **Text Muted** (`#B4B4BB`): body copy and secondary labels.
-- **Text Dim** (`#7C7C86`): meta, captions, and every uppercase section label.
+- **Text Dim** (`#83838D`): meta, captions, and every uppercase section label. Raised
+  from `#7C7C86` on 2026-09-01: the old value measured 4.11:1 on `surface` in dark and
+  3.42:1 in light, so the system's most-repeated text pairing failed WCAG AA in **both**
+  appearances. It now clears 4.5:1 against the worst-case background in each — 4.52:1 on
+  dark `surface`, 4.55:1 on light `background`. Its light counterpart moved `#8A8A94` →
+  `#707078`. The three-step text hierarchy is intact (Text 15:1 → Muted ~8:1 → Dim ~4.6:1);
+  Dim is quieter than it was relative to Muted, not louder in absolute terms.
 - **Hairline** (`rgba(233, 233, 237, 0.12)`): all borders, dividers, outline buttons, the
   header rule, and the tab-bar top edge. One border value for the entire system.
 - **Track** (`rgba(233, 233, 237, 0.10)`): progress-bar tracks and chart gridlines.
@@ -238,6 +244,27 @@ red-yellow-green scale. A/B → Signal Rose on `badge-fill`; C → Gymnasium Ste
 `steel-fill`; anything lower or absent → Text Dim on `track`. This is implemented as
 `gradeTone()` in `EvalRankScreen.js`; reuse it rather than re-deriving a mapping. A failing
 grade is rendered as *dim*, not as *red* — the system reports, it does not scold.
+
+**The Binary Verdict Exception** (decided 2026-09-01). One case is carved out of the rule
+above: a **single question that was answered right or wrong** may use `success` / `error`.
+A right/wrong read is a binary system fact — closer to validation than to evaluation — and
+the green tick / red cross is understood instantly by a 14-year-old, which is the reader
+this surface actually has. It applies to SimCoach scenario answers and to make/miss counts
+on a single drill.
+
+The exception is narrow, and the boundary is what makes it survivable:
+
+- **In scope:** one answer, right or wrong. Makes vs misses on one drill.
+- **Out of scope, still governed by Never A Rainbow:** every pillar score, every EvalRank
+  grade, every composite, every exposure tier, every trend. A *grade* is still dim when it
+  is low. The system still does not scold.
+- **Always through the token.** `theme.success` / `theme.warning` / `theme.error`, never a
+  hex literal. The tokens are re-contrasted per appearance; the literals this rule replaced
+  (`#2FBF71`, `#22C55E`, `#EF4444`) computed to 2.4:1 on the light background and there
+  were two different greens in the product for the same meaning.
+- **Colour is never the only carrier.** The tick / cross / hollow-dot shapes must
+  distinguish the states on their own, because roughly 1 in 12 male users cannot separate
+  the two hues, and the product's users are overwhelmingly male teenagers.
 
 **The Fill-Versus-Letter Rule.** `burgundy` fills; `signal-rose` letters. Burgundy text on
 a dark surface fails contrast and reads as a bug. Any accent-colored text or icon on dark
@@ -512,7 +539,8 @@ surfaces the consent card is the single pulsing element on the screen.
 - **Don't** introduce a new hue. If something needs to be distinguished, use burgundy,
   steel, or a tone step — status colors are for system messaging only.
 - **Don't** color a failing grade red. Low grades render dim; the system reports rather than
-  scolds.
+  scolds. The one carve-out is a single right/wrong answer — see The Binary Verdict
+  Exception — and it never extends to a grade, a pillar, or a composite.
 - **Don't** invent a radius or a spacing value outside the enumerated scales.
 - **Don't** put burgundy `#8A1C22` on dark as text — it fails contrast. That is what Signal
   Rose is for.

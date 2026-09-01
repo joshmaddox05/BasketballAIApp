@@ -1,9 +1,10 @@
 // ScoutHomeScreen.js - Scout board (design 14a: "new since you last looked").
 // Presentational redesign only — data loading unchanged. Motion intent: scout —
 // ONLY the new/changed rows animate in; everything else renders static.
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAppContext } from '../../context/AppContext';
@@ -20,11 +21,15 @@ import {
   BarFill,
 } from '../../components/dbe';
 import { getModulesForRole } from '../../config/roleModules';
+import ModuleIntro from '../../components/modules/ModuleIntro';
+import { useModuleIntro } from '../../hooks/useModuleIntro';
 import { canAccessFeature } from '../../utils/subscription';
 import {
   getWatchlist,
   getScoutingReports,
   searchScoutLabProspects,
+  getScoutAccessStatuses,
+  listenToUnreadNotificationCount,
 } from '../../services/firestoreService';
 
 // ─── Data mapping helpers ──────────────────────────────────────────────────────
@@ -108,7 +113,7 @@ function GradeBadge({ grade, theme }) {
         backgroundColor: evalFillFor(grade, theme),
       }}
     >
-      <Text style={{ fontFamily: TYPE.buttonPrimary.fontFamily, fontSize: 11, color: evalColorFor(grade, theme) }}>
+      <Text style={{ fontFamily: TYPE.buttonPrimary.fontFamily, fontSize: 13, color: evalColorFor(grade, theme) }}>
         {grade}
       </Text>
     </View>
@@ -128,6 +133,8 @@ export default function ScoutHomeScreen({ navigation }) {
   const [reports, setReports] = useState([]);
   const [trendingProspects, setTrendingProspects] = useState([]);
   const [prospectCount, setProspectCount] = useState(0);
+  const [accessByUid, setAccessByUid] = useState({});
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const loadDashboard = useCallback(async () => {
     if (!scoutUid) return;
@@ -140,6 +147,21 @@ export default function ScoutHomeScreen({ navigation }) {
     setReports(savedReports.map(mapReport));
     setTrendingProspects((prospects || []).slice(0, 6));
     setProspectCount((prospects || []).length);
+
+    // Consent state for the watchlist, so approvals surface on the dashboard
+    // instead of only inside a single prospect screen.
+    const statuses = await getScoutAccessStatuses(
+      savedWatchlist.map((w) => w.prospectUid || w.id),
+      scoutUid
+    ).catch(() => ({}));
+    setAccessByUid(statuses);
+  }, [scoutUid]);
+
+  // Real unread count — the bell used to carry a hardcoded always-on badge.
+  useEffect(() => {
+    if (!scoutUid) return;
+    const unsubscribe = listenToUnreadNotificationCount(scoutUid, setUnreadCount);
+    return () => unsubscribe();
   }, [scoutUid]);
 
   useFocusEffect(
@@ -160,6 +182,20 @@ export default function ScoutHomeScreen({ navigation }) {
   });
   const watchlistUpdates = sortedWatchlist.slice(0, 3).map(mapWatchUpdate);
   const newCount = watchlistUpdates.length;
+
+  // Consent buckets. Approval used to be invisible outside one detail screen, so
+  // the scout had no way to know a parent had said yes.
+  const accessBuckets = useMemo(() => {
+    const unlocked = [];
+    const awaiting = [];
+    sortedWatchlist.forEach((w) => {
+      const uid = String(w.prospectUid || w.id);
+      const status = accessByUid[uid];
+      if (status === 'approved') unlocked.push(w);
+      else if (status === 'pending') awaiting.push(w);
+    });
+    return { unlocked, awaiting };
+  }, [sortedWatchlist, accessByUid]);
   const draftCount = reports.filter((r) => r.status === 'Draft').length;
 
   const handleProspectPress = useCallback((prospect) => {
@@ -173,9 +209,11 @@ export default function ScoutHomeScreen({ navigation }) {
     if (mod.key === 'ScoutReports') return draftCount === 1 ? '1 draft open' : `${draftCount} drafts open`;
     return mod.description;
   };
+  // Shares the module-intro gate with ModuleGrid, so an intro fires the first
+  // time a scout opens a module here too.
+  const { openModule, introProps } = useModuleIntro(navigation);
   const handleModulePress = (mod) => {
-    const unlocked = canAccessFeature(mod.feature, subscription);
-    navigation.navigate(unlocked ? mod.key : 'Subscription');
+    openModule(mod, canAccessFeature(mod.feature, subscription));
   };
 
   return (
@@ -188,7 +226,11 @@ export default function ScoutHomeScreen({ navigation }) {
         right={
           <>
             <HeaderIconButton icon="chatbubble-outline" onPress={() => navigation.navigate('Messaging')} />
-            <HeaderIconButton icon="notifications-outline" badge onPress={() => navigation.navigate('Notifications')} />
+            <HeaderIconButton
+              icon="notifications-outline"
+              badge={unreadCount > 0}
+              onPress={() => navigation.navigate('Notifications')}
+            />
           </>
         }
       />
@@ -220,6 +262,55 @@ export default function ScoutHomeScreen({ navigation }) {
             <Text style={[TYPE.statCaption, { color: theme.accentText, marginTop: 5 }]}>New</Text>
           </View>
         </View>
+
+        {/* Newly unlocked — a parent approved access. Previously the scout was
+            never told and had to re-check each prospect manually. */}
+        {accessBuckets.unlocked.length > 0 && (
+          <View style={styles.section}>
+            <SectionLabel>Unlocked for you</SectionLabel>
+            {accessBuckets.unlocked.slice(0, 4).map((w, i) => (
+              <Entrance
+                key={w.prospectUid || w.id}
+                variant="slideIn"
+                delay={150 + i * 100}
+                style={i > 0 ? { marginTop: 8 } : null}
+              >
+                <Row
+                  onPress={() => handleProspectPress(w)}
+                  leading={<Avatar initials={initialsOf(w.name)} tone="steel" />}
+                  title={w.name || 'Prospect'}
+                  meta="Full profile unlocked"
+                  trailing={
+                    <Ionicons name="lock-open-outline" size={16} color={theme.primary} />
+                  }
+                />
+              </Entrance>
+            ))}
+          </View>
+        )}
+
+        {/* Requests still with the parent. */}
+        {accessBuckets.awaiting.length > 0 && (
+          <View style={styles.section}>
+            <SectionLabel>Awaiting parent approval</SectionLabel>
+            {accessBuckets.awaiting.slice(0, 4).map((w, i) => (
+              <Entrance
+                key={w.prospectUid || w.id}
+                variant="slideIn"
+                delay={150 + i * 100}
+                style={i > 0 ? { marginTop: 8 } : null}
+              >
+                <Row
+                  onPress={() => handleProspectPress(w)}
+                  leading={<Avatar initials={initialsOf(w.name)} tone="steel" />}
+                  title={w.name || 'Prospect'}
+                  meta="Pending with their guardian"
+                  trailing={<Ionicons name="hourglass-outline" size={16} color={theme.steel} />}
+                />
+              </Entrance>
+            ))}
+          </View>
+        )}
 
         {/* New on the watchlist — the only rows that animate in */}
         {watchlistUpdates.length > 0 && (
@@ -340,6 +431,8 @@ export default function ScoutHomeScreen({ navigation }) {
 
         <View style={styles.bottomPad} />
       </ScrollView>
+
+      <ModuleIntro {...introProps} />
     </SafeAreaView>
   );
 }
@@ -391,11 +484,11 @@ const styles = StyleSheet.create({
   },
   trendName: {
     fontFamily: TYPE.cardTitle.fontFamily,
-    fontSize: 12.5,
+    fontSize: 14.5,
   },
   trendMeta: {
     fontFamily: TYPE.rowMeta.fontFamily,
-    fontSize: 10,
+    fontSize: 12,
     marginTop: 3,
   },
 

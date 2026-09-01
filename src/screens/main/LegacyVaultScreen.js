@@ -109,7 +109,7 @@ function ArchetypeCard({ archetype, theme, onPress }) {
         <Text style={[TYPE.statCaption, { color: theme.steel, letterSpacing: 1.5 }]}>
           Your archetype lineage
         </Text>
-        <Text style={[TYPE.tooltipTitle, { color: theme.text, fontSize: 19, marginTop: 5 }]}>
+        <Text style={[TYPE.tooltipTitle, { color: theme.text, fontSize: 20, marginTop: 5 }]}>
           {archetype.name}
         </Text>
         <Text style={[TYPE.tooltipBody, { color: theme.textMuted, marginTop: 6, maxWidth: 250 }]}>
@@ -158,7 +158,7 @@ function CategoryCard({ category, onPress, theme, delay, locked }) {
         disabled={locked}
       >
         {locked ? tile : <Float duration={3200}>{tile}</Float>}
-        <Text style={[TYPE.rowTitle, { color: theme.text, fontSize: 13, marginTop: 10 }]}>
+        <Text style={[TYPE.rowTitle, { color: theme.text, fontSize: 15, marginTop: 10 }]}>
           {category.label}
         </Text>
         <Text style={[TYPE.cardBody, { color: theme.textDim, marginTop: 2 }]}>
@@ -179,7 +179,7 @@ function FeaturedArticleRow({ article, theme, accent, last, onPress }) {
     >
       <View style={[styles.featSpine, { backgroundColor: accent ? theme.primary : theme.steel }]} />
       <View style={{ flex: 1 }}>
-        <Text style={[TYPE.rowTitle, { color: theme.text, fontSize: 12.5, lineHeight: 17 }]}>
+        <Text style={[TYPE.rowTitle, { color: theme.text, fontSize: 14.5, lineHeight: 18 }]}>
           {article.title}
         </Text>
         <Text style={[TYPE.cardBody, { color: theme.textDim, marginTop: 2 }]}>

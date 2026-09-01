@@ -300,7 +300,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: '600',
     color: '#333',
   },
@@ -323,11 +323,11 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   title: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: '600',
     color: '#333',
     marginBottom: 12,
-    lineHeight: 24,
+    lineHeight: 25,
   },
   metaInfo: {
     marginBottom: 16,
@@ -343,7 +343,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   metaText: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
     marginLeft: 6,
   },
@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
     borderColor: '#8A1C22',
   },
   levelText: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '500',
     color: '#8A1C22',
     marginLeft: 4,
@@ -371,15 +371,15 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   descriptionTitle: {
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: '600',
     color: '#333',
     marginBottom: 8,
   },
   description: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
-    lineHeight: 20,
+    lineHeight: 21,
   },
   playerStatus: {
     marginBottom: 20,
@@ -394,7 +394,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   statusText: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
     marginLeft: 6,
   },
@@ -415,15 +415,15 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   tipTitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
     color: '#333',
     marginBottom: 4,
   },
   tipText: {
-    fontSize: 13,
+    fontSize: 15,
     color: '#666',
-    lineHeight: 18,
+    lineHeight: 19,
   },
 });
 

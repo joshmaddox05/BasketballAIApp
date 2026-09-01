@@ -1,0 +1,4 @@
+{
+  "//": "Pure ES modules so the assignment lifecycle runs under Node's test runner, mirroring src/services/blueprint and src/components/dbe/logic. Nothing here may import React, React Native, or Firebase.",
+  "type": "module"
+}

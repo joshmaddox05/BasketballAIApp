@@ -120,7 +120,7 @@ const ShotAnalysisResultsSimple = ({ results, onClose, onTryAgain, history = [] 
             <Text
                 style={{
                     fontFamily: FONTS.bodyBold,
-                    fontSize: 10.5,
+                    fontSize: 12.5,
                     letterSpacing: 1.6,
                     textTransform: 'uppercase',
                     color: theme.steel,
@@ -181,7 +181,7 @@ const ShotAnalysisResultsSimple = ({ results, onClose, onTryAgain, history = [] 
                             numberOfLines={1}
                             style={{
                                 fontFamily: FONTS.bodySemiBold,
-                                fontSize: 11.5,
+                                fontSize: 13.5,
                                 color: theme.textMuted,
                                 width: 98,
                             }}
@@ -199,7 +199,7 @@ const ShotAnalysisResultsSimple = ({ results, onClose, onTryAgain, history = [] 
                         <Text
                             style={{
                                 fontFamily: FONTS.bodyBold,
-                                fontSize: 12,
+                                fontSize: 14,
                                 color: theme.text,
                                 width: 26,
                                 textAlign: 'right',
@@ -304,7 +304,7 @@ const ShotAnalysisResultsSimple = ({ results, onClose, onTryAgain, history = [] 
                                 </Text>
                             </View>
                             {cue.description ? (
-                                <Text style={[TYPE.rowMeta, { color: theme.textDim, marginTop: 6, lineHeight: 15 }]}>
+                                <Text style={[TYPE.rowMeta, { color: theme.textDim, marginTop: 6, lineHeight: 16.5 }]}>
                                     {cue.description}
                                 </Text>
                             ) : null}
@@ -372,7 +372,7 @@ const ShotAnalysisResultsSimple = ({ results, onClose, onTryAgain, history = [] 
                             <Text
                                 style={{
                                     fontFamily: FONTS.bodyExtraBold,
-                                    fontSize: 11.5,
+                                    fontSize: 13.5,
                                     color: theme.accentText,
                                 }}
                             >
@@ -380,7 +380,7 @@ const ShotAnalysisResultsSimple = ({ results, onClose, onTryAgain, history = [] 
                             </Text>
                         </View>
                         <View style={{ flex: 1 }}>
-                            <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 13, color: theme.text }}>
+                            <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 15, color: theme.text }}>
                                 Shot analysis
                             </Text>
                             <Text style={[TYPE.rowMeta, { color: theme.textDim }]}>
@@ -424,7 +424,7 @@ const ShotAnalysisResultsSimple = ({ results, onClose, onTryAgain, history = [] 
                                 {statusFeedback.message}
                             </Text>
                             {statusFeedback.tip && metric.status !== 'good' ? (
-                                <Text style={[TYPE.rowMeta, { color: theme.textDim, marginTop: 4, lineHeight: 15 }]}>
+                                <Text style={[TYPE.rowMeta, { color: theme.textDim, marginTop: 4, lineHeight: 16.5 }]}>
                                     {statusFeedback.tip}
                                 </Text>
                             ) : null}
@@ -457,7 +457,7 @@ const ShotAnalysisResultsSimple = ({ results, onClose, onTryAgain, history = [] 
                     justifyContent: 'space-between',
                 }}
             >
-                <Text style={{ fontFamily: FONTS.bodyExtraBold, fontSize: 14.5, color: '#FFFFFF' }}>
+                <Text style={{ fontFamily: FONTS.bodyExtraBold, fontSize: 16, color: '#FFFFFF' }}>
                     {showDetails ? 'Hide full report' : 'View full report'}
                 </Text>
                 <Ionicons name={showDetails ? 'chevron-up' : 'arrow-forward'} size={16} color="#FFFFFF" />

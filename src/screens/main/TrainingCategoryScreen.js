@@ -309,7 +309,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     headerTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: 'bold',
     },
     filterButton: {
@@ -337,12 +337,12 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     categoryTitle: {
-        fontSize: 20,
+        fontSize: 21,
         fontWeight: 'bold',
         marginBottom: 4,
     },
     workoutCount: {
-        fontSize: 14,
+        fontSize: 16,
     },
     workoutsList: {
         padding: 16,
@@ -378,7 +378,7 @@ const styles = StyleSheet.create({
     },
     premiumBannerText: {
         color: '#FFF',
-        fontSize: 12,
+        fontSize: 14,
         fontWeight: '700',
         letterSpacing: 0.5,
     },
@@ -393,7 +393,7 @@ const styles = StyleSheet.create({
     },
     unlockButtonText: {
         color: '#FFF',
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '600',
     },
     workoutImageContainer: {
@@ -419,7 +419,7 @@ const styles = StyleSheet.create({
     },
     levelBadgeText: {
         color: '#FFF',
-        fontSize: 12,
+        fontSize: 14,
         fontWeight: '600',
     },
     recommendedBadge: {
@@ -436,20 +436,20 @@ const styles = StyleSheet.create({
     },
     recommendedBadgeText: {
         color: '#FFF',
-        fontSize: 11,
+        fontSize: 13,
         fontWeight: '600',
     },
     workoutContent: {
         padding: 16,
     },
     workoutTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: '700',
         marginBottom: 8,
     },
     workoutDescription: {
-        fontSize: 14,
-        lineHeight: 20,
+        fontSize: 16,
+        lineHeight: 21,
         marginBottom: 16,
     },
     workoutFooter: {
@@ -463,7 +463,7 @@ const styles = StyleSheet.create({
     },
     workoutDurationText: {
         marginLeft: 6,
-        fontSize: 14,
+        fontSize: 16,
     },
     startButton: {
         flexDirection: 'row',
@@ -475,7 +475,7 @@ const styles = StyleSheet.create({
     },
     startButtonText: {
         color: '#FFF',
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '600',
     },
 });

@@ -41,10 +41,14 @@ const gradeProgress = (score) => {
 
 // Deeper data, unlocked only after parent approval; each row is further gated by
 // the scout's subscription tier (feature: null = free once approved).
+// `route` opens the real module for this prospect. The security rules already
+// permitted a paid, parent-approved scout to read these (canViewDeepPlayerData),
+// but no UI ever navigated there — the rows were a summary with nothing behind
+// them. Modules receive `playerUid` and render read-only via useModuleSubject.
 const DEEP_SECTIONS = [
-  { key: 'eval', icon: 'stats-chart', label: 'EvalRank breakdown', feature: 'evalRank',
+  { key: 'eval', icon: 'stats-chart', label: 'EvalRank breakdown', feature: 'evalRank', route: 'EvalRank',
     value: (s) => (evalGradeOf(s?.evalRank) ? `Overall grade ${evalGradeOf(s.evalRank)}` : 'No evaluation yet') },
-  { key: 'plan', icon: 'map-outline', label: 'Blueprint360 progress', feature: 'blueprint360',
+  { key: 'plan', icon: 'map-outline', label: 'Blueprint360 progress', feature: 'blueprint360', route: 'Blueprint360',
     value: (s) => (s?.blueprint ? (s.blueprint.todayWorkout?.title ? `Today: ${s.blueprint.todayWorkout.title}` : 'Active plan') : 'No active plan') },
   { key: 'activity', icon: 'pulse-outline', label: 'Recent activity', feature: null,
     value: (s) => `${(s?.activities || []).length} recent sessions` },
@@ -224,9 +228,19 @@ export default function ScoutProspectDetailScreen({ navigation, route }) {
               const approved = accessStatus === 'approved';
               const tierOk = !s.feature || canAccessFeature(s.feature, subscription);
               const unlocked = approved && tierOk;
+              // Only an unlocked row with a module behind it is tappable; the
+              // rest stay inert so a locked row never navigates into a denied read.
+              const openable = unlocked && !!s.route;
+              const RowWrapper = openable ? TouchableOpacity : View;
               return (
-                <View
+                <RowWrapper
                   key={s.key}
+                  {...(openable
+                    ? {
+                        activeOpacity: 0.75,
+                        onPress: () => navigation.navigate(s.route, { playerUid: prospectId }),
+                      }
+                    : {})}
                   style={[
                     styles.deepRow,
                     i < DEEP_SECTIONS.length - 1 && {
@@ -242,14 +256,16 @@ export default function ScoutProspectDetailScreen({ navigation, route }) {
                       <Text style={[TYPE.rowMeta, { color: theme.textDim }]}>{s.value(summary)}</Text>
                     )}
                   </View>
-                  {unlocked ? (
+                  {openable ? (
+                    <Ionicons name="chevron-forward" size={15} color={theme.accentText} />
+                  ) : unlocked ? (
                     <Ionicons name="checkmark-circle" size={15} color={theme.accentText} />
                   ) : approved ? (
                     <Ionicons name="diamond-outline" size={14} color={theme.accentText} />
                   ) : (
                     <Ionicons name="lock-closed" size={14} color={theme.textDim} />
                   )}
-                </View>
+                </RowWrapper>
               );
             })}
           </View>
@@ -326,23 +342,23 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   ringCenter: { alignItems: 'center', justifyContent: 'center' },
-  ringGrade: { fontFamily: TYPE.screenTitle.fontFamily, fontSize: 19, lineHeight: 19 },
+  ringGrade: { fontFamily: TYPE.screenTitle.fontFamily, fontSize: 20, lineHeight: 20 },
   ringCaption: {
     fontFamily: TYPE.statCaption.fontFamily,
-    fontSize: 7.5,
+    fontSize: 10,
     letterSpacing: 0.8,
     marginTop: 2,
   },
   heroInfo: { flex: 1 },
-  heroName: { fontFamily: TYPE.screenTitle.fontFamily, fontSize: 21, lineHeight: 23 },
-  heroMeta: { fontFamily: TYPE.greeting.fontFamily, fontSize: 11.5, marginTop: 4 },
+  heroName: { fontFamily: TYPE.screenTitle.fontFamily, fontSize: 22, lineHeight: 23 },
+  heroMeta: { fontFamily: TYPE.greeting.fontFamily, fontSize: 13.5, marginTop: 4 },
   heroChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
   smallChip: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: SHAPE.radiusBadge,
   },
-  smallChipText: { fontFamily: TYPE.chip.fontFamily, fontSize: 9.5 },
+  smallChipText: { fontFamily: TYPE.chip.fontFamily, fontSize: 11.5 },
 
   consentBanner: {
     flexDirection: 'row',
@@ -356,8 +372,8 @@ const styles = StyleSheet.create({
   consentText: {
     flex: 1,
     fontFamily: TYPE.greeting.fontFamily,
-    fontSize: 10.5,
-    lineHeight: 15,
+    fontSize: 12.5,
+    lineHeight: 16.5,
   },
 
   section: { marginTop: 16 },
@@ -369,7 +385,7 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: SHAPE.radiusPill,
   },
-  attrText: { fontFamily: TYPE.chip.fontFamily, fontSize: 9.5, textTransform: 'capitalize' },
+  attrText: { fontFamily: TYPE.chip.fontFamily, fontSize: 11.5, textTransform: 'capitalize' },
 
   card: {
     borderRadius: SHAPE.radiusCard,

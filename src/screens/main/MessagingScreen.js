@@ -125,11 +125,11 @@ function ThreadItem({ thread, theme, onPress, delay = 0, last }) {
           <View style={styles.threadTopRow}>
             <Text
               numberOfLines={1}
-              style={{ flex: 1, fontFamily: FONTS.bodyBold, fontSize: 14.5, color: theme.text }}
+              style={{ flex: 1, fontFamily: FONTS.bodyBold, fontSize: 16, color: theme.text }}
             >
               {thread.name}
             </Text>
-            <Text style={{ fontFamily: FONTS.bodyMedium, fontSize: 11, color: theme.textDim }}>
+            <Text style={{ fontFamily: FONTS.bodyMedium, fontSize: 13, color: theme.textDim }}>
               {thread.time}
             </Text>
           </View>
@@ -138,7 +138,7 @@ function ThreadItem({ thread, theme, onPress, delay = 0, last }) {
               style={{
                 flex: 1,
                 fontFamily: thread.unread ? FONTS.bodyBold : FONTS.bodyMedium,
-                fontSize: 12.5,
+                fontSize: 14.5,
                 color: thread.unread ? theme.text : theme.textMuted,
               }}
               numberOfLines={1}
@@ -230,8 +230,8 @@ function ChatView({ conversation, myUid, theme, onBack }) {
                 <Text
                   style={{
                     fontFamily: FONTS.body,
-                    fontSize: 13.5,
-                    lineHeight: 19,
+                    fontSize: 15,
+                    lineHeight: 20,
                     color: mine ? '#FFFFFF' : theme.text,
                   }}
                 >
@@ -240,7 +240,7 @@ function ChatView({ conversation, myUid, theme, onBack }) {
                 <Text
                   style={{
                     fontFamily: FONTS.bodyMedium,
-                    fontSize: 9.5,
+                    fontSize: 11.5,
                     marginTop: 4,
                     textAlign: 'right',
                     color: mine ? 'rgba(255,255,255,0.65)' : theme.textDim,
@@ -488,7 +488,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    fontSize: 13.5,
+    fontSize: 15,
     maxHeight: 100,
   },
   sendBtn: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },

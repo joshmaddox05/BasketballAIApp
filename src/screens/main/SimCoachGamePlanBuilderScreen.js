@@ -17,83 +17,11 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
 import { getLinkedPlayers, assignToAthlete, saveGamePlan } from '../../services/firestoreService';
-import BasketballHalfCourt from '../../components/features/BasketballHalfCourt';
+import CourtDiagram, { defaultTokens } from '../../components/features/CourtDiagram';
+import { serializePlaySteps, toEditorRows } from '../../services/gamePlan/gamePlanSchema.js';
 
 const CATEGORIES = ['Offense', 'Defense', 'Transition'];
 const OPTION_LABELS = ['A', 'B', 'C', 'D'];
-
-const OFFENSIVE_POSITIONS = [
-  { id: 'o1', label: '1', x: 0.5, y: 0.55 },
-  { id: 'o2', label: '2', x: 0.18, y: 0.35 },
-  { id: 'o3', label: '3', x: 0.82, y: 0.35 },
-  { id: 'o4', label: '4', x: 0.25, y: 0.15 },
-  { id: 'o5', label: '5', x: 0.75, y: 0.15 },
-];
-
-const DEFENSIVE_POSITIONS = [
-  { id: 'd1', label: 'X', x: 0.5, y: 0.65 },
-  { id: 'd2', label: 'X', x: 0.2, y: 0.45 },
-  { id: 'd3', label: 'X', x: 0.8, y: 0.45 },
-  { id: 'd4', label: 'X', x: 0.3, y: 0.25 },
-  { id: 'd5', label: 'X', x: 0.7, y: 0.25 },
-];
-
-function CourtDiagram({ theme }) {
-  const COURT_W = 300;
-  const COURT_H = 180;
-
-  return (
-    <View style={styles.courtWrapper}>
-      <View style={[styles.courtInner, { width: COURT_W, height: COURT_H }]}>
-        {/* Basketball half-court backdrop (SVG) */}
-        <BasketballHalfCourt width={COURT_W} height={COURT_H} style={styles.courtSvg} />
-
-        {/* Offensive players (blue) */}
-        {OFFENSIVE_POSITIONS.map((p) => (
-          <View
-            key={p.id}
-            style={[
-              styles.playerToken,
-              styles.offToken,
-              { left: p.x * COURT_W - 14, top: p.y * COURT_H - 14 },
-            ]}
-          >
-            <Text style={styles.tokenLabel}>{p.label}</Text>
-          </View>
-        ))}
-
-        {/* Defensive players (red X) */}
-        {DEFENSIVE_POSITIONS.map((p) => (
-          <View
-            key={p.id}
-            style={[
-              styles.playerToken,
-              styles.defToken,
-              { left: p.x * COURT_W - 14, top: p.y * COURT_H - 14 },
-            ]}
-          >
-            <Text style={styles.tokenLabelDef}>{p.label}</Text>
-          </View>
-        ))}
-
-        {/* Ball */}
-        <View style={[styles.ball, { left: 0.5 * COURT_W - 8, top: 0.55 * COURT_H - 8 }]}>
-          <Ionicons name="basketball" size={14} color="#8A1C22" />
-        </View>
-      </View>
-      <View style={styles.courtLegend}>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: '#3B82F6' }]} />
-          <Text style={styles.legendText}>Offense (1–5)</Text>
-        </View>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: '#EF4444' }]} />
-          <Text style={styles.legendText}>Defense (X)</Text>
-        </View>
-      </View>
-    </View>
-  );
-}
 
 function AssignModal({ visible, athletes, selected, onToggle, onClose, onConfirm, assigning, theme }) {
   return (
@@ -153,11 +81,17 @@ export default function SimCoachGamePlanBuilderScreen({ navigation, route }) {
   const [planId, setPlanId] = useState(editingPlan?.id || null);
   const [planTitle, setPlanTitle] = useState(editingPlan?.title || 'New Game Plan');
   const [category, setCategory] = useState(editingPlan?.category || 'Offense');
-  const [steps, setSteps] = useState(
-    (editingPlan?.playSteps || [
-      'Ball handler initiates the action at the top of the key.',
-    ]).map((text, i) => ({ id: String(i), text }))
+  // Editor rows carry the step's own token layout + arrows. toEditorRows accepts
+  // both the legacy string[] shape and the new object shape.
+  const [steps, setSteps] = useState(() =>
+    toEditorRows(
+      editingPlan?.playSteps || ['Ball handler initiates the action at the top of the key.']
+    )
   );
+  // Which step's diagram is being edited, and what a drag on the court does.
+  const [activeStepIndex, setActiveStepIndex] = useState(0);
+  const [courtMode, setCourtMode] = useState('move'); // 'move' | 'arrow'
+  const [selectedTokenId, setSelectedTokenId] = useState(null);
   const [newStep, setNewStep] = useState('');
   const [question, setQuestion] = useState(editingPlan?.question || '');
   const [options, setOptions] = useState(() => {
@@ -175,17 +109,49 @@ export default function SimCoachGamePlanBuilderScreen({ navigation, route }) {
   const [saving, setSaving] = useState(false);
   const [assigning, setAssigning] = useState(false);
 
+  // The step whose diagram the court is currently editing. Guarded so an empty
+  // step list cannot crash the render.
+  const activeStep = steps[activeStepIndex] || steps[0] || { text: '', tokens: defaultTokens(), arrows: [] };
+
   const handleAddStep = useCallback(() => {
     if (!newStep.trim()) return;
-    setSteps((prev) => [...prev, { id: Date.now().toString(), text: newStep.trim() }]);
+    setSteps((prev) => {
+      // A new step inherits the previous step's formation — a play evolves from
+      // where it just was, so starting each step from the default would make the
+      // coach re-place every token.
+      const previous = prev[prev.length - 1];
+      const next = [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          text: newStep.trim(),
+          tokens: previous ? previous.tokens.map((t) => ({ ...t })) : defaultTokens(),
+          arrows: [],
+        },
+      ];
+      setActiveStepIndex(next.length - 1);
+      return next;
+    });
     setNewStep('');
     setSaved(false);
   }, [newStep]);
 
   const handleDeleteStep = useCallback((id) => {
-    setSteps((prev) => prev.filter((s) => s.id !== id));
+    setSteps((prev) => {
+      const next = prev.filter((s) => s.id !== id);
+      setActiveStepIndex((i) => Math.max(0, Math.min(i, next.length - 1)));
+      return next;
+    });
     setSaved(false);
   }, []);
+
+  // Diagram edits write back into the active step.
+  const updateActiveStep = useCallback((patch) => {
+    setSteps((prev) =>
+      prev.map((step, i) => (i === activeStepIndex ? { ...step, ...patch } : step))
+    );
+    setSaved(false);
+  }, [activeStepIndex]);
 
   const setOption = useCallback((idx, text) => {
     setOptions((prev) => prev.map((o, i) => (i === idx ? text : o)));
@@ -196,7 +162,7 @@ export default function SimCoachGamePlanBuilderScreen({ navigation, route }) {
   const buildPayload = useCallback(() => ({
     title: planTitle.trim() || 'Game Plan',
     category,
-    playSteps: steps.map((s) => s.text),
+    playSteps: serializePlaySteps(steps),
     question: question.trim(),
     options: options
       .map((text, i) => ({ label: OPTION_LABELS[i], text: text.trim() }))
@@ -208,6 +174,7 @@ export default function SimCoachGamePlanBuilderScreen({ navigation, route }) {
   const validate = useCallback(() => {
     if (!planTitle.trim()) return 'Add a title.';
     if (steps.length === 0) return 'Add at least one play step.';
+    if (!steps.some((s) => (s.text || '').trim())) return 'Give at least one play step a description.';
     if (!question.trim()) return 'Add a tactical question.';
     if (options.filter((o) => o.trim()).length < 2) return 'Add at least two answer options.';
     if (!options[correctIndex] || !options[correctIndex].trim()) return 'The correct answer must have text.';
@@ -330,14 +297,115 @@ export default function SimCoachGamePlanBuilderScreen({ navigation, route }) {
           })}
         </View>
 
-        {/* Court diagram */}
+        {/* Court diagram — one per play step, drag to position, draw to add routes */}
         <Text style={[styles.sectionTitle, { color: theme.text }]}>Court View</Text>
-        <CourtDiagram theme={theme} />
+
+        {steps.length > 0 ? (
+          <>
+            {/* Which step's diagram we're editing */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.stepTabs}
+            >
+              {steps.map((step, i) => {
+                const active = i === activeStepIndex;
+                return (
+                  <TouchableOpacity
+                    key={step.id}
+                    onPress={() => { setActiveStepIndex(i); setSelectedTokenId(null); }}
+                    style={[
+                      styles.stepTab,
+                      {
+                        backgroundColor: active ? theme.primary : theme.card,
+                        borderColor: active ? theme.primary : theme.border,
+                      },
+                    ]}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={[styles.stepTabText, { color: active ? '#fff' : theme.text }]}>
+                      Step {i + 1}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            <CourtDiagram
+              tokens={activeStep.tokens}
+              arrows={activeStep.arrows}
+              editable
+              mode={courtMode}
+              selectedTokenId={selectedTokenId}
+              onSelectToken={setSelectedTokenId}
+              onChangeTokens={(tokens) => updateActiveStep({ tokens })}
+              onChangeArrows={(arrows) => updateActiveStep({ arrows })}
+            />
+
+            {/* Move vs draw */}
+            <View style={styles.courtToolbar}>
+              {[
+                { key: 'move', label: 'Move players', icon: 'move-outline' },
+                { key: 'arrow', label: 'Draw route', icon: 'analytics-outline' },
+              ].map((tool) => {
+                const active = courtMode === tool.key;
+                return (
+                  <TouchableOpacity
+                    key={tool.key}
+                    onPress={() => setCourtMode(tool.key)}
+                    style={[
+                      styles.courtTool,
+                      {
+                        backgroundColor: active ? theme.primary : theme.card,
+                        borderColor: active ? theme.primary : theme.border,
+                      },
+                    ]}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name={tool.icon} size={15} color={active ? '#fff' : theme.text} />
+                    <Text style={[styles.courtToolText, { color: active ? '#fff' : theme.text }]}>
+                      {tool.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+              {activeStep.arrows.length > 0 ? (
+                <TouchableOpacity
+                  onPress={() => updateActiveStep({ arrows: [] })}
+                  style={[styles.courtTool, { borderColor: theme.border }]}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="trash-outline" size={15} color="#EF4444" />
+                  <Text style={[styles.courtToolText, { color: '#EF4444' }]}>Clear routes</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+
+            <Text style={[styles.courtHint, { color: theme.textSecondary }]}>
+              {courtMode === 'move'
+                ? 'Drag any player or the ball to set the formation for this step.'
+                : selectedTokenId
+                  ? 'Drag on the court to draw that player’s route.'
+                  : 'Tap a player first, then drag on the court to draw their route.'}
+            </Text>
+          </>
+        ) : null}
 
         {/* Play steps */}
         <Text style={[styles.sectionTitle, { color: theme.text }]}>Play Steps</Text>
         {steps.map((step, i) => (
-          <View key={step.id} style={[styles.stepRow, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          <TouchableOpacity
+            key={step.id}
+            onPress={() => { setActiveStepIndex(i); setSelectedTokenId(null); }}
+            activeOpacity={0.8}
+            style={[
+              styles.stepRow,
+              {
+                backgroundColor: theme.card,
+                borderColor: i === activeStepIndex ? theme.primary : theme.border,
+              },
+            ]}
+          >
             <View style={[styles.stepNum, { backgroundColor: theme.primary + '18' }]}>
               <Text style={[styles.stepNumText, { color: theme.primary }]}>{i + 1}</Text>
             </View>
@@ -345,7 +413,7 @@ export default function SimCoachGamePlanBuilderScreen({ navigation, route }) {
             <TouchableOpacity onPress={() => handleDeleteStep(step.id)} style={styles.deleteStepBtn}>
               <Ionicons name="close-circle" size={18} color="#EF4444" />
             </TouchableOpacity>
-          </View>
+          </TouchableOpacity>
         ))}
 
         {/* Add step */}
@@ -440,6 +508,37 @@ export default function SimCoachGamePlanBuilderScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
+  stepTabs: { gap: 8, paddingVertical: 8, paddingHorizontal: 2 },
+  stepTab: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  stepTabText: { fontSize: 14, fontWeight: '600' },
+  courtToolbar: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 10,
+    justifyContent: 'center',
+  },
+  courtTool: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  courtToolText: { fontSize: 14, fontWeight: '600' },
+  courtHint: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 8,
+    paddingHorizontal: 16,
+  },
   container: { flex: 1 },
   header: {
     flexDirection: 'row',
@@ -450,34 +549,34 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   backBtn: { padding: 4 },
-  headerTitle: { fontSize: 17, fontWeight: '700', flex: 1, textAlign: 'center' },
+  headerTitle: { fontSize: 18, fontWeight: '700', flex: 1, textAlign: 'center' },
   saveBtn: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
 
   scroll: { padding: 16 },
-  sectionTitle: { fontSize: 15, fontWeight: '700', marginBottom: 10, marginTop: 16 },
+  sectionTitle: { fontSize: 16.5, fontWeight: '700', marginBottom: 10, marginTop: 16 },
 
   titleInput: {
     borderWidth: 1,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: '600',
     marginBottom: 10,
   },
   categoryRow: { flexDirection: 'row', gap: 8, marginBottom: 4 },
   categoryChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5 },
-  categoryChipText: { fontSize: 13, fontWeight: '600' },
+  categoryChipText: { fontSize: 15, fontWeight: '600' },
   questionInput: {
     borderWidth: 1,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    fontSize: 14,
+    fontSize: 16,
     minHeight: 60,
     textAlignVertical: 'top',
   },
-  helperLabel: { fontSize: 12, marginTop: 12, marginBottom: 8 },
+  helperLabel: { fontSize: 14, marginTop: 12, marginBottom: 8 },
   optionRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -496,47 +595,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  optionLabel: { fontSize: 13, fontWeight: '700', width: 14 },
-  optionInput: { flex: 1, fontSize: 14 },
-
-  // Court
-  courtWrapper: {
-    borderRadius: 14,
-    padding: 12,
-    alignItems: 'center',
-  },
-  courtInner: {
-    position: 'relative',
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  courtSvg: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-  },
-  playerToken: {
-    position: 'absolute',
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  offToken: { backgroundColor: '#3B82F6', borderWidth: 1.5, borderColor: '#1D4ED8' },
-  defToken: { backgroundColor: '#EF4444', borderWidth: 1.5, borderColor: '#B91C1C' },
-  tokenLabel: { color: '#fff', fontSize: 11, fontWeight: '900' },
-  tokenLabelDef: { color: '#fff', fontSize: 10, fontWeight: '900' },
-  ball: { position: 'absolute', width: 16, height: 16 },
-
-  courtLegend: {
-    flexDirection: 'row',
-    gap: 16,
-    marginTop: 8,
-  },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  legendDot: { width: 10, height: 10, borderRadius: 5 },
-  legendText: { color: 'rgba(255,255,255,0.7)', fontSize: 11 },
+  optionLabel: { fontSize: 15, fontWeight: '700', width: 14 },
+  optionInput: { flex: 1, fontSize: 16 },
 
   stepRow: {
     flexDirection: 'row',
@@ -548,8 +608,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   stepNum: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
-  stepNumText: { fontSize: 13, fontWeight: '800' },
-  stepText: { flex: 1, fontSize: 14, lineHeight: 20 },
+  stepNumText: { fontSize: 15, fontWeight: '800' },
+  stepText: { flex: 1, fontSize: 16, lineHeight: 21 },
   deleteStepBtn: { padding: 2 },
 
   addStepRow: {
@@ -561,7 +621,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: 4,
   },
-  stepInput: { flex: 1, fontSize: 14 },
+  stepInput: { flex: 1, fontSize: 16 },
   addStepBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
 
   assignBtn: {
@@ -573,7 +633,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     marginTop: 20,
   },
-  assignBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  assignBtnText: { color: '#fff', fontSize: 17.5, fontWeight: '700' },
 
   // Modal
   modalContainer: { flex: 1 },
@@ -585,9 +645,9 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderBottomWidth: 1,
   },
-  modalTitle: { fontSize: 17, fontWeight: '700' },
-  modalSave: { fontSize: 16, fontWeight: '700' },
-  modalSubtitle: { fontSize: 13, marginBottom: 16, lineHeight: 19 },
+  modalTitle: { fontSize: 18, fontWeight: '700' },
+  modalSave: { fontSize: 17.5, fontWeight: '700' },
+  modalSubtitle: { fontSize: 15, marginBottom: 16, lineHeight: 20 },
   athleteRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -598,6 +658,6 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   athleteAvatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 14, fontWeight: '800' },
-  athleteName: { flex: 1, fontSize: 15, fontWeight: '600' },
+  avatarText: { fontSize: 16, fontWeight: '800' },
+  athleteName: { flex: 1, fontSize: 16.5, fontWeight: '600' },
 });

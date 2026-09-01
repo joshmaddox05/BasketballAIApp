@@ -280,8 +280,8 @@ const styles = StyleSheet.create({
     },
     tagline: {
         fontFamily: TYPE.tooltipBody.fontFamily,
-        fontSize: 15,
-        lineHeight: 21,
+        fontSize: 16.5,
+        lineHeight: 22,
         color: C.textMuted,
         textAlign: 'center',
         paddingHorizontal: 16,
@@ -313,14 +313,14 @@ const styles = StyleSheet.create({
     },
     featureTitle: {
         fontFamily: TYPE.rowTitle.fontFamily,
-        fontSize: 15,
+        fontSize: 16.5,
         color: C.text,
         marginBottom: 2,
     },
     featureDescription: {
         fontFamily: TYPE.rowMeta.fontFamily,
-        fontSize: 12.5,
-        lineHeight: 17,
+        fontSize: 14.5,
+        lineHeight: 18,
         color: C.textDim,
     },
     buttonsContainer: {
@@ -338,7 +338,7 @@ const styles = StyleSheet.create({
     },
     getStartedButtonText: {
         fontFamily: TYPE.buttonPrimary.fontFamily,
-        fontSize: 16.5,
+        fontSize: 18,
         color: C.text,
         letterSpacing: 0.3,
     },
@@ -351,7 +351,7 @@ const styles = StyleSheet.create({
     },
     loginButtonText: {
         fontFamily: TYPE.buttonSecondary.fontFamily,
-        fontSize: 15,
+        fontSize: 16.5,
         color: 'rgba(255, 255, 255, 0.85)',
     },
 });

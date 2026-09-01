@@ -201,7 +201,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 21,
     fontWeight: 'bold',
     color: '#333',
     marginLeft: 8,
@@ -227,13 +227,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   nextWorkoutTitle: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 8,
   },
   nextWorkoutDescription: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
     marginBottom: 12,
   },
@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   metaText: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#666',
     marginLeft: 4,
   },
@@ -307,7 +307,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   categoryBadgeText: {
-    fontSize: 11,
+    fontSize: 13,
     color: '#8A1C22',
     fontWeight: '600',
   },
@@ -318,21 +318,21 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   difficultyBadgeText: {
-    fontSize: 11,
+    fontSize: 13,
     color: '#666',
     fontWeight: '600',
   },
   workoutTitle: {
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 8,
   },
   workoutDescription: {
-    fontSize: 13,
+    fontSize: 15,
     color: '#666',
     marginBottom: 12,
-    lineHeight: 18,
+    lineHeight: 19,
   },
   workoutFooter: {
     flexDirection: 'row',
@@ -344,7 +344,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   durationText: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#666',
     marginLeft: 4,
   },
@@ -359,7 +359,7 @@ const styles = StyleSheet.create({
     borderColor: '#FFD3B6',
   },
   matchText: {
-    fontSize: 11,
+    fontSize: 13,
     color: '#8A1C22',
     fontWeight: '600',
     marginLeft: 4,
@@ -371,7 +371,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#EEE',
   },
   upgradeText: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#9C27B0',
     fontWeight: '600',
     textAlign: 'center',
@@ -389,7 +389,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   upgradeButtonText: {
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: 'bold',
     color: '#FFF',
     marginLeft: 8,

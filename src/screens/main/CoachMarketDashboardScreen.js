@@ -464,7 +464,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   rolePill: { paddingHorizontal: 9, paddingVertical: 3, borderRadius: SHAPE.radiusPill },
-  rolePillText: { fontFamily: FONTS.bodyExtraBold, fontSize: 9.5, letterSpacing: 0.8 },
+  rolePillText: { fontFamily: FONTS.bodyExtraBold, fontSize: 11.5, letterSpacing: 0.8 },
   addBtn: {
     width: SHAPE.iconButton,
     height: SHAPE.iconButton,
@@ -488,8 +488,8 @@ const styles = StyleSheet.create({
   payoutStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   balanceRow: { flexDirection: 'row', gap: SHAPE.gridGap, marginTop: 12 },
   balanceTile: { flex: 1, borderRadius: SHAPE.radiusTile, padding: 12 },
-  balanceLabel: { fontFamily: FONTS.bodySemiBold, fontSize: 9.5, letterSpacing: 1 },
-  balanceValue: { fontFamily: FONTS.heading, fontSize: 19, lineHeight: 19, marginTop: 6 },
+  balanceLabel: { fontFamily: FONTS.bodySemiBold, fontSize: 11.5, letterSpacing: 1 },
+  balanceValue: { fontFamily: FONTS.heading, fontSize: 20, lineHeight: 20, marginTop: 6 },
   payoutButton: {
     marginTop: 11,
     borderRadius: 12,
@@ -500,9 +500,9 @@ const styles = StyleSheet.create({
     gap: 8,
     overflow: 'hidden',
   },
-  payoutButtonText: { fontFamily: FONTS.bodyExtraBold, fontSize: 13.5, color: '#FFFFFF' },
+  payoutButtonText: { fontFamily: FONTS.bodyExtraBold, fontSize: 15, color: '#FFFFFF' },
   payoutRefresh: { alignItems: 'center', marginTop: 10 },
-  payoutRefreshText: { fontFamily: FONTS.bodyBold, fontSize: 12 },
+  payoutRefreshText: { fontFamily: FONTS.bodyBold, fontSize: 14 },
 
   listingRow: {
     flexDirection: 'row',
@@ -517,15 +517,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  listingTitle: { fontFamily: FONTS.bodyBold, fontSize: 12.5 },
-  listingMeta: { fontFamily: FONTS.body, fontSize: 10.5, marginTop: 2 },
-  listingPrice: { fontFamily: FONTS.heading, fontSize: 14 },
-  listingAction: { fontFamily: FONTS.bodyBold, fontSize: 11 },
+  listingTitle: { fontFamily: FONTS.bodyBold, fontSize: 14.5 },
+  listingMeta: { fontFamily: FONTS.body, fontSize: 12.5, marginTop: 2 },
+  listingPrice: { fontFamily: FONTS.heading, fontSize: 16 },
+  listingAction: { fontFamily: FONTS.bodyBold, fontSize: 13 },
   deleteBtn: { paddingLeft: 4 },
 
   bookingRight: { alignItems: 'flex-end', gap: 5 },
   statusBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 5 },
-  statusBadgeText: { fontFamily: FONTS.bodyBold, fontSize: 9, letterSpacing: 0.3 },
+  statusBadgeText: { fontFamily: FONTS.bodyBold, fontSize: 11, letterSpacing: 0.3 },
 
   bottomSpacer: { height: 24 },
 });

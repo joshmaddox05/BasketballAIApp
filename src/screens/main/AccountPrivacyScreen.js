@@ -359,7 +359,7 @@ const styles = StyleSheet.create({
         padding: 4,
     },
     headerTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: '600',
     },
     saveButton: {
@@ -370,7 +370,7 @@ const styles = StyleSheet.create({
     saveButtonText: {
         color: '#FFF',
         fontWeight: '600',
-        fontSize: 14,
+        fontSize: 16,
     },
     placeholder: {
         width: 60,
@@ -380,7 +380,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
     },
     sectionTitle: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '600',
         marginBottom: 12,
         textTransform: 'uppercase',
@@ -414,11 +414,11 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     settingTitle: {
-        fontSize: 15,
+        fontSize: 16.5,
         fontWeight: '500',
     },
     settingDescription: {
-        fontSize: 12,
+        fontSize: 14,
         marginTop: 2,
     },
     optionButton: {
@@ -431,7 +431,7 @@ const styles = StyleSheet.create({
         gap: 4,
     },
     optionText: {
-        fontSize: 13,
+        fontSize: 15,
         fontWeight: '500',
     },
     infoCard: {
@@ -443,8 +443,8 @@ const styles = StyleSheet.create({
     },
     infoText: {
         flex: 1,
-        fontSize: 13,
-        lineHeight: 18,
+        fontSize: 15,
+        lineHeight: 19,
     },
     bottomPadding: {
         height: 32,
