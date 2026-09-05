@@ -17,6 +17,7 @@ import { useAppContext } from '../../context/AppContext';
 import {
   generateInviteCode,
   getConnections,
+  getConnectionRequests,
   removeConnection,
 } from '../../services/firestoreService';
 
@@ -34,13 +35,20 @@ export default function ConnectionsScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [code, setCode] = useState(null);
   const [generating, setGenerating] = useState(false);
+  // Coach links to a high-school athlete sit here, invisible to the coach's
+  // roster, until a guardian approves them.
+  const [pendingRequests, setPendingRequests] = useState([]);
 
   const loadConnections = useCallback(async () => {
     if (!uid) return;
     setLoading(true);
     try {
-      const list = await getConnections(uid);
+      const [list, requests] = await Promise.all([
+        getConnections(uid),
+        getConnectionRequests(uid),
+      ]);
       setConnections(list);
+      setPendingRequests(requests.filter((r) => r.status === 'pending'));
     } finally {
       setLoading(false);
     }
@@ -159,6 +167,38 @@ export default function ConnectionsScreen({ navigation }) {
             </TouchableOpacity>
           )}
         </View>
+
+        {/* Coach requests waiting on a guardian. Shown to the athlete so the
+            wait is legible — otherwise a coach says "I added you" and nothing
+            appears, with no explanation anywhere. */}
+        {pendingRequests.length > 0 && (
+          <>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Waiting for approval</Text>
+            {pendingRequests.map((r) => {
+              const hasGuardian = connections.some((c) => c.role === 'parent');
+              return (
+                <View
+                  key={r.id}
+                  style={[styles.connectionRow, { backgroundColor: theme.card, borderColor: theme.border }]}
+                >
+                  <View style={[styles.connectionIcon, { backgroundColor: theme.textSecondary + '18' }]}>
+                    <Ionicons name="hourglass-outline" size={18} color={theme.textSecondary} />
+                  </View>
+                  <View style={styles.connectionInfo}>
+                    <Text style={[styles.connectionName, { color: theme.text }]}>
+                      {r.roleHolderName || 'A coach'}
+                    </Text>
+                    <Text style={[styles.connectionRole, { color: theme.textSecondary }]}>
+                      {hasGuardian
+                        ? 'Waiting for your parent or guardian to approve'
+                        : 'Needs a parent or guardian — share your code with them to approve this'}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })}
+          </>
+        )}
 
         {/* Connected accounts */}
         <Text style={[styles.sectionTitle, { color: theme.text }]}>Connected Accounts</Text>

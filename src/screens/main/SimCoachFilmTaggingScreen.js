@@ -24,6 +24,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useAppContext } from '../../context/AppContext';
 import { BottomSheet } from '../../components/dbe';
 import { getFilmEvents, saveFilmEvent, deleteFilmEvent, markFilmTaggingComplete } from '../../services/firestoreService';
+import { track, EVENTS } from '../../services/analytics';
+import { Explain, ExplainProvider, useExplain } from '../../components/features/Explain';
 
 const ACTION_TYPES = [
   'P&R', 'Iso', 'Post-Up', 'Zone Offense', 'Man Offense', 'Off-Ball Screen',
@@ -39,7 +41,7 @@ const formatClock = (sec) => {
   return `${m}:${r.toString().padStart(2, '0')}`;
 };
 
-function Chip({ label, active, onPress, theme }) {
+function Chip({ label, active, onPress, onLongPress, theme }) {
   return (
     <TouchableOpacity
       style={[
@@ -47,7 +49,9 @@ function Chip({ label, active, onPress, theme }) {
         { borderColor: active ? theme.primary : theme.border, backgroundColor: active ? theme.primary + '18' : 'transparent' },
       ]}
       onPress={onPress}
+      onLongPress={onLongPress}
       activeOpacity={0.7}
+      accessibilityHint={onLongPress ? `Press and hold for what ${label} means` : undefined}
     >
       <Text style={[styles.chipText, { color: active ? theme.primary : theme.textSecondary }]}>{label}</Text>
     </TouchableOpacity>
@@ -81,13 +85,19 @@ function EventRow({ event, theme, onPress, onDelete }) {
   );
 }
 
-export default function SimCoachFilmTaggingScreen({ navigation, route }) {
+function FilmTaggingScreen({ navigation, route }) {
+  const explain = useExplain();
   const { user, userData, theme, isDarkMode } = useAppContext();
   const { filmId, videoUrl, opponentName } = route.params || {};
   const uid = user?.uid;
   const isCoach = userData?.role === 'coach';
 
   const videoRef = useRef(null);
+  // Return-key chaining through the compose sheet, so a coach tagging a game can
+  // stay on the keyboard instead of reaching back to the screen between fields.
+  const quarterRef = useRef(null);
+  const timeRef = useRef(null);
+  const outcomeRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [positionSec, setPositionSec] = useState(0);
   const [durationSec, setDurationSec] = useState(0);
@@ -135,6 +145,7 @@ export default function SimCoachFilmTaggingScreen({ navigation, route }) {
     if (!uid || !filmId) return;
     setSaving(true);
     try {
+      track(EVENTS.FILM_TAGGED, { actionType, coverage: coverage === 'N/A' ? null : coverage });
       await saveFilmEvent(uid, filmId, {
         timestampSec: taggedAtSec,
         offenseTeam: 'opponent',
@@ -307,20 +318,46 @@ export default function SimCoachFilmTaggingScreen({ navigation, route }) {
       </ScrollView>
 
       <BottomSheet visible={composeOpen} onClose={() => setComposeOpen(false)} contentStyle={{ maxHeight: '85%' }}>
-        <ScrollView showsVerticalScrollIndicator={false}>
+        {/* keyboardShouldPersistTaps: without it a ScrollView swallows the first
+            tap while the keyboard is up purely to dismiss it, so Save Tag needed
+            two presses — and the second one only landed if the button had not
+            moved when the keyboard closed. */}
+        <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <Text style={[styles.modalTitle, { color: theme.text }]}>Tag @ {formatClock(taggedAtSec)}</Text>
 
           <Text style={[styles.modalLabel, { color: theme.textSecondary }]}>Action</Text>
+          <Text style={[styles.modalHint, { color: theme.textSecondary }]}>
+            What they ran. Press and hold any term you don't recognize.
+          </Text>
           <View style={styles.chipRow}>
             {ACTION_TYPES.map((a) => (
-              <Chip key={a} label={a} active={actionType === a} onPress={() => setActionType(a)} theme={theme} />
+              <Chip
+                key={a}
+                label={a}
+                active={actionType === a}
+                onPress={() => setActionType(a)}
+                onLongPress={() => explain(a)}
+                theme={theme}
+              />
             ))}
           </View>
 
-          <Text style={[styles.modalLabel, { color: theme.textSecondary }]}>Coverage faced</Text>
+          <Explain term="coverageFaced">
+            <Text style={[styles.modalLabel, { color: theme.textSecondary }]}>Coverage faced</Text>
+          </Explain>
+          <Text style={[styles.modalHint, { color: theme.textSecondary }]}>
+            The defense YOUR team was showing on this possession.
+          </Text>
           <View style={styles.chipRow}>
             {COVERAGES.map((c) => (
-              <Chip key={c} label={c} active={coverage === c} onPress={() => setCoverage(c)} theme={theme} />
+              <Chip
+                key={c}
+                label={c}
+                active={coverage === c}
+                onPress={() => setCoverage(c)}
+                onLongPress={() => explain(c)}
+                theme={theme}
+              />
             ))}
           </View>
 
@@ -331,6 +368,9 @@ export default function SimCoachFilmTaggingScreen({ navigation, route }) {
             placeholderTextColor={theme.textSecondary}
             value={personnel}
             onChangeText={setPersonnel}
+            returnKeyType="next"
+            onSubmitEditing={() => quarterRef.current?.focus()}
+            blurOnSubmit={false}
           />
 
           <View style={styles.rowSplit}>
@@ -338,20 +378,28 @@ export default function SimCoachFilmTaggingScreen({ navigation, route }) {
               <Text style={[styles.modalLabel, { color: theme.textSecondary }]}>Quarter</Text>
               <TextInput
                 style={[styles.modalInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.background }]}
+                ref={quarterRef}
                 placeholder="e.g. 3rd"
                 placeholderTextColor={theme.textSecondary}
                 value={quarter}
                 onChangeText={setQuarter}
+                returnKeyType="next"
+                onSubmitEditing={() => timeRef.current?.focus()}
+                blurOnSubmit={false}
               />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[styles.modalLabel, { color: theme.textSecondary }]}>Time remaining</Text>
               <TextInput
                 style={[styles.modalInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.background }]}
+                ref={timeRef}
                 placeholder="e.g. 6:42"
                 placeholderTextColor={theme.textSecondary}
                 value={timeRemaining}
                 onChangeText={setTimeRemaining}
+                returnKeyType="next"
+                onSubmitEditing={() => outcomeRef.current?.focus()}
+                blurOnSubmit={false}
               />
             </View>
           </View>
@@ -359,10 +407,13 @@ export default function SimCoachFilmTaggingScreen({ navigation, route }) {
           <Text style={[styles.modalLabel, { color: theme.textSecondary }]}>Outcome</Text>
           <TextInput
             style={[styles.modalInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.background }]}
+            ref={outcomeRef}
             placeholder="e.g. Pull-up jumper, missed"
             placeholderTextColor={theme.textSecondary}
             value={outcome}
             onChangeText={setOutcome}
+            returnKeyType="done"
+            onSubmitEditing={handleSaveTag}
           />
 
           <View style={styles.modalActions}>
@@ -433,6 +484,7 @@ const styles = StyleSheet.create({
   deniedSub: { fontSize: 16, textAlign: 'center', lineHeight: 21 },
   modalTitle: { fontSize: 19, fontWeight: '700', marginBottom: 14 },
   modalLabel: { fontSize: 14, fontWeight: '600', marginBottom: 6, marginTop: 10 },
+  modalHint: { fontSize: 12.5, lineHeight: 17, marginBottom: 8, marginTop: -2 },
   modalInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 16.5 },
   rowSplit: { flexDirection: 'row', gap: 12 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
@@ -444,3 +496,11 @@ const styles = StyleSheet.create({
   modalConfirm: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 10, paddingVertical: 12 },
   modalConfirmText: { color: '#fff', fontSize: 16.5, fontWeight: '700' },
 });
+
+export default function SimCoachFilmTaggingScreen(props) {
+  return (
+    <ExplainProvider>
+      <FilmTaggingScreen {...props} />
+    </ExplainProvider>
+  );
+}

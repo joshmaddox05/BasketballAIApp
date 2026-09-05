@@ -58,6 +58,7 @@ import CoachMarketScreen from '../screens/main/CoachMarketScreen';
 import CoachMarketListingScreen from '../screens/main/CoachMarketListingScreen';
 import CoachMarketDashboardScreen from '../screens/main/CoachMarketDashboardScreen';
 import CoachSessionsScreen from '../screens/main/CoachSessionsScreen';
+import CoachInviteScreen from '../screens/main/CoachInviteScreen';
 import AssignWorkoutScreen from '../screens/main/AssignWorkoutScreen';
 import CoachAssignmentReviewScreen from '../screens/main/CoachAssignmentReviewScreen';
 import PlayerAssignmentsScreen from '../screens/main/PlayerAssignmentsScreen';
@@ -174,6 +175,7 @@ export const sharedScreens = [
     { name: 'CoachMarketListing', component: CoachMarketListingScreen, options: { headerShown: false } },
     { name: 'CoachMarketDashboard', component: CoachMarketDashboardScreen, options: { headerShown: false } },
     { name: 'CoachSessions', component: CoachSessionsScreen, options: { headerShown: false } },
+    { name: 'CoachInvite', component: CoachInviteScreen, options: { headerShown: false } },
     { name: 'AssignWorkout', component: AssignWorkoutScreen, options: { headerShown: false } },
     { name: 'CoachAssignmentReview', component: CoachAssignmentReviewScreen, options: { headerShown: false } },
     { name: 'PlayerAssignments', component: PlayerAssignmentsScreen, options: { headerShown: false } },

@@ -12,6 +12,7 @@ import {
     Alert,
     Image
 } from 'react-native';
+import { SUPPORT_EMAIL } from '../../utils/constants';
 // Note: Switch is still used for Dark Mode toggle
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -311,7 +312,7 @@ const ProfileScreen = ({ navigation }) => {
 
                         <SettingRow
                             label="Help & Support"
-                            onPress={() => Alert.alert('Help', 'Contact: support@basketballai.com')}
+                            onPress={() => Alert.alert('Help', `Contact: ${SUPPORT_EMAIL}`)}
                         />
 
                         {/* Parent is included now that PARENT_TOUR_STEPS exists and the

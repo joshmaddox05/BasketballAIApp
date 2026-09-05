@@ -22,27 +22,6 @@ import {
 } from '../../components/dbe';
 import { TYPE, SHAPE, FONTS } from '../../utils/typography';
 
-const MOCK_PROFILE = {
-  archetype: 'Pure Scorer',
-  icon: 'basketball',
-  roleDescription:
-    'A high-efficiency offensive player whose shooting mechanics are optimized for volume scoring. You thrive in isolation and catch-and-shoot scenarios.',
-  strengths: [
-    'Exceptional shooting consistency from mid-range',
-    'Quick, repeatable release point under pressure',
-    'Strong offensive footwork and balance',
-  ],
-  improvements: [
-    'Develop off-hand finishing for more balanced attack',
-    'Increase arc height on long-range attempts',
-    'Improve footwork when attacking left side',
-  ],
-  historicalComparisons: [
-    { name: 'Ray Allen', era: '1996–2014', similarity: 74 },
-    { name: 'Reggie Miller', era: '1987–2005', similarity: 68 },
-  ],
-};
-
 const initialsOf = (name) =>
   (name || '?')
     .split(' ')
@@ -64,15 +43,18 @@ function ListItem({ icon, iconColor, iconFill, text, theme, delay }) {
 
 export default function ShotDNAArchetypeScreen({ navigation, route }) {
   const { theme, isDarkMode } = useAppContext();
-  const profile = route.params?.profile || MOCK_PROFILE;
+  // Every field below used to fall back to a fabricated "Pure Scorer" profile
+  // complete with invented strengths and a claimed 74% similarity to Ray Allen.
+  // A real profile missing a section now renders no section, rather than
+  // someone else's.
+  const profile = route.params?.profile || {};
 
-  const archetype = profile.archetype || MOCK_PROFILE.archetype;
-  const icon = profile.icon || MOCK_PROFILE.icon;
-  const roleDescription = profile.roleDescription || MOCK_PROFILE.roleDescription;
-  const strengths = profile.strengths || MOCK_PROFILE.strengths;
-  const improvements = profile.improvements || MOCK_PROFILE.improvements;
-  const historicalComparisons =
-    profile.historicalComparisons || MOCK_PROFILE.historicalComparisons;
+  const archetype = profile.archetype || null;
+  const icon = profile.icon || 'basketball';
+  const roleDescription = profile.roleDescription || null;
+  const strengths = profile.strengths || [];
+  const improvements = profile.improvements || [];
+  const historicalComparisons = profile.historicalComparisons || [];
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
@@ -94,12 +76,19 @@ export default function ShotDNAArchetypeScreen({ navigation, route }) {
               </View>
             </Float>
             <Text style={styles.badgeLabel}>ARCHETYPE</Text>
-            <Text style={styles.badgeName}>{archetype}</Text>
-            <Text style={styles.badgeRole}>{roleDescription}</Text>
+            <Text style={styles.badgeName}>{archetype || 'Not yet assigned'}</Text>
+            {roleDescription ? (
+              <Text style={styles.badgeRole}>{roleDescription}</Text>
+            ) : (
+              <Text style={styles.badgeRole}>
+                Analyse a shot to have an archetype assigned.
+              </Text>
+            )}
           </LinearGradient>
         </Entrance>
 
         {/* Strengths */}
+        {strengths.length > 0 ? (
         <View style={{ marginTop: SHAPE.sectionGap }}>
           <SectionLabel>Strengths</SectionLabel>
           <Entrance
@@ -120,8 +109,10 @@ export default function ShotDNAArchetypeScreen({ navigation, route }) {
             ))}
           </Entrance>
         </View>
+        ) : null}
 
         {/* Improvements */}
+        {improvements.length > 0 ? (
         <View style={{ marginTop: SHAPE.sectionGap }}>
           <SectionLabel>Areas to improve</SectionLabel>
           <Entrance
@@ -142,8 +133,10 @@ export default function ShotDNAArchetypeScreen({ navigation, route }) {
             ))}
           </Entrance>
         </View>
+        ) : null}
 
         {/* Historical comparisons */}
+        {historicalComparisons.length > 0 ? (
         <View style={{ marginTop: SHAPE.sectionGap }}>
           <SectionLabel
             action={`${historicalComparisons.length} player${historicalComparisons.length === 1 ? '' : 's'}`}
@@ -173,6 +166,7 @@ export default function ShotDNAArchetypeScreen({ navigation, route }) {
             </Entrance>
           ))}
         </View>
+        ) : null}
 
         {/* View full history */}
         <TouchableOpacity

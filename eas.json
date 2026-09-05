@@ -20,7 +20,9 @@
         "enterpriseProvisioning": "adhoc",
         "cache": {
           "key": "development-pods",
-          "paths": ["ios/Pods"]
+          "paths": [
+            "ios/Pods"
+          ]
         }
       },
       "android": {
@@ -35,7 +37,13 @@
         "GOOGLE_SERVICES_INFO_PLIST": "secret:GOOGLE_SERVICES_INFO_PLIST",
         "GOOGLE_SERVICES_JSON": "secret:GOOGLE_SERVICES_JSON",
         "YOUTUBE_API_KEY": "secret:YOUTUBE_API_KEY",
-        "APP_ENV": "preview"
+        "APP_ENV": "preview",
+        "SENTRY_DSN": "secret:SENTRY_DSN",
+        "SENTRY_ORG": "secret:SENTRY_ORG",
+        "SENTRY_PROJECT": "secret:SENTRY_PROJECT",
+        "SENTRY_AUTH_TOKEN": "secret:SENTRY_AUTH_TOKEN",
+        "POSTHOG_API_KEY": "secret:POSTHOG_API_KEY",
+        "POSTHOG_HOST": "secret:POSTHOG_HOST"
       },
       "ios": {
         "simulator": false
@@ -50,7 +58,13 @@
         "GOOGLE_SERVICES_INFO_PLIST": "secret:GOOGLE_SERVICES_INFO_PLIST",
         "GOOGLE_SERVICES_JSON": "secret:GOOGLE_SERVICES_JSON",
         "YOUTUBE_API_KEY": "secret:YOUTUBE_API_KEY",
-        "APP_ENV": "preview"
+        "APP_ENV": "preview",
+        "SENTRY_DSN": "secret:SENTRY_DSN",
+        "SENTRY_ORG": "secret:SENTRY_ORG",
+        "SENTRY_PROJECT": "secret:SENTRY_PROJECT",
+        "SENTRY_AUTH_TOKEN": "secret:SENTRY_AUTH_TOKEN",
+        "POSTHOG_API_KEY": "secret:POSTHOG_API_KEY",
+        "POSTHOG_HOST": "secret:POSTHOG_HOST"
       },
       "ios": {
         "simulator": false
@@ -84,7 +98,13 @@
         "STRIPE_PUBLISHABLE_KEY": "secret:STRIPE_PUBLISHABLE_KEY",
         "YOUTUBE_API_KEY": "secret:YOUTUBE_API_KEY",
         "API_BASE_URL": "secret:API_BASE_URL",
-        "APP_ENV": "production"
+        "APP_ENV": "production",
+        "SENTRY_DSN": "secret:SENTRY_DSN",
+        "SENTRY_ORG": "secret:SENTRY_ORG",
+        "SENTRY_PROJECT": "secret:SENTRY_PROJECT",
+        "SENTRY_AUTH_TOKEN": "secret:SENTRY_AUTH_TOKEN",
+        "POSTHOG_API_KEY": "secret:POSTHOG_API_KEY",
+        "POSTHOG_HOST": "secret:POSTHOG_HOST"
       }
     }
   },

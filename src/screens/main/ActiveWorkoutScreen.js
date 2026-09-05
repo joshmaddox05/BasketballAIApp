@@ -41,6 +41,7 @@ import { recomputeEvalRank } from '../../services/evalRankService';
 import { markPlanDayForWorkout } from '../../services/blueprint360Service';
 import logger from '../../utils/logger';
 import { XP_REWARDS } from '../../data/achievements';
+import { track, EVENTS } from '../../services/analytics';
 
 const { width, height } = Dimensions.get('window');
 
@@ -244,6 +245,20 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
   // Check subscription access (custom workouts are always accessible)
   const userSubscription = userData?.subscription || 'free';
   const workoutHasAccess = isCustom ? true : (!workout.requiredTier || hasAccess(userSubscription, workout.requiredTier));
+
+  // Reaching this screen with access IS starting the workout — pairing it with
+  // WORKOUT_COMPLETED gives the pilot's drop-off rate. Fires once per mount.
+  useEffect(() => {
+    if (isCustom || workoutHasAccess) {
+      track(EVENTS.WORKOUT_STARTED, {
+        workoutId: workout?.id || null,
+        category: workout?.category || null,
+        custom: !!isCustom,
+        assigned: !!assignmentRefId,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Block access to locked workouts
   useEffect(() => {
@@ -487,6 +502,12 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
 
   const completeWorkout = async () => {
     const totalWorkoutTime = Math.floor((Date.now() - startTime) / 1000);
+    track(EVENTS.WORKOUT_COMPLETED, {
+      workoutId: workout?.id || null,
+      category: workout?.category || null,
+      durationSec: totalWorkoutTime,
+      assigned: !!assignmentRefId,
+    });
 
     // Calculate total reps
     const totalReps = stepPerformance.reduce((sum, step) => sum + (step.repsCompleted || 0), 0);
@@ -663,6 +684,7 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
         });
         if (closed) {
           logger.info('Assignment submitted for coach review', { id: closed.id, status: closed.status });
+          track(EVENTS.ASSIGNMENT_SUBMITTED, { type: 'workout', status: closed.status, completionPercentage: pct });
         }
       })().catch((error) => logger.error('Assignment completion update failed', error));
 

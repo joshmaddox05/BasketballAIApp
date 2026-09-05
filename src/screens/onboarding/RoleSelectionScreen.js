@@ -1,5 +1,5 @@
 // RoleSelectionScreen.js - Role selection at the start of onboarding
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   SafeAreaView,
   StyleSheet,
@@ -16,6 +16,10 @@ import { useAppContext } from '../../context/AppContext';
 import { getCurrentUser } from '../../services/authService';
 import { updateUserProfile } from '../../services/firestoreService';
 import { getTheme } from '../../utils/theme';
+import { ONBOARDING_NARRATION } from '../../config/onboardingNarration';
+import { useScreenNarration } from '../../hooks/useScreenNarration';
+import NarrationToggle from '../../components/shared/NarrationToggle';
+import { getPendingInvite, resolveCoachInvite } from '../../services/coachInviteService';
 
 const ROLES = [
   {
@@ -91,18 +95,66 @@ export default function RoleSelectionScreen({ navigation }) {
   const [coachType, setCoachType] = useState('org');
   const [loading, setLoading] = useState(false);
 
+  // Someone arriving on a coach's invite link is a player. Asking them to pick a
+  // role is asking a question we already know the answer to — and the wrong
+  // answer is expensive: choose "Coach" here and the invite never gets claimed,
+  // because claiming attaches an ATHLETE to a coach. So this screen resolves the
+  // invite first and, when there is one, commits 'player' and moves on without
+  // ever rendering the picker.
+  //
+  // `checking` gates the whole render rather than letting the picker paint and
+  // then vanish. A screen that appears, is briefly interactive, and disappears
+  // under your thumb is worse than a beat of nothing.
+  const [checking, setChecking] = useState(true);
+  // Set when we are leaving for SkillAssessment. Keeps `checking` true through
+  // the unmount so the picker never paints for a frame on the way out.
+  const redirecting = useRef(false);
+
+  const commitRole = useCallback(async (role, extra = {}) => {
+    const user = getCurrentUser();
+    const profileUpdate = { role, ...extra };
+    if (user) {
+      await updateUserProfile(user.uid, profileUpdate);
+    }
+    // Propagate the role into local context immediately so the correct role
+    // navigator renders the moment onboarding completes (no relogin needed).
+    updateUserDataLocally(profileUpdate);
+    return profileUpdate;
+  }, [updateUserDataLocally]);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const code = await getPendingInvite();
+        if (!code) return;
+
+        // Verified, not assumed. A revoked or expired code must fall through to
+        // the normal picker — skipping role selection on a dead invite would
+        // silently make someone a player who never chose to be one.
+        const result = await resolveCoachInvite(code);
+        if (!alive || !result?.valid) return;
+
+        await commitRole('player');
+        if (!alive) return;
+        redirecting.current = true;
+        // replace, not navigate: there is nothing to go back to, and a back
+        // gesture that returns to a role picker they never saw is incoherent.
+        navigation.replace('SkillAssessment', { invitedBy: result });
+      } catch (error) {
+        // Any failure just shows the normal picker. The athlete picks 'Player'
+        // by hand and the invite is still claimed at the end of onboarding.
+      } finally {
+        if (alive && !redirecting.current) setChecking(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, [commitRole, navigation]);
+
   const handleContinue = useCallback(async () => {
     setLoading(true);
     try {
-      const user = getCurrentUser();
-      const profileUpdate = { role: selectedRole };
-      if (selectedRole === 'coach') profileUpdate.coachType = coachType;
-      if (user) {
-        await updateUserProfile(user.uid, profileUpdate);
-      }
-      // Propagate the role into local context immediately so the correct role
-      // navigator renders the moment onboarding completes (no relogin needed).
-      updateUserDataLocally(profileUpdate);
+      await commitRole(selectedRole, selectedRole === 'coach' ? { coachType } : {});
 
       // Players continue through skill assessment; other roles skip straight to
       // the final welcome step.
@@ -116,11 +168,33 @@ export default function RoleSelectionScreen({ navigation }) {
     } finally {
       setLoading(false);
     }
-  }, [selectedRole, coachType, updateUserDataLocally, navigation]);
+  }, [selectedRole, coachType, commitRole, navigation]);
+
+  // Speaks once when this step comes into view, and stops the moment the
+
+  // user moves on. Silent if they have muted the voice guide.
+
+  // Held until the invite check settles. The check is a network round trip and
+  // the narration's own settle delay is 550ms, so without this the welcome line
+  // starts speaking and then gets cut mid-word by the redirect to the skill quiz.
+  // An invited athlete never hears this line at all — they never see this screen.
+  useScreenNarration(ONBOARDING_NARRATION.role, { enabled: !checking });
+
+
+  if (checking) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centered, { backgroundColor: theme.background }]}>
+        <StatusBar style={isDarkMode ? 'light' : 'dark'} />
+        <ActivityIndicator color={theme.primary} />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <StatusBar style={isDarkMode ? 'light' : 'dark'} />
+
+      <NarrationToggle color={theme.textSecondary} fill={theme.surface} border={theme.hairline} />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.topSection}>
@@ -300,6 +374,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   perkText: { fontSize: 13, fontWeight: '600' },
+
+  centered: { alignItems: 'center', justifyContent: 'center' },
 
   coachTypeBlock: { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)' },
   coachTypeLabel: { fontSize: 14, fontWeight: '600', marginBottom: 8 },

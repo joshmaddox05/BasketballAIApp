@@ -14,6 +14,9 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
+import { ONBOARDING_NARRATION } from '../../config/onboardingNarration';
+import { useScreenNarration } from '../../hooks/useScreenNarration';
+import NarrationToggle from '../../components/shared/NarrationToggle';
 
 const PRESET_GOALS = [
     {
@@ -143,6 +146,13 @@ const GoalSettingScreen = ({ navigation }) => {
         navigation.navigate('Personalization');
     };
 
+    // Speaks once when this step comes into view, and stops the moment the
+
+    // user moves on. Silent if they have muted the voice guide.
+
+    useScreenNarration(ONBOARDING_NARRATION.goals);
+
+
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor="#FFF" />
@@ -165,6 +175,8 @@ const GoalSettingScreen = ({ navigation }) => {
 
                 <Text style={styles.headerTitle}>Set Your Training Goals</Text>
             </View>
+
+            <NarrationToggle color="#555" fill="#F4F4F5" border="#E4E4E7" />
 
             <ScrollView style={styles.content}>
                 <Text style={styles.subtitle}>

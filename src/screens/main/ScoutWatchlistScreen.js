@@ -12,9 +12,9 @@ import {
   getScoutAccessStatuses,
   WATCHLIST_STATUSES,
 } from '../../services/firestoreService';
+import { GRADE_LABEL } from '../../utils/constants';
 
 const GRADE_COLOR = { 'A+': '#22C55E', 'A': '#22C55E', 'A-': '#22C55E', 'B+': '#8A1C22', 'B': '#F59E0B', 'B-': '#F59E0B', 'C+': '#EF4444', 'C': '#EF4444' };
-const GRADE_LABEL = { 9: '9th', 10: '10th', 11: '11th', 12: '12th' };
 const STATUS_LABEL = { watching: 'Watching', contacted: 'Contacted', offer: 'Offer', committed: 'Committed', pass: 'Pass' };
 const STATUS_COLOR = { watching: '#3B82F6', contacted: '#F59E0B', offer: '#A855F7', committed: '#22C55E', pass: '#EF4444' };
 

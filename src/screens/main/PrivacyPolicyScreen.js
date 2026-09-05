@@ -3,6 +3,7 @@ import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, ScrollView } fr
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
+import { SUPPORT_EMAIL } from '../../utils/constants';
 
 const SECTIONS = [
   { title: '1. Information We Collect', body: 'We collect information you provide directly (name, email, profile data), information generated through app use (training sessions, video uploads, AI analysis results, challenge activity), and device information (device type, OS version, push notification token).' },
@@ -10,9 +11,9 @@ const SECTIONS = [
   { title: '3. Youth Safety & Guardian Controls', body: 'Athletes under 18 have private profiles by default. Scout and recruiter visibility requires explicit guardian consent. All scout accounts are manually verified. No direct contact between scouts and minors is permitted outside the platform\'s controlled messaging system.' },
   { title: '4. Data Sharing', body: 'We do not sell your personal data. We share data with Firebase (Google) for database and authentication services, Stripe for payment processing, and our AI analysis server. Scout-facing data is only shared when an athlete (or their guardian) explicitly enables scout visibility.' },
   { title: '5. Video & Biometric Data', body: 'Training videos and biomechanical analysis data are stored securely in Firebase Storage and Firestore. This data is used solely to generate your ShotDNA profile and training recommendations. You may delete your video data at any time from your Profile settings.' },
-  { title: '6. Data Retention', body: 'We retain your account data while your account is active. You may request deletion of your account and associated data at any time by contacting support@dbeapp.com. Deletion requests are processed within 30 days.' },
+  { title: '6. Data Retention & Deletion', body: `We retain your account data while your account is active. You can delete your account at any time from Profile → Account & Privacy → Delete Account. Deletion is immediate and permanent: it removes your profile, training history, evaluations, uploaded videos, messages, and the links coaches, scouts or guardians hold to your account. It cannot be undone. If you have any difficulty, contact ${SUPPORT_EMAIL}.` },
   { title: '7. Security', body: 'We use industry-standard encryption for data in transit and at rest. Firebase security rules restrict data access to authenticated users. We conduct regular security reviews of our systems.' },
-  { title: '8. Contact', body: 'For privacy questions or data deletion requests, contact us at privacy@dbeapp.com or through the Help Center in the app.' },
+  { title: '8. Contact', body: `For privacy questions or data deletion requests, contact us at ${SUPPORT_EMAIL} or through the Help Center in the app.` },
 ];
 
 export default function PrivacyPolicyScreen({ navigation }) {

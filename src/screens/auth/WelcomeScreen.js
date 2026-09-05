@@ -1,8 +1,13 @@
 // WelcomeScreen.js
 // Cinematic welcome: the promo reel plays full-bleed behind a burgundy scrim,
 // with the brand, feature list and CTAs stacked on top. The reel is muted,
-// looping and decorative — a still poster carries the layout until the first
-// frame lands, and the layout is identical if video never starts.
+// looping and decorative — the layout is identical if video never starts.
+//
+// There is no poster image. A still frame under a moving reel reads as a stutter
+// on the cut-over no matter how long the cross-fade, and the JPEG was a second
+// asset to keep in sync with the video. What holds the frame instead is a static
+// burgundy gradient — the same ramp as the scrim above the video, so the screen
+// is on-brand from the first paint whether or not the reel ever decodes.
 import React, { useEffect, useRef, useState } from 'react';
 import {
     StyleSheet,
@@ -12,7 +17,6 @@ import {
     SafeAreaView,
     StatusBar,
     Platform,
-    Image,
     Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,7 +27,6 @@ import { TYPE, MOTION } from '../../utils/typography';
 import { useReduceMotion } from '../../hooks/useReduceMotion';
 
 const PROMO_VIDEO = require('../../../assets/welcome-promo.mp4');
-const PROMO_POSTER = require('../../../assets/welcome-background.jpg');
 
 // Pre-auth screen: no theme context yet, and a video hero is dark by nature.
 // These are the dark-palette burgundy tokens, inlined deliberately.
@@ -133,8 +136,14 @@ const WelcomeScreen = ({ navigation }) => {
         <View style={styles.root}>
             <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-            {/* Poster holds the frame until the reel paints */}
-            <Image source={PROMO_POSTER} style={styles.media} resizeMode="cover" />
+            {/* Burgundy ground. Holds the frame until the reel paints, and stays
+                the whole backdrop if it never does. */}
+            <LinearGradient
+                colors={[C.ink, '#2A0A0E', C.primary]}
+                locations={[0, 0.55, 1]}
+                style={styles.media}
+                pointerEvents="none"
+            />
 
             <Animated.View
                 pointerEvents="none"
@@ -217,6 +226,19 @@ const WelcomeScreen = ({ navigation }) => {
                                 >
                                     <Text style={styles.getStartedButtonText}>Get Started</Text>
                                 </LinearGradient>
+                            </TouchableOpacity>
+
+                            {/* The landing page tells an athlete without the app
+                                to install it and then enter their code. This is
+                                the only route to that screen on a fresh install —
+                                without it, that instruction goes nowhere. */}
+                            <TouchableOpacity
+                                activeOpacity={0.7}
+                                accessibilityRole="button"
+                                style={styles.loginButton}
+                                onPress={() => navigation.navigate('JoinWithCode')}
+                            >
+                                <Text style={styles.loginButtonText}>I have an invite code</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity

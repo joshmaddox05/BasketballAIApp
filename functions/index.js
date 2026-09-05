@@ -1435,6 +1435,72 @@ exports.onScoutAccessRequested = onDocumentCreated('users/{playerUid}/scoutAcces
 });
 
 /**
+ * A coach redeemed a high-school athlete's invite code. The link does NOT exist
+ * yet — only a pending request — so the guardian has to hear about it or the
+ * coach waits forever. Mirrors onScoutAccessRequested exactly.
+ *
+ * NOTE on `route:` values below — check every one against the actual screen
+ * registry before shipping. A previous notification shipped pointing at
+ * 'CoachAthletes', which is not a registered route (the tab is 'Roster', the
+ * screen 'CoachAthletesMain'), so the tap silently fell through. 'ParentHome'
+ * is the parent tab (MainNavigator) and 'Connections' is a shared screen
+ * (SharedStackNavigator) — both verified.
+ */
+exports.onConnectionRequested = onDocumentCreated('users/{playerUid}/connectionRequests/{roleHolderUid}', async (event) => {
+  const snap = event.data;
+  if (!snap) return;
+  const request = snap.data() || {};
+  if (request.status && request.status !== 'pending') return;
+
+  const { playerUid, roleHolderUid } = event.params;
+  const coachName = request.roleHolderName || 'A coach';
+  const playerName = request.playerName || 'your athlete';
+
+  const parents = await linkedUidsWithRole(playerUid, 'parent');
+  if (!parents.length) {
+    // Not an error: the athlete may have no guardian linked yet. The request
+    // sits pending and ConnectionsScreen prompts them to invite one.
+    console.log(`Coach link request for ${playerUid} has no linked parent to notify yet.`);
+    return;
+  }
+
+  await Promise.all(parents.map((parentUid) => notifyUser(parentUid, {
+    type: 'coach_link_request',
+    title: 'Coach link request',
+    body: `${coachName} wants to coach ${playerName}. Your approval is needed.`,
+    data: { playerUid, roleHolderUid, route: 'ParentHome', params: {} },
+    channelId: 'default',
+  })));
+});
+
+/**
+ * The guardian decided. Tell the COACH, who otherwise has no signal at all —
+ * their roster simply stays empty. Watches the request doc rather than
+ * `connections` so denial is covered too.
+ */
+exports.onConnectionResolved = onDocumentUpdated('users/{playerUid}/connectionRequests/{roleHolderUid}', async (event) => {
+  const before = event.data && event.data.before && event.data.before.data();
+  const after = event.data && event.data.after && event.data.after.data();
+  if (!before || !after) return;
+  if (before.status === after.status) return;
+  if (after.status !== 'approved' && after.status !== 'denied') return;
+
+  const { playerUid, roleHolderUid } = event.params;
+  const approved = after.status === 'approved';
+  const playerName = after.playerName || 'the athlete';
+
+  await notifyUser(roleHolderUid, {
+    type: approved ? 'coach_link_approved' : 'coach_link_denied',
+    title: approved ? 'Link approved' : 'Link declined',
+    body: approved
+      ? `${playerName}'s guardian approved your request. They are on your roster now.`
+      : `${playerName}'s guardian declined your link request.`,
+    data: { playerUid, route: 'Connections', params: {} },
+    channelId: 'default',
+  });
+});
+
+/**
  * The parent decided. Tell the SCOUT — today they get nothing and have to
  * remember to re-open the one prospect screen that reads access status.
  * Watching the request doc (rather than scoutConnections) covers denial too,
@@ -1507,7 +1573,7 @@ exports.onScoutReportShared = onDocumentUpdated('users/{scoutUid}/scoutingReport
   })));
 });
 
-/** A coach booked or changed a session — tell the athlete. */
+/** A coach booked a session — tell the athlete. */
 exports.onCoachingSessionCreated = onDocumentCreated('coachingSessions/{sessionId}', async (event) => {
   const snap = event.data;
   if (!snap) return;
@@ -1523,6 +1589,62 @@ exports.onCoachingSessionCreated = onDocumentCreated('coachingSessions/{sessionI
     data: { sessionId, route: 'Home' },
     channelId: 'reminders',
   });
+});
+
+/**
+ * A session changed status — tell the OTHER party.
+ *
+ * The create trigger was the only one, so the flow was one-directional: the
+ * athlete heard about a new booking, and then nothing ever told the coach it had
+ * been confirmed or the athlete that it had been called off. The coach's own
+ * screen showed 'pending' until they happened to reopen it.
+ *
+ * Routes: 'CoachSessions' is a shared stack screen (SharedStackNavigator:176) and
+ * 'Home' is the player tab (MainNavigator:277) — both checked against the
+ * registry, since a notification pointing at an unregistered route fails
+ * silently on tap.
+ */
+exports.onCoachingSessionUpdated = onDocumentUpdated('coachingSessions/{sessionId}', async (event) => {
+  const before = event.data?.before?.data() || {};
+  const after = event.data?.after?.data() || {};
+  if (before.status === after.status) return;
+
+  const { sessionId } = event.params;
+  const coachName = after.coachName || 'Your coach';
+  const athleteName = after.athleteName || 'Your athlete';
+
+  // Who to tell depends on who could not have made the change. A cancellation can
+  // come from either side, so both are notified — the redundant one is cheap and
+  // a missed cancellation is not.
+  if (after.status === 'confirmed') {
+    await notifyUser(after.coachUid, {
+      type: 'session',
+      title: 'Session confirmed',
+      body: `${athleteName} confirmed your session.`,
+      data: { sessionId, route: 'CoachSessions' },
+      channelId: 'reminders',
+    });
+    return;
+  }
+
+  if (after.status === 'cancelled') {
+    await Promise.all([
+      notifyUser(after.athleteUid, {
+        type: 'session',
+        title: 'Session cancelled',
+        body: `${coachName} cancelled your session.`,
+        data: { sessionId, route: 'Home' },
+        channelId: 'reminders',
+      }),
+      notifyUser(after.coachUid, {
+        type: 'session',
+        title: 'Session cancelled',
+        body: `Your session with ${athleteName} was cancelled.`,
+        data: { sessionId, route: 'CoachSessions' },
+        channelId: 'reminders',
+      }),
+    ]);
+  }
 });
 
 // ============================================================================
@@ -1663,4 +1785,527 @@ exports.enforceFilmRetention = onSchedule({
     console.error('Error in enforceFilmRetention:', error);
     throw error;
   }
+});
+
+// ============================================================================
+// Account deletion (GDPR / App Store requirement, and a pilot prerequisite)
+// ============================================================================
+//
+// This used to be a lie: AccountPrivacyScreen showed two confirmation dialogs,
+// signed the user out, and told them to email support. Nothing was deleted.
+// With a cohort of high-school athletes, "delete my kid's account" has to
+// actually delete, on the spot.
+//
+// Ordering is deliberate and is the whole design. Storage and the copies other
+// users hold go FIRST; the auth record goes LAST. A failure partway through
+// therefore leaves the account still signed-in-able and the job re-runnable,
+// rather than orphaning data behind a deleted identity that nobody can ever
+// authenticate as again to retry.
+
+// Deleting a user document does NOT delete its subcollections in Firestore, and
+// there is no server-side cascade. Every one of these has to be named.
+const USER_SUBCOLLECTIONS = [
+  'activities', 'plans', 'goals', 'achievements',
+  'shotDNA', 'evalRankScores', 'blueprint360Plans', 'simCoachResults',
+  'scoutLabProfile', 'scoutAccessRequests', 'scoutConnections',
+  'connections', 'linkedPlayers', 'assignments', 'connectionRequests',
+  'coachMarketPurchases', 'gamePlans', 'films', 'filmEvents',
+  'opponentModels', 'simulationRuns', 'practicePriorities', 'simulationSessions',
+  'watchlist', 'scoutingReports', 'savedSearches',
+  'customWorkouts', 'customPlans',
+  'challengeProgress', 'dailyChallengeProgress', 'challengeInvites',
+  'friends', 'friendRequests', 'ai_analyses', 'notifications',
+];
+
+/** Delete every document a query returns, in chunks a batch can carry. */
+const deleteQueryDocs = async (snapshot) => {
+  const db = admin.firestore();
+  const docs = snapshot.docs || [];
+  for (let i = 0; i < docs.length; i += 400) {
+    const batch = db.batch();
+    docs.slice(i, i + 400).forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+  }
+  return docs.length;
+};
+
+exports.deleteAccount = onCall(async (request) => {
+  if (!request.auth) throw new Error('User must be authenticated');
+  const uid = request.auth.uid;
+  const db = admin.firestore();
+  const report = { storage: 0, reciprocal: 0, topLevel: 0, subtree: 0 };
+
+  try {
+    // 1. Storage. Playback everywhere in this app runs on `?alt=media&token=`
+    //    download URLs, which bypass Storage rules by design — so deleting the
+    //    OBJECT is the only thing that genuinely revokes access to a video.
+    //    Same reasoning as deleteFilm and enforceFilmRetention above.
+    try {
+      await admin.storage().bucket(FILM_BUCKET).deleteFiles({ prefix: `users/${uid}/` });
+      report.storage = 1;
+    } catch (e) {
+      // Non-fatal: an account with no uploads has no prefix to delete.
+      console.warn(`Storage purge for ${uid} reported: ${e?.message || e}`);
+    }
+
+    // 2. Copies OTHER users hold. This is the half that is easy to miss and the
+    //    most damaging to leave behind — a coach's roster still listing a
+    //    deleted athlete, a parent still linked to a child who is gone.
+    const [connections, linkedPlayers, friends] = await Promise.all([
+      db.collection('users').doc(uid).collection('connections').get(),
+      db.collection('users').doc(uid).collection('linkedPlayers').get(),
+      db.collection('users').doc(uid).collection('friends').get(),
+    ]);
+
+    const counterparties = new Set([
+      ...connections.docs.map((d) => d.id),
+      ...linkedPlayers.docs.map((d) => d.id),
+      ...friends.docs.map((d) => d.id),
+    ]);
+
+    for (const otherUid of counterparties) {
+      const other = db.collection('users').doc(otherUid);
+      const results = await Promise.allSettled([
+        other.collection('connections').doc(uid).delete(),
+        other.collection('linkedPlayers').doc(uid).delete(),
+        other.collection('friends').doc(uid).delete(),
+        // If the deleted account was a scout, its access request and approved
+        // connection live under the PLAYER, keyed by the scout's uid.
+        other.collection('scoutConnections').doc(uid).delete(),
+        other.collection('scoutAccessRequests').doc(uid).delete(),
+        other.collection('connectionRequests').doc(uid).delete(),
+      ]);
+      report.reciprocal += results.filter((r) => r.status === 'fulfilled').length;
+    }
+
+    // 3. Top-level documents keyed by this uid.
+    const [invites, listings, coachSessions, athleteSessions, conversations, scoutProfile] =
+      await Promise.all([
+        db.collection('inviteCodes').where('ownerUid', '==', uid).get(),
+        db.collection('coachMarketListings').where('coachUid', '==', uid).get(),
+        db.collection('coachingSessions').where('coachUid', '==', uid).get(),
+        db.collection('coachingSessions').where('athleteUid', '==', uid).get(),
+        db.collection('conversations').where('participants', 'array-contains', uid).get(),
+        db.collection('scoutLabProfiles').doc(uid).get(),
+      ]);
+
+    // Listings carry a `media` subcollection of video URLs; recursiveDelete
+    // takes the whole tree, where a plain delete would strand them.
+    for (const listing of listings.docs) {
+      await db.recursiveDelete(listing.ref);
+      report.topLevel += 1;
+    }
+    // Conversations are shared with the other participant. Deleting the thread
+    // wholesale is the honest reading of "delete my data" — the messages are
+    // this user's words, and a half-deleted thread is worse than none.
+    for (const convo of conversations.docs) {
+      await db.recursiveDelete(convo.ref);
+      report.topLevel += 1;
+    }
+    report.topLevel += await deleteQueryDocs(invites);
+    report.topLevel += await deleteQueryDocs(coachSessions);
+    report.topLevel += await deleteQueryDocs(athleteSessions);
+    if (scoutProfile.exists) {
+      await scoutProfile.ref.delete();
+      report.topLevel += 1;
+    }
+
+    // 4. Stripe. Cancel any live subscription so we stop billing a deleted
+    //    account. A Connect account is deliberately NOT deleted — it may hold
+    //    an unpaid balance owed to the coach, which is a money question for a
+    //    human, not a cleanup job.
+    const userSnap = await db.collection('users').doc(uid).get();
+    const userData = userSnap.exists ? userSnap.data() : {};
+    if (userData.stripeConnectAccountId) {
+      console.warn(
+        `Account ${uid} had Stripe Connect account ${userData.stripeConnectAccountId}. ` +
+        'Left in place for manual review — it may hold an unpaid balance.'
+      );
+    }
+
+    // 5. The user's own subtree. recursiveDelete handles arbitrary depth
+    //    (simulationSessions/responses is two levels down).
+    for (const name of USER_SUBCOLLECTIONS) {
+      try {
+        await db.recursiveDelete(db.collection('users').doc(uid).collection(name));
+        report.subtree += 1;
+      } catch (e) {
+        console.warn(`Subcollection ${name} for ${uid}: ${e?.message || e}`);
+      }
+    }
+    await db.recursiveDelete(db.collection('users').doc(uid));
+
+    // 6. The identity, last — see the ordering note at the top.
+    await admin.auth().deleteUser(uid);
+
+    console.log(`Account ${uid} deleted.`, report);
+    return { success: true, report };
+  } catch (error) {
+    console.error(`Account deletion failed for ${uid}:`, error);
+    // Surfaced to the client so the UI can tell the user it did NOT happen,
+    // rather than showing a success toast over a half-deleted account.
+    return { success: false, error: error?.message || 'Deletion failed' };
+  }
+});
+
+// ============================================================================
+// Coach → athlete invite links
+// ============================================================================
+//
+// The pilot's onboarding path: we hand the app to a coach, they send one link to
+// their team, and each athlete who taps it signs up already attached to them.
+// The original flow ran the other way — the athlete generated a code and the
+// coach typed it — which cannot work when the athlete does not have the app yet.
+//
+// Everything here runs server-side for one reason: the code in the link is a
+// bearer credential for a roster of minors. Client rules cannot enforce expiry,
+// revocation, a use cap, or — most importantly — the guardian gate, all of which
+// have to hold before a coach is attached to a fifteen-year-old.
+
+// Ambiguous glyphs excluded, matching src/utils/inviteLink.js. The two lists are
+// asserted equal by tests/invites/inviteLink.test.mjs.
+const INVITE_CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+const INVITE_CODE_LENGTH = 6;
+const INVITE_TTL_DAYS = 30;
+// A season's roster with room for mistyped signups and a few transfers. Past
+// this the link is almost certainly loose somewhere it should not be.
+const INVITE_MAX_USES = 60;
+
+const randomInviteCode = () => {
+  const bytes = require('crypto').randomBytes(INVITE_CODE_LENGTH);
+  let code = '';
+  for (let i = 0; i < INVITE_CODE_LENGTH; i++) {
+    // crypto, not Math.random: this code is the only thing standing between a
+    // stranger and a coach's list of minors.
+    code += INVITE_CODE_CHARS[bytes[i] % INVITE_CODE_CHARS.length];
+  }
+  return code;
+};
+
+/** Grades 9–12 need a guardian to approve a coach link. Mirrors utils/constants.js. */
+const gradeNeedsGuardian = (gradeLevel) =>
+  Number.isInteger(gradeLevel) && gradeLevel >= 9 && gradeLevel <= 12;
+
+/** Shared validity check. Returns the doc data, or throws with a usable reason. */
+const loadUsableInvite = async (code) => {
+  const db = admin.firestore();
+  const snap = await db.collection('coachInvites').doc(code).get();
+  if (!snap.exists) return { ok: false, reason: 'not_found' };
+
+  const invite = snap.data() || {};
+  if (invite.active === false) return { ok: false, reason: 'revoked' };
+
+  const expiresAt = invite.expiresAt?.toDate?.() || (invite.expiresAt ? new Date(invite.expiresAt) : null);
+  if (expiresAt && expiresAt.getTime() < Date.now()) return { ok: false, reason: 'expired' };
+
+  if ((invite.useCount || 0) >= (invite.maxUses || INVITE_MAX_USES)) {
+    return { ok: false, reason: 'exhausted' };
+  }
+  return { ok: true, invite, ref: snap.ref };
+};
+
+/** A coach creates a shareable team link. */
+exports.createCoachInvite = onCall(async (request) => {
+  if (!request.auth) throw new Error('Sign in required');
+  const coachUid = request.auth.uid;
+  const db = admin.firestore();
+
+  try {
+    const coachSnap = await db.collection('users').doc(coachUid).get();
+    const coach = coachSnap.data() || {};
+    if (coach.role !== 'coach') {
+      return { success: false, error: 'Only coaches can create team invites.' };
+    }
+
+    // Retry on collision. With a 31^6 keyspace this effectively never loops,
+    // but a silent overwrite here would repoint another coach's live link.
+    let code = null;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const candidate = randomInviteCode();
+      const existing = await db.collection('coachInvites').doc(candidate).get();
+      if (!existing.exists) { code = candidate; break; }
+    }
+    if (!code) return { success: false, error: 'Could not generate a code. Try again.' };
+
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + INVITE_TTL_DAYS);
+
+    await db.collection('coachInvites').doc(code).set({
+      code,
+      coachUid,
+      coachName: coach.displayName || coach.name || 'Your coach',
+      coachPhotoURL: coach.photoURL || null,
+      teamName: request.data?.teamName || coach.teamName || null,
+      active: true,
+      revokedAt: null,
+      useCount: 0,
+      maxUses: INVITE_MAX_USES,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      expiresAt,
+    });
+
+    return { success: true, code, expiresAt: expiresAt.toISOString() };
+  } catch (error) {
+    console.error('createCoachInvite failed', error);
+    return { success: false, error: 'Could not create the invite link.' };
+  }
+});
+
+/**
+ * Look up an invite WITHOUT claiming it, so the app can say who is inviting you
+ * before you have an account. Intentionally unauthenticated — the athlete has no
+ * account yet, which is the entire point.
+ *
+ * Returns the coach's display name and team only. Never the coachUid, never the
+ * use count, never anything else on the document: this endpoint answers to
+ * anyone holding a code, so it must not become a way to enumerate a coach.
+ */
+exports.resolveCoachInvite = onCall(async (request) => {
+  const code = String(request.data?.code || '').toUpperCase();
+  if (!/^[A-Z0-9]{6}$/.test(code)) return { valid: false, reason: 'invalid' };
+
+  try {
+    const result = await loadUsableInvite(code);
+    if (!result.ok) return { valid: false, reason: result.reason };
+    return {
+      valid: true,
+      coachName: result.invite.coachName || 'Your coach',
+      teamName: result.invite.teamName || null,
+    };
+  } catch (error) {
+    console.error('resolveCoachInvite failed', error);
+    return { valid: false, reason: 'error' };
+  }
+});
+
+/**
+ * Claim an invite for the signed-in athlete.
+ *
+ * MUST be called after the athlete's grade is known, because grade is what
+ * decides whether this produces a live connection or a pending request. Calling
+ * it earlier would attach a coach to a minor with no guardian involved — exactly
+ * the hole the guardian gate exists to close.
+ */
+exports.claimCoachInvite = onCall(async (request) => {
+  if (!request.auth) throw new Error('Sign in required');
+  const athleteUid = request.auth.uid;
+  const code = String(request.data?.code || '').toUpperCase();
+  const guardianEmail = (request.data?.guardianEmail || '').trim().toLowerCase() || null;
+  const db = admin.firestore();
+
+  try {
+    const result = await loadUsableInvite(code);
+    if (!result.ok) return { success: false, error: result.reason };
+    const { invite, ref } = result;
+
+    if (invite.coachUid === athleteUid) {
+      return { success: false, error: 'You cannot join your own invite.' };
+    }
+
+    const athleteSnap = await db.collection('users').doc(athleteUid).get();
+    const athlete = athleteSnap.data() || {};
+    const gradeLevel = athlete.gradeLevel;
+    const athleteName = athlete.displayName || athlete.name || 'Athlete';
+
+    // Already attached, either way round — claiming twice must be a no-op, not a
+    // duplicate. Athletes do re-tap the link.
+    const [existingConn, existingReq] = await Promise.all([
+      db.doc(`users/${athleteUid}/connections/${invite.coachUid}`).get(),
+      db.doc(`users/${athleteUid}/connectionRequests/${invite.coachUid}`).get(),
+    ]);
+    if (existingConn.exists || existingReq.exists) {
+      return { success: true, alreadyLinked: true, pending: existingReq.exists && !existingConn.exists };
+    }
+
+    const needsGuardian = gradeNeedsGuardian(gradeLevel);
+    const now = admin.firestore.FieldValue.serverTimestamp();
+
+    if (needsGuardian) {
+      // A pending REQUEST, in its own collection — never a connection with a
+      // status field. Every rule that grants a coach access checks a bare
+      // exists() on connections, so a "pending connection" would grant full
+      // access to a minor's data the moment it was written.
+      await db.doc(`users/${athleteUid}/connectionRequests/${invite.coachUid}`).set({
+        roleHolderUid: invite.coachUid,
+        roleHolderName: invite.coachName || 'Coach',
+        role: 'coach',
+        status: 'pending',
+        source: 'coachInvite',
+        inviteCode: code,
+        guardianEmail,
+        playerName: athleteName,
+        requestedAt: now,
+        resolvedAt: null,
+      });
+
+      // Queued for the Firebase "Trigger Email" extension, which reads this
+      // collection. If the extension is not installed the document simply sits
+      // there — harmless — and the athlete still has the in-app share sheet to
+      // reach their guardian. Nothing about the gate depends on delivery.
+      if (guardianEmail) {
+        await db.collection('mail').add({
+          to: [guardianEmail],
+          message: {
+            subject: `${athleteName} needs your approval on DBE HoopIQ`,
+            text:
+              `${invite.coachName || 'A coach'} invited ${athleteName} to train with them on ` +
+              `DBE HoopIQ.\n\nBecause ${athleteName} is in high school, you have to approve ` +
+              `this before the coach can see their training or contact them.\n\n` +
+              `Open the app and create a parent account, then use the invite code from ` +
+              `${athleteName}'s profile to approve it.\n\n` +
+              `If you did not expect this, you can ignore this email — nothing is shared ` +
+              `until you approve it.`,
+          },
+          createdAt: now,
+        }).catch((e) => console.warn('guardian mail queue failed (non-fatal)', e));
+      }
+    } else {
+      // College or adult — no gate. Both mirrors, same shape the redeem path writes.
+      const batch = db.batch();
+      batch.set(db.doc(`users/${athleteUid}/connections/${invite.coachUid}`), {
+        uid: invite.coachUid,
+        name: invite.coachName || 'Coach',
+        photoURL: invite.coachPhotoURL || null,
+        role: 'coach',
+        status: 'active',
+        source: 'coachInvite',
+        connectedAt: now,
+      });
+      batch.set(db.doc(`users/${invite.coachUid}/linkedPlayers/${athleteUid}`), {
+        uid: athleteUid,
+        name: athleteName,
+        photoURL: athlete.photoURL || null,
+        status: 'active',
+        source: 'coachInvite',
+        connectedAt: now,
+      });
+      await batch.commit();
+    }
+
+    await ref.update({
+      useCount: admin.firestore.FieldValue.increment(1),
+      lastUsedAt: now,
+    });
+
+    return { success: true, pending: needsGuardian, coachName: invite.coachName || 'Your coach' };
+  } catch (error) {
+    console.error('claimCoachInvite failed', error);
+    return { success: false, error: 'Could not join the team. Please try again.' };
+  }
+});
+
+/**
+ * The page a coach's link actually opens.
+ *
+ * Firebase Hosting rewrites /join/** here (see firebase.json). This exists
+ * because during the pilot most athletes tapping the link will NOT have the app:
+ * a link that only deep-links is a dead end for exactly the people it is meant
+ * to onboard. So the page does three things in order — names the coach so the
+ * link is obviously not spam, tries to hand off to the app, and if that does
+ * nothing, shows the install link and the code to type afterwards.
+ *
+ * Rendered server-side rather than fetched by client JS, so the coach's name is
+ * in the HTML the messaging app previews.
+ */
+const INSTALL_URL = 'https://testflight.apple.com/join/dbehoopiq';
+
+const escapeHtml = (s = '') =>
+  String(s).replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+exports.joinLanding = onRequest(async (req, res) => {
+  const code = String((req.path || '').split('/').filter(Boolean).pop() || '').toUpperCase();
+
+  let coachName = null;
+  let teamName = null;
+  let problem = null;
+
+  if (!/^[A-Z0-9]{6}$/.test(code)) {
+    problem = "That invite link doesn't look right.";
+  } else {
+    try {
+      const result = await loadUsableInvite(code);
+      if (result.ok) {
+        coachName = result.invite.coachName || 'Your coach';
+        teamName = result.invite.teamName || null;
+      } else {
+        problem = {
+          not_found: "We couldn't find that invite.",
+          revoked: 'That invite has been turned off by the coach.',
+          expired: 'That invite has expired. Ask your coach for a new link.',
+          exhausted: 'That invite has been used too many times. Ask your coach for a new link.',
+        }[result.reason] || "We couldn't open that invite.";
+      }
+    } catch (error) {
+      console.error('joinLanding lookup failed', error);
+      problem = 'Something went wrong opening that invite.';
+    }
+  }
+
+  const heading = problem
+    ? 'Invite unavailable'
+    : `${escapeHtml(coachName)} invited you${teamName ? ` to ${escapeHtml(teamName)}` : ''}`;
+
+  // Never cached: an invite can be revoked or run out at any moment, and a CDN
+  // holding "Coach Rivera invited you" after the coach turned the link off is
+  // worse than a slow page.
+  res.set('Cache-Control', 'no-store');
+  res.status(problem ? 404 : 200).send(`<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${heading} · DBE HoopIQ</title>
+<meta property="og:title" content="${heading}">
+<meta property="og:description" content="Join them on DBE HoopIQ and start training.">
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px;
+    font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #fff;
+    background: linear-gradient(180deg, #0B0B0F 0%, #2A0A0E 55%, #8A1C22 100%);
+  }
+  .card { width: 100%; max-width: 380px; text-align: center; }
+  .badge {
+    width: 72px; height: 72px; border-radius: 50%; margin: 0 auto 20px;
+    background: #8A1C22; display: grid; place-items: center; font-size: 34px;
+  }
+  h1 { font-size: 25px; line-height: 1.25; margin: 0 0 10px; }
+  p { color: rgba(255,255,255,.72); margin: 0 0 24px; }
+  .btn {
+    display: block; padding: 16px; border-radius: 12px; text-decoration: none;
+    font-weight: 700; margin-bottom: 12px;
+  }
+  .primary { background: #fff; color: #8A1C22; }
+  .secondary { border: 1px solid rgba(255,255,255,.25); color: #fff; }
+  .code {
+    margin-top: 24px; padding: 16px; border-radius: 12px;
+    background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.16);
+  }
+  .code b { display: block; font-size: 30px; letter-spacing: 7px; margin-top: 6px; }
+  .muted { font-size: 13.5px; color: rgba(255,255,255,.6); }
+</style>
+</head><body>
+<div class="card">
+  <div class="badge">🏀</div>
+  <h1>${heading}</h1>
+  ${problem
+    ? `<p>${escapeHtml(problem)}</p><a class="btn secondary" href="mailto:support@dbeapp.com">Contact support</a>`
+    : `<p>Set up your account and you'll be connected to them automatically.</p>
+       <a class="btn primary" href="dbehoopiq://join/${code}">Open in the app</a>
+       <a class="btn secondary" href="${INSTALL_URL}">Don't have the app? Install it</a>
+       <div class="code">
+         <span class="muted">After installing, enter this code</span>
+         <b>${code}</b>
+       </div>`}
+</div>
+${problem ? '' : `<script>
+  // Try the app immediately. If it opens, this page is never seen again; if
+  // nothing is registered for the scheme, the attempt is silently ignored and
+  // the install button below is already on screen. No timers, no redirect
+  // races — those are what produce the "blank page then App Store" flicker.
+  setTimeout(function () { window.location.href = 'dbehoopiq://join/${code}'; }, 350);
+</script>`}
+</body></html>`);
 });

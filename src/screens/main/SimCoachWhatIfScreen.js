@@ -31,6 +31,8 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
 import { BottomSheet } from '../../components/dbe';
+import { Explain, ExplainNote, ExplainProvider } from '../../components/features/Explain';
+import TierTag from '../../components/features/TierTag';
 import {
   getOpponentModel,
   getOpponentFilmEvents,
@@ -43,27 +45,6 @@ import {
 } from '../../services/firestoreService';
 
 const sortedEntries = (obj) => Object.entries(obj || {}).sort((a, b) => b[1] - a[1]);
-
-// Round-2 review fix (§1, §3.5): label the run results as a simulated
-// projection under a hypothetical coverage, not a plain model readout —
-// same TierTag pattern as SimCoachOpponentModelScreen (duplicated locally
-// rather than shared, matching how Chip/DistributionBar are already
-// duplicated per-screen in this feature).
-function TierTag({ tier, theme }) {
-  const config = {
-    observed: { label: 'FROM TAGGED FILM', icon: 'videocam-outline' },
-    modeled: { label: 'MODELED TENDENCY', icon: 'analytics-outline' },
-    simulated: { label: 'SIMULATED PROJECTION', icon: 'flask-outline' },
-  }[tier];
-  const color = tier === 'modeled' ? theme.primary : tier === 'simulated' ? '#F59E0B' : theme.textSecondary;
-  if (!config) return null;
-  return (
-    <View style={styles.tierTag}>
-      <Ionicons name={config.icon} size={11} color={color} />
-      <Text style={[styles.tierTagText, { color }]}>{config.label}</Text>
-    </View>
-  );
-}
 
 function Chip({ label, active, onPress, theme }) {
   return (
@@ -184,7 +165,7 @@ function ShareSessionModal({ visible, onClose, onShared, coachUid, run, coverage
   );
 }
 
-export default function SimCoachWhatIfScreen({ navigation, route }) {
+function WhatIfScreen({ navigation, route }) {
   const { user, userData, theme, isDarkMode } = useAppContext();
   const { opponentModelId, opponentName } = route.params || {};
   const isCoach = userData?.role === 'coach';
@@ -310,7 +291,9 @@ export default function SimCoachWhatIfScreen({ navigation, route }) {
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={[styles.headerTitle, { color: theme.text }]} numberOfLines={1}>What-If Lab — {opponentName || 'Opponent'}</Text>
-          <Text style={[styles.headerSub, { color: theme.textSecondary }]}>Outcome-level simulation</Text>
+          <Explain term="outcomeLevel">
+            <Text style={[styles.headerSub, { color: theme.textSecondary }]}>Outcome-level simulation</Text>
+          </Explain>
         </View>
       </View>
 
@@ -320,11 +303,17 @@ export default function SimCoachWhatIfScreen({ navigation, route }) {
         <View style={styles.centered}>
           <Ionicons name="flask-outline" size={40} color={theme.textSecondary} />
           <Text style={[styles.deniedTitle, { color: theme.text }]}>Not enough data yet</Text>
-          <Text style={[styles.emptySub, { color: theme.textSecondary }]}>Tag more film for this opponent to unlock the What-If Lab.</Text>
+          <Text style={[styles.emptySub, { color: theme.textSecondary }]}>
+            Tag possessions for this opponent to unlock the What-If Lab. It needs at least one
+            tagged coverage to work with, and the read gets meaningfully firmer around 30 tagged
+            possessions across 3 games.
+          </Text>
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-          <Text style={[styles.prompt, { color: theme.text }]}>If we show this coverage —</Text>
+          <Explain term="coverageFaced">
+            <Text style={[styles.prompt, { color: theme.text }]}>If we show this coverage —</Text>
+          </Explain>
           <View style={styles.chipRow}>
             {Object.keys(model.tendencies).map((c) => (
               <Chip
@@ -340,6 +329,9 @@ export default function SimCoachWhatIfScreen({ navigation, route }) {
           {quarterOptions.length > 0 && (
             <>
               <Text style={[styles.prompt, { color: theme.text, fontSize: 15 }]}>— in this part of the game (optional)</Text>
+              <Text style={[styles.emptySub, { color: theme.textSecondary, marginBottom: 6 }]}>
+                Only quarters you have tagged evidence for appear here.
+              </Text>
               <View style={styles.chipRow}>
                 <Chip label="All quarters" active={!quarter} onPress={() => { setQuarter(null); setRun(null); setFlagOpen(false); setShareOpen(false); }} theme={theme} />
                 {quarterOptions.map((q) => (
@@ -362,6 +354,11 @@ export default function SimCoachWhatIfScreen({ navigation, route }) {
               </>
             )}
           </TouchableOpacity>
+          <ExplainNote theme={theme}>
+            This re-weights the possessions you already tagged for the coverage and game state you
+            picked. It does not play out a game or invent plays — if you have not tagged it, it is
+            not in here.
+          </ExplainNote>
 
           {run && (
             <>
@@ -372,7 +369,9 @@ export default function SimCoachWhatIfScreen({ navigation, route }) {
               <View style={[styles.sectionCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
                 {sortedEntries(run.distribution).map(([action, pct]) => (
                   <View key={action} style={styles.barRow}>
-                    <Text style={[styles.barLabel, { color: theme.text }]} numberOfLines={1}>{action}</Text>
+                    <Explain term={action} hideIcon>
+                      <Text style={[styles.barLabel, { color: theme.text }]} numberOfLines={1}>{action}</Text>
+                    </Explain>
                     <View style={[styles.barTrack, { backgroundColor: theme.border }]}>
                       <View style={[styles.barFill, { width: `${Math.round(pct * 100)}%`, backgroundColor: theme.primary }]} />
                     </View>
@@ -464,8 +463,6 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 16, fontWeight: '700', marginBottom: 8 },
   sectionCard: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 14, gap: 10 },
 
-  tierTag: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
-  tierTagText: { fontSize: 12, fontWeight: '800', letterSpacing: 0.6 },
 
   barRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   barLabel: { fontSize: 14, fontWeight: '600', width: 100 },
@@ -492,3 +489,11 @@ const styles = StyleSheet.create({
   deniedTitle: { fontSize: 21, fontWeight: '700' },
   emptySub: { fontSize: 15, textAlign: 'center', lineHeight: 20 },
 });
+
+export default function SimCoachWhatIfScreen(props) {
+  return (
+    <ExplainProvider>
+      <WhatIfScreen {...props} />
+    </ExplainProvider>
+  );
+}

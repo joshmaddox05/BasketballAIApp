@@ -21,9 +21,11 @@ import {
 import { getCurrentUser } from '../../services/authService';
 import { getScenarioById } from '../../data/simCoachScenarios';
 import CourtDiagram from '../../components/features/CourtDiagram';
+import CourtLegend from '../../components/features/CourtLegend';
 import { normalizePlaySteps } from '../../services/gamePlan/gamePlanSchema.js';
 import { TYPE, FONTS, SHAPE } from '../../utils/typography';
 import { ScreenHeader, Entrance, Float } from '../../components/dbe';
+import { track, EVENTS } from '../../services/analytics';
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 export default function SimCoachScenarioScreen({ navigation, route }) {
@@ -100,6 +102,7 @@ export default function SimCoachScenarioScreen({ navigation, route }) {
             completionPercentage: 100,
             score,
           });
+          track(EVENTS.ASSIGNMENT_SUBMITTED, { type: 'scenario', score });
         }
       }
     } catch (_) {}
@@ -187,6 +190,7 @@ export default function SimCoachScenarioScreen({ navigation, route }) {
             arrows={playSteps[stepIndex]?.arrows}
             editable={false}
           />
+          <CourtLegend theme={theme} />
           {playSteps.length > 1 ? (
             <View style={styles.stepNav}>
               <TouchableOpacity

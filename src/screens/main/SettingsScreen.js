@@ -31,6 +31,7 @@ import {
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { TYPE, FONTS, SHAPE } from '../../utils/typography';
 import { ScreenHeader, SectionLabel, Entrance } from '../../components/dbe';
+import { SUPPORT_EMAIL, STORAGE_KEYS } from '../../utils/constants';
 
 const SettingsScreen = ({ navigation }) => {
     const {
@@ -133,6 +134,25 @@ const SettingsScreen = ({ navigation }) => {
             );
         } catch (error) {
             Alert.alert('Error', 'Could not reset the module intros.');
+        }
+    };
+
+    // The game-plan and film tours are screen-scoped (components/tour/ScreenTour.js),
+    // so they cannot be replayed through `startTour` from here — that call reaches
+    // this navigator's provider, not theirs. Clearing their flags re-arms them for
+    // the next visit to the screen itself, which is where they belong anyway.
+    const handleReplayScreenTours = async () => {
+        try {
+            await AsyncStorage.multiRemove([
+                STORAGE_KEYS.HAS_SEEN_GAMEPLAN_TOUR,
+                STORAGE_KEYS.HAS_SEEN_FILM_TOUR,
+            ]);
+            Alert.alert(
+                'Screen tours reset',
+                'The game plan builder and film library will walk you through again the next time you open them.'
+            );
+        } catch (error) {
+            Alert.alert('Error', 'Could not reset the screen tours.');
         }
     };
 
@@ -382,10 +402,11 @@ const SettingsScreen = ({ navigation }) => {
                         )}
 
                         <SettingRow title="Replay Module Intros" onPress={handleResetModuleIntros} />
+                        <SettingRow title="Replay Screen Tours" onPress={handleReplayScreenTours} />
 
                         <SettingRow
                             title="Help & Support"
-                            onPress={() => Alert.alert('Help & Support', 'Contact: support@basketballai.com')}
+                            onPress={() => Alert.alert('Help & Support', `Contact: ${SUPPORT_EMAIL}`)}
                         />
 
                         <SettingRow

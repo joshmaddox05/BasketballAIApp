@@ -9,13 +9,17 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAppContext } from '../../context/AppContext';
 import {
-  getLinkedPlayers,
-  getLinkedPlayerSummary,
-  getPendingScoutRequestsForParent,
+  approveConnectionRequest,
   approveScoutAccess,
+  denyConnectionRequest,
   denyScoutAccess,
+  getLinkedPlayerSummary,
+  getLinkedPlayers,
+  getPendingConnectionRequestsForParent,
+  getPendingScoutRequestsForParent,
+  getAthleteSessions,
 } from '../../services/firestoreService';
-import { getLevelTitle } from '../../utils/constants';
+import { getLevelTitle, isUpcomingSession } from '../../utils/constants';
 import ModuleGrid from '../../components/features/ModuleGrid';
 import { getModulesForRole } from '../../config/roleModules';
 import ChildSwitcher from '../../components/parent/ChildSwitcher';
@@ -36,6 +40,7 @@ import {
   LoadingState,
 } from '../../components/dbe';
 import { evalGradeOf } from '../../services/blueprint/evalRankPresenter';
+import { track, EVENTS } from '../../services/analytics';
 
 // Height is not transform-animatable in RN, so the list collapse is LayoutAnimation's
 // job. Android needs the experimental flag opted into explicitly.
@@ -97,18 +102,34 @@ const mapChild = (linked, profile, latestAchievement, evalRank) => {
   };
 };
 
-const mapWeek = (profile, activities) => {
+// `sessionsScheduled` was hardcoded to 0 and `nextSession` to an em dash, and
+// this screen never queried coachingSessions at all — so a parent whose child had
+// three sessions on the books saw a confident zero. Both now come from the same
+// documents the coach and the athlete read.
+const mapWeek = (profile, activities, sessions) => {
   const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
   const completed = (activities || []).filter((a) => {
     const d = toDate(a.createdAt);
     return d && d.getTime() >= weekAgo;
   }).length;
   const goal = profile?.preferences?.trainingDays?.length || 5;
+
+  const upcoming = (sessions || [])
+    .filter((s) => isUpcomingSession(s))
+    .map((s) => ({ ...s, __at: s.scheduledAt ? new Date(s.scheduledAt) : null }))
+    .filter((s) => s.__at && !Number.isNaN(s.__at.getTime()))
+    .sort((a, b) => a.__at - b.__at);
+
   return {
     workoutsCompleted: completed,
     workoutsGoal: goal,
-    sessionsScheduled: 0,
-    nextSession: '—',
+    sessionsScheduled: upcoming.length,
+    // An em dash still shows when there is genuinely nothing booked — the
+    // difference is that it now means "nothing scheduled" rather than "we never
+    // looked".
+    nextSession: upcoming.length
+      ? `${upcoming[0].__at.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, ${upcoming[0].__at.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`
+      : 'Nothing scheduled',
   };
 };
 
@@ -297,7 +318,10 @@ function ActivityItem({ item, index, theme, isLast }) {
   );
 }
 
-function ScoutRequestCard({ req, theme, onDecision }) {
+// Renders a consent decision. Used for BOTH scout access requests and coach
+// link requests — same stakes, same shape, same emotional weight, so the same
+// card rather than two that drift apart.
+function ConsentRequestCard({ req, theme, onDecision, icon, name, description }) {
   // The decision is the highest-stakes action on this surface — the card leaves the
   // way it arrived (Entrance variant="up" reversed) instead of vanishing mid-frame.
   const exit = useRef(new Animated.Value(0)).current;
@@ -333,14 +357,12 @@ function ScoutRequestCard({ req, theme, onDecision }) {
         >
           <View style={styles.scoutReqInfo}>
             <View style={[styles.scoutReqAvatar, { backgroundColor: theme.avatarFill }]}>
-              <Ionicons name="search-outline" size={16} color={theme.accentText} />
+              <Ionicons name={icon} size={16} color={theme.accentText} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.scoutReqName, { color: theme.text }]}>
-                {req.scoutName || 'A scout'}
-              </Text>
-              <Text style={[styles.scoutReqSub, { color: theme.textDim }]} numberOfLines={1}>
-                Wants access to {req.childName || 'your athlete'}'s eval data
+              <Text style={[styles.scoutReqName, { color: theme.text }]}>{name}</Text>
+              <Text style={[styles.scoutReqSub, { color: theme.textDim }]} numberOfLines={2}>
+                {description}
               </Text>
             </View>
           </View>
@@ -387,6 +409,7 @@ export default function ParentHomeScreen({ navigation }) {
   const [week, setWeek] = useState(null);
   const [activityFeed, setActivityFeed] = useState([]);
   const [scoutRequests, setScoutRequests] = useState([]);
+  const [coachRequests, setCoachRequests] = useState([]);
 
   // Load the roster of linked children + scout requests; ensure a valid selection.
   const refreshChildren = useCallback(async () => {
@@ -397,6 +420,7 @@ export default function ParentHomeScreen({ navigation }) {
     const linked = await getLinkedPlayers(parentUid);
     setChildren(linked);
     getPendingScoutRequestsForParent(parentUid).then(setScoutRequests).catch(() => {});
+    getPendingConnectionRequestsForParent(parentUid).then(setCoachRequests).catch(() => {});
     if (linked.length === 0) {
       setChild(null);
       setLoading(false);
@@ -413,11 +437,14 @@ export default function ParentHomeScreen({ navigation }) {
     if (!active) return;
     let alive = true;
     setLoading(true);
-    getLinkedPlayerSummary(active.uid)
-      .then((summary) => {
+    Promise.all([
+      getLinkedPlayerSummary(active.uid),
+      getAthleteSessions(active.uid).catch(() => []),
+    ])
+      .then(([summary, sessions]) => {
         if (!alive) return;
         setChild(mapChild(active, summary.profile, (summary.achievements || [])[0], summary.evalRank));
-        setWeek(mapWeek(summary.profile, summary.activities));
+        setWeek(mapWeek(summary.profile, summary.activities, sessions));
         setActivityFeed(mapActivityFeed(summary.activities));
       })
       .finally(() => {
@@ -427,6 +454,32 @@ export default function ParentHomeScreen({ navigation }) {
       alive = false;
     };
   }, [selectedChildUid, children]);
+
+  const handleCoachDecision = useCallback(
+    async (req, approve) => {
+      LayoutAnimation.configureNext(LayoutAnimation.create(MOTION.quick, 'easeInEaseOut', 'opacity'));
+      setCoachRequests((prev) =>
+        prev.filter((r) => !(r.childUid === req.childUid && r.roleHolderUid === req.roleHolderUid))
+      );
+      try {
+        if (approve) {
+          await approveConnectionRequest(req.childUid, req.roleHolderUid, {
+            role: req.role || 'coach',
+            roleHolderName: req.roleHolderName,
+            roleHolderPhotoURL: req.roleHolderPhotoURL,
+            childName: req.childName,
+          });
+          track(EVENTS.COACH_LINK_APPROVED, { role: req.role || 'coach' });
+        } else {
+          await denyConnectionRequest(req.childUid, req.roleHolderUid);
+        }
+      } catch (e) {
+        Alert.alert('Error', e.message || 'Could not update the request.');
+        getPendingConnectionRequestsForParent(parentUid).then(setCoachRequests).catch(() => {});
+      }
+    },
+    [parentUid]
+  );
 
   const handleScoutDecision = useCallback(
     async (req, approve) => {
@@ -542,11 +595,35 @@ export default function ParentHomeScreen({ navigation }) {
               Scout access request
             </Text>
             {scoutRequests.map((req) => (
-              <ScoutRequestCard
+              <ConsentRequestCard
                 key={`${req.childUid}_${req.scoutUid}`}
                 req={req}
                 theme={theme}
                 onDecision={handleScoutDecision}
+                icon="search-outline"
+                name={req.scoutName || 'A scout'}
+                description={`Wants access to ${req.childName || 'your athlete'}'s eval data`}
+              />
+            ))}
+          </View>
+        )}
+
+        {/* Coach link requests — the guardian gate on a coach attaching to a
+            high-school athlete. Same weight as scout consent, deliberately. */}
+        {coachRequests.length > 0 && (
+          <View style={styles.section}>
+            <Text style={[TYPE.sectionLabel, styles.consentLabel, { color: theme.accentText }]}>
+              Coach link request
+            </Text>
+            {coachRequests.map((req) => (
+              <ConsentRequestCard
+                key={`${req.childUid}_${req.roleHolderUid}`}
+                req={req}
+                theme={theme}
+                onDecision={handleCoachDecision}
+                icon="clipboard-outline"
+                name={req.roleHolderName || 'A coach'}
+                description={`Wants to coach ${req.childName || 'your athlete'} — assign workouts, book sessions and message them`}
               />
             ))}
           </View>

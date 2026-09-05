@@ -1,5 +1,5 @@
 // WelcomeCompleteScreen.js - Dynamic welcome screen after onboarding
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
     StyleSheet,
     Text,
@@ -9,14 +9,16 @@ import {
     StatusBar,
     Dimensions,
     Animated,
-    ImageBackground,
     Platform,
     ScrollView
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAppContext } from '../../context/AppContext';
 import { getTheme } from '../../utils/theme';
-import welcomeBackground from '../../../assets/welcome-background.jpg';
+import { completionNarrationFor } from '../../config/onboardingNarration';
+import { useScreenNarration } from '../../hooks/useScreenNarration';
+import NarrationToggle from '../../components/shared/NarrationToggle';
 
 const { width, height } = Dimensions.get('window');
 
@@ -51,6 +53,13 @@ const WelcomeCompleteScreen = ({ navigation }) => {
     const [slideAnim] = useState(new Animated.Value(50));
     const [scaleAnim] = useState(new Animated.Value(0.8));
     const [isCompleting, setIsCompleting] = useState(false);
+
+    // The closing line differs by role — a coach and a parent skip most of this
+    // flow and arrive here needing a different thing said to them. useMemo keeps
+    // the object identity stable so the hook does not treat a re-render as a
+    // fresh visit and restart the line.
+    const closingLine = useMemo(() => completionNarrationFor(role), [role]);
+    useScreenNarration(closingLine);
 
     useEffect(() => {
         // Animate the welcome screen
@@ -133,12 +142,23 @@ const WelcomeCompleteScreen = ({ navigation }) => {
     };
 
     return (
-        <ImageBackground
-            source={welcomeBackground}
+        // Was a stock JPEG under a 70%-black scrim — a grey wave shape with no
+        // relationship to the brand, dimmed until it was mostly noise. The same
+        // burgundy ramp the welcome screen and the launch reel use now carries
+        // it, so all three entry surfaces read as one product.
+        <LinearGradient
+            colors={['#0B0B0F', '#2A0A0E', '#8A1C22']}
+            locations={[0, 0.55, 1]}
             style={styles.backgroundImage}
         >
             <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
             <SafeAreaView style={styles.container}>
+                {/* Light tint: this screen sits on the burgundy gradient. */}
+                <NarrationToggle
+                    color="rgba(255,255,255,0.9)"
+                    fill="rgba(255,255,255,0.12)"
+                    border="rgba(255,255,255,0.22)"
+                />
                 <ScrollView
                     style={styles.scrollView}
                     contentContainerStyle={styles.scrollContent}
@@ -269,7 +289,7 @@ const WelcomeCompleteScreen = ({ navigation }) => {
                     </Animated.View>
                 </ScrollView>
             </SafeAreaView>
-        </ImageBackground>
+        </LinearGradient>
     );
 };
 
@@ -281,7 +301,10 @@ const styles = StyleSheet.create({
     },
     container: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        // The 70% black scrim existed to make text legible over a photo. The
+        // gradient below is already dark and controlled, so this only needs to
+        // deepen the top where the status bar sits.
+        backgroundColor: 'rgba(0, 0, 0, 0.28)',
         paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
     },
     scrollView: {

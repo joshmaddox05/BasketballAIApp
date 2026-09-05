@@ -11,6 +11,7 @@ import { getCoachListings, deleteCoachMarketListing, getCoachSessions, updateCoa
 import { createConnectAccount, createConnectOnboardingLink, getConnectAccountStatus, getConnectBalance, createConnectLoginLink } from '../../services/stripePaymentService';
 import { computeCoachRevenue } from '../../utils/coachRevenue';
 import { TYPE, SHAPE, FONTS } from '../../utils/typography';
+import { SESSION_STATUS, isUpcomingSession } from '../../utils/constants';
 import {
   Entrance,
   Shimmer,
@@ -62,7 +63,11 @@ const CoachMarketDashboardScreen = ({ navigation }) => {
       setBookings(
         mySessions.filter((s) => {
           const d = toDate(s.scheduledAt);
-          return s.status !== 'cancelled' && (!d || d.getTime() >= now);
+          // This screen calls these documents "bookings"; the Sessions screen calls
+          // them sessions. Same collection — so they must at least agree on which
+          // ones are still open. This filter used to omit the completed check, so a
+          // finished session showed here as an upcoming booking forever.
+          return isUpcomingSession(s, now);
         })
       );
     } finally {
@@ -399,7 +404,7 @@ const CoachMarketDashboardScreen = ({ navigation }) => {
               const whenLabel = when
                 ? `${when.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} · ${when.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`
                 : 'Time TBD';
-              const confirmed = booking.status === 'confirmed';
+              const confirmed = booking.status === SESSION_STATUS.CONFIRMED;
               return (
                 <Entrance key={booking.id} variant="slideIn" delay={100 + i * 100}>
                   <TouchableOpacity
@@ -441,7 +446,7 @@ const CoachMarketDashboardScreen = ({ navigation }) => {
                             { color: confirmed ? theme.steel : theme.accentText },
                           ]}
                         >
-                          {(booking.status || 'pending').toUpperCase()}
+                          {(booking.status || SESSION_STATUS.PENDING).toUpperCase()}
                         </Text>
                       </View>
                     </View>

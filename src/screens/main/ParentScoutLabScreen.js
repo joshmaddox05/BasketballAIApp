@@ -37,8 +37,8 @@ import {
   LoadingState,
 } from '../../components/dbe';
 import { evalGradeOf } from '../../services/blueprint/evalRankPresenter';
+import { GRADE_LABEL } from '../../utils/constants';
 
-const GRADE_LABEL = { 9: '9th', 10: '10th', 11: '11th', 12: '12th' };
 
 const CONSENT_STATUS_LABEL = {
   pending: 'Awaiting decision',

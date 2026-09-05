@@ -19,4 +19,12 @@ i18n.enableFallback = true;
 // Set default locale
 i18n.defaultLocale = 'en';
 
+// A key with no translation must not render as text. i18n-js defaults to the
+// "message" strategy, which emits the literal string `[missing "en.shotDNA"
+// translation]` straight into the UI — that is how six of the Pro plan's feature
+// bullets shipped onto the paywall as bracketed error text. "guess" humanizes the
+// key instead ('shotDNA' → 'Shot DNA'), so the worst case is imperfect wording
+// rather than something that reads as a crash.
+i18n.missingBehavior = 'guess';
+
 export default i18n;

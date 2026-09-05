@@ -31,35 +31,15 @@ import {
   PrimaryButton,
 } from '../../components/dbe';
 import { TYPE, SHAPE, FONTS } from '../../utils/typography';
-import { evalGradeOf } from '../../services/blueprint/evalRankPresenter';
+import { evalGradeOf, toUiEval } from '../../services/blueprint/evalRankPresenter';
 
-// ---------------------------------------------------------------------------
-// Mock data – replaced by real API data in production
-// ---------------------------------------------------------------------------
-const MOCK_READINESS_SCORE = 74;
-const MOCK_SCOUTS_VIEWED = 12;
-
-const MOCK_ACTIVITY = [
-  {
-    id: '1',
-    text: 'Duke University viewed your profile',
-    time: '2h ago',
-    icon: 'eye-outline',
-    fresh: true,
-  },
-  {
-    id: '2',
-    text: 'USC viewed your highlight reel',
-    time: '1d ago',
-    icon: 'videocam-outline',
-  },
-  {
-    id: '3',
-    text: 'Kentucky added you to a watchlist',
-    time: '3d ago',
-    icon: 'bookmark-outline',
-  },
-];
+// NOTE: this screen previously rendered a hard-coded readiness score of 74, a
+// hard-coded "12 scouts viewed you this month", and an invented activity feed
+// ("Duke University viewed your profile"). All three are gone. The readiness
+// score now comes from the exposure engine, which reports honestly when a
+// dimension has not been measured; the view counter and activity feed were
+// deleted outright because no view-tracking exists, so there is no truthful
+// version of either. Re-add them only alongside real instrumentation.
 
 const BOOST_ACTIONS = [
   {
@@ -101,10 +81,12 @@ function LockedUpgradeCard({ theme, onUpgrade }) {
         ScoutLab™ is PRO
       </Text>
       <Text style={[TYPE.tooltipBody, { color: theme.textDim, textAlign: 'center', marginTop: 6 }]}>
-        Exposure score, scout activity and a shareable athlete profile.
+        Exposure score, scout reports and a shareable athlete profile.
       </Text>
       <View style={styles.lockedPerksRow}>
-        {['Exposure score', 'Scout alerts', 'Shareable profile'].map((perk) => (
+        {/* "Scout alerts" was removed with the fabricated activity feed — the app
+            sends no scout alerts. Shared scout reports are real (SharedReportsSection). */}
+        {['Exposure score', 'Scout reports', 'Shareable profile'].map((perk) => (
           <View key={perk} style={styles.lockedPerkItem}>
             <Ionicons name="checkmark" size={14} color={theme.accentText} />
             <Text style={[TYPE.rowMeta, { color: theme.textMuted, marginTop: 0 }]}>{perk}</Text>
@@ -243,7 +225,15 @@ export default function ScoutLabScreen({ navigation }) {
     );
   }
 
-  const score = MOCK_READINESS_SCORE;
+  // Real exposure readiness. `toUiExposure` deliberately refuses to report an
+  // Exposure Index until all five dimensions are measured — the index is a MIN
+  // over them, so one unmeasured dimension pins it to zero, and showing that as
+  // a verdict would punish an athlete for simply not having trained yet.
+  // `toUiEval` returns null for no record at all and a legacy shape for
+  // pre-v1 docs, both of which land on assessable: false.
+  const exposure = toUiEval(evalRankScore)?.exposure || null;
+  const assessable = !!exposure?.assessable;
+  const score = assessable ? exposure.index : null;
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
@@ -286,44 +276,41 @@ export default function ScoutLabScreen({ navigation }) {
           <RingProgress
             size={124}
             strokeWidth={9}
-            progress={score / 100}
+            progress={assessable ? score / 100 : 0}
             color={theme.primary}
             trackColor={theme.track}
             delay={200}
           >
             <Entrance variant="count" delay={800} style={{ alignItems: 'center' }}>
-              <Text style={[styles.scoreNumber, { color: theme.text }]}>{score}</Text>
+              <Text
+                style={[styles.scoreNumber, { color: assessable ? theme.text : theme.textDim }]}
+              >
+                {assessable ? score : '--'}
+              </Text>
               <Text style={[styles.scoreOutOf, { color: theme.textDim }]}>/100</Text>
             </Entrance>
           </RingProgress>
 
           <View style={{ flex: 1 }}>
             <Text style={[TYPE.sectionLabel, { color: theme.textDim }]}>Scout readiness</Text>
-            <Entrance variant="chipPop" delay={1000} style={{ alignSelf: 'flex-start' }}>
-              <View
-                style={[
-                  styles.tierChip,
-                  { backgroundColor: theme.badgeFill, borderColor: theme.attentionBorder },
-                ]}
-              >
-                <Text style={[styles.tierChipText, { color: theme.accentText }]}>
-                  {tierFor(score)}
-                </Text>
-              </View>
-            </Entrance>
-
-            <View style={styles.viewsRow}>
-              <View style={[styles.viewsIcon, { backgroundColor: theme.steelFill }]}>
-                <PulseHalo color={theme.steelFill} duration={2200} />
-                <Ionicons name="eye-outline" size={16} color={theme.steel} />
-              </View>
-              <View>
-                <Text style={[styles.viewsNumber, { color: theme.text }]}>
-                  {MOCK_SCOUTS_VIEWED} scouts
-                </Text>
-                <Text style={[TYPE.rowMeta, { color: theme.textDim }]}>viewed you this month</Text>
-              </View>
-            </View>
+            {assessable ? (
+              <Entrance variant="chipPop" delay={1000} style={{ alignSelf: 'flex-start' }}>
+                <View
+                  style={[
+                    styles.tierChip,
+                    { backgroundColor: theme.badgeFill, borderColor: theme.attentionBorder },
+                  ]}
+                >
+                  <Text style={[styles.tierChipText, { color: theme.accentText }]}>
+                    {exposure.tierName || tierFor(score)}
+                  </Text>
+                </View>
+              </Entrance>
+            ) : (
+              <Text style={[TYPE.rowMeta, { color: theme.textDim, marginTop: 6 }]}>
+                {exposure?.message || 'Run an evaluation to assess exposure readiness'}
+              </Text>
+            )}
           </View>
         </View>
 
@@ -385,41 +372,8 @@ export default function ScoutLabScreen({ navigation }) {
           onOpen={(report) => navigation.navigate('ScoutReportDetail', { report })}
         />
 
-        {/* ── Scout activity ──────────────────────────────────────────────── */}
-        <View style={{ marginTop: SHAPE.sectionGap }}>
-          <SectionLabel>Scout activity</SectionLabel>
-          {MOCK_ACTIVITY.map((item, index) => (
-            <Entrance
-              key={item.id}
-              variant="slideIn"
-              delay={300 + index * 120}
-              style={[
-                styles.activityRow,
-                index < MOCK_ACTIVITY.length - 1 && {
-                  borderBottomWidth: 1,
-                  borderBottomColor: theme.hairline,
-                },
-              ]}
-            >
-              <View
-                style={[
-                  styles.activityIconWrap,
-                  { backgroundColor: item.fresh ? theme.badgeFill : theme.steelFill },
-                ]}
-              >
-                <Ionicons
-                  name={item.icon}
-                  size={15}
-                  color={item.fresh ? theme.accentText : theme.steel}
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.activityText, { color: theme.text }]}>{item.text}</Text>
-                <Text style={[TYPE.rowMeta, { color: theme.textDim }]}>{item.time}</Text>
-              </View>
-            </Entrance>
-          ))}
-        </View>
+        {/* Scout activity feed removed — see the note at the top of this file.
+            The app tracks no profile views, so every row here was fabricated. */}
 
         {/* ── Boost exposure ──────────────────────────────────────────────── */}
         <View style={{ marginTop: SHAPE.sectionGap }}>
@@ -511,16 +465,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   tierChipText: { fontFamily: FONTS.bodyExtraBold, fontSize: 13.5, letterSpacing: 0.5 },
-  viewsRow: { flexDirection: 'row', alignItems: 'center', gap: 9, marginTop: 14 },
-  viewsIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  viewsNumber: { fontFamily: FONTS.heading, fontSize: 18, lineHeight: 19 },
-
   visibilityCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -553,22 +497,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   editLink: { fontFamily: FONTS.bodyBold, fontSize: 13 },
-
-  // Activity
-  activityRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 11,
-    paddingVertical: 11,
-  },
-  activityIconWrap: {
-    width: 30,
-    height: 30,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  activityText: { fontFamily: FONTS.bodySemiBold, fontSize: 14.5 },
 
   // Boost
   boostRow: {

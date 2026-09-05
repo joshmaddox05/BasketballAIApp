@@ -19,6 +19,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAppContext } from '../../context/AppContext';
 import { BottomSheet } from '../../components/dbe';
+import { Explain, ExplainNote, ExplainProvider } from '../../components/features/Explain';
+import TierTag from '../../components/features/TierTag';
 import {
   getOpponentModel,
   getPracticePriorities,
@@ -37,31 +39,6 @@ function DistributionBar({ label, pct, color, theme }) {
         <View style={[styles.barFill, { width: `${Math.round(pct * 100)}%`, backgroundColor: color }]} />
       </View>
       <Text style={[styles.barPct, { color: theme.textSecondary }]}>{Math.round(pct * 100)}%</Text>
-    </View>
-  );
-}
-
-// Round-2 review fix (§1, §3.5): three data tiers get visually confused
-// today — raw tagged film, a model's aggregated tendency from that film, and
-// (on the What-If Lab) a simulated projection under a hypothetical coverage.
-// This tag makes the tier explicit wherever a number is shown, rather than
-// rendering all three with identical weight. Kept local to each screen
-// rather than pulled into a shared component, matching how DistributionBar/
-// Chip/RunRow are already duplicated per-screen in this feature.
-const TIER_CONFIG = {
-  observed: { label: 'FROM TAGGED FILM', icon: 'videocam-outline' },
-  modeled: { label: 'MODELED TENDENCY', icon: 'analytics-outline' },
-  simulated: { label: 'SIMULATED PROJECTION', icon: 'flask-outline' },
-};
-
-function TierTag({ tier, theme }) {
-  const config = TIER_CONFIG[tier];
-  const color = tier === 'modeled' ? theme.primary : tier === 'simulated' ? '#F59E0B' : theme.textSecondary;
-  if (!config) return null;
-  return (
-    <View style={styles.tierTag}>
-      <Ionicons name={config.icon} size={11} color={color} />
-      <Text style={[styles.tierTagText, { color }]}>{config.label}</Text>
     </View>
   );
 }
@@ -154,7 +131,7 @@ function LinkPracticeModal({ visible, onClose, onSave, theme }) {
   );
 }
 
-export default function SimCoachOpponentModelScreen({ navigation, route }) {
+function OpponentModelScreen({ navigation, route }) {
   const { user, userData, theme, isDarkMode } = useAppContext();
   const { opponentModelId, opponentName } = route.params || {};
   const isCoach = userData?.role === 'coach';
@@ -227,17 +204,22 @@ export default function SimCoachOpponentModelScreen({ navigation, route }) {
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           {/* Confidence summary — every number below is only as trustworthy as this */}
           <View style={[styles.summaryCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            <View style={[styles.confidenceCircle, { borderColor: '#A855F7' }]}>
-              <Text style={[styles.confidenceScore, { color: '#A855F7' }]}>{model.confidenceLevel}</Text>
-              <Text style={[styles.confidenceLabel, { color: '#A855F7' }]}>CONF</Text>
-            </View>
+            {/* "CONF" was an abbreviation with no expansion anywhere in the app. */}
+            <Explain term="confidence" hideIcon>
+              <View style={[styles.confidenceCircle, { borderColor: '#A855F7' }]}>
+                <Text style={[styles.confidenceScore, { color: '#A855F7' }]}>{model.confidenceLevel}</Text>
+                <Text style={[styles.confidenceLabel, { color: '#A855F7' }]}>CONFIDENCE</Text>
+              </View>
+            </Explain>
             <View style={{ flex: 1 }}>
               <TierTag tier="observed" theme={theme} />
               <Text style={[styles.summaryText, { color: theme.text }]}>
                 {model.sampleSize} tagged event{model.sampleSize === 1 ? '' : 's'} across {model.sourceFilmIds?.length || 0} film{model.sourceFilmIds?.length === 1 ? '' : 's'}
               </Text>
               <Text style={[styles.summarySub, { color: theme.textSecondary }]}>
-                Confidence rises with more tagged film — this is an evidence-based read, not a certainty.
+                Confidence rises with more tagged film — this is an evidence-based read, not a
+                certainty. It levels off around 30 tagged possessions across 3 games. Tap any
+                label with a ? for what it means.
               </Text>
             </View>
           </View>
@@ -283,23 +265,45 @@ export default function SimCoachOpponentModelScreen({ navigation, route }) {
 
           {/* General report: unconditioned action frequency */}
           <TierTag tier="modeled" theme={theme} />
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>What They Run (Overall)</Text>
+          <Explain term="distribution">
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>What They Run (Overall)</Text>
+          </Explain>
+          <Text style={[styles.summarySub, { color: theme.textSecondary, marginBottom: 8 }]}>
+            Every possession you tagged, regardless of what defense you were showing. Tap an
+            action to see what it means.
+          </Text>
           <View style={[styles.sectionCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
             {sortedEntries(model.actionFrequency).map(([action, pct]) => (
-              <DistributionBar key={action} label={action} pct={pct} color={theme.primary} theme={theme} />
+              <Explain key={action} term={action} hideIcon>
+                <View style={{ flex: 1 }}>
+                  <DistributionBar label={action} pct={pct} color={theme.primary} theme={theme} />
+                </View>
+              </Explain>
             ))}
           </View>
 
           {/* Detailed drill-down: by coverage faced */}
           <TierTag tier="modeled" theme={theme} />
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>By Coverage Faced</Text>
+          <Explain term="coverageFaced">
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>By Coverage Faced</Text>
+          </Explain>
+          <Text style={[styles.summarySub, { color: theme.textSecondary, marginBottom: 8 }]}>
+            Coverage means the defense YOUR team showed — so this is what they do against the
+            looks you give them. That is the part you can act on.
+          </Text>
           {sortedEntries(model.tendencySampleSizes || {}).map(([coverage, n]) => (
             <View key={coverage} style={[styles.sectionCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-              <Text style={[styles.coverageTitle, { color: theme.text }]}>
-                {coverage === 'any' ? 'No coverage tagged' : coverage} <Text style={[styles.coverageN, { color: theme.textSecondary }]}>· {n} tagged</Text>
-              </Text>
+              <Explain term={coverage === 'any' ? 'coverageFaced' : coverage}>
+                <Text style={[styles.coverageTitle, { color: theme.text }]}>
+                  {coverage === 'any' ? 'No coverage tagged' : coverage} <Text style={[styles.coverageN, { color: theme.textSecondary }]}>· {n} tagged</Text>
+                </Text>
+              </Explain>
               {sortedEntries(model.tendencies?.[coverage]).map(([action, pct]) => (
-                <DistributionBar key={action} label={action} pct={pct} color="#A855F7" theme={theme} />
+                <Explain key={action} term={action} hideIcon>
+                  <View style={{ flex: 1 }}>
+                    <DistributionBar label={action} pct={pct} color="#A855F7" theme={theme} />
+                  </View>
+                </Explain>
               ))}
             </View>
           ))}
@@ -308,11 +312,18 @@ export default function SimCoachOpponentModelScreen({ navigation, route }) {
           {model.recentOutcomes?.length > 0 && (
             <>
               <TierTag tier="observed" theme={theme} />
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>Recorded Outcomes</Text>
+              <Explain term="outcomes">
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>Recorded Outcomes</Text>
+              </Explain>
               <View style={[styles.sectionCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
                 {model.recentOutcomes.map((o, i) => (
                   <Text key={i} style={[styles.outcomeLine, { color: theme.textSecondary }]}>• {o}</Text>
                 ))}
+                <ExplainNote theme={theme}>
+                  Your own notes, shown exactly as you typed them. They are deliberately not
+                  totalled into a made/missed stat — reading free text by keyword would invent
+                  precision that isn't there.
+                </ExplainNote>
               </View>
             </>
           )}
@@ -392,8 +403,6 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 16.5, fontWeight: '700', marginBottom: 8, marginTop: 4 },
   sectionCard: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 14, gap: 10 },
 
-  tierTag: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-  tierTagText: { fontSize: 12, fontWeight: '800', letterSpacing: 0.6 },
 
   coverageTitle: { fontSize: 15, fontWeight: '700', marginBottom: 2 },
   coverageN: { fontSize: 13, fontWeight: '400' },
@@ -426,3 +435,13 @@ const styles = StyleSheet.create({
   saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 13, borderRadius: 12, marginTop: 12 },
   saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 });
+
+// One provider per screen owns the glossary sheet; every <Explain> below it
+// becomes tappable.
+export default function SimCoachOpponentModelScreen(props) {
+  return (
+    <ExplainProvider>
+      <OpponentModelScreen {...props} />
+    </ExplainProvider>
+  );
+}

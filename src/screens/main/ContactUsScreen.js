@@ -3,6 +3,7 @@ import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, ScrollView, Tex
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '../../utils/constants';
 
 export default function ContactUsScreen({ navigation }) {
   const { theme, isDarkMode, userData } = useAppContext();
@@ -41,9 +42,9 @@ export default function ContactUsScreen({ navigation }) {
           <Text style={styles.sendBtnText}>{sending ? 'Sending…' : 'Send Message'}</Text>
         </TouchableOpacity>
         <View style={[styles.divider, { borderColor: theme.border }]} />
-        <TouchableOpacity style={styles.emailRow} onPress={() => Linking.openURL('mailto:support@dbeapp.com')}>
+        <TouchableOpacity style={styles.emailRow} onPress={() => Linking.openURL(SUPPORT_MAILTO)}>
           <Ionicons name="mail-outline" size={18} color={theme.primary} />
-          <Text style={[styles.emailText, { color: theme.primary }]}>support@dbeapp.com</Text>
+          <Text style={[styles.emailText, { color: theme.primary }]}>{SUPPORT_EMAIL}</Text>
         </TouchableOpacity>
         <View style={{ height: 32 }} />
       </ScrollView>

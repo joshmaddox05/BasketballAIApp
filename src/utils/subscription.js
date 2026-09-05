@@ -34,6 +34,11 @@ export const SUBSCRIPTION_PLANS = [
     name: 'Pro',
     nameKey: 'proPlan',
     descriptionKey: 'proPlanDesc',
+    // WARNING: this string is the ONLY thing the paywall renders, and it is not
+    // read from Stripe. The real charge comes from the price ID in
+    // src/config/stripe.js (STRIPE_CONFIG.prices.pro). Change the price in the
+    // Stripe dashboard and this screen keeps advertising the old number — the
+    // paywall lies and the card is charged something else. Change both together.
     price: '$9.99',
     priceValue: 9.99,
     billingCycle: 'month',

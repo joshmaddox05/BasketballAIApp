@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useColorScheme, AppState } from 'react-native';
 import { getTheme } from '../utils/theme';
 import { STORAGE_KEYS } from '../utils/constants';
+import { identifyUser, resetUser, track, EVENTS } from '../services/analytics';
 
 // Push notification imports
 import {
@@ -45,6 +46,7 @@ import {
 // Import workout templates
 import { getAllWorkoutTemplates } from '../data/workoutTemplates';
 import { hasAccess } from '../utils/subscription';
+import { claimPendingInviteIfAny } from '../services/coachInviteService';
 import {
     mapLegacyCategoryToId,
     DEFAULT_CATEGORY_ID,
@@ -184,6 +186,15 @@ export const AppProvider = ({ children }) => {
             if (authUser) {
                 // User is signed in
                 setIsAuthenticated(true);
+
+                // Bind telemetry to the uid ONLY — never the email or display
+                // name. Most of the pilot cohort are minors; see the privacy
+                // note in services/analytics.js.
+                identifyUser(authUser.uid, {
+                    role: profile?.role || null,
+                    gradeLevel: profile?.gradeLevel ?? null,
+                    subscription: profile?.subscription || 'free',
+                });
                 
                 if (profile) {
                     // User has a profile in Firestore
@@ -302,6 +313,7 @@ export const AppProvider = ({ children }) => {
                 }
             } else {
                 // User is signed out
+                resetUser();
                 setIsAuthenticated(false);
                 setUser(null);
                 setUserData(initialUserData);
@@ -637,6 +649,32 @@ export const AppProvider = ({ children }) => {
                     ...prev,
                     onboardingCompleted: true
                 }));
+
+                track(EVENTS.ONBOARDING_COMPLETED, {
+                    role: userData?.role || null,
+                    gradeLevel: userData?.gradeLevel ?? null,
+                });
+
+                // Claim a coach invite last, and never let it block finishing.
+                // This is the earliest safe moment: the grade the server needs in
+                // order to decide between a live connection and a guardian-gated
+                // request has just been written. If it fails, the athlete still
+                // has a working account and the code stays in storage for the
+                // next app open to retry — the alternative is trapping someone on
+                // the last screen of onboarding because of a dropped request.
+                try {
+                    const result = await claimPendingInviteIfAny({
+                        guardianEmail: userData?.guardianEmail || null,
+                    });
+                    if (result?.success) {
+                        track(result.pending ? EVENTS.COACH_LINK_REQUESTED : EVENTS.COACH_LINK_APPROVED, {
+                            source: 'coachInvite',
+                            pending: !!result.pending,
+                        });
+                    }
+                } catch (error) {
+                    logger.warn('Coach invite claim deferred', error);
+                }
 
                 return true;
             } catch (error) {

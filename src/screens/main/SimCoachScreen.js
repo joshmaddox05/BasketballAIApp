@@ -14,11 +14,23 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAppContext } from '../../context/AppContext';
 import { canAccessFeature } from '../../utils/subscription';
-import { getAthleteAssignments, getGamePlans, getSharedSimulationSessions, getSessionResponses } from '../../services/firestoreService';
+import {
+  getAthleteAssignments,
+  getGamePlans,
+  getFilms,
+  getSimCoachResults,
+  getSharedSimulationSessions,
+  getSessionResponses,
+} from '../../services/firestoreService';
+import { MIN_SIMCOACH_SCENARIOS } from '../../services/blueprint/inputMappers';
+import FilmSummary from '../../components/features/FilmSummary';
 import { SIM_COACH_SCENARIOS } from '../../data/simCoachScenarios';
 import LockedFeatureCard from '../../components/features/LockedFeatureCard';
 
-const MOCK_IQ = { score: 74, classification: 'Developing', currentXP: 740, nextTierXP: 1000 };
+// A placeholder IQ of 74 used to stand in here whenever the athlete had no real
+// score — which is every athlete until their third completed scenario, since
+// MIN_SIMCOACH_SCENARIOS gates the real value. It is gone: the card shows '--'
+// until the engine can actually produce a number, and says what is missing.
 
 // Map a stored scenario assignment to the card shape the athlete view renders.
 // A coach game-plan assignment carries its scenario embedded; otherwise fall back
@@ -50,6 +62,11 @@ const IQ_CLASSIFICATION = (score) => {
 function CoachView({ navigation, theme, coachUid }) {
   const [tab, setTab] = useState('plans');
   const [plans, setPlans] = useState([]);
+  // The Film Library tab used to be a static blurb with a link — it rendered the
+  // same "Manage your film here" whether the coach had zero films or fifty, which
+  // read as "your upload didn't work". Both lists load together because the tabs
+  // share one scroll view and switching between them should not re-fetch.
+  const [films, setFilms] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useFocusEffect(
@@ -58,8 +75,11 @@ function CoachView({ navigation, theme, coachUid }) {
       let active = true;
       (async () => {
         setLoading(true);
-        const items = await getGamePlans(coachUid);
-        if (active) { setPlans(items); setLoading(false); }
+        const [planItems, filmItems] = await Promise.all([
+          getGamePlans(coachUid),
+          getFilms(coachUid),
+        ]);
+        if (active) { setPlans(planItems); setFilms(filmItems); setLoading(false); }
       })();
       return () => { active = false; };
     }, [coachUid])
@@ -144,13 +164,35 @@ function CoachView({ navigation, theme, coachUid }) {
               </View>
               <Ionicons name="arrow-forward" size={18} color="#fff" />
             </TouchableOpacity>
-            <View style={styles.emptyState}>
-              <Ionicons name="videocam-outline" size={40} color={theme.textSecondary} />
-              <Text style={[styles.ctaBlurbTitle, { color: theme.text }]}>Manage your film here</Text>
-              <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-                Uploads, play tagging, and per-opponent film all live in Film Library — tap above to open it.
-              </Text>
-            </View>
+
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Your Film</Text>
+            {loading ? (
+              <ActivityIndicator color={theme.primary} style={{ marginTop: 16 }} />
+            ) : films.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="videocam-outline" size={36} color={theme.textSecondary} />
+                <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+                  No film yet. Tap “Open Film Library” to upload your first game.
+                </Text>
+              </View>
+            ) : (
+              films.map((film) => (
+                <TouchableOpacity
+                  key={film.id}
+                  style={[styles.filmRow, { backgroundColor: theme.card, borderColor: theme.border }]}
+                  onPress={() =>
+                    navigation.navigate('SimCoachFilmTagging', {
+                      filmId: film.id,
+                      videoUrl: film.videoUrl,
+                      opponentName: film.opponentName,
+                    })
+                  }
+                  activeOpacity={0.8}
+                >
+                  <FilmSummary film={film} theme={theme} compact />
+                </TouchableOpacity>
+              ))
+            )}
           </>
         ) : tab === 'team' ? (
           <>
@@ -206,11 +248,19 @@ function CoachView({ navigation, theme, coachUid }) {
 }
 
 // ─── Athlete View ─────────────────────────────────────────────────────────────
-function AthleteView({ navigation, theme, iqData, scenarios, sessions }) {
-  const score = iqData.score;
-  const classification = IQ_CLASSIFICATION(score);
-  const xpPct = Math.min(100, (iqData.currentXP / iqData.nextTierXP) * 100);
-  const scoreColor = score >= 85 ? '#22C55E' : score >= 70 ? theme.primary : '#F59E0B';
+function AthleteView({ navigation, theme, score, completedCount, scenarios, sessions }) {
+  const measured = score != null;
+  const classification = measured ? IQ_CLASSIFICATION(score) : 'Not yet measured';
+  // Measured: the bar IS the score, on its own 0–100 scale. Unmeasured: it is
+  // progress toward the threshold. Both are real counts of real documents; the
+  // XP figures it replaced had no writer anywhere in the app.
+  const remaining = Math.max(0, MIN_SIMCOACH_SCENARIOS - completedCount);
+  const barPct = measured
+    ? Math.min(100, score)
+    : Math.min(100, (completedCount / MIN_SIMCOACH_SCENARIOS) * 100);
+  const scoreColor = !measured
+    ? theme.textSecondary
+    : score >= 85 ? '#22C55E' : score >= 70 ? theme.primary : '#F59E0B';
 
   return (
     <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -218,7 +268,7 @@ function AthleteView({ navigation, theme, iqData, scenarios, sessions }) {
       <View style={[styles.iqCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
         <View style={styles.iqCardInner}>
           <View style={[styles.iqCircle, { borderColor: scoreColor, backgroundColor: scoreColor + '18' }]}>
-            <Text style={[styles.iqScore, { color: scoreColor }]}>{score}</Text>
+            <Text style={[styles.iqScore, { color: scoreColor }]}>{measured ? score : '--'}</Text>
             <Text style={[styles.iqScoreLabel, { color: scoreColor }]}>IQ</Text>
           </View>
           <View style={{ flex: 1 }}>
@@ -226,11 +276,13 @@ function AthleteView({ navigation, theme, iqData, scenarios, sessions }) {
             <Text style={[styles.iqSubtitle, { color: theme.textSecondary }]}>Basketball Intelligence</Text>
             <View style={styles.xpLabelRow}>
               <Text style={[styles.xpLabel, { color: theme.textSecondary }]}>
-                {iqData.currentXP} / {iqData.nextTierXP} XP
+                {measured
+                  ? `Mean over your last ${completedCount} scenario${completedCount === 1 ? '' : 's'}`
+                  : `${completedCount} of ${MIN_SIMCOACH_SCENARIOS} scenarios · ${remaining} more to earn a score`}
               </Text>
             </View>
             <View style={[styles.xpTrack, { backgroundColor: theme.border }]}>
-              <View style={[styles.xpFill, { width: `${xpPct}%`, backgroundColor: scoreColor }]} />
+              <View style={[styles.xpFill, { width: `${barPct}%`, backgroundColor: scoreColor }]} />
             </View>
           </View>
         </View>
@@ -329,6 +381,7 @@ export default function SimCoachScreen({ navigation }) {
 
   const [scenarios, setScenarios] = useState([]);
   const [sessions, setSessions] = useState([]);
+  const [completedCount, setCompletedCount] = useState(0);
 
   useFocusEffect(
     useCallback(() => {
@@ -337,6 +390,12 @@ export default function SimCoachScreen({ navigation }) {
       (async () => {
         const items = await getAthleteAssignments(user.uid, { type: 'scenario' });
         if (active) setScenarios(items.map(mapScenarioAssignment));
+
+        // How many scenarios actually count toward a score — the same documents
+        // getSimCoachIQScore averages, so the progress line and the score can
+        // never disagree about whether the threshold has been met.
+        const results = await getSimCoachResults(user.uid, 50).catch(() => []);
+        if (active) setCompletedCount(results.length);
 
         const shared = await getSharedSimulationSessions(user.uid);
         // Cheap "have I already responded" flag per session — a few extra
@@ -354,12 +413,13 @@ export default function SimCoachScreen({ navigation }) {
     }, [isCoach, user?.uid])
   );
 
-  const iqRaw = simCoachIQScore;
-  const iqData = {
-    score: iqRaw?.score ?? MOCK_IQ.score,
-    currentXP: iqRaw?.currentXP ?? MOCK_IQ.currentXP,
-    nextTierXP: iqRaw?.nextTierXP ?? MOCK_IQ.nextTierXP,
-  };
+  // getSimCoachIQScore returns a NUMBER or null — never an object. Reading
+  // `.score` off it made `Number(undefined)` → NaN, so this was null no matter
+  // how many scenarios the athlete completed and the card was frozen on '--'
+  // permanently. `currentXP`/`nextTierXP` were read here too and no writer in the
+  // codebase produces either, so the XP bar has been replaced with progress
+  // toward the measurement threshold, which is a number we actually have.
+  const iqScore = Number.isFinite(Number(simCoachIQScore)) ? Number(simCoachIQScore) : null;
 
   if (!hasAccess) {
     return (
@@ -404,7 +464,14 @@ export default function SimCoachScreen({ navigation }) {
       {isCoach ? (
         <CoachView navigation={navigation} theme={theme} coachUid={user?.uid} />
       ) : (
-        <AthleteView navigation={navigation} theme={theme} iqData={iqData} scenarios={scenarios} sessions={sessions} />
+        <AthleteView
+          navigation={navigation}
+          theme={theme}
+          score={iqScore}
+          completedCount={completedCount}
+          scenarios={scenarios}
+          sessions={sessions}
+        />
       )}
     </SafeAreaView>
   );
@@ -448,6 +515,13 @@ const styles = StyleSheet.create({
   ctaCardSub: { color: 'rgba(255,255,255,0.75)', fontSize: 14, marginTop: 2 },
 
   sectionTitle: { fontSize: 17.5, fontWeight: '700', marginBottom: 10 },
+
+  filmRow: {
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 10,
+  },
 
   planCard: {
     flexDirection: 'row',

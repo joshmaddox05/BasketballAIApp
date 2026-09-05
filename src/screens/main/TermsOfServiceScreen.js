@@ -3,6 +3,7 @@ import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, ScrollView } fr
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
+import { SUPPORT_EMAIL } from '../../utils/constants';
 
 const SECTIONS = [
   { title: '1. Acceptance of Terms', body: 'By creating an account or using the DBE app, you agree to these Terms of Service. If you are under 18, your parent or guardian must review and accept these terms on your behalf.' },
@@ -14,7 +15,7 @@ const SECTIONS = [
   { title: '7. Prohibited Conduct', body: 'You may not use the platform to harass other users, share false information, attempt to circumvent youth safety controls, scrape or copy athlete data, or impersonate scouts, coaches, or platform staff.' },
   { title: '8. Limitation of Liability', body: 'The DBE platform is provided "as is." We are not responsible for decisions made based on AI analysis results, training plans, or evaluation scores. These are tools to support development, not professional medical or sports science advice.' },
   { title: '9. Changes to Terms', body: 'We may update these terms from time to time. We will notify you of significant changes via the app or email. Continued use after notification constitutes acceptance.' },
-  { title: '10. Contact', body: 'For questions about these terms, contact legal@dbeapp.com.' },
+  { title: '10. Contact', body: `For questions about these terms, contact ${SUPPORT_EMAIL}.` },
 ];
 
 export default function TermsOfServiceScreen({ navigation }) {

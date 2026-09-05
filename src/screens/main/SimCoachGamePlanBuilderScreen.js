@@ -1,6 +1,6 @@
 // SimCoachGamePlanBuilderScreen.js - Coach editor: build a custom SimCoach scenario
 // (game plan) — play steps + a tactical question — then save + assign to athletes.
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   SafeAreaView,
   StyleSheet,
@@ -18,7 +18,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
 import { getLinkedPlayers, assignToAthlete, saveGamePlan } from '../../services/firestoreService';
 import CourtDiagram, { defaultTokens } from '../../components/features/CourtDiagram';
+import CourtLegend from '../../components/features/CourtLegend';
 import { serializePlaySteps, toEditorRows } from '../../services/gamePlan/gamePlanSchema.js';
+import { ScreenTour, TourStep, useTour, GAMEPLAN_TOUR_STEPS } from '../../components/tour';
+import { STORAGE_KEYS } from '../../utils/constants';
 
 const CATEGORIES = ['Offense', 'Defense', 'Transition'];
 const OPTION_LABELS = ['A', 'B', 'C', 'D'];
@@ -72,7 +75,16 @@ function AssignModal({ visible, athletes, selected, onToggle, onClose, onConfirm
   );
 }
 
-export default function SimCoachGamePlanBuilderScreen({ navigation, route }) {
+function GamePlanBuilder({ navigation, route }) {
+  // The tour spotlights anchors that sit well below the fold (the tactical
+  // question is the last thing on this screen). measureTarget scrolls them into
+  // view, but only for a tab whose ScrollView it has been handed — hence this.
+  const scrollRef = useRef(null);
+  const { registerScrollRef, unregisterScrollRef, updateScrollY } = useTour();
+  useEffect(() => {
+    registerScrollRef('gameplan', scrollRef);
+    return () => unregisterScrollRef('gameplan');
+  }, [registerScrollRef, unregisterScrollRef]);
   const { user, userData, theme, isDarkMode } = useAppContext();
   const coachUid = user?.uid;
   const coachName = userData?.displayName || userData?.name || 'Coach';
@@ -271,15 +283,24 @@ export default function SimCoachGamePlanBuilderScreen({ navigation, route }) {
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        ref={scrollRef}
+        onScroll={(e) => updateScrollY('gameplan', e.nativeEvent.contentOffset.y)}
+        scrollEventThrottle={16}
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         {/* Plan title */}
-        <TextInput
-          style={[styles.titleInput, { backgroundColor: theme.card, borderColor: theme.border, color: theme.text }]}
-          value={planTitle}
-          onChangeText={(t) => { setPlanTitle(t); setSaved(false); }}
-          placeholder="Game plan title"
-          placeholderTextColor={theme.textSecondary}
-        />
+        <TourStep stepId="gameplan-title">
+          <TextInput
+            style={[styles.titleInput, { backgroundColor: theme.card, borderColor: theme.border, color: theme.text }]}
+            value={planTitle}
+            onChangeText={(t) => { setPlanTitle(t); setSaved(false); }}
+            placeholder="Game plan title"
+            placeholderTextColor={theme.textSecondary}
+          />
+        </TourStep>
 
         {/* Category */}
         <View style={styles.categoryRow}>
@@ -331,18 +352,22 @@ export default function SimCoachGamePlanBuilderScreen({ navigation, route }) {
               })}
             </ScrollView>
 
-            <CourtDiagram
-              tokens={activeStep.tokens}
-              arrows={activeStep.arrows}
-              editable
-              mode={courtMode}
-              selectedTokenId={selectedTokenId}
-              onSelectToken={setSelectedTokenId}
-              onChangeTokens={(tokens) => updateActiveStep({ tokens })}
-              onChangeArrows={(arrows) => updateActiveStep({ arrows })}
-            />
+            <TourStep stepId="gameplan-court">
+              <CourtDiagram
+                tokens={activeStep.tokens}
+                arrows={activeStep.arrows}
+                editable
+                mode={courtMode}
+                selectedTokenId={selectedTokenId}
+                onSelectToken={setSelectedTokenId}
+                onChangeTokens={(tokens) => updateActiveStep({ tokens })}
+                onChangeArrows={(arrows) => updateActiveStep({ arrows })}
+              />
+              <CourtLegend theme={theme} />
+            </TourStep>
 
             {/* Move vs draw */}
+            <TourStep stepId="gameplan-toolbar">
             <View style={styles.courtToolbar}>
               {[
                 { key: 'move', label: 'Move players', icon: 'move-outline' },
@@ -380,6 +405,7 @@ export default function SimCoachGamePlanBuilderScreen({ navigation, route }) {
                 </TouchableOpacity>
               ) : null}
             </View>
+            </TourStep>
 
             <Text style={[styles.courtHint, { color: theme.textSecondary }]}>
               {courtMode === 'move'
@@ -392,7 +418,9 @@ export default function SimCoachGamePlanBuilderScreen({ navigation, route }) {
         ) : null}
 
         {/* Play steps */}
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>Play Steps</Text>
+        <TourStep stepId="gameplan-steps">
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Play Steps</Text>
+        </TourStep>
         {steps.map((step, i) => (
           <TouchableOpacity
             key={step.id}
@@ -438,7 +466,9 @@ export default function SimCoachGamePlanBuilderScreen({ navigation, route }) {
         </View>
 
         {/* Tactical question */}
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>Tactical Question</Text>
+        <TourStep stepId="gameplan-question">
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Tactical Question</Text>
+        </TourStep>
         <TextInput
           style={[styles.questionInput, { backgroundColor: theme.card, borderColor: theme.border, color: theme.text }]}
           value={question}
@@ -661,3 +691,19 @@ const styles = StyleSheet.create({
   avatarText: { fontSize: 16, fontWeight: '800' },
   athleteName: { flex: 1, fontSize: 16.5, fontWeight: '600' },
 });
+
+// The tour is mounted around the screen, not inside the navigator: this is a
+// pushed route on the Playbook stack, which the cross-tab tour engine cannot
+// navigate to. See components/tour/ScreenTour.js.
+export default function SimCoachGamePlanBuilderScreen(props) {
+  const { theme } = useAppContext();
+  return (
+    <ScreenTour
+      steps={GAMEPLAN_TOUR_STEPS}
+      storageKey={STORAGE_KEYS.HAS_SEEN_GAMEPLAN_TOUR}
+      theme={theme}
+    >
+      <GamePlanBuilder {...props} />
+    </ScreenTour>
+  );
+}

@@ -22,6 +22,25 @@ import { useToast } from '../dbe';
 
 const { width } = Dimensions.get('window');
 
+// The display name for a tier id. Alerts used to interpolate the raw enum, so a
+// paying user read "Your pro subscription will remain active…" — and a legacy
+// doc still holding 'basic'/'premium' printed a tier name that no longer exists.
+const planNameFor = (id) => {
+    const plan = SUBSCRIPTION_PLANS.find((p) => p.id === id);
+    return plan ? i18n.t(plan.nameKey) : i18n.t('proPlan');
+};
+
+// Stripe does not guarantee `currentPeriodEnd` is present on every subscription
+// shape, and `new Date(undefined)` renders the string "Invalid Date" straight
+// into a confirmation dialog about the user's money. subscriptionService guards
+// this same field; the modal did not.
+const formatPeriodEnd = (details) => {
+    const raw = details?.currentPeriodEnd;
+    if (!raw) return null;
+    const date = new Date(raw);
+    return Number.isNaN(date.getTime()) ? null : date.toLocaleDateString();
+};
+
 const SubscriptionModal = ({ visible, onClose, onUpgrade }) => {
     const { userData, theme: contextTheme, isDarkMode } = useAppContext();
     const { initializePaymentSheet, openPaymentSheet } = useSubscriptionPayment();
@@ -69,9 +88,12 @@ const SubscriptionModal = ({ visible, onClose, onUpgrade }) => {
 
             // Handle downgrade to free (cancellation)
             if (planId === 'free' && hasActiveSubscription) {
+                const endsOn = formatPeriodEnd(userData.subscriptionDetails);
                 Alert.alert(
                     'Cancel Subscription?',
-                    `Your ${currentPlanId} subscription will remain active until ${new Date(userData.subscriptionDetails.currentPeriodEnd).toLocaleDateString()}. After that, you'll be downgraded to the free plan.`,
+                    `Your ${planNameFor(currentPlanId)} subscription will remain active ${
+                        endsOn ? `until ${endsOn}` : 'until the end of your current billing period'
+                    }. After that, you'll be downgraded to the free plan.`,
                     [
                         { text: 'Keep Subscription', style: 'cancel' },
                         {
@@ -108,13 +130,14 @@ const SubscriptionModal = ({ visible, onClose, onUpgrade }) => {
                 }
 
                 const actionText = isUpgrade ? 'upgraded' : 'downgraded';
+                const endsOn = formatPeriodEnd(userData.subscriptionDetails);
                 const timingText = isUpgrade
                     ? 'immediately and you\'ll be charged a prorated amount'
-                    : `at the end of your current billing period (${new Date(userData.subscriptionDetails.currentPeriodEnd).toLocaleDateString()})`;
+                    : `at the end of your current billing period${endsOn ? ` (${endsOn})` : ''}`;
 
                 Alert.alert(
                     `${isUpgrade ? 'Upgrade' : 'Downgrade'} Subscription?`,
-                    `Your subscription will be ${actionText} to ${planId} ${timingText}.`,
+                    `Your subscription will be ${actionText} to ${planNameFor(planId)} ${timingText}.`,
                     [
                         { text: 'Cancel', style: 'cancel', onPress: () => setProcessingPayment(false) },
                         {
@@ -284,13 +307,10 @@ const SubscriptionModal = ({ visible, onClose, onUpgrade }) => {
                                             // Format limit display
                                             let limitText = '';
                                             if (feature.limit && feature.limit > 0) {
-                                                if (feature.key === 'mentorSessions') {
-                                                    limitText = ` (${feature.limit}/mo)`;
-                                                } else if (feature.key === 'basicAiAnalysis') {
-                                                    limitText = ` (${feature.limit}/mo)`;
-                                                } else {
-                                                    limitText = ` (${feature.limit}x)`;
-                                                }
+                                                limitText =
+                                                    feature.key === 'mentorSessions'
+                                                        ? ` (${feature.limit}/mo)`
+                                                        : ` (${feature.limit}x)`;
                                             } else if (feature.limit === -1) {
                                                 limitText = ' (unlimited)';
                                             }

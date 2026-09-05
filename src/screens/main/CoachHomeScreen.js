@@ -22,6 +22,7 @@ import ModuleIntro from '../../components/modules/ModuleIntro';
 import { useModuleIntro } from '../../hooks/useModuleIntro';
 import { canAccessFeature } from '../../utils/subscription';
 import { TYPE, SHAPE, FONTS } from '../../utils/typography';
+import { isUpcomingSession } from '../../utils/constants';
 import {
   HeaderIconButton,
   Entrance,
@@ -96,10 +97,13 @@ const initialsOf = (name) =>
 // because both roles still reach CoachMarket from the module grid, whereas
 // reviewing an athlete's submitted work previously had NO entry point at all for
 // a trainer (they have no Roster tab) and only a header icon for an org coach.
+// 'invite' replaces 'add_athlete' as the primary way onto a roster. Adding an
+// athlete by typing a code they generated only works once they already have the
+// app; the pilot runs the other way round.
 const ORG_QUICK_ACTIONS = [
   { id: 'assign', label: 'Assign', icon: 'clipboard-outline', primary: true },
+  { id: 'invite', label: 'Invite', icon: 'person-add-outline' },
   { id: 'review', label: 'Review', icon: 'checkmark-done-outline' },
-  { id: 'add_athlete', label: 'Add', icon: 'person-add-outline' },
   { id: 'sessions', label: 'Sessions', icon: 'calendar-outline' },
 ];
 
@@ -300,7 +304,9 @@ export default function CoachHomeScreen({ navigation }) {
       setSessionsThisWeek(
         coachSessions.filter((s) => {
           const d = toDate(s.scheduledAt);
-          return s.status !== 'cancelled' && d && d.getTime() >= Date.now() && d.getTime() <= weekOut;
+          // "This week" is a window on top of the shared upcoming definition, not
+          // a second definition of its own.
+          return isUpcomingSession(s) && d && d.getTime() >= Date.now() && d.getTime() <= weekOut;
         }).length
       );
     } finally {
@@ -331,7 +337,9 @@ export default function CoachHomeScreen({ navigation }) {
 
   const handleQuickAction = useCallback(
     (actionId) => {
-      if (actionId === 'add_athlete') {
+      if (actionId === 'invite') {
+        navigation.navigate('CoachInvite');
+      } else if (actionId === 'add_athlete') {
         navigation.navigate('LinkAccount', { onLinked: loadRoster });
       } else if (actionId === 'sessions') {
         navigation.navigate('CoachSessions');

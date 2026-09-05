@@ -1,17 +1,41 @@
 // EditDrillScreen.js - Coach edits or deletes an existing CoachMarket listing.
 // Reachable only for DRAFT listings (live listings must be unpublished first).
-import React, { useState, useCallback } from 'react';
-import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, Alert } from 'react-native';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
-import { updateCoachMarketListing, deleteCoachMarketListing } from '../../services/firestoreService';
+import { updateCoachMarketListing, deleteCoachMarketListing, getListingMedia } from '../../services/firestoreService';
 import DrillListingForm from '../../components/features/DrillListingForm';
 
 export default function EditDrillScreen({ navigation, route }) {
   const { theme, isDarkMode } = useAppContext();
   const listing = route.params?.listing || {};
   const [saving, setSaving] = useState(false);
+
+  // Video URLs no longer live on the listing document — they are in a
+  // purchase-gated `media` subcollection. Without re-attaching them here the
+  // form would open with empty video slots and the next save would wipe every
+  // drill's video. The coach owns this listing, so the rule permits the read.
+  const [media, setMedia] = useState(null);
+  useEffect(() => {
+    if (!listing.id) { setMedia({}); return; }
+    let active = true;
+    getListingMedia(listing.id).then((m) => { if (active) setMedia(m); });
+    return () => { active = false; };
+  }, [listing.id]);
+
+  const initial = useMemo(() => {
+    if (!media) return null;
+    return {
+      ...listing,
+      drills: (listing.drills || []).map((d, i) => ({
+        ...d,
+        videoUrl: media[String(i)]?.videoUrl || '',
+        storagePath: media[String(i)]?.storagePath || '',
+      })),
+    };
+  }, [listing, media]);
 
   const handleSubmit = useCallback(async (payload) => {
     if (!listing.id) return;
@@ -60,13 +84,20 @@ export default function EditDrillScreen({ navigation, route }) {
           <Ionicons name="trash-outline" size={22} color="#EF4444" />
         </TouchableOpacity>
       </View>
-      <DrillListingForm initial={listing} submitting={saving} onSubmit={handleSubmit} />
+      {initial ? (
+        <DrillListingForm initial={initial} submitting={saving} onSubmit={handleSubmit} />
+      ) : (
+        <View style={styles.loading}>
+          <ActivityIndicator color={theme.primary} />
+        </View>
+      )}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

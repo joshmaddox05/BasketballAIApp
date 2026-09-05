@@ -17,8 +17,12 @@ import { recomputeEvalRank } from '../../services/evalRankService';
 import { generateAndSavePlan } from '../../services/blueprint360Service';
 import { deriveArchetype, describeArchetype } from '../../services/blueprint/archetypeAssignment';
 import { ALL_ARCHETYPE_IDS } from '../../services/blueprint/archetypes';
+import { PILLAR_ROWS } from '../../services/blueprint/evalRankPresenter';
 import { TYPE, FONTS, SHAPE } from '../../utils/typography';
 import logger from '../../utils/logger';
+import { ONBOARDING_NARRATION } from '../../config/onboardingNarration';
+import { useScreenNarration } from '../../hooks/useScreenNarration';
+import NarrationToggle from '../../components/shared/NarrationToggle';
 import {
   ScreenHeader,
   SectionLabel,
@@ -29,10 +33,23 @@ import {
 } from '../../components/dbe';
 
 const CONFIDENCE_COPY = {
-  none: 'No profile data yet — this is a starting point, not a verdict',
-  low: 'Low confidence — based on one signal',
-  medium: 'Moderate confidence — a few signals agree',
-  high: 'High confidence — profile and measured data agree',
+  none: 'A starting point, not a verdict — we have nothing on you yet.',
+  low: 'One signal to go on so far.',
+  medium: 'A few signals agree on this.',
+  high: 'Everything we know about you points here.',
+};
+
+// Archetype labels are slash-compounds: "Defensive Anchor / Rim Protector". The
+// second half is a gloss for coaches, and as a heading it forces the title onto
+// two lines. The card leads with the name and lets the description do the rest.
+const shortLabel = (label = '') => label.split(' / ')[0];
+
+// "Progression gate: SRS ≥ 65" was rendered verbatim. SRS means nothing to a
+// sixteen-year-old on their third minute in the app.
+const gateSentence = (gate) => {
+  if (!gate?.metric) return null;
+  const pillar = PILLAR_ROWS.find((p) => p.key === gate.metric);
+  return `You'll graduate this archetype at ${pillar?.label || gate.metric} ${gate.min}.`;
 };
 
 const PERMISSION_TONE = {
@@ -71,7 +88,7 @@ function ShotMenuRow({ tone, shots, theme }) {
 
   return (
     <View style={{ marginTop: 8 }}>
-      <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 12.5, color: text }}>
+      <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 13, color: text }}>
         {PERMISSION_TONE[tone].label}
       </Text>
       <View style={styles.chipWrap}>
@@ -85,7 +102,7 @@ function ShotMenuRow({ tone, shots, theme }) {
               backgroundColor: fill,
             }}
           >
-            <Text style={{ fontFamily: FONTS.bodyMedium, fontSize: 12.5, color: text }}>
+            <Text style={{ fontFamily: FONTS.bodyMedium, fontSize: 13.5, color: text }}>
               {shotName(s)}
             </Text>
           </View>
@@ -95,9 +112,21 @@ function ShotMenuRow({ tone, shots, theme }) {
   );
 }
 
-function ArchetypeCard({ archetypeId, selected, recommended, reasons, onSelect, theme, delay }) {
+/**
+ * @param {boolean} compact onboarding pass — drops the coach-facing detail
+ *   (shot menu, progression gate, restricted skills) and shows at most two
+ *   reasons. That block is genuinely useful on the profile, where someone opened
+ *   this screen on purpose; at minute three of a first session it is a wall of
+ *   vocabulary nobody has been taught yet, and it is what squeezed every other
+ *   line on this card down to label sizes.
+ */
+function ArchetypeCard({ archetypeId, selected, recommended, reasons, onSelect, theme, delay, compact }) {
   const d = describeArchetype(archetypeId);
   if (!d) return null;
+
+  // Two reasons is the most anyone reads on a card they are about to tap. The
+  // third is always the weakest signal — the engine ranks them.
+  const shownReasons = compact ? (reasons || []).slice(0, 2) : reasons;
 
   return (
     <Entrance variant="cellIn" delay={delay}>
@@ -116,8 +145,13 @@ function ArchetypeCard({ archetypeId, selected, recommended, reasons, onSelect, 
       >
         <View style={styles.cardHeader}>
           <View style={{ flex: 1 }}>
-            <Text style={[TYPE.rowTitle, { color: theme.text }]}>{d.label}</Text>
-            <Text style={[TYPE.statCaption, { color: theme.textMuted, marginTop: 3 }]}>
+            <Text style={[TYPE.tooltipTitle, { color: theme.text }]}>
+              {compact ? shortLabel(d.label) : d.label}
+            </Text>
+            {/* Was TYPE.statCaption — an 11.5pt UPPERCASE label preset with 1.1
+                tracking, applied to a full sentence. That single misuse is most
+                of why this screen reads as small, shouty and dense. */}
+            <Text style={[TYPE.tooltipBody, { color: theme.textMuted, marginTop: 4 }]}>
               {d.description}
             </Text>
           </View>
@@ -135,17 +169,17 @@ function ArchetypeCard({ archetypeId, selected, recommended, reasons, onSelect, 
           </View>
         ) : null}
 
-        {reasons?.length ? (
-          <View style={{ marginTop: 10, gap: 5 }}>
-            {reasons.map((r, i) => (
+        {shownReasons?.length ? (
+          <View style={{ marginTop: 12, gap: 8 }}>
+            {shownReasons.map((r, i) => (
               <View key={i} style={styles.reasonRow}>
-                <Ionicons name="ellipse" size={5} color={theme.accentText} style={{ marginTop: 6 }} />
+                <Ionicons name="ellipse" size={5} color={theme.accentText} style={{ marginTop: 8 }} />
                 <Text
                   style={{
                     flex: 1,
                     fontFamily: FONTS.body,
-                    fontSize: 13.5,
-                    lineHeight: 17.5,
+                    fontSize: 15,
+                    lineHeight: 21,
                     color: theme.textMuted,
                   }}
                 >
@@ -157,32 +191,54 @@ function ArchetypeCard({ archetypeId, selected, recommended, reasons, onSelect, 
         ) : null}
 
         {selected ? (
-          <View style={{ marginTop: 12, borderTopWidth: 1, borderTopColor: theme.hairline, paddingTop: 10 }}>
-            <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 13, color: theme.text }}>
-              Must master: {d.coreSkills.map((s) => s.label).join(', ')}
+          <View style={{ marginTop: 14, borderTopWidth: 1, borderTopColor: theme.hairline, paddingTop: 12 }}>
+            {/* The one line that matters on either pass: what this archetype
+                actually asks you to get good at. */}
+            <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 13.5, color: theme.textDim }}>
+              What you'll work on
             </Text>
-            {d.restrictedSkills.length ? (
-              <Text style={[TYPE.statCaption, { color: theme.textDim, marginTop: 3 }]}>
-                Trained minimally: {d.restrictedSkills.map((s) => s.label).join(', ')}
-              </Text>
-            ) : null}
-            <Text style={[TYPE.statCaption, { color: theme.textDim, marginTop: 3 }]}>
-              Progression gate: {d.gate.metric} ≥ {d.gate.min}
-            </Text>
-
             <Text
               style={{
                 fontFamily: FONTS.bodySemiBold,
-                fontSize: 13,
+                fontSize: 16,
+                lineHeight: 22,
                 color: theme.text,
-                marginTop: 10,
+                marginTop: 3,
               }}
             >
-              Shot menu
+              {d.coreSkills.map((sk) => sk.label).join(', ')}
             </Text>
-            <ShotMenuRow tone="green" shots={d.shotMenu.green} theme={theme} />
-            <ShotMenuRow tone="yellow" shots={d.shotMenu.yellow} theme={theme} />
-            <ShotMenuRow tone="red" shots={d.shotMenu.red} theme={theme} />
+
+            {/* Everything below is coach vocabulary. It belongs on the profile,
+                where this screen was opened deliberately — not in onboarding. */}
+            {!compact ? (
+              <>
+                {d.restrictedSkills.length ? (
+                  <Text style={[TYPE.tooltipBody, { color: theme.textDim, marginTop: 8 }]}>
+                    Trained lightly: {d.restrictedSkills.map((sk) => sk.label).join(', ')}
+                  </Text>
+                ) : null}
+                {gateSentence(d.gate) ? (
+                  <Text style={[TYPE.tooltipBody, { color: theme.textDim, marginTop: 4 }]}>
+                    {gateSentence(d.gate)}
+                  </Text>
+                ) : null}
+
+                <Text
+                  style={{
+                    fontFamily: FONTS.bodySemiBold,
+                    fontSize: 13.5,
+                    color: theme.textDim,
+                    marginTop: 14,
+                  }}
+                >
+                  Your shot menu
+                </Text>
+                <ShotMenuRow tone="green" shots={d.shotMenu.green} theme={theme} />
+                <ShotMenuRow tone="yellow" shots={d.shotMenu.yellow} theme={theme} />
+                <ShotMenuRow tone="red" shots={d.shotMenu.red} theme={theme} />
+              </>
+            ) : null}
           </View>
         ) : null}
       </TouchableOpacity>
@@ -190,10 +246,23 @@ function ArchetypeCard({ archetypeId, selected, recommended, reasons, onSelect, 
   );
 }
 
-export default function ArchetypeSelectScreen({ navigation }) {
+/**
+ * Doubles as an onboarding step (`route.params.onboarding`). The screen already
+ * derives, presents and persists an archetype; the onboarding pass differs only
+ * in where it goes afterwards and in leading with a confirmation rather than a
+ * catalogue. Registering the same component twice beats a second near-identical
+ * screen that would drift from this one the first time the engine changes.
+ */
+export default function ArchetypeSelectScreen({ navigation, route }) {
+  const onboarding = !!route?.params?.onboarding;
   const { userData, user, theme, isDarkMode, updateUserDataLocally, setEvalRankScore, setBlueprint360Plan } =
     useAppContext();
   const showToast = useToast();
+
+  // Only in the onboarding pass. Reached later from the profile, this is a screen
+  // the athlete chose to open — narrating it there would be talking over someone
+  // who already knows why they came.
+  useScreenNarration(ONBOARDING_NARRATION.archetype, { enabled: onboarding });
 
   const derived = useMemo(
     () =>
@@ -263,10 +332,18 @@ export default function ArchetypeSelectScreen({ navigation }) {
       if (plan) setBlueprint360Plan(plan);
 
       showToast('Archetype set — your plan has been rebuilt');
-      navigation.goBack();
+      if (onboarding) {
+        navigation.navigate('FeaturesIntro');
+      } else {
+        navigation.goBack();
+      }
     } catch (error) {
       logger.error('Archetype confirm failed', error);
       showToast('Could not save your archetype right now');
+      // Mid-onboarding this must never be a dead end. The archetype was already
+      // written from PersonalizationScreen, so continuing loses the confirmation
+      // stamp and nothing else — far better than trapping someone on step 4.
+      if (onboarding) navigation.navigate('FeaturesIntro');
     } finally {
       setSaving(false);
     }
@@ -277,9 +354,12 @@ export default function ArchetypeSelectScreen({ navigation }) {
       <StatusBar style={isDarkMode ? 'light' : 'dark'} />
       <ScreenHeader
         title="Your Archetype"
-        subtitle="What you are being developed into"
-        onBack={() => navigation.goBack()}
+        subtitle={onboarding ? 'Based on your position and size' : 'What you are being developed into'}
+        onBack={onboarding ? undefined : () => navigation.goBack()}
       />
+      {onboarding && (
+        <NarrationToggle color={theme.textSecondary} fill={theme.surface} border={theme.hairline} />
+      )}
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <Entrance
@@ -292,24 +372,31 @@ export default function ArchetypeSelectScreen({ navigation }) {
             padding: 14,
           }}
         >
-          <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 14, color: theme.text }}>
-            {derived.ambiguous ? 'Two archetypes fit you equally well' : 'Best match'}
+          <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 16, color: theme.text }}>
+            {derived.ambiguous ? 'Two archetypes fit you equally well' : 'Your best match'}
           </Text>
-          <Text style={[TYPE.statCaption, { color: theme.textMuted, marginTop: 4 }]}>
+          {/* Another sentence that was set in the uppercase label preset. */}
+          <Text style={[TYPE.tooltipBody, { color: theme.textMuted, marginTop: 4 }]}>
             {CONFIDENCE_COPY[derived.confidence]}
           </Text>
 
-          {derived.needs.length ? (
-            <View style={{ marginTop: 10, gap: 4 }}>
+          {/* `needs` is about sharpening this later — real, but not something to
+              hand someone before they have confirmed anything. It stays on the
+              profile pass. */}
+          {!onboarding && derived.needs.length ? (
+            <View style={{ marginTop: 10, gap: 5 }}>
               {derived.needs.map((n) => (
-                <Text key={n} style={[TYPE.statCaption, { color: theme.textDim }]}>
+                <Text key={n} style={[TYPE.tooltipBody, { color: theme.textDim }]}>
                   • {n}
                 </Text>
               ))}
             </View>
           ) : null}
 
-          {derived.signalsMissing.includes('position') || derived.signalsMissing.includes('height') ? (
+          {/* Onboarding just asked for position and height, and EditProfile is not
+              reachable from the onboarding stack — so this prompt only makes sense
+              for someone whose profile is genuinely missing them. */}
+          {!onboarding && (derived.signalsMissing.includes('position') || derived.signalsMissing.includes('height')) ? (
             <OutlineButton
               icon="person-outline"
               label="Add position & height"
@@ -321,6 +408,11 @@ export default function ArchetypeSelectScreen({ navigation }) {
 
         <View style={{ marginTop: SHAPE.sectionGap }}>
           <SectionLabel>{showAll ? 'All archetypes' : 'Suggested'}</SectionLabel>
+          {onboarding && !showAll ? (
+            <Text style={[TYPE.tooltipBody, { color: theme.textDim, marginBottom: 8 }]}>
+              Tap it to see what you'll be working on.
+            </Text>
+          ) : null}
           <View style={{ gap: 11 }}>
             {visibleIds.map((id, i) => (
               <ArchetypeCard
@@ -332,6 +424,7 @@ export default function ArchetypeSelectScreen({ navigation }) {
                 onSelect={setSelected}
                 theme={theme}
                 delay={60 + i * 50}
+                compact={onboarding}
               />
             ))}
           </View>
@@ -346,13 +439,15 @@ export default function ArchetypeSelectScreen({ navigation }) {
 
         <PrimaryButton
           icon="checkmark-circle-outline"
-          label={saving ? 'Saving…' : 'Confirm archetype'}
+          label={saving ? 'Saving…' : onboarding ? "That's me — continue" : 'Confirm archetype'}
           disabled={saving || !selected}
           onPress={handleConfirm}
           style={{ marginTop: SHAPE.sectionGap }}
         />
-        <Text style={[TYPE.statCaption, { color: theme.textDim, marginTop: 8, textAlign: 'center' }]}>
-          You can change this later. Changing it rebuilds your plan and re-scores your shot menu.
+        <Text style={[TYPE.tooltipBody, { color: theme.textDim, marginTop: 10, textAlign: 'center' }]}>
+          {onboarding
+            ? 'You can change this any time.'
+            : 'Changing this rebuilds your plan and re-scores your shot menu.'}
         </Text>
 
         <View style={styles.bottomSpacer} />

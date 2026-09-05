@@ -1,0 +1,4 @@
+{
+  "//": "Marks this directory's files as ES modules so the pure ones (constants.js and friends) run unchanged under Node's test runner, mirroring src/services/blueprint and src/services/assignments. Metro and Babel ignore the `type` field and transform these files normally, so the React Native build is unaffected. Note this directory is NOT uniformly pure — filmUpload.js, profileImage.js and typography.js import React Native — but Node only ever loads the files a test imports, and no test imports those.",
+  "type": "module"
+}

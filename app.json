@@ -46,7 +46,15 @@
           "isAccessMediaLocationEnabled": true
         }
       ],
-      "expo-video"
+      "expo-video",
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/",
+          "project": "basketballaiapp",
+          "organization": "basketball-ai-ecosystem"
+        }
+      ]
     ],
     "extra": {
       "eas": {

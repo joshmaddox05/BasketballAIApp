@@ -21,20 +21,8 @@ import { useAppContext } from '../../context/AppContext';
 import { updateUserProfile, getUserProfile } from '../../services/firestoreService';
 import { getTheme } from '../../utils/theme';
 import { uploadProfileImage } from '../../utils/profileImage';
-import { parseHeightToInches } from '../../services/blueprint/archetypeAssignment';
-
-// Height is stored as free text (`6'2"`). These two keep the picker and the stored
-// string in agreement so the archetype engine has a single format to parse.
-const splitHeight = (raw) => {
-    const inches = parseHeightToInches(raw);
-    if (!inches) return { feet: null, inches: null };
-    return { feet: Math.floor(inches / 12), inches: Math.round(inches % 12) };
-};
-
-const composeHeight = (feet, inches) => {
-    if (feet == null) return null;
-    return `${feet}'${inches ?? 0}"`;
-};
+import { composeHeight, splitHeight } from '../../services/blueprint/archetypeAssignment';
+import { GRADE_LEVELS, POSITIONS, FEET_OPTIONS, INCH_OPTIONS } from '../../utils/constants';
 
 const EditProfileScreen = ({ navigation }) => {
     const { userData, user, isDarkMode, theme: contextTheme, updateUserDataLocally } = useAppContext();
@@ -65,22 +53,6 @@ const EditProfileScreen = ({ navigation }) => {
     ];
     const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     const DURATION_OPTIONS = [15, 30, 45, 60, 90];
-    const POSITIONS = [
-        { value: 'PG', label: 'PG' },
-        { value: 'SG', label: 'SG' },
-        { value: 'SF', label: 'SF' },
-        { value: 'PF', label: 'PF' },
-        { value: 'C', label: 'C' },
-    ];
-    const FEET_OPTIONS = [4, 5, 6, 7];
-    const INCH_OPTIONS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
-    const GRADE_LEVELS = [
-        { value: 9, label: '9th' },
-        { value: 10, label: '10th' },
-        { value: 11, label: '11th' },
-        { value: 12, label: '12th' },
-        { value: 0, label: 'Not HS' },
-    ];
 
     useEffect(() => {
         // Check if any changes have been made
@@ -96,7 +68,14 @@ const EditProfileScreen = ({ navigation }) => {
         const coachTypeChanged = coachType !== (userData?.coachType || 'org');
         const bioChanged = bio !== (userData?.bio || '');
 
-        setHasChanges(nameChanged || imageChanged || daysChanged || durationChanged || gradeChanged || coachTypeChanged || bioChanged);
+        // positionChanged and heightChanged were computed and then left out of this
+        // disjunction, so Save stayed disabled for anyone whose only edit was their
+        // position or height — the two fields the archetype engine weighs most, and
+        // the two this screen exists to collect.
+        setHasChanges(
+            nameChanged || imageChanged || daysChanged || durationChanged || gradeChanged
+            || positionChanged || heightChanged || coachTypeChanged || bioChanged
+        );
     }, [displayName, profileImage, trainingDays, preferredDuration, gradeLevel, position, heightFeet, heightInches, coachType, bio, userData]);
 
     const pickImage = async () => {

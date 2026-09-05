@@ -22,15 +22,8 @@ import {
 } from '../../services/firestoreService';
 import { uploadProfileImage } from '../../utils/profileImage';
 import { evalGradeOf } from '../../services/blueprint/evalRankPresenter';
-
-const POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'];
-const GRADE_LEVELS = [
-  { value: 9, label: '9th' },
-  { value: 10, label: '10th' },
-  { value: 11, label: '11th' },
-  { value: 12, label: '12th' },
-  { value: 0, label: 'Not HS' },
-];
+import { composeHeight, splitHeight } from '../../services/blueprint/archetypeAssignment';
+import { GRADE_LEVELS, POSITIONS, FEET_OPTIONS, INCH_OPTIONS } from '../../utils/constants';
 
 const initialsFor = (name = '') =>
   name.split(' ').map((n) => n[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || '?';
@@ -46,7 +39,11 @@ export default function EditAthleteProfileScreen({ navigation, route }) {
   const [displayName, setDisplayName] = useState('');
   const [photo, setPhoto] = useState(null); // string URL or { uri }
   const [position, setPosition] = useState(null);
-  const [height, setHeight] = useState('');
+  // Was a free-text field, so a parent could type "six two" or "74" and the
+  // archetype engine got nothing usable out of it while the athlete's own screen
+  // wrote a clean `6'2"`. Same picker on both sides now.
+  const [heightFeet, setHeightFeet] = useState(null);
+  const [heightInches, setHeightInches] = useState(null);
   const [gradeLevel, setGradeLevel] = useState(null);
 
   useEffect(() => {
@@ -61,7 +58,9 @@ export default function EditAthleteProfileScreen({ navigation, route }) {
       setDisplayName(prof?.displayName || prof?.name || '');
       setPhoto(prof?.photoURL || null);
       setPosition(prof?.position || null);
-      setHeight(prof?.height || '');
+      const h = splitHeight(prof?.height);
+      setHeightFeet(h.feet);
+      setHeightInches(h.inches);
       setGradeLevel(prof?.gradeLevel ?? null);
       setWasVisible(!!scoutLab?.directoryVisible);
       setLoading(false);
@@ -98,7 +97,7 @@ export default function EditAthleteProfileScreen({ navigation, route }) {
         name: displayName.trim(),
         photoURL,
         position: position || null,
-        height: height.trim() || null,
+        height: composeHeight(heightFeet, heightInches),
         gradeLevel: gradeLevel ?? null,
       };
       await updateUserProfile(childUid, update);
@@ -136,7 +135,7 @@ export default function EditAthleteProfileScreen({ navigation, route }) {
     } finally {
       setSaving(false);
     }
-  }, [childUid, displayName, photo, position, height, gradeLevel, wasVisible, navigation]);
+  }, [childUid, displayName, photo, position, heightFeet, heightInches, gradeLevel, wasVisible, navigation]);
 
   const renderHeader = () => (
     <View style={[styles.header, { borderBottomColor: theme.border }]}>
@@ -203,24 +202,41 @@ export default function EditAthleteProfileScreen({ navigation, route }) {
           <View style={styles.chipRow}>
             {POSITIONS.map((p) => (
               <TouchableOpacity
-                key={p}
-                style={[styles.chip, { borderColor: position === p ? theme.primary : theme.border, backgroundColor: position === p ? theme.primary + '18' : 'transparent' }]}
-                onPress={() => setPosition(position === p ? null : p)}
+                key={p.value}
+                style={[styles.chip, { borderColor: position === p.value ? theme.primary : theme.border, backgroundColor: position === p.value ? theme.primary + '18' : 'transparent' }]}
+                onPress={() => setPosition(position === p.value ? null : p.value)}
               >
-                <Text style={[styles.chipText, { color: position === p ? theme.primary : theme.textSecondary }]}>{p}</Text>
+                <Text style={[styles.chipText, { color: position === p.value ? theme.primary : theme.textSecondary }]}>{p.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
 
           {/* Height */}
           <Text style={[styles.label, { color: theme.textSecondary }]}>Height</Text>
-          <TextInput
-            style={[styles.input, { backgroundColor: theme.card, borderColor: theme.border, color: theme.text }]}
-            value={height}
-            onChangeText={setHeight}
-            placeholder={`e.g. 6'2"`}
-            placeholderTextColor={theme.textSecondary}
-          />
+          <View style={styles.chipRow}>
+            {FEET_OPTIONS.map((f) => (
+              <TouchableOpacity
+                key={f}
+                style={[styles.chip, { borderColor: heightFeet === f ? theme.primary : theme.border, backgroundColor: heightFeet === f ? theme.primary + '18' : 'transparent' }]}
+                onPress={() => setHeightFeet(heightFeet === f ? null : f)}
+              >
+                <Text style={[styles.chipText, { color: heightFeet === f ? theme.primary : theme.textSecondary }]}>{f}'</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          {heightFeet != null && (
+            <View style={styles.chipRow}>
+              {INCH_OPTIONS.map((i) => (
+                <TouchableOpacity
+                  key={i}
+                  style={[styles.chip, { borderColor: heightInches === i ? theme.primary : theme.border, backgroundColor: heightInches === i ? theme.primary + '18' : 'transparent' }]}
+                  onPress={() => setHeightInches(i)}
+                >
+                  <Text style={[styles.chipText, { color: heightInches === i ? theme.primary : theme.textSecondary }]}>{i}"</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
 
           {/* Grade */}
           <Text style={[styles.label, { color: theme.textSecondary }]}>Grade Level</Text>

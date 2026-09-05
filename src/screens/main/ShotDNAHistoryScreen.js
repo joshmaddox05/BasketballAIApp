@@ -17,16 +17,6 @@ import { canAccessFeature } from '../../utils/subscription';
 
 const FILTERS = ['All', 'Last 30 Days', 'Last 90 Days'];
 
-const MOCK_HISTORY = [
-  { id: '1', date: 'Jun 10, 2026', score: 81, topMetric: 'Follow-Through', type: 'Mid-Range' },
-  { id: '2', date: 'Jun 7, 2026', score: 74, topMetric: 'Arc Height', type: 'Three-Pointer' },
-  { id: '3', date: 'Jun 3, 2026', score: 79, topMetric: 'Consistency', type: 'Free Throw' },
-  { id: '4', date: 'May 28, 2026', score: 68, topMetric: 'Release Angle', type: 'Pull-Up' },
-  { id: '5', date: 'May 22, 2026', score: 83, topMetric: 'Footwork', type: 'Catch & Shoot' },
-  { id: '6', date: 'May 15, 2026', score: 71, topMetric: 'Follow-Through', type: 'Mid-Range' },
-  { id: '7', date: 'Apr 30, 2026', score: 77, topMetric: 'Arc Height', type: 'Three-Pointer' },
-];
-
 function getScoreColor(score) {
   if (score >= 80) return '#4CAF50';
   if (score >= 65) return '#8A1C22';
@@ -35,7 +25,10 @@ function getScoreColor(score) {
 
 function getFilteredHistory(history, filter) {
   if (filter === 'All') return history;
-  const now = new Date('2026-06-13');
+  // Was hard-coded to new Date('2026-06-13') so the removed mock's fixed dates
+  // would fall inside the windows. Against real analyses that froze both
+  // filters to a date in the past.
+  const now = new Date();
   const cutoff = filter === 'Last 30 Days' ? 30 : 90;
   return history.filter((item) => {
     const itemDate = new Date(item.date);
@@ -74,10 +67,9 @@ export default function ShotDNAHistoryScreen({ navigation }) {
   const { theme, shotDNAProfile } = useAppContext();
   const [activeFilter, setActiveFilter] = useState('All');
 
-  const allHistory =
-    shotDNAProfile?.recentAnalyses && shotDNAProfile.recentAnalyses.length
-      ? shotDNAProfile.recentAnalyses
-      : MOCK_HISTORY;
+  // No fallback: an athlete with no analyses gets the EmptyState below rather
+  // than seven invented sessions dated in the past.
+  const allHistory = shotDNAProfile?.recentAnalyses || [];
 
   const filteredHistory = getFilteredHistory(allHistory, activeFilter);
 

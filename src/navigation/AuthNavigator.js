@@ -5,6 +5,7 @@ import WelcomeScreen from '../screens/auth/WelcomeScreen';
 import LoginScreen from '../screens/auth/LoginScreen';
 import SignupScreen from '../screens/auth/SignupScreen';
 import PasswordResetScreen from '../screens/auth/PasswordResetScreen';
+import JoinWithCodeScreen from '../screens/auth/JoinWithCodeScreen';
 
 const Stack = createStackNavigator();
 
@@ -15,6 +16,7 @@ const AuthNavigator = () => {
             <Stack.Screen name="Login" component={LoginScreen} />
             <Stack.Screen name="Signup" component={SignupScreen} />
             <Stack.Screen name="PasswordReset" component={PasswordResetScreen} />
+            <Stack.Screen name="JoinWithCode" component={JoinWithCodeScreen} />
         </Stack.Navigator>
     );
 };

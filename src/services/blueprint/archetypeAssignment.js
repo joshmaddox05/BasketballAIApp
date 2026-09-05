@@ -186,6 +186,63 @@ export const parseHeightToInches = (raw) => {
   return null;
 };
 
+/**
+ * The stored height format: `6'2"`. Every picker in the app produces exactly
+ * this, so parseHeightToInches above has one shape to handle rather than
+ * whatever a free-text field happened to receive.
+ */
+export const composeHeight = (feet, inches) => {
+  if (feet == null) return null;
+  return `${feet}'${inches ?? 0}"`;
+};
+
+/** Inverse of composeHeight, via the tolerant parser — so a height stored in any
+ *  of the older accepted formats still populates the picker correctly. */
+export const splitHeight = (raw) => {
+  const inches = parseHeightToInches(raw);
+  if (!inches) return { feet: null, inches: null };
+  return { feet: Math.floor(inches / 12), inches: Math.round(inches % 12) };
+};
+
+/**
+ * Which training categories each archetype should actually be doing, as weights
+ * in 0..1 over WORKOUT_CATEGORIES (declared in data/workoutTemplates.js — the
+ * string values are duplicated here rather than imported, because this module is
+ * pure and workoutTemplates pulls in the subscription tiers).
+ *
+ * This is the missing half of the archetype. The engine has always been able to
+ * tell an athlete they are a Defensive Anchor; nothing then changed about what it
+ * asked them to train, because the recommender only ever saw level, goals and
+ * focus areas. A 6'9" anchor and a 5'9" ball handler with the same three focus
+ * chips got byte-identical recommendations.
+ *
+ * Weights are relative within an archetype, not across them: the recommender
+ * scales its budget by the weight of the workout's own category.
+ */
+export const ARCHETYPE_CATEGORY_AFFINITY = {
+  PRIMARY_BALL_HANDLER: { Dribbling: 1.0, Passing: 0.9, Shooting: 0.7, Physical: 0.5, Defense: 0.4, Custom: 0.6 },
+  SECONDARY_CREATOR:    { Dribbling: 0.8, Passing: 0.9, Shooting: 0.8, Physical: 0.5, Defense: 0.5, Custom: 0.6 },
+  MOVEMENT_SHOOTER:     { Shooting: 1.0, Physical: 0.7, Dribbling: 0.6, Passing: 0.4, Defense: 0.4, Custom: 0.5 },
+  SPOT_UP_SHOOTER:      { Shooting: 1.0, Defense: 0.6, Physical: 0.5, Dribbling: 0.4, Passing: 0.4, Custom: 0.5 },
+  SLASHER:              { Dribbling: 0.9, Physical: 0.9, Shooting: 0.6, Defense: 0.5, Passing: 0.4, Custom: 0.5 },
+  INTERIOR_FINISHER:    { Physical: 1.0, Defense: 0.7, Shooting: 0.5, Passing: 0.4, Dribbling: 0.3, Custom: 0.5 },
+  TWO_WAY_DEFENDER:     { Defense: 1.0, Physical: 0.8, Shooting: 0.6, Dribbling: 0.5, Passing: 0.4, Custom: 0.5 },
+  DEFENSIVE_ANCHOR:     { Defense: 1.0, Physical: 0.9, Passing: 0.4, Shooting: 0.4, Dribbling: 0.3, Custom: 0.5 },
+  HYBRID:               { Shooting: 0.7, Dribbling: 0.7, Defense: 0.7, Physical: 0.7, Passing: 0.7, Custom: 0.7 },
+};
+
+/**
+ * How well a workout category suits an archetype, 0..1.
+ * An unknown archetype or category returns the neutral 0.5, so a missing
+ * archetype leaves the ranking exactly as it was rather than reshuffling it.
+ */
+export const categoryAffinityFor = (archetypeId, category) => {
+  const row = ARCHETYPE_CATEGORY_AFFINITY[archetypeId];
+  if (!row) return 0.5;
+  const weight = row[category];
+  return typeof weight === 'number' ? weight : 0.5;
+};
+
 // Height only means something relative to peers, and grade is the only age proxy
 // the app stores (no birthdate exists — see PRODUCT.md "explicitly undecided").
 // `guard` = at/below this is guard-sized; `big` = at/above this is big-sized.

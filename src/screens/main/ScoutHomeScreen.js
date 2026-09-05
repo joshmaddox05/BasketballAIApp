@@ -31,6 +31,7 @@ import {
   getScoutAccessStatuses,
   listenToUnreadNotificationCount,
 } from '../../services/firestoreService';
+import { GRADE_LABEL } from '../../utils/constants';
 
 // ─── Data mapping helpers ──────────────────────────────────────────────────────
 
@@ -47,7 +48,6 @@ const shortDate = (value) => {
   return d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—';
 };
 
-const GRADE_LABEL = { 9: '9th', 10: '10th', 11: '11th', 12: '12th' };
 
 // Grade → color, remapped to the burgundy palette (README 14c note):
 // A→accentText, B→accentText, C→steel, else textDim.

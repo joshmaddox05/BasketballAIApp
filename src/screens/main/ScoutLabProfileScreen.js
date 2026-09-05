@@ -15,33 +15,13 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
 import { canAccessFeature } from '../../utils/subscription';
+import { GRADE_LABEL } from '../../utils/constants';
 
-// ---------------------------------------------------------------------------
-// Mock data – replaced by real API data in production
-// ---------------------------------------------------------------------------
-const MOCK_HIGHLIGHTS = [
-  {
-    id: '1',
-    title: 'State Championship Highlights',
-    duration: '2:34',
-    views: 142,
-    thumbnail: null, // real URL in production
-  },
-  {
-    id: '2',
-    title: 'AAU Tournament Reel',
-    duration: '3:11',
-    views: 87,
-    thumbnail: null,
-  },
-  {
-    id: '3',
-    title: 'Shooting Mechanics Drill',
-    duration: '1:48',
-    views: 63,
-    thumbnail: null,
-  },
-];
+// Highlight reels were three fabricated clips ("State Championship Highlights",
+// 142 views) on the very profile a scout reads. There is no highlight upload
+// anywhere in the app — no collection, no service, and the "Add" button had no
+// handler — so nothing here could ever have been real. Empty state until the
+// feature exists.
 
 // Mock stat badges for the stats row
 const buildStatBadges = ({ evalGrade, shotDNA, blueprintStatus }) => [
@@ -68,41 +48,6 @@ const buildStatBadges = ({ evalGrade, shotDNA, blueprintStatus }) => [
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
-function VideoThumbnailCard({ clip, theme, onPress }) {
-  return (
-    <TouchableOpacity
-      style={[styles.videoThumb, { backgroundColor: theme.backgroundTertiary || theme.backgroundSecondary }]}
-      activeOpacity={0.8}
-      onPress={onPress}
-    >
-      {/* Dark overlay simulating video thumbnail */}
-      <View style={[styles.videoOverlay, { backgroundColor: 'rgba(0,0,0,0.35)' }]} />
-
-      {/* Centered play button */}
-      <View style={styles.playBtnWrap}>
-        <View style={[styles.playCircle, { backgroundColor: theme.primary }]}>
-          <Ionicons name="play" size={20} color="#fff" style={{ marginLeft: 2 }} />
-        </View>
-      </View>
-
-      {/* Duration badge – top right */}
-      <View style={styles.durationBadgeWrap}>
-        <View style={styles.durationBadge}>
-          <Text style={styles.durationText}>{clip.duration}</Text>
-        </View>
-      </View>
-
-      {/* Title + views – bottom */}
-      <View style={[styles.videoMeta, { backgroundColor: 'rgba(0,0,0,0.55)' }]}>
-        <Text style={styles.videoTitle} numberOfLines={1}>
-          {clip.title}
-        </Text>
-        <Text style={styles.videoViews}>{clip.views} views</Text>
-      </View>
-    </TouchableOpacity>
-  );
-}
-
 function StatBadge({ badge, theme }) {
   return (
     <View
@@ -133,7 +78,6 @@ export default function ScoutLabProfileScreen({ navigation, route }) {
   const viewingUid = prospect?.id || prospect?.uid || route?.params?.uid || null;
   const isOwnProfile = !viewingUid || viewingUid === userData?.uid;
 
-  const GRADE_LABEL = { 9: '9th', 10: '10th', 11: '11th', 12: '12th' };
 
   let name, position, age, grade, location, evalGrade, shotDNA, blueprintStatus;
   if (isOwnProfile) {
@@ -196,10 +140,6 @@ export default function ScoutLabProfileScreen({ navigation, route }) {
       ],
     );
   }, [isOwnProfile, name]);
-
-  const handleVideoPress = useCallback((clip) => {
-    Alert.alert(clip.title, 'Video player coming soon.', [{ text: 'OK' }]);
-  }, []);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
@@ -277,24 +217,15 @@ export default function ScoutLabProfileScreen({ navigation, route }) {
         <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
           <View style={styles.cardTitleRow}>
             <Text style={[styles.cardTitle, { color: theme.text }]}>Highlight Reel</Text>
-            {isOwnProfile && (
-              <TouchableOpacity
-                style={[styles.addVideoBtn, { backgroundColor: theme.primary + '18' }]}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="add" size={16} color={theme.primary} />
-                <Text style={[styles.addVideoBtnText, { color: theme.primary }]}>Add</Text>
-              </TouchableOpacity>
-            )}
           </View>
-          {MOCK_HIGHLIGHTS.map((clip) => (
-            <VideoThumbnailCard
-              key={clip.id}
-              clip={clip}
-              theme={theme}
-              onPress={() => handleVideoPress(clip)}
-            />
-          ))}
+          <View style={styles.highlightsEmpty}>
+            <Ionicons name="videocam-outline" size={22} color={theme.textSecondary} />
+            <Text style={[styles.highlightsEmptyText, { color: theme.textSecondary }]}>
+              {isOwnProfile
+                ? 'Highlight reels are not available yet.'
+                : 'This athlete has no highlight reels.'}
+            </Text>
+          </View>
         </View>
 
         {/* ── Action Buttons ─────────────────────────────────────────────── */}
@@ -430,57 +361,15 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   cardTitle: { fontSize: 17.5, fontWeight: '700' },
-  addVideoBtn: {
-    flexDirection: 'row',
+  highlightsEmpty: {
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 10,
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 22,
   },
-  addVideoBtnText: { fontSize: 15, fontWeight: '600' },
+  highlightsEmptyText: { fontSize: 13.5, textAlign: 'center' },
 
   // Video thumbnail
-  videoThumb: {
-    borderRadius: 12,
-    height: 110,
-    marginBottom: 10,
-    overflow: 'hidden',
-    justifyContent: 'flex-end',
-  },
-  videoOverlay: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  playBtnWrap: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  playCircle: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  durationBadgeWrap: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-  },
-  durationBadge: {
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    borderRadius: 5,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  durationText: { color: '#fff', fontSize: 13, fontWeight: '600' },
-  videoMeta: {
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-  },
-  videoTitle: { color: '#fff', fontSize: 15, fontWeight: '600' },
-  videoViews: { color: 'rgba(255,255,255,0.75)', fontSize: 13, marginTop: 2 },
 
   // Buttons
   primaryBtn: {

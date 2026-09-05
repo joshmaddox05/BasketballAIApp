@@ -37,6 +37,7 @@ import {
   getCoachAssignmentSummary,
 } from '../../services/firestoreService';
 import { ARCHETYPES } from '../../services/blueprint/archetypes';
+import { Explain, ExplainProvider } from '../../components/features/Explain';
 
 // Display order + accent color per archetype family (services/blueprint/archetypes.js
 // §A.2's `family` field) so the roster reads as offense/defense/utility groups
@@ -127,14 +128,19 @@ function PlayerRow({ player, theme, onPress }) {
           </Text>
         </View>
       </View>
-      <View style={[styles.workloadPill, { backgroundColor: player.workload.color + '18' }]}>
-        <Text style={[styles.workloadText, { color: player.workload.color }]}>{player.workload.label}</Text>
-      </View>
+      {/* The comment on computeWorkload says plainly that this is a 7-day session
+          count and not a fatigue model. The coach reading "High" in red had no way
+          to know that — so now the label says it. */}
+      <Explain term="workload" hideIcon>
+        <View style={[styles.workloadPill, { backgroundColor: player.workload.color + '18' }]}>
+          <Text style={[styles.workloadText, { color: player.workload.color }]}>{player.workload.label}</Text>
+        </View>
+      </Explain>
     </Wrapper>
   );
 }
 
-export default function SimCoachTeamModelScreen({ navigation }) {
+function TeamModelScreen({ navigation }) {
   const { user, userData, theme, isDarkMode } = useAppContext();
   const isCoach = userData?.role === 'coach';
   const coachUid = user?.uid;
@@ -340,3 +346,11 @@ const styles = StyleSheet.create({
   accessDenied: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 },
   deniedTitle: { fontSize: 21, fontWeight: '700' },
 });
+
+export default function SimCoachTeamModelScreen(props) {
+  return (
+    <ExplainProvider>
+      <TeamModelScreen {...props} />
+    </ExplainProvider>
+  );
+}

@@ -18,6 +18,8 @@ export const STRIPE_CONFIG = {
   },
 
   // Payment links - users will be redirected to these URLs to complete subscription
+  // NOTE: test-mode link (buy.stripe.com/test_...). Must be swapped for the live
+  // link before anyone outside the pilot can actually pay.
   paymentLinks: {
     pro: 'https://buy.stripe.com/test_bJe5kF0qfc9J1kXg4018c01', // reused Premium link
   },

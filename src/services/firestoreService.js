@@ -33,6 +33,8 @@ import {
 } from './assignments/assignmentLifecycle';
 import { deleteFile } from './storageService';
 import { ACHIEVEMENTS, getLevelFromXP } from '../data/achievements';
+import { isHighSchoolGrade, requiresGuardianConsent, SESSION_STATUS } from '../utils/constants';
+import { MIN_SIMCOACH_SCENARIOS } from './blueprint/inputMappers';
 
 /**
  * Recursively remove `undefined` values from an object/array so it is safe to
@@ -3398,10 +3400,23 @@ export const getSimCoachResults = async (uid, limitCount = 20) => {
   }
 };
 
+/**
+ * Mean decision-IQ over the athlete's recent scenarios, or null when there is not
+ * yet enough to call it a measurement.
+ *
+ * The threshold is the same MIN_SIMCOACH_SCENARIOS that Blueprint and EvalRank
+ * enforce. It was applied there but not here, so a single answered scenario
+ * produced a number on the Home tile and the SimCoach card while Blueprint, on
+ * the same data, called decision accuracy unmeasured. One of the two had to be
+ * wrong in front of the athlete; now neither reports a score the engine will not
+ * stand behind.
+ *
+ * @returns {Promise<number|null>} 0–100, or null when unmeasured.
+ */
 export const getSimCoachIQScore = async (uid) => {
   try {
     const results = await getSimCoachResults(uid, 10);
-    if (results.length === 0) return null;
+    if (results.length < MIN_SIMCOACH_SCENARIOS) return null;
     // `|| 0` silently scored every pre-iqScore result as zero, so the displayed IQ
     // was dragged toward 0 by history rather than reflecting it. Fall back to the
     // boolean `correct` those documents do carry, and ignore anything with neither.
@@ -3446,9 +3461,13 @@ export const getScoutLabProfile = async (uid) => {
   }
 };
 
-// High-school grades 9–12 are the only scout-discoverable cohort (per COO policy).
-export const isHighSchoolGrade = (gradeLevel) =>
-  Number.isInteger(gradeLevel) && gradeLevel >= 9 && gradeLevel <= 12;
+// Re-exported, not defined here. The canonical definition moved to
+// utils/constants.js alongside GRADE_LEVELS and requiresGuardianConsent — grade
+// semantics now drive eligibility and the guardian gate, not just scout
+// discoverability, so burying them in the data layer was the wrong home. This
+// re-export keeps the existing `import { isHighSchoolGrade } from
+// '../../services/firestoreService'` call sites working.
+export { isHighSchoolGrade };
 
 /**
  * Publish (or update) the player's public directory entry so scouts can
@@ -3578,14 +3597,87 @@ export const getCoachMarketListings = async ({ category, limitCount = 30 } = {})
   }
 };
 
+// ─── CoachMarket media entitlement ──────────────────────────────────────────
+//
+// A listing document is readable by ANY signed-in user (see firestore.rules —
+// browse has to work before you buy). It used to carry `drills[].videoUrl`,
+// and those URLs are Firebase download URLs of the form `?alt=media&token=…`,
+// which are bearer credentials that bypass Storage rules entirely. The paywall
+// in CoachMarketListingScreen was a client-side `canWatch` check, so anyone who
+// read the listing doc through the SDK could stream every paid drill for free.
+//
+// The video URLs now live in a `media` subcollection that only the owner or a
+// holder of users/{uid}/coachMarketPurchases/{listingId} may read. The public
+// document keeps title, duration and a `hasVideo` flag — everything the browse
+// and lock-icon UI needs, and nothing that grants access.
+//
+// Residual, accepted for now: a legitimate buyer can still reshare their URL.
+// Short-lived signed URLs are the only real fix and are deliberately deferred.
+
+/** Strip credentials out of a drills array, keeping what the public UI needs. */
+const publicDrills = (drills = []) =>
+  (drills || []).map((d) => ({
+    title: d.title || 'Untitled drill',
+    durationSec: d.durationSec || null,
+    hasVideo: !!d.videoUrl,
+  }));
+
+/** Write one media doc per drill index; remove any left over from a shorter edit. */
+const writeListingMedia = async (listingId, drills = []) => {
+  const col = collection(db, 'coachMarketListings', listingId, 'media');
+  await Promise.all(
+    (drills || []).map((d, i) =>
+      setDoc(doc(col, String(i)), {
+        videoUrl: d.videoUrl || '',
+        storagePath: d.storagePath || '',
+        updatedAt: serverTimestamp(),
+      })
+    )
+  );
+  // An edit that removed drills would otherwise strand the old media docs —
+  // and a stranded doc is a live video URL nobody can see but everyone who
+  // bought the listing can still fetch.
+  const existing = await getDocs(col);
+  await Promise.all(
+    existing.docs
+      .filter((d) => Number(d.id) >= (drills || []).length)
+      .map((d) => deleteDoc(d.ref))
+  );
+};
+
+/**
+ * Video URLs for a listing, keyed by drill index. Callers must gate on
+ * ownership or purchase before calling — the rules enforce it regardless, so a
+ * non-entitled caller gets an empty map rather than an exception.
+ * @returns {Promise<Object<string, {videoUrl: string, storagePath: string}>>}
+ */
+export const getListingMedia = async (listingId) => {
+  try {
+    const snapshot = await getDocs(collection(db, 'coachMarketListings', listingId, 'media'));
+    const byIndex = {};
+    snapshot.docs.forEach((d) => {
+      byIndex[d.id] = { videoUrl: d.data().videoUrl || '', storagePath: d.data().storagePath || '' };
+    });
+    return byIndex;
+  } catch (error) {
+    // Expected for a signed-in user who has not purchased: the rule denies the
+    // read. Not an error condition worth surfacing.
+    console.warn('Listing media unavailable (not entitled, or none uploaded).');
+    return {};
+  }
+};
+
 export const saveCoachMarketListing = async (coachUid, listingData) => {
   try {
+    const { drills, ...rest } = listingData;
     const ref = await addDoc(collection(db, 'coachMarketListings'), {
-      ...listingData,
+      ...rest,
+      drills: publicDrills(drills),
       coachUid,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
+    await writeListingMedia(ref.id, drills);
     return ref.id;
   } catch (error) {
     console.error('Error saving CoachMarket listing:', error);
@@ -3620,10 +3712,14 @@ export const getCoachMarketListing = async (listingId) => {
 
 export const updateCoachMarketListing = async (listingId, data) => {
   try {
-    await updateDoc(doc(db, 'coachMarketListings', listingId), {
-      ...data,
-      updatedAt: serverTimestamp(),
-    });
+    // Status-only updates (publish / unpublish) carry no drills — leave the
+    // media subcollection untouched in that case rather than wiping it.
+    const { drills, ...rest } = data;
+    const payload = { ...rest, updatedAt: serverTimestamp() };
+    if (drills !== undefined) payload.drills = publicDrills(drills);
+
+    await updateDoc(doc(db, 'coachMarketListings', listingId), payload);
+    if (drills !== undefined) await writeListingMedia(listingId, drills);
   } catch (error) {
     console.error('Error updating CoachMarket listing:', error);
     throw error;
@@ -3632,6 +3728,11 @@ export const updateCoachMarketListing = async (listingId, data) => {
 
 export const deleteCoachMarketListing = async (listingId) => {
   try {
+    // Cascade the media subcollection first: deleting the parent document in
+    // Firestore does NOT delete its subcollections, and an orphaned media doc
+    // is a live video URL with no listing left to gate it.
+    const media = await getDocs(collection(db, 'coachMarketListings', listingId, 'media'));
+    await Promise.all(media.docs.map((d) => deleteDoc(d.ref)));
     await deleteDoc(doc(db, 'coachMarketListings', listingId));
   } catch (error) {
     console.error('Error deleting CoachMarket listing:', error);
@@ -3850,6 +3951,45 @@ export const redeemInviteCode = async (code, redeemer) => {
 
     const redeemerRole = redeemer?.role || 'parent';
 
+    // A coach linking to a high-school athlete needs guardian approval first.
+    //
+    // The pending request lives in its OWN collection rather than as a
+    // `status: 'pending'` field on `connections`, and that is the whole point:
+    // firestore.rules gates on a bare `exists()` of the connections doc
+    // (isConnectedTo / isParentConnectedTo / isParentOfPlayer), so a pending
+    // entry written there would grant a coach full read access to a minor's
+    // data the instant it appeared — the JS layer's status filter would hide it
+    // from the UI while the rules quietly allowed everything. Collection
+    // separation is what makes the scout flow safe, and it is what makes this
+    // safe. Do not "simplify" this into a status field.
+    //
+    // A PARENT is never gated — they are the approving authority, and blocking
+    // them would make the gate unopenable for an athlete with no guardian yet.
+    const ownerSnap = await getDoc(doc(db, 'users', ownerUid));
+    const needsConsent =
+      redeemerRole === 'coach' && requiresGuardianConsent(ownerSnap.data()?.gradeLevel);
+
+    if (needsConsent) {
+      await Promise.all([
+        setDoc(doc(db, 'users', ownerUid, 'connectionRequests', redeemerUid), {
+          roleHolderUid: redeemerUid,
+          roleHolderName: redeemer?.displayName || 'Anonymous',
+          roleHolderPhotoURL: redeemer?.photoURL || null,
+          role: redeemerRole,
+          playerName: invite.ownerName || 'Anonymous',
+          status: 'pending',
+          requestedAt: serverTimestamp(),
+          resolvedAt: null,
+        }),
+        updateDoc(codeRef, { used: true, usedBy: redeemerUid, usedAt: serverTimestamp() }),
+      ]);
+      return {
+        ownerUid,
+        ownerName: invite.ownerName || 'Anonymous',
+        pending: true,
+      };
+    }
+
     await Promise.all([
       // Player's connections: who is linked to me
       setDoc(doc(db, 'users', ownerUid, 'connections', redeemerUid), {
@@ -3875,10 +4015,107 @@ export const redeemInviteCode = async (code, redeemer) => {
       }),
     ]);
 
-    return { ownerUid, ownerName: invite.ownerName || 'Anonymous' };
+    return { ownerUid, ownerName: invite.ownerName || 'Anonymous', pending: false };
   } catch (error) {
     console.error('Error redeeming invite code:', error);
     throw error;
+  }
+};
+
+// ─── Guardian consent on coach links ────────────────────────────────────────
+//
+// Mirrors the scout consent flow (requestScoutAccess / approveScoutAccess /
+// denyScoutAccess) deliberately, so there is one shape to reason about for
+// "an adult wants access to a minor" rather than two.
+
+/**
+ * Pending coach-link requests across all of a parent's children.
+ * Mirrors getPendingScoutRequestsForParent.
+ */
+export const getPendingConnectionRequestsForParent = async (parentUid) => {
+  try {
+    const children = await getLinkedPlayers(parentUid);
+    const perChild = await Promise.all(
+      children.map(async (child) => {
+        try {
+          const q = query(
+            collection(db, 'users', child.uid, 'connectionRequests'),
+            where('status', '==', 'pending')
+          );
+          const snapshot = await getDocs(q);
+          return snapshot.docs.map((d) => ({
+            id: d.id,
+            childUid: child.uid,
+            childName: child.name || 'Your athlete',
+            ...d.data(),
+          }));
+          // Per-child catch: one unreadable child must not empty the whole list.
+        } catch {
+          return [];
+        }
+      })
+    );
+    return perChild.flat();
+  } catch (error) {
+    console.error('Error loading pending connection requests:', error);
+    return [];
+  }
+};
+
+/** A guardian approves a coach link: writes both mirrors, stamps the request. */
+export const approveConnectionRequest = async (childUid, roleHolderUid, meta = {}) => {
+  try {
+    await Promise.all([
+      setDoc(doc(db, 'users', childUid, 'connections', roleHolderUid), {
+        role: meta.role || 'coach',
+        name: meta.roleHolderName || 'Coach',
+        photoURL: meta.roleHolderPhotoURL || null,
+        linkedAt: serverTimestamp(),
+        status: 'active',
+        // Recorded so it is later provable that this link was consented to,
+        // not merely that it exists.
+        approvedByGuardian: true,
+      }),
+      setDoc(doc(db, 'users', roleHolderUid, 'linkedPlayers', childUid), {
+        name: meta.childName || 'Athlete',
+        photoURL: meta.childPhotoURL || null,
+        linkedAt: serverTimestamp(),
+        status: 'active',
+      }),
+      updateDoc(doc(db, 'users', childUid, 'connectionRequests', roleHolderUid), {
+        status: 'approved',
+        resolvedAt: serverTimestamp(),
+      }),
+    ]);
+  } catch (error) {
+    console.error('Error approving connection request:', error);
+    throw error;
+  }
+};
+
+/** A guardian denies a coach link. No connection document is ever written. */
+export const denyConnectionRequest = async (childUid, roleHolderUid) => {
+  try {
+    await updateDoc(doc(db, 'users', childUid, 'connectionRequests', roleHolderUid), {
+      status: 'denied',
+      resolvedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error('Error denying connection request:', error);
+    throw error;
+  }
+};
+
+/** Pending/denied requests on one athlete — for the athlete's own Connections screen. */
+export const getConnectionRequests = async (playerUid) => {
+  try {
+    const snapshot = await getDocs(collection(db, 'users', playerUid, 'connectionRequests'));
+    return snapshot.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (b.requestedAt?.seconds || 0) - (a.requestedAt?.seconds || 0));
+  } catch (error) {
+    console.error('Error loading connection requests:', error);
+    return [];
   }
 };
 
@@ -4375,8 +4612,9 @@ export const saveFilm = async (coachUid, meta) => {
       videoUrl: meta.videoUrl || '',
       storagePath: meta.storagePath || '',
       durationSec: typeof meta.durationSec === 'number' ? meta.durationSec : null,
-      // Legacy field, kept for back-compat — no current screen reads it.
-      status: 'uploaded',
+      // One status field, not two. `status` was written alongside this one and
+      // read by nothing — a second name for the same idea is how a reader ends up
+      // checking the stale one.
       processingStatus: 'uploaded',
       taggedEventIds: [],
       opponentModelId: null,
@@ -4400,7 +4638,12 @@ export const getFilms = async (coachUid) => {
   try {
     const snapshot = await getDocs(collection(db, 'users', coachUid, 'films'));
     const items = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-    items.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+    // A doc read back before its serverTimestamp resolves has createdAt === null.
+    // Coalescing that to 0 sorted the film the coach JUST uploaded to the bottom
+    // of the list — the one moment they are certain to be looking for it. Treat an
+    // unresolved timestamp as "now", which is what it is about to become.
+    const at = (f) => (f.createdAt?.seconds ?? Number.MAX_SAFE_INTEGER);
+    items.sort((a, b) => at(b) - at(a));
     return items;
   } catch (error) {
     console.error('Error fetching films:', error);
@@ -5173,9 +5416,10 @@ export const createCoachingSession = async (session) => {
       scheduledAt: session.scheduledAt || null,
       location: session.location || '',
       mode: session.mode || 'court',
+      // The agreed rate. NOT a charge: nothing in the app collects it, and the
+      // coach and athlete settle outside the product. The UI says so.
       amount: session.amount || 0,
-      status: 'pending',
-      rating: null,
+      status: SESSION_STATUS.PENDING,
       createdAt: serverTimestamp(),
     });
     return ref.id;
@@ -5215,9 +5459,20 @@ export const getAthleteSessions = async (athleteUid) => {
   }
 };
 
+/**
+ * Move a session to a new status. `status` must be a SESSION_STATUS value —
+ * passing an unknown string used to write it straight through, and every filter
+ * downstream then treated the session as neither upcoming nor past.
+ */
 export const updateSessionStatus = async (sessionId, status) => {
   try {
-    await updateDoc(doc(db, 'coachingSessions', sessionId), { status });
+    if (!Object.values(SESSION_STATUS).includes(status)) {
+      throw new Error(`Unknown session status: ${status}`);
+    }
+    await updateDoc(doc(db, 'coachingSessions', sessionId), {
+      status,
+      statusUpdatedAt: serverTimestamp(),
+    });
   } catch (error) {
     console.error('Error updating session status:', error);
     throw error;

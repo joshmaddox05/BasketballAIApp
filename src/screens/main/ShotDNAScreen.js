@@ -32,19 +32,19 @@ import {
 } from '../../components/dbe';
 import { TYPE, SHAPE, FONTS, MOTION } from '../../utils/typography';
 
-const MOCK_MECHANICS = [
-  { label: 'Release Angle', score: 78 },
-  { label: 'Footwork', score: 65 },
-  { label: 'Consistency', score: 82 },
-  { label: 'Arc Height', score: 71 },
-  { label: 'Follow-Through', score: 88 },
-];
-
-const MOCK_ANALYSES = [
-  { id: '1', date: 'Jun 10, 2026', score: 81, type: 'Mid-Range' },
-  { id: '2', date: 'Jun 7, 2026', score: 74, type: 'Three-Pointer' },
-  { id: '3', date: 'Jun 3, 2026', score: 79, type: 'Free Throw' },
-];
+// The five axes the biomechanics backend reports. These are real, fixed
+// dimensions of the analysis — they exist so the radar has a shape to draw
+// before the athlete has been measured, and every score is zero until one is.
+// (This replaced a mock that carried invented scores of 78/65/82/71/88, which
+// the screen showed to anyone who had never analysed a shot. `hasProfile`
+// already renders '--' and empty bars; the mock was the only thing stopping it.)
+const MECHANIC_DIMENSIONS = [
+  'Release Angle',
+  'Footwork',
+  'Consistency',
+  'Arc Height',
+  'Follow-Through',
+].map((label) => ({ label, score: 0 }));
 
 // Short axis captions for the radar (mock: RELEASE / FOOT / CONSIST / ARC / FOLLOW).
 const SHORT_LABELS = {
@@ -224,11 +224,10 @@ export default function ShotDNAScreen({ navigation }) {
   const mechanics =
     shotDNAProfile?.mechanics && shotDNAProfile.mechanics.length
       ? shotDNAProfile.mechanics
-      : MOCK_MECHANICS;
-  const recentAnalyses =
-    shotDNAProfile?.recentAnalyses && shotDNAProfile.recentAnalyses.length
-      ? shotDNAProfile.recentAnalyses
-      : MOCK_ANALYSES;
+      : MECHANIC_DIMENSIONS;
+  // No fallback: an athlete with no analyses sees the EmptyState below, not a
+  // list of shots they never took.
+  const recentAnalyses = shotDNAProfile?.recentAnalyses || [];
   const lineage = shotDNAProfile?.historicalComparisons || [];
   const avg = Math.round(mechanics.reduce((s, m) => s + (m.score || 0), 0) / (mechanics.length || 1));
 

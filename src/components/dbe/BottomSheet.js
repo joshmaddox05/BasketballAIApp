@@ -8,8 +8,23 @@
 //
 // Also adds the two dismissals every sheet in the app was missing: tap the backdrop,
 // and drag the sheet down.
+//
+// And it owns keyboard avoidance for every sheet in the product. An RN `Modal`
+// gets no automatic keyboard inset on iOS, so a sheet pinned to `flex-end` simply
+// sits under the keyboard: any input in its lower half, and the submit button
+// below them, become unreachable — there is nothing to scroll, because the
+// sheet's own height never changed. Every sheet with a text field had this. It is
+// fixed here, once, rather than in each of them.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Modal, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import ReAnimated, {
   Easing,
@@ -131,7 +146,17 @@ export function BottomSheet({
 
   return (
     <Modal visible transparent animationType="none" onRequestClose={onClose}>
-      <View style={styles.root}>
+      {/* The root itself does the avoiding, rather than a wrapper around the sheet.
+          Several sheets size themselves with a percentage maxHeight, and a
+          percentage only resolves against a parent with a real height — an
+          auto-sized wrapper would silently drop those constraints and let a tall
+          sheet run off the top of the screen. Insetting the root also shrinks the
+          backdrop, but only by exactly the keyboard's height, which the keyboard
+          is covering anyway. */}
+      <KeyboardAvoidingView
+        style={styles.root}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
         <ReAnimated.View style={[StyleSheet.absoluteFill, { backgroundColor: theme.scrim }, backdropStyle]}>
           <Pressable
             style={StyleSheet.absoluteFill}
@@ -163,7 +188,7 @@ export function BottomSheet({
           ) : null}
           {children}
         </ReAnimated.View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

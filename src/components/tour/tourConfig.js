@@ -220,3 +220,103 @@ export const PARENT_TOUR_STEPS = [
         tooltipPosition: 'top',
     },
 ];
+
+// ─── Screen-scoped tours ──────────────────────────────────────────────────────
+// These run inside a single screen via <ScreenTour>, not across tabs.
+//
+// `tab` here is NOT a route. ScreenTour passes no navigationRef, so
+// navigateToStep returns immediately and nothing is ever navigated to — which is
+// the point, since both of these are pushed routes on the Playbook stack that the
+// cross-tab engine cannot reach. What `tab` still does is key the scroll-ref
+// registry, which is how measureTarget scrolls an anchor below the fold into the
+// spotlight. The screen registers its ScrollView under this same string.
+//
+// Narration is optional. narrationService falls back to the OS voice for any step
+// with no generated asset, so these speak from the moment they ship; running
+// `ELEVENLABS_API_KEY=… npm run narration` upgrades them to the produced voice.
+
+export const GAMEPLAN_TOUR_STEPS = [
+    {
+        id: 'gameplan-title',
+        target: 'gameplan-title',
+        tab: 'gameplan',
+        title: 'Name the Play',
+        description: 'Give the plan a name your athletes will recognize on their assignment list — "Horns Flare vs Drop" beats "Play 3".',
+        narrationId: 'tour.gameplan-title',
+        script: 'Start by naming the play. Your athletes see this name on their assignment list, so make it something they will recognize.',
+        tooltipPosition: 'bottom',
+    },
+    {
+        id: 'gameplan-court',
+        target: 'gameplan-court',
+        tab: 'gameplan',
+        title: 'Draw It Up',
+        description: 'Drag any player or the ball to set the formation. Blue filled circles are your offense, red rings are the defense.',
+        narrationId: 'tour.gameplan-court',
+        script: 'This is your court. Drag any player or the ball to set the formation. The filled blue circles are your offense, and the red rings are the defense.',
+        tooltipPosition: 'bottom',
+    },
+    {
+        id: 'gameplan-toolbar',
+        target: 'gameplan-toolbar',
+        tab: 'gameplan',
+        title: 'Move or Draw',
+        description: 'Switch between moving players and drawing their routes. Select a player first, then draw the path they run.',
+        narrationId: 'tour.gameplan-toolbar',
+        script: 'Switch between moving players and drawing routes here. Select a player first, then draw the path they should run.',
+        tooltipPosition: 'top',
+    },
+    {
+        id: 'gameplan-steps',
+        target: 'gameplan-steps',
+        tab: 'gameplan',
+        title: 'One Step at a Time',
+        description: 'A play is a sequence. Add a step for each beat — the entry, the screen, the read — and each one keeps its own diagram.',
+        narrationId: 'tour.gameplan-steps',
+        script: 'A play is a sequence, so add a step for each beat — the entry, the screen, the read. Each step keeps its own diagram.',
+        tooltipPosition: 'top',
+    },
+    {
+        id: 'gameplan-question',
+        target: 'gameplan-question',
+        tab: 'gameplan',
+        title: 'Ask the Read',
+        description: 'This is what turns a diagram into a rep. Ask the decision the play hinges on, mark the right answer, and explain why.',
+        narrationId: 'tour.gameplan-question',
+        script: 'This is what turns a diagram into a rep. Ask the decision the play hinges on, mark the correct answer, and explain why it is right.',
+        tooltipPosition: 'top',
+    },
+];
+
+export const FILM_TOUR_STEPS = [
+    {
+        id: 'film-upload',
+        target: 'film-upload',
+        tab: 'film',
+        title: 'Start With Film',
+        description: 'Upload a game from your phone. It stays yours — nothing is shared or used for training unless you say so.',
+        narrationId: 'tour.film-upload',
+        script: 'Everything here starts with film. Upload a game from your phone. It stays yours — nothing is shared or used for training unless you say so.',
+        tooltipPosition: 'bottom',
+    },
+    {
+        id: 'film-card',
+        target: 'film-card',
+        tab: 'film',
+        title: 'Tag What You See',
+        description: 'Tag possessions as you watch — the action they ran and the coverage they faced. Tags are what the scouting report is built from.',
+        narrationId: 'tour.film-card',
+        script: 'Once a film is up, tag possessions as you watch. What they ran, and the coverage they faced. Those tags are the raw material for every scouting report.',
+        tooltipPosition: 'bottom',
+    },
+    {
+        id: 'film-retention',
+        target: 'film-retention',
+        tab: 'film',
+        title: 'You Control How Long',
+        description: 'Set film to auto-delete on a date. Nothing is kept longer than you choose — worth setting when the footage has minors in it.',
+        narrationId: 'tour.film-retention',
+        script: 'You decide how long film is kept. Set it to auto-delete on a date, and nothing lives longer than you chose. Worth doing when there are minors in the footage.',
+        tooltipPosition: 'top',
+    },
+];

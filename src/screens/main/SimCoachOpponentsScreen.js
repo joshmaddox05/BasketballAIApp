@@ -22,6 +22,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAppContext } from '../../context/AppContext';
 import { getFilms, getOpponentModels, generateOpponentModel } from '../../services/firestoreService';
+import { Explain, ExplainNote, ExplainProvider } from '../../components/features/Explain';
 
 function OpponentCard({ opponent, theme, building, onBuild, onView }) {
   const hasModel = !!opponent.model;
@@ -33,17 +34,23 @@ function OpponentCard({ opponent, theme, building, onBuild, onView }) {
         </View>
         <View style={{ flex: 1 }}>
           <Text style={[styles.name, { color: theme.text }]}>{opponent.opponentName}</Text>
-          <Text style={[styles.meta, { color: theme.textSecondary }]}>
-            {opponent.filmCount} film{opponent.filmCount === 1 ? '' : 's'} · {opponent.taggedCount} tagged event{opponent.taggedCount === 1 ? '' : 's'}
-          </Text>
+          <Explain term="taggedEvent">
+            <Text style={[styles.meta, { color: theme.textSecondary }]}>
+              {opponent.filmCount} film{opponent.filmCount === 1 ? '' : 's'} · {opponent.taggedCount} tagged event{opponent.taggedCount === 1 ? '' : 's'}
+            </Text>
+          </Explain>
         </View>
         {hasModel ? (
-          <View style={[styles.confidencePill, { backgroundColor: '#A855F718' }]}>
-            <Text style={[styles.confidenceText, { color: '#A855F7' }]}>{opponent.model.confidenceLevel}% confidence</Text>
-          </View>
+          <Explain term="confidence" hideIcon>
+            <View style={[styles.confidencePill, { backgroundColor: '#A855F718' }]}>
+              <Text style={[styles.confidenceText, { color: '#A855F7' }]}>{opponent.model.confidenceLevel}% confidence</Text>
+            </View>
+          </Explain>
         ) : (
           <View style={[styles.confidencePill, { backgroundColor: theme.border }]}>
-            <Text style={[styles.confidenceText, { color: theme.textSecondary }]}>Not analyzed</Text>
+            <Text style={[styles.confidenceText, { color: theme.textSecondary }]}>
+              {opponent.taggedCount === 0 ? 'Tag film first' : 'No report yet'}
+            </Text>
           </View>
         )}
       </View>
@@ -82,7 +89,7 @@ function OpponentCard({ opponent, theme, building, onBuild, onView }) {
   );
 }
 
-export default function SimCoachOpponentsScreen({ navigation }) {
+function OpponentsScreen({ navigation }) {
   const { user, userData, theme, isDarkMode } = useAppContext();
   const isCoach = userData?.role === 'coach';
   const coachUid = user?.uid;
@@ -230,3 +237,11 @@ const styles = StyleSheet.create({
   accessDenied: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 },
   deniedTitle: { fontSize: 21, fontWeight: '700' },
 });
+
+export default function SimCoachOpponentsScreen(props) {
+  return (
+    <ExplainProvider>
+      <OpponentsScreen {...props} />
+    </ExplainProvider>
+  );
+}

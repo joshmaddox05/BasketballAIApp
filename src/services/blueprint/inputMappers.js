@@ -39,7 +39,13 @@ import { summarizeAttempts } from './shotPermissions.js';
 // ─── Evidence thresholds ─────────────────────────────────────────────────────
 // Below these, a signal exists but is too thin to call a measurement.
 export const MIN_SHOTS_PER_COMPONENT = 20;
-export const MIN_SIMCOACH_SESSIONS = 3;
+// Named "scenarios", not "sessions". This counts entries in simCoachResults —
+// one per tactical scenario an athlete answers. It has nothing to do with
+// `simulationSessions`, the shared what-if runs a coach opens for their team,
+// which the SimCoachSessions* screens are named after. Two unrelated concepts
+// were sharing the word, in a codebase where four other things are also called
+// a session.
+export const MIN_SIMCOACH_SCENARIOS = 3;
 export const MIN_WEEKS_FOR_VARIANCE = 4;
 export const MIN_WORKOUTS_FOR_LOAD = 6;
 export const MIN_PLAN_DAYS_FOR_ADHERENCE = 4;
@@ -212,16 +218,16 @@ export const buildPillarComponents = (sources = {}) => {
     },
     iqs: {
       decisionAccuracy:
-        Number.isFinite(simCoach.meanIQScore) && simCoach.sessionCount >= MIN_SIMCOACH_SESSIONS
+        Number.isFinite(simCoach.meanIQScore) && simCoach.sessionCount >= MIN_SIMCOACH_SCENARIOS
           ? component(simCoach.meanIQScore, {
               source: 'simCoachResults',
               confidence: 'high',
-              note: `Mean IQ score over ${simCoach.sessionCount} SimCoach sessions`,
+              note: `Mean IQ score over ${simCoach.sessionCount} SimCoach scenarios`,
               sample: simCoach.sessionCount,
             })
           : unmeasured(
               'simCoachResults',
-              `Complete ${MIN_SIMCOACH_SESSIONS} SimCoach sessions to measure decision accuracy`
+              `Complete ${MIN_SIMCOACH_SCENARIOS} SimCoach scenarios to measure decision accuracy`
             ),
       decisionSpeed: unmeasured('none', 'SimCoach does not capture decision latency yet'),
       advantageRecognition: unmeasured('none', 'No advantage-recognition measure yet'),
@@ -300,16 +306,16 @@ export const buildVectorComponents = (sources = {}, opts = {}) => {
     },
     IQ: {
       DC:
-        Number.isFinite(simCoach.meanIQScore) && simCoach.sessionCount >= MIN_SIMCOACH_SESSIONS
+        Number.isFinite(simCoach.meanIQScore) && simCoach.sessionCount >= MIN_SIMCOACH_SCENARIOS
           ? component(simCoach.meanIQScore, {
               source: 'simCoachResults',
               confidence: 'high',
-              note: `Mean IQ score over ${simCoach.sessionCount} SimCoach sessions`,
+              note: `Mean IQ score over ${simCoach.sessionCount} SimCoach scenarios`,
               sample: simCoach.sessionCount,
             })
           : unmeasured(
               'simCoachResults',
-              `Complete ${MIN_SIMCOACH_SESSIONS} SimCoach sessions to measure decision correctness`
+              `Complete ${MIN_SIMCOACH_SCENARIOS} SimCoach scenarios to measure decision correctness`
             ),
       DL: unmeasured('none', 'SimCoach does not capture decision latency yet'),
       AR: unmeasured('none', 'No advantage-recognition measure yet'),

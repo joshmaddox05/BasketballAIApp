@@ -29,6 +29,16 @@ import {
   roundCoord as r3,
 } from '../../services/gamePlan/courtLayout.js';
 
+// One source of truth for the court palette. The arrow-stroke mapping below and
+// the styles at the bottom of this file were two independent copies of it, and
+// CourtLegend needs a third — so it lives here and everything reads from it.
+export const TOKEN_COLORS = {
+  offense: '#3B82F6',
+  defense: '#EF4444',
+  ball: '#FDE68A',
+  ballGlyph: '#8A1C22',
+};
+
 export const COURT_W = 300;
 export const COURT_H = 180;
 const TOKEN = 28;
@@ -161,7 +171,7 @@ function DraggableToken({ token, editable, selected, onSelect, onMove, width, he
         ]}
       >
         {token.role === TOKEN_ROLES.BALL ? (
-          <Ionicons name="basketball" size={13} color="#8A1C22" />
+          <Ionicons name="basketball" size={13} color={TOKEN_COLORS.ballGlyph} />
         ) : (
           <Text
             style={
@@ -272,10 +282,10 @@ export default function CourtDiagram({
           const owner = tokenById[a.tokenId];
           const color =
             owner?.role === TOKEN_ROLES.DEFENSE
-              ? '#EF4444'
+              ? TOKEN_COLORS.defense
               : owner?.role === TOKEN_ROLES.BALL
-                ? '#8A1C22'
-                : '#3B82F6';
+                ? TOKEN_COLORS.ballGlyph
+                : TOKEN_COLORS.offense;
           return (
             <ArrowPath
               key={a.tokenId}
@@ -338,9 +348,20 @@ const styles = StyleSheet.create({
     borderColor: '#FFFFFF',
     borderWidth: 2.5,
   },
-  offToken: { backgroundColor: '#3B82F6', borderColor: '#1D4ED8' },
-  defToken: { backgroundColor: '#EF4444', borderColor: '#B91C1C' },
-  ballToken: { backgroundColor: '#FDE68A', borderColor: '#8A1C22' },
+  // Offense is solid, defense is hollow. Both used to be solid discs of equal
+  // weight, five blue and five red, and on a busy diagram the red X's read as
+  // loudly as the players — coaches reported the colors as being the wrong way
+  // round, which is really a report that the two sides were indistinguishable at
+  // a glance. Filling only the offense makes the side with the ball the figure
+  // and the defense the ground, matching every whiteboard ever drawn.
+  offToken: { backgroundColor: TOKEN_COLORS.offense, borderColor: '#1D4ED8' },
+  defToken: {
+    backgroundColor: 'transparent',
+    borderColor: TOKEN_COLORS.defense,
+    borderWidth: 2.5,
+  },
+  ballToken: { backgroundColor: TOKEN_COLORS.ball, borderColor: '#8A1C22' },
   tokenLabel: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
-  tokenLabelDef: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
+  // Was byte-identical to tokenLabel, which made the branch selecting it a no-op.
+  tokenLabelDef: { color: TOKEN_COLORS.defense, fontSize: 14, fontWeight: '800' },
 });

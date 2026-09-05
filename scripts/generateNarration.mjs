@@ -64,6 +64,7 @@ function collectFrom(file, label) {
 const sources = [
   ['src/components/tour/tourConfig.js', 'tour'],
   ['src/config/moduleIntros.js', 'module intros'],
+  ['src/config/onboardingNarration.js', 'onboarding'],
 ];
 
 const collected = sources.flatMap(([file, label]) => collectFrom(file, label));

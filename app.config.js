@@ -3,6 +3,11 @@ export default {
   expo: {
     name: "Basketball AI Training",
     slug: "BasketballAIApp",
+    // Registers dbehoopiq:// on both platforms. The coach invite landing page
+    // (functions joinLanding, served at /join/<code>) hands off to this when the
+    // app is installed. Adding it changes native config, so it needs a new build
+    // — it will not arrive over an OTA update.
+    scheme: "dbehoopiq",
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/icon.png",
@@ -79,7 +84,19 @@ export default {
       ],
       "expo-apple-authentication",
       "@react-native-google-signin/google-signin",
-      "./plugins/withPoseModel"
+      "./plugins/withPoseModel",
+      // Sentry's plugin wires native crash capture and source-map upload.
+      // org/project are read from SENTRY_ORG / SENTRY_PROJECT at build time so
+      // they are not committed; SENTRY_AUTH_TOKEN (an EAS secret) authorises
+      // the source-map upload. Without them the build still succeeds — you just
+      // get minified stack traces.
+      [
+        "@sentry/react-native/expo",
+        {
+          organization: process.env.SENTRY_ORG,
+          project: process.env.SENTRY_PROJECT
+        }
+      ]
     ],
     extra: {
       eas: {
@@ -93,6 +110,10 @@ export default {
       stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY,
       youtubeApiKey: process.env.YOUTUBE_API_KEY,
       apiBaseUrl: process.env.API_BASE_URL,
+      // Telemetry. Absent values disable the SDK rather than throwing.
+      sentryDsn: process.env.SENTRY_DSN,
+      posthogApiKey: process.env.POSTHOG_API_KEY,
+      posthogHost: process.env.POSTHOG_HOST,
     },
     owner: "jmaddox0503",
     updates: {

@@ -14,7 +14,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
-import { getLevelTitle } from '../../utils/constants';
+import { getLevelTitle, SESSION_STATUS, isUpcomingSession } from '../../utils/constants';
 import {
   getGreeting,
   getNextAction,
@@ -376,7 +376,7 @@ function CoachSessionsSection({ sessions, theme, onConfirm }) {
                 {s.coachName} · {when}
               </Text>
             </View>
-            {s.status === 'pending' ? (
+            {s.status === SESSION_STATUS.PENDING ? (
               <TouchableOpacity
                 onPress={() => onConfirm(s)}
                 style={[styles.confirmBtn, { backgroundColor: theme.primary }]}
@@ -431,14 +431,10 @@ export default function HomeScreen({ navigation }) {
     ]);
     // Verified work is done business — drop it from the home feed.
     setCoachAssignments(items.filter((a) => a.status !== ASSIGNMENT_STATUS.VERIFIED));
-    // Only upcoming, non-cancelled sessions surface on the athlete home.
-    const now = Date.now();
-    setCoachSessions(
-      sessions.filter((s) => {
-        const d = sessionDate(s.scheduledAt);
-        return s.status !== 'cancelled' && s.status !== 'completed' && (!d || d.getTime() >= now);
-      })
-    );
+    // Same definition of "upcoming" the coach's own screen uses — these are the
+    // very same documents, and the two views disagreeing about which sessions are
+    // live is a support ticket waiting to happen.
+    setCoachSessions(sessions.filter((s) => isUpcomingSession(s)));
   }, [user?.uid]);
 
   const userPrefs = userData?.preferences || {};
@@ -536,9 +532,11 @@ export default function HomeScreen({ navigation }) {
 
   const handleConfirmSession = useCallback(
     async (session) => {
-      setCoachSessions((prev) => prev.map((s) => (s.id === session.id ? { ...s, status: 'confirmed' } : s)));
+      setCoachSessions((prev) =>
+        prev.map((s) => (s.id === session.id ? { ...s, status: SESSION_STATUS.CONFIRMED } : s))
+      );
       try {
-        await updateSessionStatus(session.id, 'confirmed');
+        await updateSessionStatus(session.id, SESSION_STATUS.CONFIRMED);
       } catch (_) {
         loadCoachAssignments();
       }

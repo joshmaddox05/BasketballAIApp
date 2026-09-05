@@ -35,6 +35,7 @@ import {
     Shimmer,
     DrawnPath,
 } from '../../components/dbe';
+import { track, EVENTS } from '../../services/analytics';
 
 // Default improvement suggestions when none are provided
 const getDefaultImprovements = () => [
@@ -194,6 +195,7 @@ const ShootingAnalysisScreen = ({ navigation }) => {
 
             // Perform comprehensive AI analysis with phase detection and biomechanics
             console.log('🏀 Using comprehensive analysis for feedback-based improvement');
+            track(EVENTS.SHOT_ANALYSIS_RUN);
             const results = await aiAnalysisService.analyzeComprehensive(videoData);
 
             console.log('✅ Comprehensive analysis complete!');

@@ -22,6 +22,7 @@ import { registerWithEmail } from '../../services/authService';
 import { signInWithGoogle } from '../../services/googleAuthService';
 import { signInWithApple, isAppleSignInAvailable } from '../../services/appleAuthService';
 import { getTheme } from '../../utils/theme';
+import { track, EVENTS } from '../../services/analytics';
 
 const SignupScreen = ({ navigation }) => {
     const [name, setName] = useState(''); // Remove demo data for production
@@ -107,6 +108,8 @@ const SignupScreen = ({ navigation }) => {
             if (result.user && result.profile) {
                 console.log('Registration successful!', result.user.email);
                 
+                track(EVENTS.SIGNUP_COMPLETED, { method: 'email' });
+
                 Alert.alert(
                     'Account Created!',
                     'Your account has been created successfully. Please check your email to verify your account.',

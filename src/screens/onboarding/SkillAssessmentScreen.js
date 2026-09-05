@@ -1,4 +1,16 @@
-// SkillAssessmentScreen.js — first-run skill self-assessment and quiz.
+// SkillAssessmentScreen.js — first-run skill assessment.
+//
+// THE QUIZ IS THE PATH. This screen used to open on three big self-select cards
+// with the quiz demoted to one of two equal buttons underneath, so essentially
+// nobody took it — they read "Advanced", recognised themselves in the flattering
+// label, and tapped it. A self-reported level is the single input the workout
+// engine weighs most (30 of 100 points), and it is the one people are worst at
+// reporting about themselves.
+//
+// So the landing state is now the quiz and nothing else. Picking a level by hand
+// is still there, one tap away behind a quiet link, because a returning player
+// who genuinely knows their level should not be made to answer five questions.
+// It is a fallback, not a fork.
 //
 // Ported onto the burgundy system: theme colours (this screen used to be a hard-coded
 // white slab that ignored dark mode entirely), TYPE presets, SHAPE radii, and the dbe
@@ -18,89 +30,24 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
 import { BarFill, PrimaryButton, OutlineButton } from '../../components/dbe';
-import { TYPE, SHAPE, MOTION } from '../../utils/typography';
+import { TYPE, SHAPE, MOTION, FONTS } from '../../utils/typography';
+import { ONBOARDING_NARRATION } from '../../config/onboardingNarration';
+import { useScreenNarration } from '../../hooks/useScreenNarration';
+import NarrationToggle from '../../components/shared/NarrationToggle';
+import { SKILL_LEVELS, QUESTIONS, scoreSkillQuiz } from '../../data/skillQuiz';
 
-const SKILL_LEVELS = [
-    {
-        id: 'beginner',
-        title: 'Beginner',
-        description: 'I\'m new to basketball or haven\'t played much. I want to learn the basics.',
-        icon: 'basketball-outline',
-        traits: ['Little to no experience', 'Looking to learn fundamentals', 'Working on basic coordination'],
-        encouragement: 'Perfect! Every pro started as a beginner. Let\'s build your foundation!'
-    },
-    {
-        id: 'intermediate',
-        title: 'Intermediate',
-        description: 'I have some experience and can play decent. I want to refine my skills.',
-        icon: 'basketball',
-        traits: ['Have played before', 'Understand basic rules', 'Can make some shots consistently', 'Want to improve technique'],
-        encouragement: 'Great! You have a solid foundation. Let\'s take your skills to the next level!'
-    },
-    {
-        id: 'advanced',
-        title: 'Advanced',
-        description: 'I play regularly and have good skills. I want to take my game to the next level.',
-        icon: 'ribbon',
-        traits: ['Play frequently', 'Good shooting form', 'Consistent performance', 'Looking for advanced training'],
-        encouragement: 'Excellent! You\'re ready for elite-level training and complex drills!'
-    }
-];
 
-const QUESTIONS = [
-    {
-        id: 'q1',
-        question: 'How often do you play basketball?',
-        options: [
-            { id: 'q1a1', text: 'Rarely or never', skillLevel: 'beginner' },
-            { id: 'q1a2', text: 'Occasionally (once a month)', skillLevel: 'beginner' },
-            { id: 'q1a3', text: 'Regularly (1-2 times a week)', skillLevel: 'intermediate' },
-            { id: 'q1a4', text: 'Frequently (3+ times a week)', skillLevel: 'advanced' },
-        ]
-    },
-    {
-        id: 'q2',
-        question: 'How would you rate your shooting accuracy?',
-        options: [
-            { id: 'q2a1', text: 'I miss most shots', skillLevel: 'beginner' },
-            { id: 'q2a2', text: 'I make some shots, but inconsistently', skillLevel: 'beginner' },
-            { id: 'q2a3', text: 'I make shots consistently from some spots', skillLevel: 'intermediate' },
-            { id: 'q2a4', text: 'I make shots consistently from most spots', skillLevel: 'advanced' },
-        ]
-    },
-    {
-        id: 'q3',
-        question: 'How comfortable are you with dribbling?',
-        options: [
-            { id: 'q3a1', text: 'I often lose control of the ball', skillLevel: 'beginner' },
-            { id: 'q3a2', text: 'I can dribble with my dominant hand', skillLevel: 'beginner' },
-            { id: 'q3a3', text: 'I can dribble with both hands', skillLevel: 'intermediate' },
-            { id: 'q3a4', text: 'I can perform advanced dribbling moves', skillLevel: 'advanced' },
-        ]
-    },
-    {
-        id: 'q4',
-        question: 'How would you describe your knowledge of basketball strategies?',
-        options: [
-            { id: 'q4a1', text: 'Limited understanding of the game', skillLevel: 'beginner' },
-            { id: 'q4a2', text: 'Basic understanding of positions and rules', skillLevel: 'beginner' },
-            { id: 'q4a3', text: 'Good understanding of offensive and defensive strategies', skillLevel: 'intermediate' },
-            { id: 'q4a4', text: 'Comprehensive understanding of complex strategies', skillLevel: 'advanced' },
-        ]
-    },
-    {
-        id: 'q5',
-        question: 'Have you received any formal basketball training?',
-        options: [
-            { id: 'q5a1', text: 'No formal training', skillLevel: 'beginner' },
-            { id: 'q5a2', text: 'Some school or recreational training', skillLevel: 'beginner' },
-            { id: 'q5a3', text: 'Regular training or coaching', skillLevel: 'intermediate' },
-            { id: 'q5a4', text: 'Advanced or professional coaching', skillLevel: 'advanced' },
-        ]
-    }
-];
 
-const SkillAssessmentScreen = ({ navigation }) => {
+const SkillAssessmentScreen = ({ navigation, route }) => {
+    // Athletes arriving on a coach's link skip role selection entirely and land
+    // here first, so this is where the invite has to be acknowledged. Without it
+    // the link goes invisible the moment it is tapped: they run a generic
+    // onboarding and only discover they are on someone's roster later, which
+    // reads as the app having done something behind their back.
+    //
+    // Passed forward by RoleSelectionScreen rather than re-resolved, so this
+    // costs no extra round trip and cannot disagree with what that screen acted on.
+    const invitedBy = route?.params?.invitedBy || null;
     const { updateUserSkillLevel, theme, isDarkMode } = useAppContext();
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [answers, setAnswers] = useState({});
@@ -108,6 +55,8 @@ const SkillAssessmentScreen = ({ navigation }) => {
     const [showResults, setShowResults] = useState(false);
     const [selectedSkillLevel, setSelectedSkillLevel] = useState(null);
     const [assessedSkillLevel, setAssessedSkillLevel] = useState(null);
+    // The manual picker is opt-in now rather than the landing state.
+    const [manualOpen, setManualOpen] = useState(false);
 
     // Question progress is driven straight from currentQuestionIndex by <BarFill>,
     // which retargets on the native driver — no JS-driven Animated.Value needed.
@@ -121,38 +70,33 @@ const SkillAssessmentScreen = ({ navigation }) => {
     };
 
     const handleSelectAnswer = (questionId, answer) => {
-        setAnswers({
-            ...answers,
-            [questionId]: answer
-        });
+        // The merged object is computed here and passed down, rather than being
+        // read back out of state. setAnswers does not apply synchronously, so
+        // calculateSkillLevel() used to score only the FIRST FOUR answers — the
+        // final question, the one the user just tapped, never counted. Harmless
+        // while almost nobody took the quiz; not harmless now that it is the path.
+        const nextAnswers = { ...answers, [questionId]: answer };
+        setAnswers(nextAnswers);
 
-        // Move to next question or show results if last question
         if (currentQuestionIndex < QUESTIONS.length - 1) {
             setCurrentQuestionIndex(currentQuestionIndex + 1);
         } else {
-            calculateSkillLevel();
+            calculateSkillLevel(nextAnswers);
         }
     };
 
-    const calculateSkillLevel = () => {
-        // Count the skill levels from answers
-        const skillLevelCounts = Object.values(answers).reduce((counts, answer) => {
-            counts[answer.skillLevel] = (counts[answer.skillLevel] || 0) + 1;
-            return counts;
-        }, {});
-
-        // Determine the most common skill level
-        let maxCount = 0;
-        let determinedSkillLevel = 'beginner';
-
-        for (const [level, count] of Object.entries(skillLevelCounts)) {
-            if (count > maxCount) {
-                maxCount = count;
-                determinedSkillLevel = level;
-            }
+    // Back through the quiz, and out of it from the first question. Auto-advance
+    // on tap means a mis-tap is otherwise unrecoverable without restarting.
+    const handleBackQuestion = () => {
+        if (currentQuestionIndex === 0) {
+            setShowQuestionnaire(false);
+            return;
         }
+        setCurrentQuestionIndex((i) => i - 1);
+    };
 
-        setAssessedSkillLevel(determinedSkillLevel);
+    const calculateSkillLevel = (finalAnswers) => {
+        setAssessedSkillLevel(scoreSkillQuiz(finalAnswers));
         setShowResults(true);
     };
 
@@ -170,11 +114,99 @@ const SkillAssessmentScreen = ({ navigation }) => {
         navigation.navigate('GoalSetting');
     };
 
+    // The landing state. One thing to do, and the reason for doing it.
+    const renderIntro = () => (
+        <ScrollView contentContainerStyle={styles.introScroll} showsVerticalScrollIndicator={false}>
+            {invitedBy ? (
+                <View style={[styles.inviteBanner, { backgroundColor: theme.primary + '18', borderColor: theme.primary }]}>
+                    <Ionicons name="person-add" size={20} color={theme.primary} />
+                    <View style={{ flex: 1 }}>
+                        <Text style={[styles.inviteTitle, { color: theme.text }]}>
+                            {invitedBy.coachName} invited you
+                            {invitedBy.teamName ? ` to ${invitedBy.teamName}` : ''}
+                        </Text>
+                        <Text style={[styles.inviteSub, { color: theme.textSecondary }]}>
+                            Finish setting up and you'll be on their roster automatically.
+                        </Text>
+                    </View>
+                </View>
+            ) : null}
+
+            <View style={[styles.introCard, { backgroundColor: theme.surface, borderColor: theme.hairline }]}>
+                <View style={[styles.introIcon, { backgroundColor: theme.primary }]}>
+                    <Ionicons name="clipboard" size={30} color="#FFFFFF" />
+                </View>
+
+                <Text style={[TYPE.screenTitle, styles.introTitle, { color: theme.text }]}>
+                    Let's find your level
+                </Text>
+
+                <Text style={[TYPE.tooltipBody, styles.introBody, { color: theme.textMuted }]}>
+                    Five questions about how you actually play — how often you're on the court, what
+                    you can do with the ball, and what you know about the game.
+                </Text>
+
+                <View style={[styles.introMeta, { backgroundColor: theme.surface2 }]}>
+                    <View style={styles.introMetaItem}>
+                        <Ionicons name="help-circle-outline" size={16} color={theme.accentText} />
+                        <Text style={[TYPE.cardBody, styles.introMetaText, { color: theme.textMuted }]}>
+                            {QUESTIONS.length} questions
+                        </Text>
+                    </View>
+                    <View style={styles.introMetaItem}>
+                        <Ionicons name="time-outline" size={16} color={theme.accentText} />
+                        <Text style={[TYPE.cardBody, styles.introMetaText, { color: theme.textMuted }]}>
+                            About a minute
+                        </Text>
+                    </View>
+                </View>
+
+                <PrimaryButton
+                    label="Start Skill Quiz"
+                    onPress={handleStartQuestionnaire}
+                    style={styles.introCta}
+                />
+
+                <Text style={[TYPE.rowMeta, styles.introFootnote, { color: theme.textMuted }]}>
+                    Your level sets how hard your first drills are. You can change it any time.
+                </Text>
+            </View>
+
+            {/* Deliberately quiet, and deliberately still here. A returning player
+                who knows exactly where they stand should not have to answer five
+                questions to say so. */}
+            <TouchableOpacity
+                onPress={() => setManualOpen(true)}
+                style={styles.manualLink}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+            >
+                <Text style={[TYPE.rowMeta, { color: theme.steel }]}>
+                    I'd rather pick my level myself
+                </Text>
+            </TouchableOpacity>
+        </ScrollView>
+    );
+
     const renderQuestion = () => {
         const question = QUESTIONS[currentQuestionIndex];
 
         return (
             <View style={styles.questionContainer}>
+                <TouchableOpacity
+                    onPress={handleBackQuestion}
+                    style={styles.quizBack}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel={currentQuestionIndex === 0 ? 'Back' : 'Previous question'}
+                >
+                    <Ionicons name="chevron-back" size={18} color={theme.textMuted} />
+                    <Text style={[TYPE.rowMeta, { color: theme.textMuted }]}>
+                        {currentQuestionIndex === 0 ? 'Back' : 'Previous question'}
+                    </Text>
+                </TouchableOpacity>
+
                 <View style={styles.progressContainer}>
                     {/* BarFill instead of an animated `width` — the transform version
                         stays on the native driver. */}
@@ -197,21 +229,30 @@ const SkillAssessmentScreen = ({ navigation }) => {
                 </Text>
 
                 <View style={styles.optionsContainer}>
-                    {question.options.map(option => (
-                        <TouchableOpacity
-                            key={option.id}
-                            style={[
-                                styles.optionButton,
-                                { backgroundColor: theme.surface, borderColor: theme.hairline },
-                            ]}
-                            onPress={() => handleSelectAnswer(question.id, option)}
-                            activeOpacity={0.8}
-                            accessibilityRole="button"
-                            accessibilityLabel={option.text}
-                        >
-                            <Text style={[TYPE.rowTitle, { color: theme.text }]}>{option.text}</Text>
-                        </TouchableOpacity>
-                    ))}
+                    {question.options.map(option => {
+                        // Only visible after going back — but without it, returning
+                        // to a question shows no trace of what you already said.
+                        const chosen = answers[question.id]?.id === option.id;
+                        return (
+                            <TouchableOpacity
+                                key={option.id}
+                                style={[
+                                    styles.optionButton,
+                                    { backgroundColor: theme.surface, borderColor: theme.hairline },
+                                    chosen && { borderColor: theme.primary, backgroundColor: theme.badgeFill },
+                                ]}
+                                onPress={() => handleSelectAnswer(question.id, option)}
+                                activeOpacity={0.8}
+                                accessibilityRole="radio"
+                                accessibilityState={{ selected: chosen }}
+                                accessibilityLabel={option.text}
+                            >
+                                <Text style={[TYPE.rowTitle, { color: chosen ? theme.accentText : theme.text }]}>
+                                    {option.text}
+                                </Text>
+                            </TouchableOpacity>
+                        );
+                    })}
                 </View>
             </View>
         );
@@ -221,12 +262,12 @@ const SkillAssessmentScreen = ({ navigation }) => {
         return (
             <View style={styles.skillLevelSelectionContainer}>
                 <Text style={[TYPE.screenTitle, styles.skillLevelSelectionTitle, { color: theme.text }]}>
-                    {showResults ? 'Your Skill Level' : 'Select Your Skill Level'}
+                    {showResults ? 'Your Skill Level' : 'Pick Your Level'}
                 </Text>
                 <Text style={[TYPE.tooltipBody, styles.skillLevelSelectionSubtitle, { color: theme.textMuted }]}>
                     {showResults
-                        ? 'Based on your answers, we recommend this level. You can change it if you prefer.'
-                        : 'Choose the option that best describes your current basketball skill level.'}
+                        ? 'Based on your answers, this is where you sit. Change it if you disagree.'
+                        : 'Pick where your game is now. This sets how hard your first drills are, and you can move it any time.'}
                 </Text>
 
                 {showResults && (
@@ -313,30 +354,26 @@ const SkillAssessmentScreen = ({ navigation }) => {
                 </ScrollView>
 
                 {/* Affirmative action is the solid primary and sits on the right. */}
-                {showResults ? (
-                    <PrimaryButton
-                        label="Confirm & Continue"
-                        onPress={handleConfirmSkillLevel}
+                {/* Load-bearing guard on the manual path: with nothing selected and
+                    no assessment yet, handleConfirmSkillLevel calls .charAt on null. */}
+                <PrimaryButton
+                    label="Confirm & Continue"
+                    onPress={handleConfirmSkillLevel}
+                    disabled={!showResults && !selectedSkillLevel}
+                    style={styles.actionButton}
+                    accessibilityHint={
+                        !showResults && !selectedSkillLevel ? 'Choose a skill level first' : undefined
+                    }
+                />
+
+                {/* The offer stays open right up to the last tap — this is the
+                    moment someone realises they are guessing. */}
+                {!showResults && (
+                    <OutlineButton
+                        label="Take the quiz instead"
+                        onPress={handleStartQuestionnaire}
                         style={styles.actionButton}
                     />
-                ) : (
-                    <View style={styles.actionsContainer}>
-                        {/* Load-bearing guard: with nothing selected and no assessment
-                            yet, handleConfirmSkillLevel would call .charAt on null. */}
-                        <OutlineButton
-                            label="Select Manually"
-                            onPress={handleConfirmSkillLevel}
-                            disabled={!selectedSkillLevel}
-                            style={[styles.actionButton, styles.actionSplit]}
-                            accessibilityHint={selectedSkillLevel ? undefined : 'Choose a skill level first'}
-                        />
-                        <View style={{ width: SHAPE.gridGap }} />
-                        <PrimaryButton
-                            label="Take Skill Quiz"
-                            onPress={handleStartQuestionnaire}
-                            style={[styles.actionButton, styles.actionSplit]}
-                        />
-                    </View>
                 )}
             </View>
         );
@@ -376,6 +413,18 @@ const SkillAssessmentScreen = ({ navigation }) => {
         );
     };
 
+    // Speaks once when this step comes into view, and stops the moment the
+
+    // user moves on. Silent if they have muted the voice guide.
+
+    // Both branches are module constants, so the object identity is stable across
+    // renders — useScreenNarration keys "have I already spoken this visit?" off
+    // that, and a fresh object every render would restart the line endlessly.
+    useScreenNarration(
+        invitedBy ? ONBOARDING_NARRATION.skillInvited : ONBOARDING_NARRATION.skill,
+    );
+
+
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
             <StatusBar
@@ -402,10 +451,17 @@ const SkillAssessmentScreen = ({ navigation }) => {
                 </Text>
             </View>
 
+            <NarrationToggle color={theme.textSecondary} fill={theme.surface} border={theme.hairline} />
+
             {/* Content based on current state */}
+            {/* Three states, in the order they matter: the quiz in progress, the
+                level cards (as a quiz result or as the manual fallback), and
+                otherwise the landing state — which is the quiz invitation. */}
             {showQuestionnaire && !showResults
                 ? renderQuestion()
-                : renderSkillLevelSelection()
+                : showResults || manualOpen
+                    ? renderSkillLevelSelection()
+                    : renderIntro()
             }
         </SafeAreaView>
     );
@@ -442,6 +498,70 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         textAlign: 'center',
+    },
+
+    inviteBanner: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 12,
+        padding: 14,
+        borderRadius: 14,
+        borderWidth: 1,
+        marginBottom: 18,
+    },
+    inviteTitle: { fontFamily: FONTS.bodyBold, fontSize: 16 },
+    inviteSub: { fontFamily: FONTS.body, fontSize: 13.5, lineHeight: 18, marginTop: 3 },
+
+    // Landing state
+    introScroll: {
+        flexGrow: 1,
+        padding: SHAPE.screenPadding,
+        justifyContent: 'center',
+    },
+    introCard: {
+        borderRadius: SHAPE.radiusCard,
+        borderWidth: 1,
+        padding: SHAPE.cardPadding + 4,
+        alignItems: 'center',
+    },
+    introIcon: {
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 16,
+    },
+    introTitle: {
+        textAlign: 'center',
+        marginBottom: 8,
+    },
+    introBody: {
+        textAlign: 'center',
+        marginBottom: 18,
+    },
+    introMeta: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        gap: 20,
+        alignSelf: 'stretch',
+        paddingVertical: 12,
+        borderRadius: SHAPE.radiusBadge,
+        marginBottom: 20,
+    },
+    introMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    introMetaText: {},
+    introCta: { alignSelf: 'stretch' },
+    introFootnote: { textAlign: 'center', marginTop: 14 },
+    manualLink: { alignItems: 'center', paddingVertical: 18 },
+
+    // Quiz
+    quizBack: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 2,
+        alignSelf: 'flex-start',
+        marginBottom: 12,
     },
 
     // Skill Level Selection Styles
@@ -516,12 +636,8 @@ const styles = StyleSheet.create({
         marginLeft: 8,
         flex: 1,
     },
-    actionsContainer: {
-        flexDirection: 'row',
-    },
     // minHeight clears the 44pt touch-target floor on its own.
-    actionButton: { minHeight: 44 },
-    actionSplit: { flex: 1 },
+    actionButton: { minHeight: 44, marginTop: 10 },
 
     // Question Styles
     questionContainer: {

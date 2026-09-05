@@ -85,11 +85,6 @@ service cloud.firestore {
         allow read, write: if isOwner(uid);
       }
 
-      // User's training sessions - only owner can access
-      match /sessions/{sessionId} {
-        allow read, write: if isOwner(uid);
-      }
-
       // User's goals - owner, connected role-holder, or approved scout (read-only)
       match /goals/{goalId} {
         allow read: if canViewPlayerData(uid);
@@ -153,6 +148,31 @@ service cloud.firestore {
       match /connections/{otherUid} {
         allow read: if isOwner(uid) || isOwner(otherUid) || isParentOfPlayer(uid);
         allow write: if isOwner(uid) || isOwner(otherUid);
+      }
+
+      // Pending coach→athlete link requests, awaiting guardian approval.
+      //
+      // This collection exists SEPARATELY from `connections` for one specific
+      // reason: every rule that grants a role-holder access to a player checks
+      // a bare exists() on connections/{uid} — isConnectedTo, isParentConnectedTo
+      // and the top-level isParentOfPlayer all do. A pending entry written into
+      // `connections` with a status field would therefore pass canViewPlayerData,
+      // canViewDeepPlayerData, assignment writes, and the users/{uid} update rule
+      // the moment it was created, no matter what the client-side status filter
+      // showed. The scout flow avoids the same trap by splitting
+      // scoutAccessRequests from scoutConnections. Keep them separate.
+      //
+      // Same asymmetry as scoutAccessRequests: the coach may create their own
+      // request and may only ever write 'pending' — they can never self-approve,
+      // because only the athlete or a role=='parent' connection can write the
+      // grant in `connections`.
+      match /connectionRequests/{roleHolderUid} {
+        allow read: if isOwner(uid) || isConnectedTo(uid) || isOwner(roleHolderUid);
+        allow create: if isSignedIn()
+          && roleHolderUid == request.auth.uid
+          && request.resource.data.status == 'pending';
+        allow update: if isOwner(uid) || isParentConnectedTo(uid);
+        allow delete: if isOwner(uid) || isParentConnectedTo(uid);
       }
 
       // Linked players - this role-holder's roster / child list.
@@ -358,10 +378,46 @@ service cloud.firestore {
 
     // Invite codes - any signed-in user can read (to validate/redeem).
     // Creator must own the code; redeemer marks it used via update.
+    // Coach → athlete invite links (the pilot's onboarding path).
+    //
+    // Deliberately NOT client-readable, and never client-writable. The code in a
+    // link is a bearer credential: anyone holding it can attach themselves to a
+    // coach's roster of minors. So the only paths in are two callables that run
+    // as admin — resolveCoachInvite, which returns the coach's name and nothing
+    // else, and claimCoachInvite, which enforces expiry, revocation and the
+    // guardian gate before writing anything.
+    //
+    // The coach can read and revoke their OWN invites, which is what the manage
+    // screen needs; they cannot create one directly, because createCoachInvite
+    // is what guarantees the code is generated server-side and is unguessable.
+    match /coachInvites/{code} {
+      allow read: if isSignedIn() && resource.data.coachUid == request.auth.uid;
+      allow create: if false;
+      // Revoke only. A coach must never be able to edit who an invite points at,
+      // or repoint a link they already sent to a team.
+      allow update: if isSignedIn()
+        && resource.data.coachUid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['active', 'revokedAt']);
+      allow delete: if false;
+    }
+
     match /inviteCodes/{code} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && request.resource.data.ownerUid == request.auth.uid;
-      allow update: if isSignedIn();
+      // Was `if isSignedIn()`, which let ANY signed-in user mark ANY code used
+      // — a trivial denial-of-service on someone else's invite. A redeemer may
+      // now only burn a code by claiming it for themselves, and only once.
+      allow update: if isSignedIn() && (
+        resource.data.ownerUid == request.auth.uid
+        || (
+          resource.data.used == false
+          && request.resource.data.used == true
+          && request.resource.data.usedBy == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['used', 'usedBy', 'usedAt'])
+        )
+      );
       allow delete: if isSignedIn() && resource.data.ownerUid == request.auth.uid;
     }
 
@@ -391,6 +447,28 @@ service cloud.firestore {
         || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sales'])
       );
       allow delete: if isSignedIn() && resource.data.coachUid == request.auth.uid;
+
+      // Drill video URLs. The parent listing is world-readable to any signed-in
+      // user (browse has to work before you buy), and a Firebase download URL
+      // (`?alt=media&token=...`) is a bearer credential that bypasses Storage
+      // rules entirely — so while these URLs sat on the listing document, the
+      // paywall was a client-side `canWatch` check that anyone could skip by
+      // reading the document through the SDK. Moving them here is what actually
+      // enforces payment.
+      //
+      // Entitlement is the purchase record the Stripe webhook already writes
+      // server-side (handleCoachMarketPaymentSucceeded), so a buyer cannot
+      // fabricate one — users/{uid}/coachMarketPurchases is owner-writable, but
+      // a self-written record only ever grants access to a listing, never money
+      // to the coach, and the free-enroll path is a legitimate writer of it.
+      match /media/{drillIndex} {
+        allow read: if isSignedIn() && (
+          get(/databases/$(database)/documents/coachMarketListings/$(listingId)).data.coachUid == request.auth.uid
+          || exists(/databases/$(database)/documents/users/$(request.auth.uid)/coachMarketPurchases/$(listingId))
+        );
+        allow write: if isSignedIn()
+          && get(/databases/$(database)/documents/coachMarketListings/$(listingId)).data.coachUid == request.auth.uid;
+      }
     }
 
     // Messaging - 1:1 conversations between two users (participant-gated).
@@ -417,9 +495,23 @@ service cloud.firestore {
     // Coach sessions - a coach schedules a session with a linked athlete.
     // Only the two participants can read; the coach creates; either updates status.
     match /coachingSessions/{sessionId} {
-      allow read: if isSignedIn() &&
-        (resource.data.coachUid == request.auth.uid || resource.data.athleteUid == request.auth.uid);
-      allow create: if isSignedIn() && request.resource.data.coachUid == request.auth.uid;
+      // Read: the two parties, plus the athlete's linked guardian. A parent who
+      // approved the coach link is entitled to see what that coach has scheduled
+      // with their child — the parent home surfaces the count and the next date.
+      // They cannot write: booking, confirming and cancelling stay with the coach
+      // and the athlete.
+      allow read: if isSignedIn() && (
+        resource.data.coachUid == request.auth.uid
+        || resource.data.athleteUid == request.auth.uid
+        || isParentOfPlayer(resource.data.athleteUid)
+      );
+      // Create previously checked only that the caller claimed to be the coach,
+      // so any signed-in user could schedule a session against any athlete they
+      // knew the uid of. Now the athlete must actually be linked to them — which,
+      // with the guardian gate above, means a guardian approved that link.
+      allow create: if isSignedIn()
+        && request.resource.data.coachUid == request.auth.uid
+        && exists(/databases/$(database)/documents/users/$(request.resource.data.athleteUid)/connections/$(request.auth.uid));
       allow update: if isSignedIn() &&
         (resource.data.coachUid == request.auth.uid || resource.data.athleteUid == request.auth.uid);
       allow delete: if false;

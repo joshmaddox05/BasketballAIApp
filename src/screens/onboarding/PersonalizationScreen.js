@@ -1,5 +1,5 @@
 // PersonalizationScreen.js
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     StyleSheet,
     Text,
@@ -7,6 +7,7 @@ import {
     TouchableOpacity,
     ScrollView,
     SafeAreaView,
+    TextInput,
     Alert
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
@@ -14,17 +15,26 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
 import { getCurrentUser } from '../../services/authService';
 import { updateUserProfile } from '../../services/firestoreService';
+import {
+    GRADE_LEVELS,
+    isBelowHighSchool,
+    isHighSchoolGrade,
+    POSITIONS,
+    FEET_OPTIONS,
+    INCH_OPTIONS,
+} from '../../utils/constants';
+import { composeHeight, deriveArchetype } from '../../services/blueprint/archetypeAssignment';
+import { getPendingInvite } from '../../services/coachInviteService';
+
+// Deliberately permissive. A stricter pattern rejects real addresses (plus tags,
+// new TLDs, unicode local parts) and the only cost of letting a typo through is
+// an email that does not arrive — which the in-app approval path already covers.
+const isLikelyEmail = (value) => /^\S+@\S+\.\S+$/.test((value || '').trim());
+import { ONBOARDING_NARRATION } from '../../config/onboardingNarration';
+import { useScreenNarration } from '../../hooks/useScreenNarration';
+import NarrationToggle from '../../components/shared/NarrationToggle';
 
 const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
-// Grade level drives scout discoverability (high-school only, grades 9–12).
-const GRADE_LEVELS = [
-    { value: 9, label: '9th' },
-    { value: 10, label: '10th' },
-    { value: 11, label: '11th' },
-    { value: 12, label: '12th' },
-    { value: 0, label: 'Not HS' },
-];
 
 const WORKOUT_DURATIONS = [
     { value: 15, label: '15 min' },
@@ -38,6 +48,34 @@ const PersonalizationScreen = ({ navigation }) => {
     const { userData, updateUserPreferences, updateUserDataLocally } = useAppContext();
 
     const [gradeLevel, setGradeLevel] = useState(userData?.gradeLevel ?? null);
+    // Position and height are 45 of the archetype engine's 120 signal weight, and
+    // until now onboarding asked for neither — the only way to supply them was to
+    // find them buried in Edit Profile after the fact, which nobody did. Asking
+    // here is what makes the archetype the app assigns worth anything.
+    const [position, setPosition] = useState(userData?.position ?? null);
+    const [heightFeet, setHeightFeet] = useState(null);
+    const [heightInches, setHeightInches] = useState(null);
+
+    // A guardian's email is asked for in exactly one situation: this athlete
+    // arrived through a coach's invite AND is in grades 9-12, so the coach link
+    // needs a guardian's approval before it does anything.
+    //
+    // Without it the pilot deadlocks. The gate says the coach gets a pending
+    // request; the athlete is then told to go find a parent and get them to
+    // install the app — with no way to reach them from here. The coach, who just
+    // invited fifteen players, sees an empty roster and no explanation. Asking
+    // for one email turns that dead end into a message we can send.
+    const [invitedByCoach, setInvitedByCoach] = useState(false);
+    const [guardianEmail, setGuardianEmail] = useState('');
+    useEffect(() => {
+        let alive = true;
+        getPendingInvite().then((code) => {
+            if (alive) setInvitedByCoach(!!code);
+        });
+        return () => { alive = false; };
+    }, []);
+
+    const guardianRequired = invitedByCoach && isHighSchoolGrade(gradeLevel);
 
     const [selectedDays, setSelectedDays] = useState({
         Mon: true,
@@ -75,6 +113,44 @@ const PersonalizationScreen = ({ navigation }) => {
     };
 
     const handleContinue = () => {
+        // Grade is required, not optional. It decides three things that cannot
+        // be decided later: whether we may serve this user at all, whether a
+        // coach link needs guardian approval, and whether scouts can discover
+        // them. An account that reaches the app with gradeLevel unset defeats
+        // all three.
+        if (gradeLevel == null) {
+            Alert.alert('Grade Level', 'Please select your grade level to continue.');
+            return;
+        }
+        if (isBelowHighSchool(gradeLevel)) {
+            // COPPA: serving under-13s requires verifiable parental consent,
+            // which this app does not implement. See the note in constants.js.
+            Alert.alert(
+                'Not available yet',
+                'DBE HoopIQ is currently open to high-school and college athletes. ' +
+                'We are not able to create an account for younger players yet.'
+            );
+            return;
+        }
+
+        if (guardianRequired && !isLikelyEmail(guardianEmail)) {
+            Alert.alert(
+                'Parent or guardian email',
+                "Because you're in high school, a parent or guardian has to approve your coach " +
+                    'seeing your training. Enter their email so we can ask them.'
+            );
+            return;
+        }
+
+        if (!position) {
+            Alert.alert('Position', 'Pick the position you play most. You can change it later.');
+            return;
+        }
+        if (heightFeet == null) {
+            Alert.alert('Height', 'Select your height so we can size your archetype correctly.');
+            return;
+        }
+
         // Check if at least one day is selected
         if (!Object.values(selectedDays).some(selected => selected)) {
             Alert.alert('Select Days', 'Please select at least one training day');
@@ -95,18 +171,63 @@ const PersonalizationScreen = ({ navigation }) => {
             focusAreas: Object.keys(focusAreas).filter(area => focusAreas[area])
         });
 
-        // Persist grade level (root profile field — drives scout discoverability)
-        if (gradeLevel != null) {
-            const user = getCurrentUser();
-            if (user) {
-                updateUserProfile(user.uid, { gradeLevel }).catch(() => {});
-            }
-            updateUserDataLocally({ gradeLevel });
+        const height = composeHeight(heightFeet, heightInches);
+        const focusList = Object.keys(focusAreas).filter(area => focusAreas[area]);
+
+        // Derive the archetype right here, from what was just collected, and write
+        // it with the rest. Downstream surfaces gate on `archetypeId` existing —
+        // Blueprint360 refuses to generate a plan without one — so leaving it unset
+        // until the athlete happened to open a separate screen meant a brand-new
+        // account had a dead Blueprint tab. Confirming is the next step; a derived
+        // value that the athlete has not confirmed yet is still a real, usable one.
+        let derived = null;
+        try {
+            derived = deriveArchetype({
+                position,
+                height,
+                gradeLevel,
+                focusAreas: focusList,
+            });
+        } catch (_) {
+            // A failed derivation must not block onboarding — the confirm screen
+            // re-derives from the same saved fields and can recover there.
         }
 
-        // Navigate to features intro
-        navigation.navigate('FeaturesIntro');
+        const profileUpdate = { gradeLevel, position, height };
+        // Stored on the profile so the claim at the end of onboarding can read it,
+        // and so a guardian request can be re-sent later without asking again.
+        if (guardianRequired) profileUpdate.guardianEmail = guardianEmail.trim().toLowerCase();
+        if (derived?.best?.archetypeId) {
+            profileUpdate.archetypeId = derived.best.archetypeId;
+            profileUpdate.archetypeLabel = derived.best.label;
+            profileUpdate.secondaryArchetypeId = derived.runnerUp?.archetypeId || null;
+            profileUpdate.archetypeSource = 'derived';
+            profileUpdate.archetypeDerivation = {
+                confidence: derived.confidence,
+                reasons: derived.best.reasons || [],
+                signalsUsed: derived.signalsUsed || [],
+                engineVersion: 1,
+            };
+        }
+
+        // Persist grade level (root profile field — drives scout discoverability
+        // and the guardian gate on coach links), plus the archetype signals.
+        const user = getCurrentUser();
+        if (user) {
+            updateUserProfile(user.uid, profileUpdate).catch(() => {});
+        }
+        updateUserDataLocally(profileUpdate);
+
+        // Show the athlete what we concluded and let them correct it once.
+        navigation.navigate('ArchetypeConfirm');
     };
+
+    // Speaks once when this step comes into view, and stops the moment the
+
+    // user moves on. Silent if they have muted the voice guide.
+
+    useScreenNarration(ONBOARDING_NARRATION.personalization);
+
 
     return (
         <SafeAreaView style={styles.container}>
@@ -130,6 +251,8 @@ const PersonalizationScreen = ({ navigation }) => {
 
                 <Text style={styles.headerTitle}>Personalize Your Training</Text>
             </View>
+
+            <NarrationToggle color="#555" fill="#F4F4F5" border="#E4E4E7" />
 
             <ScrollView style={styles.content}>
                 <Text style={styles.subtitle}>
@@ -162,6 +285,110 @@ const PersonalizationScreen = ({ navigation }) => {
                             </TouchableOpacity>
                         ))}
                     </View>
+                </View>
+
+                {/* Only when a coach invite is waiting AND the athlete is 9-12.
+                    A college athlete signing up through the same link never sees
+                    this, and neither does anyone who found the app on their own. */}
+                {guardianRequired && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Parent or Guardian Email</Text>
+                        <Text style={styles.sectionSubtitle}>
+                            Your coach invited you, and because you're in high school a parent or
+                            guardian approves that before your coach can see your training. We'll
+                            email them — you can start training right away either way.
+                        </Text>
+                        <TextInput
+                            style={styles.guardianInput}
+                            value={guardianEmail}
+                            onChangeText={setGuardianEmail}
+                            placeholder="parent@example.com"
+                            placeholderTextColor="#999"
+                            keyboardType="email-address"
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                            textContentType="emailAddress"
+                        />
+                    </View>
+                )}
+
+                {/* Position & Size — the archetype engine's two strongest inputs */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Position</Text>
+                    <Text style={styles.sectionSubtitle}>The spot you play most. This sets your archetype, which decides your drills.</Text>
+
+                    <View style={styles.durationContainer}>
+                        {POSITIONS.map(p => (
+                            <TouchableOpacity
+                                key={p.value}
+                                style={[
+                                    styles.durationButton,
+                                    position === p.value && styles.selectedDurationButton
+                                ]}
+                                onPress={() => setPosition(p.value)}
+                            >
+                                <Text
+                                    style={[
+                                        styles.durationButtonText,
+                                        position === p.value && styles.selectedDurationButtonText
+                                    ]}
+                                >
+                                    {p.label}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </View>
+
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Height</Text>
+                    <Text style={styles.sectionSubtitle}>Compared against your grade, not against everyone — a 6'2" freshman is a different player than a 6'2" senior.</Text>
+
+                    <View style={styles.durationContainer}>
+                        {FEET_OPTIONS.map(f => (
+                            <TouchableOpacity
+                                key={f}
+                                style={[
+                                    styles.durationButton,
+                                    heightFeet === f && styles.selectedDurationButton
+                                ]}
+                                onPress={() => setHeightFeet(f)}
+                            >
+                                <Text
+                                    style={[
+                                        styles.durationButtonText,
+                                        heightFeet === f && styles.selectedDurationButtonText
+                                    ]}
+                                >
+                                    {f}'
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+
+                    {heightFeet != null && (
+                        <View style={styles.durationContainer}>
+                            {INCH_OPTIONS.map(i => (
+                                <TouchableOpacity
+                                    key={i}
+                                    style={[
+                                        styles.durationButton,
+                                        heightInches === i && styles.selectedDurationButton
+                                    ]}
+                                    onPress={() => setHeightInches(i)}
+                                >
+                                    <Text
+                                        style={[
+                                            styles.durationButtonText,
+                                            heightInches === i && styles.selectedDurationButtonText
+                                        ]}
+                                    >
+                                        {i}"
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    )}
                 </View>
 
                 {/* Training Days */}
@@ -454,13 +681,13 @@ const PersonalizationScreen = ({ navigation }) => {
             </ScrollView>
 
             <View style={styles.actionButtonsContainer}>
-                <TouchableOpacity
-                    style={styles.skipButton}
-                    onPress={() => navigation.navigate('FeaturesIntro')}
-                >
-                    <Text style={styles.skipButtonText}>Skip</Text>
-                </TouchableOpacity>
-
+                {/* The Skip button used to jump straight to FeaturesIntro,
+                    persisting nothing — so an athlete could finish onboarding
+                    with no grade at all, which is the one field here that is
+                    load-bearing for consent and eligibility. Training
+                    preferences are genuinely skippable; grade is not, so Skip
+                    runs the same validation and only the preferences are
+                    optional. */}
                 <TouchableOpacity
                     style={styles.continueButton}
                     onPress={handleContinue}
@@ -473,6 +700,17 @@ const PersonalizationScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
+    guardianInput: {
+        borderWidth: 1,
+        borderColor: '#DDD',
+        borderRadius: 10,
+        paddingHorizontal: 14,
+        paddingVertical: 14,
+        fontSize: 16,
+        color: '#111',
+        backgroundColor: '#FAFAFA',
+        marginTop: 4,
+    },
     container: {
         flex: 1,
         backgroundColor: '#FFF',
@@ -673,18 +911,6 @@ const styles = StyleSheet.create({
         borderTopWidth: 1,
         borderTopColor: '#EEE',
         backgroundColor: '#FFF',
-    },
-    skipButton: {
-        flex: 1,
-        paddingVertical: 14,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 8,
-    },
-    skipButtonText: {
-        fontSize: 17.5,
-        color: '#666',
-        fontWeight: '600',
     },
     continueButton: {
         flex: 2,

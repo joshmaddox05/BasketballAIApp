@@ -16,7 +16,7 @@ import {
   isoWeekKey,
   toDate,
   MIN_SHOTS_PER_COMPONENT,
-  MIN_SIMCOACH_SESSIONS,
+  MIN_SIMCOACH_SCENARIOS,
 } from '../../src/services/blueprint/inputMappers.js';
 import { computeExposureVector, COMPOSITE_WEIGHTS } from '../../src/services/blueprint/evalRankEngine.js';
 import { summarizeAttempts } from '../../src/services/blueprint/shotPermissions.js';
@@ -164,13 +164,13 @@ test('SPS can now reach full coverage — it previously could not', () => {
 test('SimCoach measures IQS only past the session threshold', () => {
   const below = buildPillarComponents({
     ...EMPTY,
-    simCoach: { meanIQScore: 78, sessionCount: MIN_SIMCOACH_SESSIONS - 1 },
+    simCoach: { meanIQScore: 78, sessionCount: MIN_SIMCOACH_SCENARIOS - 1 },
   });
   assert.equal(below.measuredPillars.IQS, false);
 
   const at = buildPillarComponents({
     ...EMPTY,
-    simCoach: { meanIQScore: 78, sessionCount: MIN_SIMCOACH_SESSIONS },
+    simCoach: { meanIQScore: 78, sessionCount: MIN_SIMCOACH_SCENARIOS },
   });
   assert.equal(at.measuredPillars.IQS, true);
   // decisionAccuracy carries exactly half of IQS, and renormalization means the
@@ -534,10 +534,10 @@ test('unknown or malformed tracked steps are ignored, not counted as zero', () =
 // The engine takes {meanIQScore, sessionCount}, so these test that contract at
 // the mapper boundary; the derivation itself is asserted below it.
 
-test('SimCoach sessions measure decision accuracy once past the threshold', () => {
+test('SimCoach scenarios measure decision accuracy once past the threshold', () => {
   const { meta, measuredPillars } = buildPillarComponents({
     ...EMPTY,
-    simCoach: { meanIQScore: 67, sessionCount: MIN_SIMCOACH_SESSIONS },
+    simCoach: { meanIQScore: 67, sessionCount: MIN_SIMCOACH_SCENARIOS },
   });
   assert.equal(meta.iqs.decisionAccuracy.measured, true);
   assert.equal(meta.iqs.decisionAccuracy.value, 67);
@@ -553,13 +553,13 @@ test('a zero sessionCount can never measure IQ, whatever the mean says', () => {
   });
   assert.equal(meta.iqs.decisionAccuracy.measured, false);
   assert.equal(measuredPillars.IQS, false);
-  assert.match(meta.iqs.decisionAccuracy.note, /SimCoach sessions/i);
+  assert.match(meta.iqs.decisionAccuracy.note, /SimCoach scenarios/i);
 });
 
 test('IQ stays unmeasured below the session threshold', () => {
   const { meta } = buildPillarComponents({
     ...EMPTY,
-    simCoach: { meanIQScore: 100, sessionCount: MIN_SIMCOACH_SESSIONS - 1 },
+    simCoach: { meanIQScore: 100, sessionCount: MIN_SIMCOACH_SCENARIOS - 1 },
   });
   // Deliberate: two right answers is not an IQ measurement. This is why a player
   // sees nothing move until their third scenario.

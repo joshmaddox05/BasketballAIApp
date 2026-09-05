@@ -22,6 +22,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAppContext } from '../../context/AppContext';
 import { getSimulationRuns, linkComparedSimulationRuns } from '../../services/firestoreService';
+import { Explain, ExplainNote, ExplainProvider } from '../../components/features/Explain';
 
 const toDate = (value) => {
   if (!value) return null;
@@ -68,7 +69,7 @@ function RunRow({ run, selected, disabled, onPress, theme }) {
   );
 }
 
-export default function SimCoachCompareScreen({ navigation, route }) {
+function CompareScreen({ navigation, route }) {
   const { user, userData, theme, isDarkMode } = useAppContext();
   const { opponentModelId, opponentName } = route.params || {};
   const isCoach = userData?.role === 'coach';
@@ -196,6 +197,15 @@ export default function SimCoachCompareScreen({ navigation, route }) {
           {baseline && compare && (
             <>
               <Text style={[styles.sectionTitle, { color: theme.text, marginTop: 16 }]}>Side by Side</Text>
+              {/* The delta colour inverts the usual convention on purpose, and
+                  nothing said so: a POSITIVE number means they run that action
+                  MORE in the compare scenario, which is worse for you. Red for
+                  positive was correct and completely undecipherable. */}
+              <ExplainNote theme={theme} icon="swap-vertical-outline">
+                Change is {'\u201C'}compare{'\u201D'} minus {'\u201C'}baseline{'\u201D'}. A red
+                +number means they run it more in the compare scenario — something to prepare for.
+                Green means less.
+              </ExplainNote>
               <View style={[styles.legendRow]}>
                 <View style={styles.legendItem}>
                   <View style={[styles.legendDot, { backgroundColor: theme.primary }]} />
@@ -214,7 +224,9 @@ export default function SimCoachCompareScreen({ navigation, route }) {
                   const delta = Math.round((b - a) * 100);
                   return (
                     <View key={action} style={styles.compareRow}>
-                      <Text style={[styles.compareLabel, { color: theme.text }]} numberOfLines={1}>{action}</Text>
+                      <Explain term={action} hideIcon>
+                        <Text style={[styles.compareLabel, { color: theme.text }]} numberOfLines={1}>{action}</Text>
+                      </Explain>
                       <View style={styles.compareBars}>
                         <View style={styles.compareBarLine}>
                           <View style={[styles.barTrack, { backgroundColor: theme.border }]}>
@@ -229,7 +241,10 @@ export default function SimCoachCompareScreen({ navigation, route }) {
                           <Text style={[styles.barPct, { color: theme.textSecondary }]}>{Math.round(b * 100)}%</Text>
                         </View>
                       </View>
-                      <Text style={[styles.deltaText, { color: delta > 0 ? '#EF4444' : delta < 0 ? '#22C55E' : theme.textSecondary }]}>
+                      <Text
+                        style={[styles.deltaText, { color: delta > 0 ? '#EF4444' : delta < 0 ? '#22C55E' : theme.textSecondary }]}
+                        accessibilityLabel={`${action}: ${delta > 0 ? 'up' : delta < 0 ? 'down' : 'unchanged'} ${Math.abs(delta)} percent versus baseline`}
+                      >
                         {delta > 0 ? '+' : ''}{delta}%
                       </Text>
                     </View>
@@ -299,3 +314,11 @@ const styles = StyleSheet.create({
   emptyButton: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 24, paddingVertical: 14, borderRadius: 12, marginTop: 4 },
   emptyButtonText: { color: '#fff', fontSize: 16.5, fontWeight: '700' },
 });
+
+export default function SimCoachCompareScreen(props) {
+  return (
+    <ExplainProvider>
+      <CompareScreen {...props} />
+    </ExplainProvider>
+  );
+}

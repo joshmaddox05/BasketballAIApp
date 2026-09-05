@@ -15,6 +15,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
 import { redeemInviteCode } from '../../services/firestoreService';
+import { track, EVENTS } from '../../services/analytics';
 
 export default function LinkAccountScreen({ navigation, route }) {
   const { theme, isDarkMode, user, userData } = useAppContext();
@@ -37,10 +38,16 @@ export default function LinkAccountScreen({ navigation, route }) {
         photoURL: userData?.photoURL || user?.photoURL || null,
         role: userData?.role || 'parent',
       };
-      const { ownerName } = await redeemInviteCode(trimmed, redeemer);
+      const { ownerName, pending } = await redeemInviteCode(trimmed, redeemer);
+      // A coach linking to a high-school athlete does NOT get a connection —
+      // only a request awaiting the athlete's guardian. Saying "Linked!" here
+      // would be a lie the coach then acts on, wondering why their roster is
+      // empty.
       Alert.alert(
-        'Linked!',
-        `You're now connected to ${ownerName}.`,
+        pending ? 'Request sent' : 'Linked!',
+        pending
+          ? `${ownerName} is a high-school athlete, so their parent or guardian has to approve this before you can work together. They have been notified — you will see ${ownerName} on your roster once it is approved.`
+          : `You're now connected to ${ownerName}.`,
         [
           {
             text: 'OK',
@@ -53,6 +60,10 @@ export default function LinkAccountScreen({ navigation, route }) {
           },
         ]
       );
+      track(pending ? EVENTS.COACH_LINK_REQUESTED : EVENTS.COACH_LINK_APPROVED, {
+        role: redeemer.role,
+        pending: !!pending,
+      });
     } catch (error) {
       Alert.alert('Could not link', error.message || 'Please check the code and try again.');
     } finally {

@@ -1,12 +1,12 @@
 // CoachMarketListingScreen.js - Drill/course detail view for CoachMarket
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useAppContext } from '../../context/AppContext';
-import { purchaseCoachMarketListing, getUserCoachMarketPurchases } from '../../services/firestoreService';
+import { purchaseCoachMarketListing, getUserCoachMarketPurchases, getListingMedia } from '../../services/firestoreService';
 import { useSubscriptionPayment, processCoachMarketPayment } from '../../services/stripePaymentService';
 
 const formatDuration = (sec) => {
@@ -54,12 +54,19 @@ const CoachMarketListingScreen = ({ navigation, route }) => {
   const [purchasing, setPurchasing] = useState(false);
   const [previewActive, setPreviewActive] = useState(false);
   const [activeVideoUrl, setActiveVideoUrl] = useState(null);
+  // Video URLs live in a purchase-gated subcollection, not on the listing doc.
+  // Empty until we know this viewer is entitled — see getListingMedia.
+  const [media, setMedia] = useState({});
 
   const { initializePaymentSheet, openPaymentSheet } = useSubscriptionPayment();
 
   const isOwnListing = listing.coachUid && listing.coachUid === user?.uid;
   const canWatch = purchased || isOwnListing;
-  const drillsWithVideo = listing.drills.filter((d) => d.videoUrl);
+  // `hasVideo` is public metadata; the URL itself is not. This is what keeps
+  // the lock icons and "Purchase to watch" copy accurate for a viewer who is
+  // not entitled to the URLs.
+  const drillsWithVideo = listing.drills.filter((d) => d.hasVideo || d.videoUrl);
+  const urlForDrill = (index) => media[String(index)]?.videoUrl || null;
 
   const player = useVideoPlayer(null, (p) => { p.loop = false; });
 
@@ -83,6 +90,16 @@ const CoachMarketListingScreen = ({ navigation, route }) => {
       return () => { active = false; };
     }, [user?.uid, listing.id])
   );
+
+  // Fetch the gated media only once this viewer is known to be entitled. The
+  // rule would deny it anyway; not asking keeps the console clean and makes the
+  // entitlement explicit at the call site.
+  useEffect(() => {
+    if (!listing.id || !canWatch) { setMedia({}); return; }
+    let active = true;
+    getListingMedia(listing.id).then((m) => { if (active) setMedia(m); });
+    return () => { active = false; };
+  }, [listing.id, canWatch]);
 
   const handlePurchase = useCallback(async () => {
     if (purchasing || !listing.id) return;
@@ -192,7 +209,11 @@ const CoachMarketListingScreen = ({ navigation, route }) => {
               <TouchableOpacity
                 style={styles.videoThumbnailOverlay}
                 activeOpacity={0.85}
-                onPress={() => (canWatch && drillsWithVideo[0] ? playVideo(drillsWithVideo[0].videoUrl) : handlePreview())}
+                onPress={() => {
+                  const firstIdx = listing.drills.findIndex((d) => d.hasVideo || d.videoUrl);
+                  const url = firstIdx >= 0 ? urlForDrill(firstIdx) : null;
+                  return canWatch && url ? playVideo(url) : handlePreview();
+                }}
               >
                 <View style={[styles.playCircle, { backgroundColor: 'rgba(138, 28, 34,0.92)' }]}>
                   <Ionicons name={canWatch ? 'play' : 'lock-closed'} size={30} color="#FFF" style={{ marginLeft: canWatch ? 4 : 0 }} />
@@ -280,18 +301,20 @@ const CoachMarketListingScreen = ({ navigation, route }) => {
               {listing.drills.length} Drill{listing.drills.length === 1 ? '' : 's'}
             </Text>
             {listing.drills.map((d, i) => {
-              const isActive = d.videoUrl && d.videoUrl === activeVideoUrl;
-              const playable = canWatch && !!d.videoUrl;
+              const url = urlForDrill(i);
+              const hasVideo = d.hasVideo || !!d.videoUrl;
+              const isActive = !!url && url === activeVideoUrl;
+              const playable = canWatch && !!url;
               return (
                 <TouchableOpacity
                   key={i}
                   style={styles.drillRow}
                   activeOpacity={playable ? 0.7 : 1}
-                  onPress={() => playable && playVideo(d.videoUrl)}
+                  onPress={() => playable && playVideo(url)}
                 >
                   <View style={[styles.drillIndex, { backgroundColor: `${primary}22` }]}>
                     <Ionicons
-                      name={playable ? (isActive ? 'pause' : 'play') : (d.videoUrl ? 'lock-closed' : 'ellipse-outline')}
+                      name={playable ? (isActive ? 'pause' : 'play') : (hasVideo ? 'lock-closed' : 'ellipse-outline')}
                       size={14}
                       color={primary}
                     />

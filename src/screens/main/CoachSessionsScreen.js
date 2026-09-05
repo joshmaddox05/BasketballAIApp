@@ -32,6 +32,11 @@ import {
 } from '../../services/firestoreService';
 import { TYPE, SHAPE, FONTS } from '../../utils/typography';
 import {
+  SESSION_STATUS,
+  SESSION_CLOSED_STATUSES,
+  isUpcomingSession,
+} from '../../utils/constants';
+import {
   Entrance,
   Float,
   AttentionDot,
@@ -159,19 +164,21 @@ function NowMarker({ theme }) {
 
 function statusBadge(s, isNext, theme) {
   if (isNext) return { label: 'NEXT UP', bg: theme.badgeFill, color: theme.accentText };
-  const status = (s.status || 'pending').toUpperCase();
-  if (s.status === 'confirmed') return { label: status, bg: theme.steelFill, color: theme.steel };
-  if (s.status === 'pending') return { label: status, bg: theme.badgeFill, color: theme.accentText };
+  const status = (s.status || SESSION_STATUS.PENDING).toUpperCase();
+  if (s.status === SESSION_STATUS.CONFIRMED) return { label: status, bg: theme.steelFill, color: theme.steel };
+  if (s.status === SESSION_STATUS.PENDING) return { label: status, bg: theme.badgeFill, color: theme.accentText };
   return { label: status, bg: theme.surface2, color: theme.textMuted };
 }
 
-function SessionRow({ s, theme, isNext, showComplete, onComplete, delay }) {
-  const done = s.status === 'completed' || s.status === 'cancelled';
+function SessionRow({ s, theme, isNext, showComplete, onComplete, onCancel, delay }) {
+  const done = SESSION_CLOSED_STATUSES.includes(s.status);
   const badge = statusBadge(s, isNext, theme);
   const metaParts = [
     s.location,
     s.mode === 'virtual' ? 'Virtual' : 'Court session',
-    s.amount ? `$${s.amount}` : null,
+    // Flagged as agreed, not charged. Nothing in the app takes this money, and a
+    // bare "$40" on a booking reads like it was already collected.
+    s.amount ? `$${s.amount} agreed` : null,
   ].filter(Boolean);
   return (
     <Entrance variant="slideIn" delay={delay}>
@@ -224,6 +231,11 @@ function SessionRow({ s, theme, isNext, showComplete, onComplete, delay }) {
               </TouchableOpacity>
             )
           ) : null}
+          {showComplete && !done ? (
+            <TouchableOpacity onPress={onCancel} hitSlop={{ top: 6, bottom: 6 }}>
+              <Text style={[styles.completeLink, { color: theme.textDim }]}>Cancel session</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
       </View>
     </Entrance>
@@ -273,15 +285,9 @@ export default function CoachSessionsScreen({ navigation }) {
   );
 
   const now = Date.now();
-  const upcoming = sessions.filter((s) => {
-    const d = toDate(s.scheduledAt);
-    return s.status !== 'completed' && s.status !== 'cancelled' && (!d || d.getTime() >= now);
-  });
-  const pending = upcoming.filter((s) => s.status === 'pending');
-  const past = sessions.filter((s) => {
-    const d = toDate(s.scheduledAt);
-    return s.status === 'completed' || s.status === 'cancelled' || (d && d.getTime() < now);
-  });
+  const upcoming = sessions.filter((s) => isUpcomingSession(s, now));
+  const pending = upcoming.filter((s) => s.status === SESSION_STATUS.PENDING);
+  const past = sessions.filter((s) => !isUpcomingSession(s, now));
 
   const openBooking = useCallback(async () => {
     setModalOpen(true);
@@ -331,16 +337,43 @@ export default function CoachSessionsScreen({ navigation }) {
     }
   }, [athlete, dayOffset, hour, coachUid, coachName, type, location, mode, amount, load]);
 
-  const markCompleted = useCallback(
-    async (session) => {
-      setSessions((prev) => prev.map((s) => (s.id === session.id ? { ...s, status: 'completed' } : s)));
+  // Optimistic, with a reload as the rollback: the list is small and a failed
+  // write should not leave the row lying about its state.
+  const setStatus = useCallback(
+    async (session, status) => {
+      setSessions((prev) => prev.map((s) => (s.id === session.id ? { ...s, status } : s)));
       try {
-        await updateSessionStatus(session.id, 'completed');
+        await updateSessionStatus(session.id, status);
       } catch (_) {
         load();
       }
     },
     [load]
+  );
+
+  const markCompleted = useCallback(
+    (session) => setStatus(session, SESSION_STATUS.COMPLETED),
+    [setStatus]
+  );
+
+  // 'cancelled' was read by five filters across four screens and written by
+  // nothing — no cancel existed anywhere in the product. This is the writer.
+  const cancelSession = useCallback(
+    (session) => {
+      Alert.alert(
+        'Cancel session?',
+        `${session.athleteName || 'Your athlete'} will be told this session is off. This cannot be undone.`,
+        [
+          { text: 'Keep it', style: 'cancel' },
+          {
+            text: 'Cancel session',
+            style: 'destructive',
+            onPress: () => setStatus(session, SESSION_STATUS.CANCELLED),
+          },
+        ]
+      );
+    },
+    [setStatus]
   );
 
   const list =
@@ -431,6 +464,7 @@ export default function CoachSessionsScreen({ navigation }) {
                             isNext={s.id === nextId && tab !== 'past'}
                             showComplete={tab !== 'past'}
                             onComplete={() => markCompleted(s)}
+                            onCancel={() => cancelSession(s)}
                             delay={delay}
                           />
                         </React.Fragment>
@@ -470,7 +504,11 @@ export default function CoachSessionsScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={styles.modalScroll} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.modalScroll}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
           <Text style={[TYPE.sectionLabel, styles.fieldLabel, { color: theme.textDim }]}>Athlete</Text>
           {roster.length === 0 ? (
             <Text style={[TYPE.tooltipBody, { color: theme.textDim }]}>No linked athletes yet.</Text>
