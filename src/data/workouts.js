@@ -1,4 +1,12 @@
 // workouts.js - Comprehensive workout library
+//
+// The read/decision layer for these steps lives in workoutLibraryIntelligence.js,
+// keyed by step title, and is merged on at the bottom of this file. Steps here are
+// prose written per workout rather than shared template objects, so the title is
+// the only stable key there is — see that file for why some steps deliberately get
+// no read layer at all.
+import { withConcept } from './workoutLibraryIntelligence.js';
+
 export const workoutCategories = {
   SHOOTING: 'shooting',
   DRIBBLING: 'dribbling',
@@ -14,7 +22,7 @@ export const difficultyLevels = {
   ADVANCED: 'Advanced'
 };
 
-export const comprehensiveWorkouts = [
+const BASE_WORKOUTS = [
   // ==================== SHOOTING WORKOUTS (8) ====================
   {
     id: 'shooting-1',
@@ -2585,6 +2593,14 @@ export const comprehensiveWorkouts = [
   }
 ];
 
+// Merged read/decision layer. Additive and one-directional: a step's own authored
+// fields always win, and a step with no concept mapping passes through untouched,
+// so every workout renders at least exactly as it did before.
+export const comprehensiveWorkouts = BASE_WORKOUTS.map((workout) => ({
+  ...workout,
+  steps: (workout.steps || []).map((step) => withConcept(workout.id, step)),
+}));
+
 // Helper functions for workout management
 export const getWorkoutsByCategory = (category) => {
   return comprehensiveWorkouts.filter(workout => workout.category === category);
@@ -2603,9 +2619,10 @@ export const getWorkoutById = (id) => {
 };
 
 export const getWorkoutsBySubscription = (subscription) => {
-  return comprehensiveWorkouts.filter(workout => 
-    workout.requiredSubscription === 'free' || 
-    (subscription === 'premium' && workout.requiredSubscription === 'premium')
+  // Two-tier model: a paid (non-'free') subscription unlocks all workouts.
+  const isPaid = !!subscription && subscription !== 'free';
+  return comprehensiveWorkouts.filter(workout =>
+    workout.requiredSubscription === 'free' || isPaid
   );
 };
 

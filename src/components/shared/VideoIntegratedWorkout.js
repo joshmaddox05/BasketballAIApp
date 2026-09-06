@@ -134,7 +134,7 @@ const VideoIntegratedWorkout = ({
             <Text style={styles.stepInstructions}>{step.instructions}</Text>
             {step.tips && (
               <View style={styles.stepTips}>
-                <Ionicons name="bulb-outline" size={16} color="#FF6B00" />
+                <Ionicons name="bulb-outline" size={16} color="#8A1C22" />
                 <Text style={styles.stepTipsText}>{step.tips}</Text>
               </View>
             )}
@@ -181,15 +181,15 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F0F0F0',
   },
   workoutTitle: {
-    fontSize: 24,
+    fontSize: 25,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 8,
   },
   workoutDescription: {
-    fontSize: 16,
+    fontSize: 17.5,
     color: '#666',
-    lineHeight: 22,
+    lineHeight: 23,
     marginBottom: 12,
   },
   workoutMeta: {
@@ -201,7 +201,7 @@ const styles = StyleSheet.create({
     marginRight: 16,
   },
   metaText: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
     marginLeft: 4,
   },
@@ -220,13 +220,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   videosSectionTitle: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: 'bold',
     color: '#333',
   },
   seeAllText: {
-    fontSize: 14,
-    color: '#FF6B00',
+    fontSize: 16,
+    color: '#8A1C22',
     fontWeight: '500',
   },
   videosList: {
@@ -244,7 +244,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
   },
   noVideosContainer: {
@@ -252,7 +252,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   noVideosText: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#999',
     textAlign: 'center',
   },
@@ -264,7 +264,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   stepsSectionTitle: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 16,
@@ -284,26 +284,26 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#FF6B00',
+    backgroundColor: '#8A1C22',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
   stepNumberText: {
     color: '#FFF',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: 'bold',
   },
   stepTitle: {
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: '600',
     color: '#333',
     flex: 1,
   },
   stepInstructions: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
-    lineHeight: 20,
+    lineHeight: 21,
     marginBottom: 8,
   },
   stepTips: {
@@ -313,11 +313,11 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 6,
     borderLeftWidth: 3,
-    borderLeftColor: '#FF6B00',
+    borderLeftColor: '#8A1C22',
   },
   stepTipsText: {
-    fontSize: 13,
-    color: '#E65100',
+    fontSize: 15,
+    color: '#6F161B',
     marginLeft: 6,
     flex: 1,
     fontStyle: 'italic',
@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   equipmentTitle: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 12,
@@ -350,7 +350,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   equipmentText: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#2E7D32',
     marginLeft: 4,
   },
@@ -361,7 +361,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   coachNotesTitle: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 12,
@@ -374,9 +374,9 @@ const styles = StyleSheet.create({
     borderLeftColor: '#2196F3',
   },
   coachNotesText: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
-    lineHeight: 20,
+    lineHeight: 21,
     fontStyle: 'italic',
   },
 });

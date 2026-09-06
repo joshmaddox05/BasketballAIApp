@@ -293,7 +293,7 @@ const styles = StyleSheet.create({
         gap: 8,
     },
     headerTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: '700',
     },
     headerBadge: {
@@ -306,7 +306,7 @@ const styles = StyleSheet.create({
     },
     headerBadgeText: {
         color: '#FFF',
-        fontSize: 13,
+        fontSize: 15,
         fontWeight: 'bold',
     },
     headerRight: {
@@ -319,7 +319,7 @@ const styles = StyleSheet.create({
     },
     loadingText: {
         marginTop: 16,
-        fontSize: 15,
+        fontSize: 16.5,
     },
     emptyContainer: {
         flex: 1,
@@ -339,12 +339,12 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     emptyTitle: {
-        fontSize: 22,
+        fontSize: 23,
         fontWeight: 'bold',
         marginBottom: 8,
     },
     emptySubtext: {
-        fontSize: 16,
+        fontSize: 17.5,
         textAlign: 'center',
     },
     closeFullButton: {
@@ -355,7 +355,7 @@ const styles = StyleSheet.create({
     },
     closeFullButtonText: {
         color: '#FFF',
-        fontSize: 17,
+        fontSize: 18,
         fontWeight: '600',
     },
     scrollView: {
@@ -378,7 +378,7 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
     introText: {
-        fontSize: 15,
+        fontSize: 16.5,
         textAlign: 'center',
     },
     requestCard: {
@@ -413,12 +413,12 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     requestName: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: '600',
         marginBottom: 4,
     },
     requestSubtext: {
-        fontSize: 14,
+        fontSize: 16,
     },
     requestActions: {
         flexDirection: 'row',
@@ -435,7 +435,7 @@ const styles = StyleSheet.create({
         gap: 8,
     },
     declineText: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: '600',
     },
     acceptButton: {
@@ -449,7 +449,7 @@ const styles = StyleSheet.create({
     },
     acceptText: {
         color: '#FFF',
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: '600',
     },
     footer: {
@@ -463,7 +463,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     laterButtonText: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: '600',
     },
 });

@@ -14,6 +14,9 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
+import { ONBOARDING_NARRATION } from '../../config/onboardingNarration';
+import { useScreenNarration } from '../../hooks/useScreenNarration';
+import NarrationToggle from '../../components/shared/NarrationToggle';
 
 const PRESET_GOALS = [
     {
@@ -22,7 +25,7 @@ const PRESET_GOALS = [
         description: 'Work on shooting form and consistency',
         icon: 'basketball',
         category: 'shooting',
-        color: '#FF6B00',
+        color: '#8A1C22',
         recommendedFor: ['beginner', 'intermediate', 'advanced']
     },
     {
@@ -143,6 +146,13 @@ const GoalSettingScreen = ({ navigation }) => {
         navigation.navigate('Personalization');
     };
 
+    // Speaks once when this step comes into view, and stops the moment the
+
+    // user moves on. Silent if they have muted the voice guide.
+
+    useScreenNarration(ONBOARDING_NARRATION.goals);
+
+
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor="#FFF" />
@@ -166,6 +176,8 @@ const GoalSettingScreen = ({ navigation }) => {
                 <Text style={styles.headerTitle}>Set Your Training Goals</Text>
             </View>
 
+            <NarrationToggle color="#555" fill="#F4F4F5" border="#E4E4E7" />
+
             <ScrollView style={styles.content}>
                 <Text style={styles.subtitle}>
                     Select goals to help us personalize your training plan. You can change these later.
@@ -175,7 +187,7 @@ const GoalSettingScreen = ({ navigation }) => {
                 {recommendedGoals.length > 0 && (
                     <View style={styles.recommendedSection}>
                         <View style={styles.recommendedHeader}>
-                            <Ionicons name="star" size={20} color="#FF6B00" />
+                            <Ionicons name="star" size={20} color="#8A1C22" />
                             <Text style={styles.recommendedTitle}>Recommended for {userData.level ? userData.level.charAt(0).toUpperCase() + userData.level.slice(1) : 'Beginner'}s</Text>
                         </View>
                         <View style={styles.goalsContainer}>
@@ -388,7 +400,7 @@ const GoalSettingScreen = ({ navigation }) => {
                             value={reminders}
                             onValueChange={setReminders}
                             trackColor={{ false: '#DEE4E7', true: '#FFD3B6' }}
-                            thumbColor={reminders ? '#FF6B00' : '#F5F5F5'}
+                            thumbColor={reminders ? '#8A1C22' : '#F5F5F5'}
                         />
                     </View>
                     <Text style={styles.reminderDescription}>
@@ -442,13 +454,13 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     activeStepDot: {
-        backgroundColor: '#FF6B00',
+        backgroundColor: '#8A1C22',
     },
     completedStepDot: {
         backgroundColor: '#4CAF50',
     },
     stepNumber: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: 'bold',
         color: '#666',
     },
@@ -459,7 +471,7 @@ const styles = StyleSheet.create({
         marginHorizontal: 8,
     },
     headerTitle: {
-        fontSize: 20,
+        fontSize: 21,
         fontWeight: 'bold',
         color: '#333',
         textAlign: 'center',
@@ -469,10 +481,10 @@ const styles = StyleSheet.create({
         padding: 24,
     },
     subtitle: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#666',
         marginBottom: 24,
-        lineHeight: 20,
+        lineHeight: 21,
     },
     recommendedSection: {
         marginBottom: 24,
@@ -484,9 +496,9 @@ const styles = StyleSheet.create({
         paddingHorizontal: 4,
     },
     recommendedTitle: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: 'bold',
-        color: '#FF6B00',
+        color: '#8A1C22',
         marginLeft: 8,
     },
     recommendedGoalCard: {
@@ -498,7 +510,7 @@ const styles = StyleSheet.create({
         marginBottom: 24,
     },
     allGoalsTitle: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: 'bold',
         color: '#333',
         marginBottom: 16,
@@ -520,7 +532,7 @@ const styles = StyleSheet.create({
     },
     selectedGoalCard: {
         backgroundColor: '#FFF0E6',
-        borderColor: '#FF6B00',
+        borderColor: '#8A1C22',
         borderWidth: 2,
     },
     goalCheckbox: {
@@ -537,8 +549,8 @@ const styles = StyleSheet.create({
         backgroundColor: 'transparent',
     },
     selectedGoalCheckbox: {
-        backgroundColor: '#FF6B00',
-        borderColor: '#FF6B00',
+        backgroundColor: '#8A1C22',
+        borderColor: '#8A1C22',
     },
     goalIconContainer: {
         width: 40,
@@ -550,22 +562,22 @@ const styles = StyleSheet.create({
         marginRight: 16,
     },
     selectedGoalIconContainer: {
-        backgroundColor: '#FF6B00',
+        backgroundColor: '#8A1C22',
     },
     goalInfo: {
         flex: 1,
     },
     goalTitle: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: '600',
         color: '#333',
         marginBottom: 4,
     },
     selectedGoalTitle: {
-        color: '#FF6B00',
+        color: '#8A1C22',
     },
     goalDescription: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#666',
     },
     customGoalContainer: {
@@ -575,7 +587,7 @@ const styles = StyleSheet.create({
         marginBottom: 32,
     },
     customGoalTitle: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: '600',
         color: '#333',
         marginBottom: 16,
@@ -592,14 +604,14 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         paddingHorizontal: 16,
         paddingVertical: 12,
-        fontSize: 14,
+        fontSize: 16,
         marginRight: 12,
     },
     addCustomGoalButton: {
         width: 48,
         height: 48,
         borderRadius: 24,
-        backgroundColor: '#FF6B00',
+        backgroundColor: '#8A1C22',
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -607,7 +619,7 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     customGoalCategoryLabel: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#666',
         marginBottom: 8,
     },
@@ -627,14 +639,14 @@ const styles = StyleSheet.create({
     },
     selectedCategoryOption: {
         backgroundColor: '#FFF0E6',
-        borderColor: '#FF6B00',
+        borderColor: '#8A1C22',
     },
     categoryOptionText: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#666',
     },
     selectedCategoryOptionText: {
-        color: '#FF6B00',
+        color: '#8A1C22',
         fontWeight: '500',
     },
     reminderContainer: {
@@ -650,14 +662,14 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     reminderTitle: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: '600',
         color: '#333',
     },
     reminderDescription: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#666',
-        lineHeight: 20,
+        lineHeight: 21,
     },
     actionButtonsContainer: {
         flexDirection: 'row',
@@ -675,13 +687,13 @@ const styles = StyleSheet.create({
         marginRight: 8,
     },
     skipButtonText: {
-        fontSize: 16,
+        fontSize: 17.5,
         color: '#666',
         fontWeight: '600',
     },
     continueButton: {
         flex: 2,
-        backgroundColor: '#FF6B00',
+        backgroundColor: '#8A1C22',
         paddingVertical: 14,
         borderRadius: 8,
         justifyContent: 'center',
@@ -689,7 +701,7 @@ const styles = StyleSheet.create({
         marginLeft: 8,
     },
     continueButtonText: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: 'bold',
         color: '#FFF',
     },

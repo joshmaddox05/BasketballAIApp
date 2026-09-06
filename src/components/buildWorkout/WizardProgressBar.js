@@ -92,15 +92,15 @@ const styles = StyleSheet.create({
     borderColor: '#4CAF50'
   },
   circleCurrent: {
-    backgroundColor: '#FF6B00',
-    borderColor: '#FF6B00'
+    backgroundColor: '#8A1C22',
+    borderColor: '#8A1C22'
   },
   circleUpcoming: {
     backgroundColor: '#1A1A1A',
     borderColor: '#3A3A3A'
   },
   stepNumber: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
     color: '#888888'
   },
@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
   },
   stepLabel: {
     marginTop: 6,
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '500',
     color: '#888888'
   },
@@ -120,7 +120,7 @@ const styles = StyleSheet.create({
     color: '#4CAF50'
   },
   stepLabelCurrent: {
-    color: '#FF6B00'
+    color: '#8A1C22'
   },
   stepLabelUpcoming: {
     color: '#666666'

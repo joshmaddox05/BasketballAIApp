@@ -193,7 +193,7 @@ const ActivityDetailScreen = ({ route, navigation }) => {
     if (loading) {
         return (
             <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#FF6B00" />
+                <ActivityIndicator size="large" color="#8A1C22" />
             </View>
         );
     }
@@ -470,7 +470,7 @@ const ActivityDetailScreen = ({ route, navigation }) => {
                                 workoutId: activity.id.replace('workout-', '') || '1'
                             })}
                         >
-                            <Ionicons name="repeat" size={18} color="#FF6B00" />
+                            <Ionicons name="repeat" size={18} color="#8A1C22" />
                             <Text style={styles.repeatButtonText}>Repeat Workout</Text>
                         </TouchableOpacity>
                     )}
@@ -480,7 +480,7 @@ const ActivityDetailScreen = ({ route, navigation }) => {
                             style={styles.repeatButton}
                             onPress={() => navigation.navigate('ShootingAnalysis')}
                         >
-                            <Ionicons name="camera" size={18} color="#FF6B00" />
+                            <Ionicons name="camera" size={18} color="#8A1C22" />
                             <Text style={styles.repeatButtonText}>New Analysis</Text>
                         </TouchableOpacity>
                     )}
@@ -528,7 +528,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     headerTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: 'bold',
         color: '#333',
     },
@@ -567,13 +567,13 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     activityTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: 'bold',
         color: '#333',
         marginBottom: 4,
     },
     activityDate: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#666',
     },
     summaryStats: {
@@ -588,12 +588,12 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     statLabel: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#666',
         marginBottom: 4,
     },
     statValue: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: 'bold',
         color: '#333',
     },
@@ -603,7 +603,7 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     sectionTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: 'bold',
         color: '#333',
         marginBottom: 16,
@@ -613,7 +613,7 @@ const styles = StyleSheet.create({
         height: 120,
         borderRadius: 60,
         borderWidth: 8,
-        borderColor: '#FF6B00',
+        borderColor: '#8A1C22',
         justifyContent: 'center',
         alignItems: 'center',
         alignSelf: 'center',
@@ -622,10 +622,10 @@ const styles = StyleSheet.create({
     performanceScoreText: {
         fontSize: 36,
         fontWeight: 'bold',
-        color: '#FF6B00',
+        color: '#8A1C22',
     },
     performanceScoreLabel: {
-        fontSize: 12,
+        fontSize: 14,
         color: '#666',
     },
     performanceBar: {
@@ -637,11 +637,11 @@ const styles = StyleSheet.create({
     },
     performanceFill: {
         height: '100%',
-        backgroundColor: '#FF6B00',
+        backgroundColor: '#8A1C22',
         borderRadius: 4,
     },
     performanceDescription: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#666',
         textAlign: 'center',
     },
@@ -659,13 +659,13 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     statGridValue: {
-        fontSize: 20,
+        fontSize: 21,
         fontWeight: 'bold',
         color: '#333',
         marginBottom: 4,
     },
     statGridLabel: {
-        fontSize: 12,
+        fontSize: 14,
         color: '#666',
         textAlign: 'center',
     },
@@ -681,20 +681,20 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     exerciseName: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: '500',
         color: '#333',
         marginBottom: 2,
     },
     exerciseReps: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#666',
     },
     exercisePerformance: {
         paddingHorizontal: 12,
     },
     exercisePerformanceText: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: 'bold',
     },
     improvementItem: {
@@ -706,11 +706,11 @@ const styles = StyleSheet.create({
         borderBottomColor: '#F0F0F0',
     },
     improvementStat: {
-        fontSize: 16,
+        fontSize: 17.5,
         color: '#333',
     },
     improvementChange: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: 'bold',
     },
     notesContainer: {
@@ -719,9 +719,9 @@ const styles = StyleSheet.create({
         padding: 12,
     },
     notesText: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#333',
-        lineHeight: 20,
+        lineHeight: 21,
     },
     coachFeedbackContainer: {
         backgroundColor: '#FFF8E1',
@@ -745,19 +745,19 @@ const styles = StyleSheet.create({
         marginRight: 8,
     },
     coachInitials: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: 'bold',
         color: '#FFF',
     },
     coachName: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '600',
         color: '#333',
     },
     coachFeedback: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#333',
-        lineHeight: 20,
+        lineHeight: 21,
     },
     recommendationsContainer: {
         marginBottom: 8,
@@ -770,43 +770,43 @@ const styles = StyleSheet.create({
         width: 24,
         height: 24,
         borderRadius: 12,
-        backgroundColor: '#FF6B00',
+        backgroundColor: '#8A1C22',
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 12,
     },
     recommendationBulletText: {
         color: '#FFF',
-        fontSize: 12,
+        fontSize: 14,
         fontWeight: 'bold',
     },
     recommendationText: {
         flex: 1,
-        fontSize: 14,
+        fontSize: 16,
         color: '#333',
-        lineHeight: 20,
+        lineHeight: 21,
     },
     leaderboardPosition: {
         alignItems: 'center',
         marginBottom: 16,
     },
     leaderboardPositionLabel: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#666',
         marginBottom: 4,
     },
     leaderboardPositionValue: {
-        fontSize: 24,
+        fontSize: 25,
         fontWeight: 'bold',
-        color: '#FF6B00',
+        color: '#8A1C22',
     },
     leaderboardPositionTotal: {
-        fontSize: 16,
+        fontSize: 17.5,
         color: '#666',
         fontWeight: 'normal',
     },
     leaderboardTopLabel: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '600',
         color: '#333',
         marginBottom: 8,
@@ -828,19 +828,19 @@ const styles = StyleSheet.create({
         marginRight: 12,
     },
     leaderboardRankText: {
-        fontSize: 12,
+        fontSize: 14,
         fontWeight: 'bold',
         color: '#333',
     },
     leaderboardName: {
         flex: 1,
-        fontSize: 14,
+        fontSize: 16,
         color: '#333',
     },
     leaderboardScore: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: 'bold',
-        color: '#FF6B00',
+        color: '#8A1C22',
     },
     actionContainer: {
         flexDirection: 'row',
@@ -857,18 +857,18 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
         borderRadius: 8,
         borderWidth: 1,
-        borderColor: '#FF6B00',
+        borderColor: '#8A1C22',
         marginRight: 8,
     },
     repeatButtonText: {
-        color: '#FF6B00',
-        fontSize: 14,
+        color: '#8A1C22',
+        fontSize: 16,
         fontWeight: '600',
         marginLeft: 6,
     },
     shareButtonLarge: {
         flex: 1,
-        backgroundColor: '#FF6B00',
+        backgroundColor: '#8A1C22',
         paddingVertical: 12,
         borderRadius: 8,
         justifyContent: 'center',
@@ -877,7 +877,7 @@ const styles = StyleSheet.create({
     },
     shareButtonText: {
         color: '#FFF',
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: 'bold',
     },
     errorContainer: {
@@ -887,22 +887,22 @@ const styles = StyleSheet.create({
         padding: 40,
     },
     errorTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: 'bold',
         color: '#333',
         marginTop: 16,
         marginBottom: 8,
     },
     errorMessage: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#666',
         textAlign: 'center',
         marginBottom: 24,
     },
     backButtonText: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: 'bold',
-        color: '#FF6B00',
+        color: '#8A1C22',
     }
 });
 

@@ -1,0 +1,559 @@
+// ScoutLabScreen.js - 12d: athlete exposure, scout activity, boost actions
+import React, { useState, useCallback, useEffect } from 'react';
+import {
+  SafeAreaView,
+  StyleSheet,
+  View,
+  Text,
+  TouchableOpacity,
+  ScrollView,
+  Switch,
+  Alert,
+} from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+import { Ionicons } from '@expo/vector-icons';
+import { useAppContext } from '../../context/AppContext';
+import { canAccessFeature } from '../../utils/subscription';
+import {
+  getScoutLabProfile,
+  publishScoutLabProfile,
+  unpublishScoutLabProfile,
+  isHighSchoolGrade,
+  getSharedReportsForPlayer,
+} from '../../services/firestoreService';
+import SharedReportsSection from '../../components/features/SharedReportsSection';
+import {
+  Entrance,
+  PulseHalo,
+  RingProgress,
+  ScreenHeader,
+  SectionLabel,
+  PrimaryButton,
+} from '../../components/dbe';
+import { TYPE, SHAPE, FONTS } from '../../utils/typography';
+import { evalGradeOf, toUiEval } from '../../services/blueprint/evalRankPresenter';
+
+// NOTE: this screen previously rendered a hard-coded readiness score of 74, a
+// hard-coded "12 scouts viewed you this month", and an invented activity feed
+// ("Duke University viewed your profile"). All three are gone. The readiness
+// score now comes from the exposure engine, which reports honestly when a
+// dimension has not been measured; the view counter and activity feed were
+// deleted outright because no view-tracking exists, so there is no truthful
+// version of either. Re-add them only alongside real instrumentation.
+
+const BOOST_ACTIONS = [
+  {
+    id: 'profile',
+    label: 'Complete profile',
+    description: 'Stats, GPA and contact info',
+    icon: 'person-circle-outline',
+    done: true,
+  },
+  {
+    id: 'gates',
+    label: 'Clear your exposure gates',
+    description: 'See exactly what is holding your visibility back',
+    icon: 'shield-checkmark-outline',
+    done: false,
+  },
+  {
+    id: 'evaluation',
+    label: 'Run your evaluation',
+    description: 'The platform grade is what scouts actually see',
+    icon: 'star-outline',
+    done: false,
+  },
+];
+
+const tierFor = (score) =>
+  score >= 80 ? 'D1 READY' : score >= 65 ? 'D2 PROSPECT' : score >= 50 ? 'D3 PROSPECT' : 'BUILDING';
+
+// ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
+function LockedUpgradeCard({ theme, onUpgrade }) {
+  return (
+    <Entrance variant="cardIn" style={[styles.lockedCard, { backgroundColor: theme.surface }]}>
+      <View style={[styles.lockedIconWrap, { backgroundColor: theme.badgeFill }]}>
+        <Ionicons name="lock-closed" size={28} color={theme.accentText} />
+      </View>
+      <Text style={[TYPE.tooltipTitle, { color: theme.text, textAlign: 'center' }]}>
+        ScoutLab™ is PRO
+      </Text>
+      <Text style={[TYPE.tooltipBody, { color: theme.textDim, textAlign: 'center', marginTop: 6 }]}>
+        Exposure score, scout reports and a shareable athlete profile.
+      </Text>
+      <View style={styles.lockedPerksRow}>
+        {/* "Scout alerts" was removed with the fabricated activity feed — the app
+            sends no scout alerts. Shared scout reports are real (SharedReportsSection). */}
+        {['Exposure score', 'Scout reports', 'Shareable profile'].map((perk) => (
+          <View key={perk} style={styles.lockedPerkItem}>
+            <Ionicons name="checkmark" size={14} color={theme.accentText} />
+            <Text style={[TYPE.rowMeta, { color: theme.textMuted, marginTop: 0 }]}>{perk}</Text>
+          </View>
+        ))}
+      </View>
+      <PrimaryButton
+        label="Upgrade to PRO"
+        icon="rocket-outline"
+        onPress={onUpgrade}
+        style={{ alignSelf: 'stretch', marginTop: 18 }}
+      />
+    </Entrance>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main Screen
+// ---------------------------------------------------------------------------
+export default function ScoutLabScreen({ navigation }) {
+  const { user, userData, theme, isDarkMode, evalRankScore, shotDNAProfile } = useAppContext();
+
+  const subscription = userData?.subscription || 'free';
+  const hasAccess = canAccessFeature('scoutLab', subscription);
+
+  const name = userData?.displayName || userData?.name || 'Athlete';
+  const position = userData?.position || 'PG';
+  const grade = userData?.grade || '10th';
+
+  const playerUid = user?.uid;
+  const [directoryVisible, setDirectoryVisible] = useState(false);
+  const [toggling, setToggling] = useState(false);
+  // Reports a scout has explicitly shared with this athlete.
+  const [sharedReports, setSharedReports] = useState([]);
+
+  // Load the player's current directory visibility on mount.
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      if (!playerUid) return;
+      const [profile, reports] = await Promise.all([
+        getScoutLabProfile(playerUid),
+        getSharedReportsForPlayer(playerUid).catch(() => []),
+      ]);
+      if (active) {
+        setDirectoryVisible(!!profile?.directoryVisible);
+        setSharedReports(reports);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [playerUid]);
+
+  const handleToggleVisibility = useCallback(
+    async (next) => {
+      if (!playerUid || toggling) return;
+      // Discovery is high-school only (grades 9–12). Guard before publishing.
+      if (next && !isHighSchoolGrade(userData?.gradeLevel)) {
+        Alert.alert(
+          'High-school athletes only',
+          'Scout discovery is available to high-school athletes (grades 9–12). Set your grade level in Edit Profile to enable it.'
+        );
+        return;
+      }
+      setToggling(true);
+      setDirectoryVisible(next); // optimistic
+      try {
+        if (next) {
+          // Per COO policy the public entry is minimal: name, grade, size,
+          // position, archetype, main attributes, evaluation score only.
+          await publishScoutLabProfile(playerUid, {
+            name,
+            gradeLevel: userData?.gradeLevel,
+            position: userData?.position || null,
+            height: userData?.height || null,
+            archetype: userData?.archetypeLabel || shotDNAProfile?.archetype || null,
+            mainAttributes: userData?.preferences?.focusAreas || null,
+            evaluationScore: evalGradeOf(evalRankScore),
+            region: userData?.region || null,
+          });
+        } else {
+          await unpublishScoutLabProfile(playerUid);
+        }
+      } catch (error) {
+        setDirectoryVisible(!next); // revert on failure
+        Alert.alert('Error', error.message || 'Could not update your recruiting visibility.');
+      } finally {
+        setToggling(false);
+      }
+    },
+    [playerUid, toggling, name, userData, evalRankScore, shotDNAProfile]
+  );
+
+  // These previously pointed at 'UploadHighlights' and 'RequestEvaluation', neither
+  // of which is registered anywhere — both threw at runtime. They now go to real
+  // screens, and the labels match what those screens do:
+  //  - the platform's own ranking IS the authoritative evaluation (COO policy: a
+  //    scout's manual grade never alters it), so "request an evaluation" was the
+  //    wrong mental model — running your own EvalRank is the real action;
+  //  - the exposure gates are the concrete thing blocking a player's visibility,
+  //    which is what the old "upload highlights" CTA was gesturing at.
+  const handleBoostAction = useCallback(
+    (actionId) => {
+      if (actionId === 'profile') {
+        navigation.navigate('EditProfile');
+      } else if (actionId === 'gates') {
+        navigation.navigate('EvalRankBadges');
+      } else if (actionId === 'evaluation') {
+        navigation.navigate('EvalRank');
+      }
+    },
+    [navigation],
+  );
+
+  const handleViewProfile = useCallback(() => {
+    navigation.navigate('ScoutLabProfile');
+  }, [navigation]);
+
+  const handleUpgrade = useCallback(() => {
+    navigation.navigate('Subscription');
+  }, [navigation]);
+
+  if (!hasAccess) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+        <StatusBar style={isDarkMode ? 'light' : 'dark'} />
+        <ScreenHeader title="ScoutLab™" subtitle="Recruiting exposure" />
+        <ScrollView
+          contentContainerStyle={styles.lockedScrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <LockedUpgradeCard theme={theme} onUpgrade={handleUpgrade} />
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  // Real exposure readiness. `toUiExposure` deliberately refuses to report an
+  // Exposure Index until all five dimensions are measured — the index is a MIN
+  // over them, so one unmeasured dimension pins it to zero, and showing that as
+  // a verdict would punish an athlete for simply not having trained yet.
+  // `toUiEval` returns null for no record at all and a legacy shape for
+  // pre-v1 docs, both of which land on assessable: false.
+  const exposure = toUiEval(evalRankScore)?.exposure || null;
+  const assessable = !!exposure?.assessable;
+  const score = assessable ? exposure.index : null;
+
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+      <StatusBar style={isDarkMode ? 'light' : 'dark'} />
+
+      <ScreenHeader
+        title="ScoutLab™"
+        subtitle="Recruiting exposure"
+        right={
+          <View
+            style={[
+              styles.statusPill,
+              { backgroundColor: directoryVisible ? theme.badgeFill : theme.steelFill },
+            ]}
+          >
+            <View style={styles.dotWrap}>
+              {directoryVisible ? <PulseHalo color={theme.accentText} duration={1800} /> : null}
+              <View
+                style={[
+                  styles.dot,
+                  { backgroundColor: directoryVisible ? theme.accentText : theme.steel },
+                ]}
+              />
+            </View>
+            <Text
+              style={[
+                styles.statusPillText,
+                { color: directoryVisible ? theme.accentText : theme.steel },
+              ]}
+            >
+              {directoryVisible ? 'PUBLISHED' : 'HIDDEN'}
+            </Text>
+          </View>
+        }
+      />
+
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* ── Exposure readiness ring ─────────────────────────────────────── */}
+        <View style={styles.scoreRow}>
+          <RingProgress
+            size={124}
+            strokeWidth={9}
+            progress={assessable ? score / 100 : 0}
+            color={theme.primary}
+            trackColor={theme.track}
+            delay={200}
+          >
+            <Entrance variant="count" delay={800} style={{ alignItems: 'center' }}>
+              <Text
+                style={[styles.scoreNumber, { color: assessable ? theme.text : theme.textDim }]}
+              >
+                {assessable ? score : '--'}
+              </Text>
+              <Text style={[styles.scoreOutOf, { color: theme.textDim }]}>/100</Text>
+            </Entrance>
+          </RingProgress>
+
+          <View style={{ flex: 1 }}>
+            <Text style={[TYPE.sectionLabel, { color: theme.textDim }]}>Scout readiness</Text>
+            {assessable ? (
+              <Entrance variant="chipPop" delay={1000} style={{ alignSelf: 'flex-start' }}>
+                <View
+                  style={[
+                    styles.tierChip,
+                    { backgroundColor: theme.badgeFill, borderColor: theme.attentionBorder },
+                  ]}
+                >
+                  <Text style={[styles.tierChipText, { color: theme.accentText }]}>
+                    {exposure.tierName || tierFor(score)}
+                  </Text>
+                </View>
+              </Entrance>
+            ) : (
+              <Text style={[TYPE.rowMeta, { color: theme.textDim, marginTop: 6 }]}>
+                {exposure?.message || 'Run an evaluation to assess exposure readiness'}
+              </Text>
+            )}
+          </View>
+        </View>
+
+        {/* ── Recruiting visibility toggle ────────────────────────────────── */}
+        <Entrance
+          variant="cardIn"
+          delay={120}
+          style={[styles.visibilityCard, { backgroundColor: theme.surface }]}
+        >
+          <View style={[styles.visibilityIconWrap, { backgroundColor: theme.badgeFill }]}>
+            <Ionicons
+              name={directoryVisible ? 'eye-outline' : 'eye-off-outline'}
+              size={17}
+              color={theme.accentText}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[TYPE.rowTitle, { color: theme.text }]}>Recruiting visibility</Text>
+            <Text style={[TYPE.rowMeta, { color: theme.textDim }]}>
+              {directoryVisible ? 'Findable in prospect search' : 'Hidden from prospect search'}
+            </Text>
+          </View>
+          <Switch
+            value={directoryVisible}
+            onValueChange={handleToggleVisibility}
+            disabled={toggling}
+            trackColor={{ false: theme.hairline, true: theme.primary }}
+            thumbColor="#FFFFFF"
+          />
+        </Entrance>
+
+        {/* ── Athlete identity row ────────────────────────────────────────── */}
+        <Entrance
+          variant="cardIn"
+          delay={180}
+          style={[styles.portfolioCard, { backgroundColor: theme.surface }]}
+        >
+          <View style={[styles.avatarPlaceholder, { backgroundColor: theme.avatarFill }]}>
+            <Ionicons name="person" size={20} color={theme.accentText} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[TYPE.rowTitle, { color: theme.text }]}>{name}</Text>
+            <Text style={[TYPE.rowMeta, { color: theme.textDim }]}>
+              {position} · {grade} grade
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('EditProfile')}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={[styles.editLink, { color: theme.accentText }]}>Edit</Text>
+          </TouchableOpacity>
+        </Entrance>
+
+        {/* ── Reports scouts have shared with this athlete ─────────────────── */}
+        <SharedReportsSection
+          reports={sharedReports}
+          theme={theme}
+          onOpen={(report) => navigation.navigate('ScoutReportDetail', { report })}
+        />
+
+        {/* Scout activity feed removed — see the note at the top of this file.
+            The app tracks no profile views, so every row here was fabricated. */}
+
+        {/* ── Boost exposure ──────────────────────────────────────────────── */}
+        <View style={{ marginTop: SHAPE.sectionGap }}>
+          <SectionLabel>Boost your exposure</SectionLabel>
+          {BOOST_ACTIONS.map((action, index) => (
+            <Entrance key={action.id} variant="cellIn" delay={380 + index * 90}>
+              <TouchableOpacity
+                style={[
+                  styles.boostRow,
+                  { backgroundColor: theme.surface },
+                  index > 0 && { marginTop: 8 },
+                ]}
+                onPress={() => !action.done && handleBoostAction(action.id)}
+                activeOpacity={action.done ? 1 : 0.8}
+              >
+                {action.done ? (
+                  <View style={[styles.checkOn, { backgroundColor: theme.primary }]}>
+                    <Ionicons name="checkmark" size={13} color="#FFFFFF" />
+                  </View>
+                ) : (
+                  <View style={[styles.checkOff, { borderColor: theme.hairline }]} />
+                )}
+                <View style={{ flex: 1 }}>
+                  <Text style={[TYPE.rowTitle, { color: theme.text, fontSize: 14.5 }]}>
+                    {action.label}
+                  </Text>
+                  <Text style={[TYPE.rowMeta, { color: theme.textDim, fontSize: 12.5 }]}>
+                    {action.description}
+                  </Text>
+                </View>
+                {!action.done ? (
+                  <Ionicons name="chevron-forward" size={15} color={theme.textDim} />
+                ) : null}
+              </TouchableOpacity>
+            </Entrance>
+          ))}
+        </View>
+
+        {/* ── Share profile CTA ───────────────────────────────────────────── */}
+        <TouchableOpacity
+          style={[styles.primaryCta, { backgroundColor: theme.primary }]}
+          activeOpacity={0.85}
+          onPress={handleViewProfile}
+        >
+          <Text style={styles.primaryCtaText}>Share athlete profile</Text>
+          <Ionicons name="share-outline" size={17} color="#FFFFFF" />
+        </TouchableOpacity>
+
+        <View style={styles.bottomSpacer} />
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Styles
+// ---------------------------------------------------------------------------
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: SHAPE.radiusPill,
+  },
+  dotWrap: { width: 6, height: 6 },
+  dot: { width: 6, height: 6, borderRadius: 3 },
+  statusPillText: { fontFamily: FONTS.bodyBold, fontSize: 12, letterSpacing: 0.7 },
+
+  scrollContent: { paddingHorizontal: SHAPE.screenPadding, paddingTop: 16 },
+  lockedScrollContent: {
+    paddingHorizontal: SHAPE.screenPadding,
+    flexGrow: 1,
+    justifyContent: 'center',
+  },
+
+  // Score / readiness
+  scoreRow: { flexDirection: 'row', alignItems: 'center', gap: 18 },
+  scoreNumber: { fontFamily: FONTS.heading, fontSize: 38, lineHeight: 40 },
+  scoreOutOf: { fontFamily: FONTS.bodySemiBold, fontSize: 12, marginTop: 2 },
+  tierChip: {
+    borderRadius: SHAPE.radiusPill,
+    borderWidth: 1,
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+    marginTop: 8,
+  },
+  tierChipText: { fontFamily: FONTS.bodyExtraBold, fontSize: 13.5, letterSpacing: 0.5 },
+  visibilityCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+    padding: SHAPE.cardPadding,
+    borderRadius: SHAPE.radiusCard,
+    marginTop: SHAPE.sectionGap,
+  },
+  visibilityIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: SHAPE.radiusBadge + 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  portfolioCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+    padding: SHAPE.cardPadding,
+    borderRadius: SHAPE.radiusCard,
+    marginTop: SHAPE.cardGap,
+  },
+  avatarPlaceholder: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  editLink: { fontFamily: FONTS.bodyBold, fontSize: 13 },
+
+  // Boost
+  boostRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+    paddingHorizontal: 13,
+    paddingVertical: 12,
+    borderRadius: SHAPE.radiusTile,
+  },
+  checkOn: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkOff: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1.5,
+  },
+
+  // CTA
+  primaryCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    borderRadius: SHAPE.radiusTile,
+    marginTop: SHAPE.sectionGap,
+  },
+  primaryCtaText: { fontFamily: FONTS.bodyExtraBold, fontSize: 16, color: '#FFFFFF' },
+
+  // Locked / Upgrade
+  lockedCard: {
+    borderRadius: SHAPE.radiusHero,
+    padding: 24,
+    alignItems: 'center',
+  },
+  lockedIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: SHAPE.radiusCard,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  lockedPerksRow: { width: '100%', marginTop: 14 },
+  lockedPerkItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 5,
+  },
+
+  bottomSpacer: { height: 30 },
+});

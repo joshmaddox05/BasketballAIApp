@@ -10,7 +10,10 @@ import {
     StatusBar,
     Dimensions,
     Animated,
-    ActivityIndicator
+    ActivityIndicator,
+    LayoutAnimation,
+    Platform,
+    UIManager
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
@@ -29,6 +32,13 @@ import {
 } from '../../services/firestoreService';
 import { ACHIEVEMENT_CATEGORIES } from '../../data/achievements';
 import { TourStep, useTour } from '../../components/tour';
+import { Entrance } from '../../components/dbe';
+import { FONTS, MOTION } from '../../utils/typography';
+
+// Android needs the experimental LayoutAnimation flag opted into explicitly.
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 const { width } = Dimensions.get('window');
 
@@ -162,18 +172,24 @@ const ProgressScreen = ({ navigation }) => {
         // Find the index of the selected tab
         const tabIndex = TABS.findIndex(tab => tab.id === tabId);
 
-        // Animate the tab indicator
+        // Animate the tab indicator. translateX, not `left`: the indicator is the one
+        // element the user tracks during a tab change, so it is the worst possible
+        // candidate to run off the GPU — `left` is a layout property and relayouts
+        // the row every frame.
         Animated.spring(tabIndicatorPosition, {
             toValue: tabIndex * (width / TABS.length),
-            useNativeDriver: false,
+            useNativeDriver: true,
             friction: 8,
         }).start();
 
         setActiveTab(tabId);
     };
 
-    // Toggle goal expansion
+    // Toggle goal expansion.
+    // The description used to pop in and jump the card's height. Height is not
+    // transform-animatable in RN, so LayoutAnimation is the right tool here.
     const toggleGoalExpansion = (goalId) => {
+        LayoutAnimation.configureNext(LayoutAnimation.create(MOTION.quick, 'easeInEaseOut', 'opacity'));
         if (expandedGoalId === goalId) {
             setExpandedGoalId(null);
         } else {
@@ -207,12 +223,16 @@ const ProgressScreen = ({ navigation }) => {
 
     // Get skill data for charts - now using real workout data
     const getSkillData = () => {
+        // One burgundy line voice across every skill. This was five hues keyed to
+        // skill (green / blue / purple / orange); the selected chip already says which
+        // skill you are looking at, and colour-coded categories are the anti-reference.
+        const skillLine = (opacity = 1) => `rgba(138, 28, 34, ${opacity})`;
         const skillColors = {
-            shooting: (opacity = 1) => `rgba(255, 107, 0, ${opacity})`,
-            dribbling: (opacity = 1) => `rgba(76, 175, 80, ${opacity})`,
-            physical: (opacity = 1) => `rgba(33, 150, 243, ${opacity})`,
-            defense: (opacity = 1) => `rgba(156, 39, 176, ${opacity})`,
-            passing: (opacity = 1) => `rgba(255, 152, 0, ${opacity})`,
+            shooting: skillLine,
+            dribbling: skillLine,
+            physical: skillLine,
+            defense: skillLine,
+            passing: skillLine,
         };
 
         // Calculate skill progress from workout history
@@ -292,7 +312,7 @@ const ProgressScreen = ({ navigation }) => {
                 labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
                 datasets: [{
                     data: [0, 0, 0, 0, 0, 0, 0],
-                    color: (opacity = 1) => `rgba(255, 107, 0, ${opacity})`,
+                    color: (opacity = 1) => `rgba(138, 28, 34, ${opacity})`,
                     strokeWidth: 2
                 }]
             };
@@ -333,7 +353,7 @@ const ProgressScreen = ({ navigation }) => {
             labels,
             datasets: [{
                 data: workoutMinutes.map(m => m || 0.1), // Ensure at least 0.1 for visibility
-                color: (opacity = 1) => `rgba(255, 107, 0, ${opacity})`,
+                color: (opacity = 1) => `rgba(138, 28, 34, ${opacity})`,
                 strokeWidth: 2
             }]
         };
@@ -539,20 +559,20 @@ const ProgressScreen = ({ navigation }) => {
                             style={[
                                 styles.skillTab,
                                 selectedSkill === 'shooting' && styles.selectedSkillTab,
-                                selectedSkill === 'shooting' && { borderColor: '#FF6B00' }
+                                selectedSkill === 'shooting' && { borderColor: theme.primary }
                             ]}
                             onPress={() => setSelectedSkill('shooting')}
                         >
                             <Ionicons
                                 name="basketball"
                                 size={16}
-                                color={selectedSkill === 'shooting' ? '#FF6B00' : theme.textSecondary}
+                                color={selectedSkill === 'shooting' ? theme.accentText : theme.textSecondary}
                             />
                             <Text
                                 style={[
                                     styles.skillTabText,
                                     { color: theme.textSecondary },
-                                    selectedSkill === 'shooting' && { color: '#FF6B00', fontWeight: '600' }
+                                    selectedSkill === 'shooting' && { color: theme.accentText }
                                 ]}
                             >
                                 Shooting
@@ -563,20 +583,20 @@ const ProgressScreen = ({ navigation }) => {
                             style={[
                                 styles.skillTab,
                                 selectedSkill === 'dribbling' && styles.selectedSkillTab,
-                                selectedSkill === 'dribbling' && { borderColor: '#4CAF50' }
+                                selectedSkill === 'dribbling' && { borderColor: theme.primary }
                             ]}
                             onPress={() => setSelectedSkill('dribbling')}
                         >
                             <Ionicons
                                 name="hand-left"
                                 size={16}
-                                color={selectedSkill === 'dribbling' ? '#4CAF50' : theme.textSecondary}
+                                color={selectedSkill === 'dribbling' ? theme.accentText : theme.textSecondary}
                             />
                             <Text
                                 style={[
                                     styles.skillTabText,
                                     { color: theme.textSecondary },
-                                    selectedSkill === 'dribbling' && { color: '#4CAF50', fontWeight: '600' }
+                                    selectedSkill === 'dribbling' && { color: theme.accentText }
                                 ]}
                             >
                                 Dribbling
@@ -587,20 +607,20 @@ const ProgressScreen = ({ navigation }) => {
                             style={[
                                 styles.skillTab,
                                 selectedSkill === 'physical' && styles.selectedSkillTab,
-                                selectedSkill === 'physical' && { borderColor: '#2196F3' }
+                                selectedSkill === 'physical' && { borderColor: theme.primary }
                             ]}
                             onPress={() => setSelectedSkill('physical')}
                         >
                             <Ionicons
                                 name="fitness"
                                 size={16}
-                                color={selectedSkill === 'physical' ? '#2196F3' : theme.textSecondary}
+                                color={selectedSkill === 'physical' ? theme.accentText : theme.textSecondary}
                             />
                             <Text
                                 style={[
                                     styles.skillTabText,
                                     { color: theme.textSecondary },
-                                    selectedSkill === 'physical' && { color: '#2196F3', fontWeight: '600' }
+                                    selectedSkill === 'physical' && { color: theme.accentText }
                                 ]}
                             >
                                 Physical
@@ -615,14 +635,15 @@ const ProgressScreen = ({ navigation }) => {
                         height={200}
                         chartConfig={{
                             ...chartConfig,
-                            color: (opacity = 1) => selectedSkill === 'shooting' ? `rgba(255, 107, 0, ${opacity})` :
-                                selectedSkill === 'dribbling' ? `rgba(76, 175, 80, ${opacity})` :
-                                    `rgba(33, 150, 243, ${opacity})`,
+                            // One line colour for every skill. The three-hue version
+                            // (burgundy / green / blue) coded the skill by colour, which
+                            // the chip row above already does — and colour-coding
+                            // categories is the system's named anti-reference.
+                            color: (opacity = 1) => `rgba(138, 28, 34, ${opacity})`,
                             propsForDots: {
                                 r: '5',
                                 strokeWidth: '2',
-                                stroke: selectedSkill === 'shooting' ? '#FF6B00' :
-                                    selectedSkill === 'dribbling' ? '#4CAF50' : '#2196F3'
+                                stroke: theme.primary
                             }
                         }}
                         bezier
@@ -649,11 +670,11 @@ const ProgressScreen = ({ navigation }) => {
                                 const percentage = Math.round((count / total) * 100);
 
                                 const categoryConfig = {
-                                    'Shooting': { icon: 'basketball', color: '#FF6B00' },
-                                    'Dribbling': { icon: 'hand-left', color: '#4CAF50' },
-                                    'Physical': { icon: 'fitness', color: '#2196F3' },
-                                    'Defense': { icon: 'shield', color: '#9C27B0' },
-                                    'Passing': { icon: 'swap-horizontal', color: '#FF9800' },
+                                    'Shooting': { icon: 'basketball', color: theme.accentText },
+                                    'Dribbling': { icon: 'hand-left', color: theme.accentText },
+                                    'Physical': { icon: 'fitness', color: theme.accentText },
+                                    'Defense': { icon: 'shield', color: theme.accentText },
+                                    'Passing': { icon: 'swap-horizontal', color: theme.accentText },
                                 };
 
                                 const config = categoryConfig[category] || { icon: 'fitness', color: theme.textSecondary };
@@ -698,7 +719,7 @@ const ProgressScreen = ({ navigation }) => {
                             <Text style={[styles.sectionTitle, { color: theme.text }]}>Recommended For You</Text>
                         </View>
 
-                        <View style={[styles.recommendationCard, { backgroundColor: theme.backgroundSecondary }]}>
+                        <View style={[styles.recommendationCard, { backgroundColor: theme.backgroundSecondary, borderColor: theme.primary }]}>
                             <View style={styles.recommendationHeader}>
                                 <View style={[styles.recommendationIconContainer, { backgroundColor: theme.primary + '20' }]}>
                                     <Ionicons name="trophy" size={24} color={theme.primary} />
@@ -716,10 +737,7 @@ const ProgressScreen = ({ navigation }) => {
                             <TouchableOpacity
                                 style={[styles.recommendationButton, { backgroundColor: theme.primary }]}
                                 onPress={() => {
-                                    navigation.navigate('Training', {
-                                        screen: 'TrainingMain',
-                                        params: { filterCategory: recommendations.nextWorkout }
-                                    });
+                                    navigation.navigate('Training', { filterCategory: recommendations.nextWorkout });
                                 }}
                             >
                                 <Text style={styles.recommendationButtonText}>
@@ -764,7 +782,7 @@ const ProgressScreen = ({ navigation }) => {
                             <Text style={[styles.xpText, { color: theme.textSecondary }]}>{gamificationStats.totalXP} XP</Text>
                         </View>
                         <TouchableOpacity style={styles.achievementsTrophyIcon}>
-                            <Ionicons name="trophy" size={28} color="#FFD700" />
+                            <Ionicons name="trophy" size={28} color={theme.accentText} />
                             <Text style={[styles.achievementCount, { color: theme.textSecondary }]}>
                                 {unlockedAchievements.length}/{achievementProgress.length}
                             </Text>
@@ -800,7 +818,7 @@ const ProgressScreen = ({ navigation }) => {
                         style={[
                             styles.achievementCategoryChip,
                             { backgroundColor: theme.backgroundTertiary },
-                            selectedAchievementCategory === 'all' && [styles.achievementCategoryChipActive, { borderColor: theme.primary }]
+                            selectedAchievementCategory === 'all' && [styles.achievementCategoryChipActive, { backgroundColor: theme.badgeFill, borderColor: theme.primary }]
                         ]}
                         onPress={() => setSelectedAchievementCategory('all')}
                     >
@@ -834,7 +852,7 @@ const ProgressScreen = ({ navigation }) => {
                                 style={[
                                     styles.achievementCategoryChip,
                                     { backgroundColor: theme.backgroundTertiary },
-                                    isSelected && [styles.achievementCategoryChipActive, { borderColor: theme.primary }]
+                                    isSelected && [styles.achievementCategoryChipActive, { backgroundColor: theme.badgeFill, borderColor: theme.primary }]
                                 ]}
                                 onPress={() => setSelectedAchievementCategory(category)}
                             >
@@ -869,7 +887,7 @@ const ProgressScreen = ({ navigation }) => {
                                 style={[
                                     styles.achievementCard,
                                     { backgroundColor: theme.backgroundSecondary, borderColor: theme.border },
-                                    achievement.unlocked && [styles.achievementCardUnlocked, { backgroundColor: theme.card }]
+                                    achievement.unlocked && [styles.achievementCardUnlocked, { backgroundColor: theme.card, borderColor: theme.attentionBorder }]
                                 ]}
                             >
                                 <View style={styles.achievementIconContainer}>
@@ -888,8 +906,8 @@ const ProgressScreen = ({ navigation }) => {
                                         />
                                     </View>
                                     {achievement.unlocked && (
-                                        <View style={styles.unlockedBadge}>
-                                            <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
+                                        <View style={[styles.unlockedBadge, { backgroundColor: theme.surface }]}>
+                                            <Ionicons name="checkmark-circle" size={16} color={theme.accentText} />
                                         </View>
                                     )}
                                 </View>
@@ -953,12 +971,14 @@ const ProgressScreen = ({ navigation }) => {
             ? activeGoals.reduce((sum, g) => sum + Math.min((g.current / g.target) * 100, 100), 0) / activeGoals.length
             : 0;
 
+        // Never a rainbow: goal progress reads in the system's two voices, not on a
+        // red-yellow-green ramp. Done and nearly-done are accent; mid-progress is the
+        // neutral steel second voice; barely-started is dim. The system reports, it
+        // does not scold.
         const getProgressColor = (progress) => {
-            if (progress >= 100) return '#4CAF50';
-            if (progress >= 75) return '#8BC34A';
-            if (progress >= 50) return '#FFC107';
-            if (progress >= 25) return '#FF9800';
-            return theme.primary;
+            if (progress >= 75) return theme.primary;
+            if (progress >= 25) return theme.steel;
+            return theme.textDim;
         };
 
         const getCategoryIcon = (category) => {
@@ -985,7 +1005,7 @@ const ProgressScreen = ({ navigation }) => {
                         </View>
                         <View style={[styles.goalsSummaryDivider, { backgroundColor: theme.border }]} />
                         <View style={styles.goalsSummaryItem}>
-                            <Text style={[styles.goalsSummaryValue, { color: '#4CAF50' }]}>{completedGoals.length}</Text>
+                            <Text style={[styles.goalsSummaryValue, { color: theme.accentText }]}>{completedGoals.length}</Text>
                             <Text style={[styles.goalsSummaryLabel, { color: theme.textSecondary }]}>Completed</Text>
                         </View>
                         <View style={[styles.goalsSummaryDivider, { backgroundColor: theme.border }]} />
@@ -1013,7 +1033,7 @@ const ProgressScreen = ({ navigation }) => {
                     <TouchableOpacity
                         style={[
                             styles.goalsToggleButton,
-                            showCompletedGoals && { backgroundColor: '#4CAF50' },
+                            showCompletedGoals && { backgroundColor: theme.primary },
                             !showCompletedGoals && { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border }
                         ]}
                         onPress={() => setShowCompletedGoals(true)}
@@ -1064,7 +1084,7 @@ const ProgressScreen = ({ navigation }) => {
                                     onPress={() => toggleGoalExpansion(goal.id)}
                                     activeOpacity={0.7}
                                 >
-                                    <View style={styles.goalCardHeader}>
+                                    <View style={[styles.goalCardHeader, { borderBottomColor: theme.hairline }]}>
                                         <View style={[styles.goalCategoryIcon, { backgroundColor: progressColor + '20' }]}>
                                             <Ionicons
                                                 name={getCategoryIcon(goal.category || goal.type)}
@@ -1081,7 +1101,7 @@ const ProgressScreen = ({ navigation }) => {
                                             </Text>
                                         </View>
                                         {isCompleted && (
-                                            <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
+                                            <Ionicons name="checkmark-circle" size={24} color={theme.accentText} />
                                         )}
                                     </View>
 
@@ -1105,9 +1125,11 @@ const ProgressScreen = ({ navigation }) => {
                                     </View>
 
                                     {expandedGoalId === goal.id && goal.description && (
-                                        <Text style={[styles.goalCardDescription, { color: theme.textSecondary }]}>
-                                            {goal.description}
-                                        </Text>
+                                        <Entrance variant="up" duration={MOTION.quick}>
+                                            <Text style={[styles.goalCardDescription, { color: theme.textSecondary }]}>
+                                                {goal.description}
+                                            </Text>
+                                        </Entrance>
                                     )}
                                 </TouchableOpacity>
                             );
@@ -1178,8 +1200,9 @@ const ProgressScreen = ({ navigation }) => {
                             styles.tabIndicator,
                             { backgroundColor: theme.primary },
                             {
-                                left: tabIndicatorPosition,
+                                left: 0,
                                 width: width / TABS.length,
+                                transform: [{ translateX: tabIndicatorPosition }],
                             }
                         ]}
                     />
@@ -1212,8 +1235,8 @@ const styles = StyleSheet.create({
         borderBottomWidth: 1,
     },
     headerTitle: {
-        fontSize: 24,
-        fontWeight: 'bold',
+        fontSize: 25,
+        fontFamily: FONTS.bodyBold,
     },
     tabsContainer: {
         flexDirection: 'row',
@@ -1228,12 +1251,12 @@ const styles = StyleSheet.create({
     activeTab: {
     },
     tabText: {
-        fontSize: 12,
-        fontWeight: '500',
+        fontSize: 14,
+        fontFamily: FONTS.bodyMedium,
         textAlign: 'center',
     },
     activeTabText: {
-        fontWeight: 'bold',
+        fontFamily: FONTS.bodyBold,
     },
     tabIndicator: {
         position: 'absolute',
@@ -1259,8 +1282,8 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     summaryTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
+        fontSize: 19,
+        fontFamily: FONTS.bodyBold,
     },
     timeframeSelector: {
         flexDirection: 'row',
@@ -1270,7 +1293,8 @@ const styles = StyleSheet.create({
         borderRadius: 16,
     },
     timeframeText: {
-        fontSize: 12,
+        fontFamily: FONTS.body,
+        fontSize: 14,
         marginRight: 4,
     },
     metricsRow: {
@@ -1285,12 +1309,13 @@ const styles = StyleSheet.create({
         marginHorizontal: 4,
     },
     metricValue: {
-        fontSize: 24,
-        fontWeight: 'bold',
+        fontSize: 25,
+        fontFamily: FONTS.heading,
         marginBottom: 4,
     },
     metricLabel: {
-        fontSize: 12,
+        fontFamily: FONTS.body,
+        fontSize: 14,
     },
     metricIcon: {
         marginBottom: 8,
@@ -1298,16 +1323,14 @@ const styles = StyleSheet.create({
     caloriesCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#E8F5E9',
         padding: 12,
         borderRadius: 12,
         marginTop: 12,
         gap: 8,
     },
     caloriesText: {
-        fontSize: 14,
-        color: '#2E7D32',
-        fontWeight: '500',
+        fontSize: 16,
+        fontFamily: FONTS.bodyMedium,
     },
     loadingContainer: {
         flex: 1,
@@ -1317,15 +1340,16 @@ const styles = StyleSheet.create({
     },
     loadingText: {
         marginTop: 12,
-        fontSize: 16,
+        fontFamily: FONTS.body,
+        fontSize: 17.5,
     },
     chartContainer: {
         padding: 16,
         marginTop: 8,
     },
     chartTitle: {
-        fontSize: 16,
-        fontWeight: 'bold',
+        fontSize: 17.5,
+        fontFamily: FONTS.bodyBold,
         marginBottom: 16,
     },
     chart: {
@@ -1339,8 +1363,8 @@ const styles = StyleSheet.create({
         gap: 8,
     },
     chartPeriod: {
-        fontSize: 12,
-        fontWeight: '500',
+        fontSize: 14,
+        fontFamily: FONTS.bodyMedium,
     },
     shootingAccuracyCard: {
         padding: 16,
@@ -1355,10 +1379,11 @@ const styles = StyleSheet.create({
     },
     accuracyPercentage: {
         fontSize: 48,
-        fontWeight: 'bold',
+        fontFamily: FONTS.bodyBold,
     },
     accuracyLabel: {
-        fontSize: 14,
+        fontFamily: FONTS.body,
+        fontSize: 16,
         marginTop: 4,
     },
     accuracyProgressBar: {
@@ -1388,11 +1413,12 @@ const styles = StyleSheet.create({
         borderRadius: 5,
     },
     accuracyStatText: {
-        fontSize: 14,
-        fontWeight: '500',
+        fontSize: 16,
+        fontFamily: FONTS.bodyMedium,
     },
     accuracyHint: {
-        fontSize: 12,
+        fontFamily: FONTS.body,
+        fontSize: 14,
         textAlign: 'center',
         fontStyle: 'italic',
     },
@@ -1406,8 +1432,8 @@ const styles = StyleSheet.create({
         gap: 4,
     },
     trendText: {
-        fontSize: 12,
-        fontWeight: '600',
+        fontSize: 14,
+        fontFamily: FONTS.bodySemiBold,
     },
     skillChartContainer: {
         padding: 16,
@@ -1424,12 +1450,12 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     sectionTitle: {
-        fontSize: 16,
-        fontWeight: 'bold',
+        fontSize: 17.5,
+        fontFamily: FONTS.heading,
     },
     seeAllText: {
-        fontSize: 14,
-        fontWeight: '500',
+        fontSize: 16,
+        fontFamily: FONTS.bodyMedium,
     },
     skillProgressRow: {
         marginBottom: 8,
@@ -1444,12 +1470,12 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     skillName: {
-        fontSize: 14,
-        fontWeight: '500',
+        fontSize: 16,
+        fontFamily: FONTS.bodyMedium,
     },
     skillValue: {
-        fontSize: 14,
-        fontWeight: 'bold',
+        fontSize: 16,
+        fontFamily: FONTS.bodyBold,
     },
     progressBar: {
         height: 6,
@@ -1475,7 +1501,8 @@ const styles = StyleSheet.create({
         marginRight: 16,
     },
     goalName: {
-        fontSize: 14,
+        fontFamily: FONTS.body,
+        fontSize: 16,
         marginBottom: 8,
     },
     goalProgress: {
@@ -1491,15 +1518,17 @@ const styles = StyleSheet.create({
         alignItems: 'flex-end',
     },
     goalPercentage: {
-        fontSize: 14,
-        fontWeight: 'bold',
+        fontSize: 16,
+        fontFamily: FONTS.bodyBold,
         marginBottom: 2,
     },
     goalDeadline: {
-        fontSize: 12,
+        fontFamily: FONTS.body,
+        fontSize: 14,
     },
     moreIndicator: {
-        fontSize: 12,
+        fontFamily: FONTS.body,
+        fontSize: 14,
         textAlign: 'center',
         marginTop: 8,
     },
@@ -1525,14 +1554,12 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     badgeName: {
-        fontSize: 12,
+        fontFamily: FONTS.body,
+        fontSize: 14,
         textAlign: 'center',
     },
     lockedAchievement: {
         opacity: 0.7,
-    },
-    lockedBadgeName: {
-        color: '#999',
     },
     lockIconContainer: {
         position: 'absolute',
@@ -1552,23 +1579,25 @@ const styles = StyleSheet.create({
         margin: 16,
     },
     emptyStateText: {
-        fontSize: 14,
+        fontFamily: FONTS.body,
+        fontSize: 16,
         textAlign: 'center',
         marginBottom: 16,
     },
     emptyStateSubtext: {
-        fontSize: 13,
+        fontFamily: FONTS.body,
+        fontSize: 15,
         textAlign: 'center',
     },
     emptyStateButton: {
-        backgroundColor: '#FF6B00',
+        backgroundColor: '#8A1C22',
         paddingHorizontal: 16,
         paddingVertical: 10,
         borderRadius: 8,
     },
     emptyStateButtonText: {
         color: '#FFF',
-        fontWeight: 'bold',
+        fontFamily: FONTS.bodyBold,
     },
 
     // Skills Tab Styles
@@ -1589,11 +1618,12 @@ const styles = StyleSheet.create({
     selectedSkillTab: {
     },
     skillTabText: {
-        fontSize: 14,
+        fontFamily: FONTS.body,
+        fontSize: 16,
         marginLeft: 6,
     },
     selectedSkillTabText: {
-        fontWeight: '600',
+        fontFamily: FONTS.bodySemiBold,
     },
     skillDetailContainer: {
         padding: 16,
@@ -1606,20 +1636,21 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     skillDetailName: {
-        fontSize: 18,
-        fontWeight: 'bold',
+        fontSize: 19,
+        fontFamily: FONTS.heading,
         marginBottom: 4,
     },
     skillDetailRating: {
-        fontSize: 14,
+        fontFamily: FONTS.body,
+        fontSize: 16,
     },
     skillBreakdownContainer: {
         padding: 16,
         marginTop: 8,
     },
     skillBreakdownTitle: {
-        fontSize: 16,
-        fontWeight: 'bold',
+        fontSize: 17.5,
+        fontFamily: FONTS.bodyBold,
         marginBottom: 16,
     },
     skillBreakdownItem: {
@@ -1644,12 +1675,12 @@ const styles = StyleSheet.create({
         marginRight: 10,
     },
     skillBreakdownName: {
-        fontSize: 14,
-        fontWeight: '500',
+        fontSize: 16,
+        fontFamily: FONTS.bodyMedium,
     },
     skillBreakdownValue: {
-        fontSize: 14,
-        fontWeight: 'bold',
+        fontSize: 16,
+        fontFamily: FONTS.bodyBold,
     },
     skillBreakdownBar: {
         height: 6,
@@ -1665,7 +1696,8 @@ const styles = StyleSheet.create({
         marginTop: 8,
     },
     categorySubtitle: {
-        fontSize: 13,
+        fontFamily: FONTS.body,
+        fontSize: 15,
         marginBottom: 16,
     },
     categoryItem: {
@@ -1690,16 +1722,17 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     categoryName: {
-        fontSize: 15,
-        fontWeight: '600',
+        fontSize: 16.5,
+        fontFamily: FONTS.bodySemiBold,
     },
     categoryCount: {
-        fontSize: 12,
+        fontFamily: FONTS.body,
+        fontSize: 14,
         marginTop: 2,
     },
     categoryPercentage: {
-        fontSize: 16,
-        fontWeight: 'bold',
+        fontSize: 17.5,
+        fontFamily: FONTS.bodyBold,
     },
     categoryBar: {
         height: 8,
@@ -1720,7 +1753,6 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingVertical: 12,
         borderBottomWidth: 1,
-        borderBottomColor: '#F0F0F0',
     },
     trainingItemContent: {
         flexDirection: 'row',
@@ -1740,12 +1772,13 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     trainingItemTitle: {
-        fontSize: 14,
-        fontWeight: '600',
+        fontSize: 16,
+        fontFamily: FONTS.bodySemiBold,
         marginBottom: 4,
     },
     trainingItemDescription: {
-        fontSize: 12,
+        fontFamily: FONTS.body,
+        fontSize: 14,
     },
 
     // Goals Tab Styles
@@ -1758,21 +1791,21 @@ const styles = StyleSheet.create({
         borderBottomWidth: 1,
     },
     goalsTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
+        fontSize: 19,
+        fontFamily: FONTS.bodyBold,
     },
     addGoalButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#FF6B00',
+        backgroundColor: '#8A1C22',
         paddingHorizontal: 12,
         paddingVertical: 8,
         borderRadius: 20,
     },
     addGoalText: {
         color: '#FFF',
-        fontSize: 14,
-        fontWeight: 'bold',
+        fontSize: 16,
+        fontFamily: FONTS.bodyBold,
         marginLeft: 4,
     },
     goalsList: {
@@ -1781,11 +1814,6 @@ const styles = StyleSheet.create({
     goalCard: {
         borderRadius: 12,
         marginBottom: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 2,
         overflow: 'hidden',
     },
     goalCardHeader: {
@@ -1794,7 +1822,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         padding: 16,
         borderBottomWidth: 1,
-        borderBottomColor: '#F0F0F0',
     },
     goalCardHeaderContent: {
         flexDirection: 'row',
@@ -1807,8 +1834,8 @@ const styles = StyleSheet.create({
         marginRight: 10,
     },
     goalCardTitle: {
-        fontSize: 16,
-        fontWeight: '600',
+        fontSize: 17.5,
+        fontFamily: FONTS.heading,
     },
     goalCardProgress: {
         padding: 16,
@@ -1819,11 +1846,12 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     goalCardProgressText: {
-        fontSize: 14,
+        fontFamily: FONTS.body,
+        fontSize: 16,
     },
     goalCardProgressPercentage: {
-        fontSize: 14,
-        fontWeight: 'bold',
+        fontSize: 16,
+        fontFamily: FONTS.bodyBold,
     },
     goalCardProgressBar: {
         height: 8,
@@ -1836,7 +1864,6 @@ const styles = StyleSheet.create({
     },
     goalCardDetails: {
         padding: 16,
-        backgroundColor: '#F5F5F5',
     },
     goalCardDetailItem: {
         flexDirection: 'row',
@@ -1844,18 +1871,18 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     goalCardDetailText: {
-        fontSize: 14,
+        fontFamily: FONTS.body,
+        fontSize: 16,
         marginLeft: 8,
     },
     updateProgressContainer: {
         marginTop: 12,
         paddingTop: 12,
         borderTopWidth: 1,
-        borderTopColor: '#E0E0E0',
     },
     updateProgressTitle: {
-        fontSize: 14,
-        fontWeight: '600',
+        fontSize: 16,
+        fontFamily: FONTS.bodySemiBold,
         marginBottom: 8,
     },
     updateProgressControls: {
@@ -1872,8 +1899,8 @@ const styles = StyleSheet.create({
         borderWidth: 1,
     },
     currentProgressValue: {
-        fontSize: 18,
-        fontWeight: 'bold',
+        fontSize: 19,
+        fontFamily: FONTS.bodyBold,
         paddingHorizontal: 16,
     },
     goalCardActions: {
@@ -1889,7 +1916,8 @@ const styles = StyleSheet.create({
         marginRight: 8,
     },
     goalCardActionText: {
-        fontSize: 14,
+        fontFamily: FONTS.body,
+        fontSize: 16,
         marginLeft: 4,
     },
     goalCardActionDelete: {
@@ -1923,8 +1951,8 @@ const styles = StyleSheet.create({
         gap: 4,
     },
     goalTimeText: {
-        fontSize: 11,
-        fontWeight: '500',
+        fontSize: 13,
+        fontFamily: FONTS.bodyMedium,
     },
     goalStatusBadge: {
         flexDirection: 'row',
@@ -1960,8 +1988,8 @@ const styles = StyleSheet.create({
         gap: 10,
     },
     completedGoalsTitle: {
-        fontSize: 15,
-        fontWeight: '600',
+        fontSize: 16.5,
+        fontFamily: FONTS.bodySemiBold,
     },
     completedGoalsList: {
         paddingHorizontal: 16,
@@ -1972,7 +2000,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingVertical: 10,
         borderTopWidth: 1,
-        borderTopColor: '#E0E0E0',
     },
     completedGoalIcon: {
         width: 28,
@@ -1984,10 +2011,12 @@ const styles = StyleSheet.create({
     },
     completedGoalName: {
         flex: 1,
-        fontSize: 14,
+        fontFamily: FONTS.body,
+        fontSize: 16,
     },
     completedGoalValue: {
-        fontSize: 13,
+        fontFamily: FONTS.body,
+        fontSize: 15,
     },
     // Goals Tab Styles
     goalsSummaryCard: {
@@ -2004,11 +2033,12 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     goalsSummaryValue: {
-        fontSize: 24,
-        fontWeight: 'bold',
+        fontSize: 25,
+        fontFamily: FONTS.heading,
     },
     goalsSummaryLabel: {
-        fontSize: 12,
+        fontFamily: FONTS.body,
+        fontSize: 14,
         marginTop: 4,
     },
     goalsSummaryDivider: {
@@ -2028,8 +2058,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     goalsToggleText: {
-        fontSize: 14,
-        fontWeight: '600',
+        fontSize: 16,
+        fontFamily: FONTS.bodySemiBold,
     },
     goalsEmptyState: {
         borderRadius: 16,
@@ -2038,15 +2068,16 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     goalsEmptyTitle: {
-        fontSize: 18,
-        fontWeight: '600',
+        fontSize: 19,
+        fontFamily: FONTS.bodySemiBold,
         marginTop: 16,
         marginBottom: 8,
     },
     goalsEmptyText: {
-        fontSize: 14,
+        fontFamily: FONTS.body,
+        fontSize: 16,
         textAlign: 'center',
-        lineHeight: 20,
+        lineHeight: 21,
         marginBottom: 20,
     },
     goalsAddButton: {
@@ -2059,8 +2090,8 @@ const styles = StyleSheet.create({
     },
     goalsAddButtonText: {
         color: '#FFF',
-        fontSize: 15,
-        fontWeight: '600',
+        fontSize: 16.5,
+        fontFamily: FONTS.bodySemiBold,
     },
     goalCard: {
         borderRadius: 12,
@@ -2085,11 +2116,12 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     goalCardTitle: {
-        fontSize: 16,
-        fontWeight: '600',
+        fontSize: 17.5,
+        fontFamily: FONTS.bodySemiBold,
     },
     goalCardCategory: {
-        fontSize: 12,
+        fontFamily: FONTS.body,
+        fontSize: 14,
         marginTop: 2,
         textTransform: 'capitalize',
     },
@@ -2102,12 +2134,12 @@ const styles = StyleSheet.create({
         marginBottom: 6,
     },
     goalProgressValues: {
-        fontSize: 14,
-        fontWeight: '500',
+        fontSize: 16,
+        fontFamily: FONTS.bodyMedium,
     },
     goalProgressPercent: {
-        fontSize: 14,
-        fontWeight: '600',
+        fontSize: 16,
+        fontFamily: FONTS.bodySemiBold,
     },
     goalProgressBar: {
         height: 8,
@@ -2119,8 +2151,9 @@ const styles = StyleSheet.create({
         borderRadius: 4,
     },
     goalCardDescription: {
-        fontSize: 13,
-        lineHeight: 18,
+        fontFamily: FONTS.body,
+        fontSize: 15,
+        lineHeight: 19,
         marginTop: 8,
     },
     viewAllGoalsButton: {
@@ -2135,8 +2168,8 @@ const styles = StyleSheet.create({
         gap: 8,
     },
     viewAllGoalsText: {
-        fontSize: 15,
-        fontWeight: '600',
+        fontSize: 16.5,
+        fontFamily: FONTS.bodySemiBold,
     },
     floatingAddGoalButton: {
         flexDirection: 'row',
@@ -2151,8 +2184,8 @@ const styles = StyleSheet.create({
     },
     floatingAddGoalText: {
         color: '#FFF',
-        fontSize: 15,
-        fontWeight: '600',
+        fontSize: 16.5,
+        fontFamily: FONTS.bodySemiBold,
     },
 
     // Recommendations Styles
@@ -2162,16 +2195,9 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     recommendationCard: {
-        backgroundColor: '#FFF9F5',
         borderRadius: 16,
         padding: 16,
         borderWidth: 2,
-        borderColor: '#FF6B00',
-        shadowColor: '#FF6B00',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-        elevation: 3,
     },
     recommendationHeader: {
         flexDirection: 'row',
@@ -2183,7 +2209,6 @@ const styles = StyleSheet.create({
         width: 48,
         height: 48,
         borderRadius: 24,
-        backgroundColor: '#FF6B00',
         justifyContent: 'center',
         alignItems: 'center',
         opacity: 0.15,
@@ -2192,42 +2217,37 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     recommendationTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
+        fontSize: 19,
+        fontFamily: FONTS.heading,
         marginBottom: 6,
     },
     recommendationReason: {
-        fontSize: 14,
-        lineHeight: 20,
+        fontFamily: FONTS.body,
+        fontSize: 16,
+        lineHeight: 21,
     },
     recommendationButton: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#FF6B00',
         paddingVertical: 14,
         paddingHorizontal: 20,
         borderRadius: 12,
         gap: 8,
-        shadowColor: '#FF6B00',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.3,
-        shadowRadius: 6,
-        elevation: 4,
     },
     recommendationButtonText: {
         color: '#FFF',
-        fontSize: 15,
-        fontWeight: '600',
+        fontSize: 16.5,
+        fontFamily: FONTS.bodySemiBold,
     },
     alternativesSection: {
         marginTop: 16,
         paddingTop: 16,
         borderTopWidth: 1,
-        borderTopColor: '#FFE5D4',
     },
     alternativesLabel: {
-        fontSize: 13,
+        fontFamily: FONTS.body,
+        fontSize: 15,
         marginBottom: 10,
     },
     alternativesChips: {
@@ -2240,12 +2260,12 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         backgroundColor: '#FFF',
         borderWidth: 1,
-        borderColor: '#FF6B00',
+        borderColor: '#8A1C22',
     },
     alternativeChipText: {
-        fontSize: 13,
-        color: '#FF6B00',
-        fontWeight: '500',
+        fontSize: 15,
+        color: '#8A1C22',
+        fontFamily: FONTS.bodyMedium,
     },
 
     // ==================== ACHIEVEMENTS TAB STYLES ====================
@@ -2253,11 +2273,6 @@ const styles = StyleSheet.create({
         padding: 16,
         borderRadius: 16,
         marginBottom: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-        elevation: 3,
     },
     xpLevelHeader: {
         flexDirection: 'row',
@@ -2269,39 +2284,33 @@ const styles = StyleSheet.create({
         width: 56,
         height: 56,
         borderRadius: 28,
-        backgroundColor: '#FF6B00',
         justifyContent: 'center',
         alignItems: 'center',
-        shadowColor: '#FF6B00',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 4,
     },
     levelNumber: {
-        fontSize: 24,
-        fontWeight: 'bold',
+        fontSize: 25,
+        fontFamily: FONTS.heading,
         color: '#FFF',
     },
     xpLevelInfo: {
         flex: 1,
     },
     levelTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
+        fontSize: 19,
+        fontFamily: FONTS.heading,
         marginBottom: 4,
     },
     xpText: {
-        fontSize: 14,
-        fontWeight: '500',
+        fontSize: 16,
+        fontFamily: FONTS.bodyMedium,
     },
     achievementsTrophyIcon: {
         alignItems: 'center',
         gap: 4,
     },
     achievementCount: {
-        fontSize: 12,
-        fontWeight: '600',
+        fontSize: 14,
+        fontFamily: FONTS.bodySemiBold,
     },
     xpProgressSection: {
         gap: 8,
@@ -2313,11 +2322,11 @@ const styles = StyleSheet.create({
     },
     xpProgressFill: {
         height: '100%',
-        backgroundColor: '#FF6B00',
         borderRadius: 4,
     },
     xpProgressText: {
-        fontSize: 12,
+        fontFamily: FONTS.body,
+        fontSize: 14,
         textAlign: 'center',
     },
     achievementCategoryFilter: {
@@ -2335,20 +2344,18 @@ const styles = StyleSheet.create({
         paddingHorizontal: 14,
         paddingVertical: 8,
         borderRadius: 20,
-        backgroundColor: '#F5F5F5',
         borderWidth: 1,
         borderColor: 'transparent',
     },
-    achievementCategoryChipActive: {
-        backgroundColor: '#FF6B0015',
-        borderColor: '#FF6B00',
-    },
+    // Active state is entirely theme-driven at the call site (badge fill + primary
+    // border); nothing static left to declare.
+    achievementCategoryChipActive: {},
     achievementCategoryChipText: {
-        fontSize: 13,
-        fontWeight: '500',
+        fontSize: 15,
+        fontFamily: FONTS.bodyMedium,
     },
     achievementCategoryChipTextActive: {
-        fontWeight: '600',
+        fontFamily: FONTS.bodySemiBold,
     },
     achievementsList: {
         gap: 12,
@@ -2359,21 +2366,19 @@ const styles = StyleSheet.create({
         gap: 12,
     },
     emptyAchievementsText: {
-        fontSize: 14,
+        fontFamily: FONTS.body,
+        fontSize: 16,
         textAlign: 'center',
     },
     achievementCard: {
-        backgroundColor: '#F8F8F8',
         borderRadius: 12,
         padding: 14,
         flexDirection: 'row',
         gap: 12,
         borderWidth: 2,
-        borderColor: '#E0E0E0',
     },
     achievementCardUnlocked: {
         backgroundColor: '#FFF',
-        borderColor: '#4CAF5030',
     },
     achievementIconContainer: {
         position: 'relative',
@@ -2385,7 +2390,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 2,
-        borderColor: '#E0E0E0',
     },
     achievementIconUnlocked: {
         borderColor: 'transparent',
@@ -2403,14 +2407,15 @@ const styles = StyleSheet.create({
         gap: 4,
     },
     achievementTitle: {
-        fontSize: 15,
-        fontWeight: '600',
+        fontSize: 16.5,
+        fontFamily: FONTS.heading,
     },
     achievementTitleLocked: {
     },
     achievementDescription: {
-        fontSize: 13,
-        lineHeight: 18,
+        fontFamily: FONTS.body,
+        fontSize: 15,
+        lineHeight: 19,
     },
     achievementProgressSection: {
         marginTop: 8,
@@ -2418,7 +2423,6 @@ const styles = StyleSheet.create({
     },
     achievementProgressBar: {
         height: 6,
-        backgroundColor: '#E0E0E0',
         borderRadius: 3,
         overflow: 'hidden',
     },
@@ -2427,8 +2431,8 @@ const styles = StyleSheet.create({
         borderRadius: 3,
     },
     achievementProgressText: {
-        fontSize: 11,
-        fontWeight: '500',
+        fontSize: 13,
+        fontFamily: FONTS.bodyMedium,
     },
     achievementTierBadge: {
         alignItems: 'flex-end',
@@ -2436,13 +2440,13 @@ const styles = StyleSheet.create({
         gap: 2,
     },
     achievementTierText: {
-        fontSize: 12,
-        fontWeight: '700',
+        fontSize: 14,
+        fontFamily: FONTS.bodyBold,
         textTransform: 'uppercase',
     },
     achievementXPText: {
-        fontSize: 11,
-        fontWeight: '600',
+        fontSize: 13,
+        fontFamily: FONTS.bodySemiBold,
     },
 });
 

@@ -14,18 +14,70 @@ service cloud.firestore {
       return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
     }
 
+    // Top-level equivalent of isParentConnectedTo (usable outside the /users match):
+    // true when the requester is the player's linked parent/guardian.
+    function isParentOfPlayer(playerUid) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(playerUid)/connections/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(playerUid)/connections/$(request.auth.uid)).data.role == 'parent';
+    }
+
     // Users collection - users can only read/write their own data
     match /users/{uid} {
       // Users can read their own profile, and basic info of other users
       allow read: if isSignedIn();
-      // Users can only create/update their own profile
+      // Owner creates/updates their own profile; a linked parent/guardian may
+      // update their (minor) child's profile on their behalf.
       allow create: if isOwner(uid);
-      allow update: if isOwner(uid);
+      allow update: if isOwner(uid) || isParentConnectedTo(uid);
       allow delete: if false; // Prevent accidental deletion
 
-      // User's activities - only owner can access
+      // Helper: a connected role-holder (parent/coach) may read this player's progress.
+      // True when the requesting user has an entry in the player's connections subcollection.
+      function isConnectedTo(playerUid) {
+        return isSignedIn() &&
+          exists(/databases/$(database)/documents/users/$(playerUid)/connections/$(request.auth.uid));
+      }
+
+      // Helper: the requester is the player's PARENT/guardian (a connection with role 'parent').
+      // Parents authorize scout access on the (minor) player's behalf.
+      function isParentConnectedTo(playerUid) {
+        return isConnectedTo(playerUid) &&
+          get(/databases/$(database)/documents/users/$(playerUid)/connections/$(request.auth.uid)).data.role == 'parent';
+      }
+
+      // Helper: a scout whose access to this player was parent-approved.
+      function hasApprovedScout(playerUid) {
+        return isSignedIn() &&
+          exists(/databases/$(database)/documents/users/$(playerUid)/scoutConnections/$(request.auth.uid));
+      }
+
+      // Who may read this player's evaluation data: the player, a connected
+      // parent/coach, or a parent-approved scout.
+      function canViewPlayerData(playerUid) {
+        return isOwner(playerUid) || isConnectedTo(playerUid) || hasApprovedScout(playerUid);
+      }
+
+      // Helper: the requesting user has a paid (Pro) subscription. Two-tier model
+      // (free vs. paid); any non-'free' subscription value counts as paid.
+      function requesterIsPaid() {
+        return isSignedIn()
+          && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.subscription != null
+          && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.subscription != 'free';
+      }
+
+      // Tier-gated read for DEEP evaluation data (ShotDNA/EvalRank/Blueprint360/
+      // SimCoach). The owner and connected parents/coaches are never tier-gated —
+      // only the parent-approved SCOUT path requires a paid subscription (G1).
+      function canViewDeepPlayerData(playerUid) {
+        return isOwner(playerUid) || isConnectedTo(playerUid)
+          || (hasApprovedScout(playerUid) && requesterIsPaid());
+      }
+
+      // User's activities - owner, connected role-holder, or approved scout (read-only)
       match /activities/{activityId} {
-        allow read, write: if isOwner(uid);
+        allow read: if canViewPlayerData(uid);
+        allow write: if isOwner(uid);
       }
 
       // User's training plans - only owner can access
@@ -33,18 +85,230 @@ service cloud.firestore {
         allow read, write: if isOwner(uid);
       }
 
-      // User's training sessions - only owner can access
-      match /sessions/{sessionId} {
-        allow read, write: if isOwner(uid);
-      }
-
-      // User's goals - only owner can access
+      // User's goals - owner, connected role-holder, or approved scout (read-only)
       match /goals/{goalId} {
+        allow read: if canViewPlayerData(uid);
+        allow write: if isOwner(uid);
+      }
+
+      // User's achievements - owner, connected role-holder, or approved scout (read-only)
+      match /achievements/{achievementId} {
+        allow read: if canViewPlayerData(uid);
+        allow write: if isOwner(uid);
+      }
+
+      // DBE progress (ShotDNA, EvalRank, Blueprint360, SimCoach) - owner read/write;
+      // connected role-holder (parent/coach) read-only; parent-approved scout read-only
+      // ONLY if they hold a paid (Pro) subscription — deep data is tier-gated (G1).
+      match /shotDNA/{analysisId} {
+        allow read: if canViewDeepPlayerData(uid);
+        allow write: if isOwner(uid);
+      }
+      match /evalRankScores/{scoreId} {
+        allow read: if canViewDeepPlayerData(uid);
+        allow write: if isOwner(uid);
+      }
+      match /blueprint360Plans/{planId} {
+        allow read: if canViewDeepPlayerData(uid);
+        allow write: if isOwner(uid);
+      }
+      match /simCoachResults/{resultId} {
+        allow read: if canViewDeepPlayerData(uid);
+        allow write: if isOwner(uid);
+      }
+      match /scoutLabProfile/{docId} {
+        allow read, write: if isOwner(uid) || isParentConnectedTo(uid);
+      }
+
+      // Scout access requests - a scout requests deeper access to this (minor) player.
+      // The scout creates/re-sends their own request (pending only — they can never
+      // self-approve); the player's PARENT approves/denies.
+      match /scoutAccessRequests/{scoutId} {
+        allow read: if isOwner(uid) || isConnectedTo(uid) || isOwner(scoutId);
+        allow create: if isSignedIn() && scoutId == request.auth.uid;
+        allow update: if (isOwner(uid) || isParentConnectedTo(uid)) ||
+          (isSignedIn() && scoutId == request.auth.uid && request.resource.data.status == 'pending');
+        allow delete: if isOwner(uid) || isParentConnectedTo(uid);
+      }
+
+      // Approved scout connections - written by the player's parent on approval.
+      // Presence grants the scout read access via canViewPlayerData().
+      match /scoutConnections/{scoutId} {
+        allow read: if isOwner(uid) || isOwner(scoutId) || isConnectedTo(uid);
+        allow write: if isOwner(uid) || isParentConnectedTo(uid);
+      }
+
+      // Connections - role-holders linked to this player (player owns consent).
+      // Mirrors the friends rule: either side may write (redeem / revoke).
+      // A linked parent may also READ (list) the child's connections. Guardianship
+      // means knowing which coaches/role-holders are attached to a minor, and it is
+      // what lets the parent message the child's coach — a per-doc-only read rule
+      // makes the list query fail, since the parent owns just their own entry.
+      // Writes stay restricted to the two parties on the connection.
+      match /connections/{otherUid} {
+        allow read: if isOwner(uid) || isOwner(otherUid) || isParentOfPlayer(uid);
+        allow write: if isOwner(uid) || isOwner(otherUid);
+      }
+
+      // Pending coach→athlete link requests, awaiting guardian approval.
+      //
+      // This collection exists SEPARATELY from `connections` for one specific
+      // reason: every rule that grants a role-holder access to a player checks
+      // a bare exists() on connections/{uid} — isConnectedTo, isParentConnectedTo
+      // and the top-level isParentOfPlayer all do. A pending entry written into
+      // `connections` with a status field would therefore pass canViewPlayerData,
+      // canViewDeepPlayerData, assignment writes, and the users/{uid} update rule
+      // the moment it was created, no matter what the client-side status filter
+      // showed. The scout flow avoids the same trap by splitting
+      // scoutAccessRequests from scoutConnections. Keep them separate.
+      //
+      // Same asymmetry as scoutAccessRequests: the coach may create their own
+      // request and may only ever write 'pending' — they can never self-approve,
+      // because only the athlete or a role=='parent' connection can write the
+      // grant in `connections`.
+      match /connectionRequests/{roleHolderUid} {
+        allow read: if isOwner(uid) || isConnectedTo(uid) || isOwner(roleHolderUid);
+        allow create: if isSignedIn()
+          && roleHolderUid == request.auth.uid
+          && request.resource.data.status == 'pending';
+        allow update: if isOwner(uid) || isParentConnectedTo(uid);
+        allow delete: if isOwner(uid) || isParentConnectedTo(uid);
+      }
+
+      // Linked players - this role-holder's roster / child list.
+      // Either the role-holder (uid) or the player (playerUid) may write,
+      // so the player can revoke and remove their own roster entry.
+      match /linkedPlayers/{playerUid} {
+        allow read, write: if isOwner(uid) || isOwner(playerUid);
+      }
+
+      // Coach assignments - a linked coach assigns a workout/scenario to this
+      // athlete. The athlete + a connected coach can read; the athlete (owner) or
+      // a connected coach may create/update/delete (athlete flips status done).
+      match /assignments/{assignmentId} {
+        allow read: if canViewPlayerData(uid);
+        allow create, update, delete: if isOwner(uid) || isConnectedTo(uid);
+      }
+
+      // CoachMarket purchases - the buyer's own enrolled listings.
+      match /coachMarketPurchases/{listingId} {
         allow read, write: if isOwner(uid);
       }
 
-      // User's achievements - only owner can access
-      match /achievements/{achievementId} {
+      // SimCoach game plans - the coach's own authored scenarios. Assigned copies
+      // are embedded into the athlete's assignment doc, so athletes never read here.
+      match /gamePlans/{planId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      // Coach game film - the coach's own uploaded video metadata. The video file
+      // itself lives in Storage under users/{uid}/films/ (owner-only — see
+      // storage.rules, where the read rule was narrowed from any-signed-in-user
+      // to the owner during the governance pass).
+      //
+      // Reads now consult the governance field `accessScope.allowedUids`
+      // (spec §6) instead of ownership alone, so the field is load-bearing
+      // rather than decorative. It defaults to [coachUid] in saveFilm, so this
+      // is currently equivalent to owner-only in practice — the point is that
+      // the moment a film-sharing UI writes a second uid into that array, the
+      // rule already honors it, rather than sharing silently not working (or,
+      // worse, being "made to work" by loosening the rule later under pressure).
+      //
+      // .get(..., default) chaining keeps this safe for legacy film docs
+      // written before Phase 0 added the governance fields — those have no
+      // accessScope at all and fall back to owner-only rather than erroring.
+      function filmAllowedUids(filmData) {
+        return filmData.get('accessScope', {}).get('allowedUids', []);
+      }
+
+      match /films/{filmId} {
+        allow read: if isOwner(uid)
+          || (isSignedIn() && request.auth.uid in filmAllowedUids(resource.data));
+        allow create, delete: if isOwner(uid);
+        // Provenance is immutable: a film's ownerUid can never be reassigned by
+        // an update, so `authorizedBy`/`ownerUid` stay a trustworthy record of
+        // who authorized this footage. Partial updates are fine here —
+        // request.resource.data is the merged post-write state, so the
+        // taggedEventIds/processingStatus updates saveFilmEvent makes still pass.
+        allow update: if isOwner(uid)
+          && request.resource.data.get('ownerUid', null) == resource.data.get('ownerUid', null);
+      }
+
+      // SimCoach Coach: tagged basketball events extracted from a coach's own
+      // film (manual, automated, or hybrid extraction — see
+      // docs/SIMCOACH_COACH_TECHNICAL_SPEC.md §4-§5).
+      //
+      // Deliberately still owner-only, NOT accessScope-gated like films above.
+      // Gating these would mean a get() on the parent film doc inside the rule,
+      // evaluated once per event — a query returning 200 tagged events would
+      // fire 200 rule-side document reads, billed and subject to the per-request
+      // access-call cap. Since nothing today grants a non-owner access to film
+      // in the first place (allowedUids is always [coachUid]), that cost would
+      // buy nothing. If film sharing ever ships, denormalize allowedUids onto
+      // each filmEvent and match on it directly — the same fix applied to
+      // simulationSessions.participantUids in Phase 3, and for the same reason.
+      match /filmEvents/{eventId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      // SimCoach Coach Phase 2: opponent models aggregated from filmEvents,
+      // what-if simulation runs against them, and practice priorities
+      // flagged from those runs. All owner-only, matching films/filmEvents.
+      match /opponentModels/{opponentModelId} {
+        allow read, write: if isOwner(uid);
+      }
+      match /simulationRuns/{runId} {
+        allow read, write: if isOwner(uid);
+      }
+      match /practicePriorities/{priorityId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      // SimCoach Coach Phase 3: Team Simulation Collaboration & Communication
+      // (docs/SIMCOACH_COACH_TECHNICAL_SPEC.md §3.5/§8/§9). First non-owner
+      // access pattern in this file for SimCoach data — the coach still owns
+      // and fully controls the session doc, but a participant (currently:
+      // player only, see the firestoreService.js comment on
+      // createSimulationSession for why staff participants aren't supported
+      // yet) needs read access to a session shared with them, and write
+      // access to submit their own response. `participants` is a map keyed
+      // by uid specifically so `request.auth.uid in resource.data.participants`
+      // is a cheap, direct check — Firestore rules can't efficiently scan an
+      // array of {uid, role} objects for a matching sub-field.
+      match /simulationSessions/{sessionId} {
+        allow read: if isOwner(uid) || (isSignedIn() && request.auth.uid in resource.data.participants);
+        allow create, update, delete: if isOwner(uid);
+
+        // A participant may only create their own response, and only if the
+        // coach granted canRespond; only the coach can edit/remove entries
+        // (e.g. to reopen a session for a redo). Every check re-reads the
+        // parent session doc rather than trusting resource.data on the
+        // response itself, since permissions live on the session, not here.
+        match /responses/{responseId} {
+          allow read: if isOwner(uid) || (isSignedIn() &&
+            request.auth.uid in get(/databases/$(database)/documents/users/$(uid)/simulationSessions/$(sessionId)).data.participants);
+          allow create: if isSignedIn()
+            && request.auth.uid in get(/databases/$(database)/documents/users/$(uid)/simulationSessions/$(sessionId)).data.participants
+            && get(/databases/$(database)/documents/users/$(uid)/simulationSessions/$(sessionId)).data.participants[request.auth.uid].canRespond == true;
+          allow update, delete: if isOwner(uid);
+        }
+      }
+
+      // Scout watchlist, scouting reports & saved searches - owner-only
+      match /watchlist/{prospectId} {
+        allow read, write: if isOwner(uid);
+      }
+      // The scout owns their reports. `sharedWithPlayer` may only ever be set on a
+      // SUBMITTED report — that invariant is enforced here rather than only in the
+      // client, so the player-facing read rule below can key on one field and a
+      // draft can never reach an athlete.
+      match /scoutingReports/{reportId} {
+        allow read: if isOwner(uid);
+        allow write: if isOwner(uid)
+          && (request.resource.data.get('sharedWithPlayer', false) == false
+              || request.resource.data.get('status', '') == 'submitted');
+      }
+      match /savedSearches/{searchId} {
         allow read, write: if isOwner(uid);
       }
 
@@ -110,6 +374,169 @@ service cloud.firestore {
       match /notifications/{notificationId} {
         allow read, write: if isOwner(uid);
       }
+    }
+
+    // Invite codes - any signed-in user can read (to validate/redeem).
+    // Creator must own the code; redeemer marks it used via update.
+    // Coach → athlete invite links (the pilot's onboarding path).
+    //
+    // Deliberately NOT client-readable, and never client-writable. The code in a
+    // link is a bearer credential: anyone holding it can attach themselves to a
+    // coach's roster of minors. So the only paths in are two callables that run
+    // as admin — resolveCoachInvite, which returns the coach's name and nothing
+    // else, and claimCoachInvite, which enforces expiry, revocation and the
+    // guardian gate before writing anything.
+    //
+    // The coach can read and revoke their OWN invites, which is what the manage
+    // screen needs; they cannot create one directly, because createCoachInvite
+    // is what guarantees the code is generated server-side and is unguessable.
+    match /coachInvites/{code} {
+      allow read: if isSignedIn() && resource.data.coachUid == request.auth.uid;
+      allow create: if false;
+      // Revoke only. A coach must never be able to edit who an invite points at,
+      // or repoint a link they already sent to a team.
+      allow update: if isSignedIn()
+        && resource.data.coachUid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['active', 'revokedAt']);
+      allow delete: if false;
+    }
+
+    match /inviteCodes/{code} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.ownerUid == request.auth.uid;
+      // Was `if isSignedIn()`, which let ANY signed-in user mark ANY code used
+      // — a trivial denial-of-service on someone else's invite. A redeemer may
+      // now only burn a code by claiming it for themselves, and only once.
+      allow update: if isSignedIn() && (
+        resource.data.ownerUid == request.auth.uid
+        || (
+          resource.data.used == false
+          && request.resource.data.used == true
+          && request.resource.data.usedBy == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['used', 'usedBy', 'usedAt'])
+        )
+      );
+      allow delete: if isSignedIn() && resource.data.ownerUid == request.auth.uid;
+    }
+
+    // ScoutLab prospect directory - signed-in scouts can search/read.
+    // A player publishes/removes their own directory entry (doc id == their uid).
+    match /scoutLabProfiles/{profileId} {
+      allow read: if isSignedIn();
+      // The player publishes their own entry, or their parent/guardian does on their behalf.
+      allow write: if isSignedIn() && (profileId == request.auth.uid || isParentOfPlayer(profileId));
+    }
+
+    // DBE Module: CoachMarket listings - signed-in read, coach owns their listings.
+    // Owner can fully edit/delete their own listing (single drills capped at $5).
+    // Any other signed-in user may ONLY bump the `sales` counter on a free-enroll
+    // purchase (mirrors the hoopCommunityPosts like-counter rule).
+    match /coachMarketListings/{listingId} {
+      function validListingPrice(d) {
+        // Enforce the $5 cap on single drills; series (and legacy untyped) uncapped.
+        return !(d.type == 'single') || d.price <= 5;
+      }
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.coachUid == request.auth.uid
+        && validListingPrice(request.resource.data);
+      allow update: if isSignedIn() && (
+        (resource.data.coachUid == request.auth.uid && validListingPrice(request.resource.data))
+        || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sales'])
+      );
+      allow delete: if isSignedIn() && resource.data.coachUid == request.auth.uid;
+
+      // Drill video URLs. The parent listing is world-readable to any signed-in
+      // user (browse has to work before you buy), and a Firebase download URL
+      // (`?alt=media&token=...`) is a bearer credential that bypasses Storage
+      // rules entirely — so while these URLs sat on the listing document, the
+      // paywall was a client-side `canWatch` check that anyone could skip by
+      // reading the document through the SDK. Moving them here is what actually
+      // enforces payment.
+      //
+      // Entitlement is the purchase record the Stripe webhook already writes
+      // server-side (handleCoachMarketPaymentSucceeded), so a buyer cannot
+      // fabricate one — users/{uid}/coachMarketPurchases is owner-writable, but
+      // a self-written record only ever grants access to a listing, never money
+      // to the coach, and the free-enroll path is a legitimate writer of it.
+      match /media/{drillIndex} {
+        allow read: if isSignedIn() && (
+          get(/databases/$(database)/documents/coachMarketListings/$(listingId)).data.coachUid == request.auth.uid
+          || exists(/databases/$(database)/documents/users/$(request.auth.uid)/coachMarketPurchases/$(listingId))
+        );
+        allow write: if isSignedIn()
+          && get(/databases/$(database)/documents/coachMarketListings/$(listingId)).data.coachUid == request.auth.uid;
+      }
+    }
+
+    // Messaging - 1:1 conversations between two users (participant-gated).
+    match /conversations/{convId} {
+      allow read: if isSignedIn() && request.auth.uid in resource.data.participants;
+      allow create: if isSignedIn()
+        && request.auth.uid in request.resource.data.participants
+        && request.resource.data.participants.size() == 2;
+      allow update: if isSignedIn() && request.auth.uid in resource.data.participants;
+      allow delete: if false;
+
+      function conversationParticipants() {
+        return get(/databases/$(database)/documents/conversations/$(convId)).data.participants;
+      }
+      match /messages/{messageId} {
+        allow read: if isSignedIn() && request.auth.uid in conversationParticipants();
+        allow create: if isSignedIn()
+          && request.resource.data.senderUid == request.auth.uid
+          && request.auth.uid in conversationParticipants();
+        allow update, delete: if false; // messages are immutable
+      }
+    }
+
+    // Coach sessions - a coach schedules a session with a linked athlete.
+    // Only the two participants can read; the coach creates; either updates status.
+    match /coachingSessions/{sessionId} {
+      // Read: the two parties, plus the athlete's linked guardian. A parent who
+      // approved the coach link is entitled to see what that coach has scheduled
+      // with their child — the parent home surfaces the count and the next date.
+      // They cannot write: booking, confirming and cancelling stay with the coach
+      // and the athlete.
+      allow read: if isSignedIn() && (
+        resource.data.coachUid == request.auth.uid
+        || resource.data.athleteUid == request.auth.uid
+        || isParentOfPlayer(resource.data.athleteUid)
+      );
+      // Create previously checked only that the caller claimed to be the coach,
+      // so any signed-in user could schedule a session against any athlete they
+      // knew the uid of. Now the athlete must actually be linked to them — which,
+      // with the guardian gate above, means a guardian approved that link.
+      allow create: if isSignedIn()
+        && request.resource.data.coachUid == request.auth.uid
+        && exists(/databases/$(database)/documents/users/$(request.resource.data.athleteUid)/connections/$(request.auth.uid));
+      allow update: if isSignedIn() &&
+        (resource.data.coachUid == request.auth.uid || resource.data.athleteUid == request.auth.uid);
+      allow delete: if false;
+    }
+
+    // DBE Module: HoopCommunity posts - signed-in read, author owns their posts.
+    // Updates allowed for any signed-in user (likes/comment counters).
+    match /hoopCommunityPosts/{postId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.authorUid == request.auth.uid;
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn() && resource.data.authorUid == request.auth.uid;
+    }
+
+    // DBE Module: LegacyVault articles - signed-in read, admin-curated
+    match /legacyVault/{articleId} {
+      allow read: if isSignedIn();
+      allow write: if false; // Admin only
+    }
+
+    // Head-to-head challenge match results - signed-in participants read/write
+    match /challengeMatches/{matchId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn();
+      allow delete: if false;
     }
 
     // Workout templates - public read, admin write only
@@ -187,6 +614,51 @@ service cloud.firestore {
         allow read: if isSignedIn();
         allow create, delete: if isSignedIn() && likeId == request.auth.uid;
       }
+    }
+
+    // Collection-group read of scouting reports, so an athlete (or their linked
+    // parent) can see reports written ABOUT them. Reports live under the scout who
+    // authored them, so there is no player-owned path to read; subcollection rules
+    // do not apply to collectionGroup queries, hence this separate match.
+    //
+    // Only explicitly shared reports are visible, and the write rule above
+    // guarantees shared implies submitted — a scout's draft is never exposed.
+    // The matching query MUST filter on both prospectUid and sharedWithPlayer, or
+    // Firestore rejects it as not provably safe.
+    match /{path=**}/scoutingReports/{reportId} {
+      allow read: if isSignedIn()
+        && resource.data.sharedWithPlayer == true
+        && (request.auth.uid == resource.data.prospectUid
+            || isParentOfPlayer(resource.data.prospectUid));
+    }
+
+    // Collection-group read of assignments, so a coach can query every assignment
+    // they issued across all their athletes in one go. Subcollection rules do NOT
+    // apply to collectionGroup queries, so this match is required in addition to
+    // the per-athlete rule under /users/{uid}/assignments — without it
+    // getCoachAssignments fails outright.
+    // Scoped to the issuing coach: a coach only ever sees their own assignments.
+    // Writes stay on the per-athlete path.
+    match /{path=**}/assignments/{assignmentId} {
+      allow read: if isSignedIn() && resource.data.coachUid == request.auth.uid;
+    }
+
+    // Collection-group read of simulation sessions, so a participant can see every
+    // session shared with them across all coaches. Sessions live under the coach
+    // who owns them (users/{coachUid}/simulationSessions), so there is no
+    // participant-owned path to read; subcollection rules do NOT apply to
+    // collectionGroup queries, so this match is required in addition to the
+    // per-coach rule above - without it getSharedSimulationSessions fails outright.
+    //
+    // Matches the denormalized `participantUids` array, NOT the `participants` map
+    // the per-coach rule uses. A collectionGroup query must be provably safe from
+    // its own constraints, and getSharedSimulationSessions filters with
+    // array-contains on participantUids; a rule keyed on `participants` could not
+    // be satisfied by that constraint, so Firestore would reject the whole query.
+    // Read-only - participants write through the responses subcollection, which is
+    // governed by the per-coach rule on the nested path.
+    match /{path=**}/simulationSessions/{sessionId} {
+      allow read: if isSignedIn() && request.auth.uid in resource.data.participantUids;
     }
 
     // User challenges (joined challenges) - users can read their own and update progress

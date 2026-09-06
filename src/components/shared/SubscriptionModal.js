@@ -13,30 +13,53 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
-import { SUBSCRIPTION_PLANS } from '../../utils/subscription';
+import { SUBSCRIPTION_PLANS, isPaidTier } from '../../utils/subscription';
 import i18n from '../../i18n/i18n';
 import { getTheme } from '../../utils/theme';
 import { getPriceId } from '../../config/stripe';
 import { useSubscriptionPayment, processSubscriptionPayment, updateSubscription } from '../../services/stripePaymentService';
+import { useToast } from '../dbe';
 
 const { width } = Dimensions.get('window');
+
+// The display name for a tier id. Alerts used to interpolate the raw enum, so a
+// paying user read "Your pro subscription will remain active…" — and a legacy
+// doc still holding 'basic'/'premium' printed a tier name that no longer exists.
+const planNameFor = (id) => {
+    const plan = SUBSCRIPTION_PLANS.find((p) => p.id === id);
+    return plan ? i18n.t(plan.nameKey) : i18n.t('proPlan');
+};
+
+// Stripe does not guarantee `currentPeriodEnd` is present on every subscription
+// shape, and `new Date(undefined)` renders the string "Invalid Date" straight
+// into a confirmation dialog about the user's money. subscriptionService guards
+// this same field; the modal did not.
+const formatPeriodEnd = (details) => {
+    const raw = details?.currentPeriodEnd;
+    if (!raw) return null;
+    const date = new Date(raw);
+    return Number.isNaN(date.getTime()) ? null : date.toLocaleDateString();
+};
 
 const SubscriptionModal = ({ visible, onClose, onUpgrade }) => {
     const { userData, theme: contextTheme, isDarkMode } = useAppContext();
     const { initializePaymentSheet, openPaymentSheet } = useSubscriptionPayment();
     const [processingPayment, setProcessingPayment] = useState(false);
+    const showToast = useToast();
 
     // Fallback to default theme if context theme is undefined
     const theme = contextTheme || getTheme(isDarkMode || false);
 
     const currentPlanId = userData.subscription || 'free';
 
-    // Define tier hierarchy for upgrade/downgrade detection
-    const tierHierarchy = { free: 0, basic: 1, premium: 2, pro: 3 };
+    // Two-tier model: a user is either free (0) or paid (1). Legacy
+    // 'basic'/'premium' values count as paid via isPaidTier.
+    const tierLevel = (id) => (isPaidTier(id) ? 1 : 0);
 
     const handleSelectPlan = async (planId) => {
-        // Don't allow selecting the same plan
-        if (planId === currentPlanId) {
+        // Don't allow re-selecting the plan the user is effectively on
+        // (exact match, or already-paid tapping the single paid plan).
+        if (planId === currentPlanId || (isPaidTier(planId) && isPaidTier(currentPlanId))) {
             return;
         }
 
@@ -54,8 +77,8 @@ const SubscriptionModal = ({ visible, onClose, onUpgrade }) => {
             }
 
             // Determine if this is an upgrade, downgrade, or new subscription
-            const currentTierLevel = tierHierarchy[currentPlanId] || 0;
-            const newTierLevel = tierHierarchy[planId] || 0;
+            const currentTierLevel = tierLevel(currentPlanId);
+            const newTierLevel = tierLevel(planId);
             const isUpgrade = newTierLevel > currentTierLevel;
             const isDowngrade = newTierLevel < currentTierLevel;
             const hasActiveSubscription = currentPlanId !== 'free' && userData.subscriptionDetails?.stripeSubscriptionId;
@@ -65,9 +88,12 @@ const SubscriptionModal = ({ visible, onClose, onUpgrade }) => {
 
             // Handle downgrade to free (cancellation)
             if (planId === 'free' && hasActiveSubscription) {
+                const endsOn = formatPeriodEnd(userData.subscriptionDetails);
                 Alert.alert(
                     'Cancel Subscription?',
-                    `Your ${currentPlanId} subscription will remain active until ${new Date(userData.subscriptionDetails.currentPeriodEnd).toLocaleDateString()}. After that, you'll be downgraded to the free plan.`,
+                    `Your ${planNameFor(currentPlanId)} subscription will remain active ${
+                        endsOn ? `until ${endsOn}` : 'until the end of your current billing period'
+                    }. After that, you'll be downgraded to the free plan.`,
                     [
                         { text: 'Keep Subscription', style: 'cancel' },
                         {
@@ -78,7 +104,7 @@ const SubscriptionModal = ({ visible, onClose, onUpgrade }) => {
                                 setProcessingPayment(false);
 
                                 if (result.success) {
-                                    Alert.alert('Success', result.message);
+                                    showToast(result.message);
                                     if (onUpgrade) await onUpgrade('free');
                                     onClose();
                                 } else {
@@ -104,13 +130,14 @@ const SubscriptionModal = ({ visible, onClose, onUpgrade }) => {
                 }
 
                 const actionText = isUpgrade ? 'upgraded' : 'downgraded';
+                const endsOn = formatPeriodEnd(userData.subscriptionDetails);
                 const timingText = isUpgrade
                     ? 'immediately and you\'ll be charged a prorated amount'
-                    : `at the end of your current billing period (${new Date(userData.subscriptionDetails.currentPeriodEnd).toLocaleDateString()})`;
+                    : `at the end of your current billing period${endsOn ? ` (${endsOn})` : ''}`;
 
                 Alert.alert(
                     `${isUpgrade ? 'Upgrade' : 'Downgrade'} Subscription?`,
-                    `Your subscription will be ${actionText} to ${planId} ${timingText}.`,
+                    `Your subscription will be ${actionText} to ${planNameFor(planId)} ${timingText}.`,
                     [
                         { text: 'Cancel', style: 'cancel', onPress: () => setProcessingPayment(false) },
                         {
@@ -214,10 +241,13 @@ const SubscriptionModal = ({ visible, onClose, onUpgrade }) => {
                         </Text>
 
                         {SUBSCRIPTION_PLANS.map((plan) => {
-                            const isCurrentPlan = plan.id === currentPlanId;
+                            // Treat any paid value (incl. legacy basic/premium) as the Pro plan.
+                            const isCurrentPlan = isPaidTier(plan.id)
+                                ? isPaidTier(currentPlanId)
+                                : !isPaidTier(currentPlanId);
                             const isPremium = plan.id !== 'free';
-                            const planLevel = tierHierarchy[plan.id] || 0;
-                            const currentLevel = tierHierarchy[currentPlanId] || 0;
+                            const planLevel = tierLevel(plan.id);
+                            const currentLevel = tierLevel(currentPlanId);
                             const isUpgrade = planLevel > currentLevel;
                             const isDowngrade = planLevel < currentLevel;
 
@@ -277,13 +307,10 @@ const SubscriptionModal = ({ visible, onClose, onUpgrade }) => {
                                             // Format limit display
                                             let limitText = '';
                                             if (feature.limit && feature.limit > 0) {
-                                                if (feature.key === 'mentorSessions') {
-                                                    limitText = ` (${feature.limit}/mo)`;
-                                                } else if (feature.key === 'basicAiAnalysis') {
-                                                    limitText = ` (${feature.limit}/mo)`;
-                                                } else {
-                                                    limitText = ` (${feature.limit}x)`;
-                                                }
+                                                limitText =
+                                                    feature.key === 'mentorSessions'
+                                                        ? ` (${feature.limit}/mo)`
+                                                        : ` (${feature.limit}x)`;
                                             } else if (feature.limit === -1) {
                                                 limitText = ' (unlimited)';
                                             }
@@ -366,7 +393,7 @@ const styles = StyleSheet.create({
         paddingBottom: 10,
     },
     title: {
-        fontSize: 24,
+        fontSize: 25,
         fontWeight: 'bold',
     },
     closeButton: {
@@ -376,9 +403,9 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
     },
     subtitle: {
-        fontSize: 16,
+        fontSize: 17.5,
         marginBottom: 20,
-        lineHeight: 22,
+        lineHeight: 23,
     },
     planCard: {
         borderRadius: 12,
@@ -403,7 +430,7 @@ const styles = StyleSheet.create({
     },
     popularText: {
         color: '#FFF',
-        fontSize: 12,
+        fontSize: 14,
         fontWeight: 'bold',
     },
     planHeader: {
@@ -413,14 +440,14 @@ const styles = StyleSheet.create({
         marginBottom: 15,
     },
     planName: {
-        fontSize: 22,
+        fontSize: 23,
         fontWeight: 'bold',
     },
     planDescription: {
-        fontSize: 14,
+        fontSize: 16,
         fontStyle: 'italic',
         marginBottom: 10,
-        lineHeight: 20,
+        lineHeight: 21,
     },
     priceContainer: {
         alignItems: 'flex-end',
@@ -430,7 +457,7 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     billingCycle: {
-        fontSize: 14,
+        fontSize: 16,
     },
     featuresContainer: {
         marginTop: 10,
@@ -441,7 +468,7 @@ const styles = StyleSheet.create({
         marginBottom: 10,
     },
     featureText: {
-        fontSize: 14,
+        fontSize: 16,
         marginLeft: 10,
         flex: 1,
     },
@@ -454,7 +481,7 @@ const styles = StyleSheet.create({
     currentText: {
         color: '#FFF',
         fontWeight: 'bold',
-        fontSize: 14,
+        fontSize: 16,
     },
     upgradeButton: {
         marginTop: 15,
@@ -465,13 +492,13 @@ const styles = StyleSheet.create({
     upgradeButtonText: {
         color: '#FFF',
         fontWeight: 'bold',
-        fontSize: 16,
+        fontSize: 17.5,
     },
     disclaimer: {
-        fontSize: 12,
+        fontSize: 14,
         textAlign: 'center',
         marginTop: 20,
-        lineHeight: 18,
+        lineHeight: 19,
     },
     processingContainer: {
         flexDirection: 'row',

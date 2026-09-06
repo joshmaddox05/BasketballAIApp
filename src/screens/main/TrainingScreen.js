@@ -54,7 +54,7 @@ const TrainingScreen = ({ navigation }) => {
     const [myPlans, setMyPlans] = useState([]);
 
     const trainingCategories = [
-        { id: '1', title: 'Shooting', icon: 'basketball-outline', color: '#FF6B00' },
+        { id: '1', title: 'Shooting', icon: 'basketball-outline', color: '#8A1C22' },
         { id: '2', title: 'Dribbling', icon: 'hand-left-outline', color: '#4CAF50' },
         { id: '3', title: 'Physical', icon: 'fitness-outline', color: '#2196F3' },
         { id: '4', title: 'Defense', icon: 'shield-outline', color: '#9C27B0' },
@@ -243,7 +243,7 @@ const TrainingScreen = ({ navigation }) => {
     if (loading) {
         return (
             <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#FF6B00" />
+                <ActivityIndicator size="large" color="#8A1C22" />
             </View>
         );
     }
@@ -318,7 +318,7 @@ const TrainingScreen = ({ navigation }) => {
                             activeOpacity={0.9}
                         >
                             <LinearGradient
-                                colors={['#FF6B00', '#FF8C33']}
+                                colors={['#8A1C22', '#4C0F14']}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 1 }}
                                 style={styles.buildWorkoutGradient}
@@ -331,7 +331,7 @@ const TrainingScreen = ({ navigation }) => {
                                         </Text>
                                         <View style={styles.buildWorkoutButton}>
                                             <Text style={styles.buildWorkoutButtonText}>Get Started</Text>
-                                            <Ionicons name="arrow-forward" size={16} color="#FF6B00" />
+                                            <Ionicons name="arrow-forward" size={16} color="#8A1C22" />
                                         </View>
                                     </View>
                                     <View style={styles.buildWorkoutIcon}>
@@ -587,7 +587,7 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     headerTitle: {
-        fontSize: 24,
+        fontSize: 25,
         fontWeight: 'bold',
         flex: 1,
     },
@@ -623,13 +623,13 @@ const styles = StyleSheet.create({
     searchInput: {
         flex: 1,
         height: 44,
-        fontSize: 16,
+        fontSize: 17.5,
     },
     categoriesSection: {
         marginBottom: 24,
     },
     sectionTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: 'bold',
         marginBottom: 16,
     },
@@ -640,7 +640,7 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     seeAllText: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '500',
     },
     categoriesList: {
@@ -675,7 +675,7 @@ const styles = StyleSheet.create({
         marginBottom: 6,
     },
     categoryTitle: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '700',
         color: '#FFF',
     },
@@ -708,12 +708,12 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     browseByTypeTitle: {
-        fontSize: 15,
+        fontSize: 16.5,
         fontWeight: '600',
         marginBottom: 2,
     },
     browseByTypeSubtitle: {
-        fontSize: 13,
+        fontSize: 15,
     },
     analysisSection: {
         marginBottom: 24,
@@ -733,16 +733,16 @@ const styles = StyleSheet.create({
         paddingRight: 12,
     },
     analysisTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: 'bold',
         color: '#FFF',
         marginBottom: 8,
     },
     analysisDescription: {
-        fontSize: 14,
+        fontSize: 16,
         color: 'rgba(255,255,255,0.9)',
         marginBottom: 12,
-        lineHeight: 20,
+        lineHeight: 21,
     },
     analysisButton: {
         backgroundColor: '#FFF',
@@ -799,7 +799,7 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     workoutTitle: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: '600',
         marginBottom: 6,
     },
@@ -808,7 +808,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     workoutLevel: {
-        fontSize: 14,
+        fontSize: 16,
         marginRight: 12,
     },
     workoutDuration: {
@@ -816,14 +816,14 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     workoutDurationText: {
-        fontSize: 14,
+        fontSize: 16,
         marginLeft: 4,
     },
     startButton: {
         width: 40,
         height: 40,
         borderRadius: 20,
-        backgroundColor: '#FF6B00',
+        backgroundColor: '#8A1C22',
         justifyContent: 'center',
         alignItems: 'center',
         marginLeft: 8,
@@ -856,7 +856,7 @@ const styles = StyleSheet.create({
         marginLeft: 8,
     },
     premiumBadgeText: {
-        fontSize: 10,
+        fontSize: 12,
         fontWeight: 'bold',
         color: '#FFF',
         letterSpacing: 0.5,
@@ -871,7 +871,7 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
     emptyStateText: {
-        fontSize: 14,
+        fontSize: 16,
         textAlign: 'center',
     },
     challengeSection: {
@@ -887,14 +887,14 @@ const styles = StyleSheet.create({
         elevation: 2,
     },
     challengeTitle: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: 'bold',
         marginBottom: 8,
     },
     challengeDescription: {
-        fontSize: 14,
+        fontSize: 16,
         marginBottom: 16,
-        lineHeight: 20,
+        lineHeight: 21,
     },
     challengeWorkout: {
         flexDirection: 'row',
@@ -906,7 +906,7 @@ const styles = StyleSheet.create({
         borderBottomWidth: 1,
     },
     challengeWorkoutTitle: {
-        fontSize: 15,
+        fontSize: 16.5,
         fontWeight: '500',
     },
     trainingProgramsSection: {
@@ -941,7 +941,7 @@ const styles = StyleSheet.create({
     },
     loadingVideoText: {
         marginLeft: 8,
-        fontSize: 14,
+        fontSize: 16,
     },
     retryButton: {
         paddingHorizontal: 16,
@@ -951,7 +951,7 @@ const styles = StyleSheet.create({
     },
     retryButtonText: {
         color: '#FFF',
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '500',
     },
     // Build Your Workout Card Styles
@@ -959,7 +959,7 @@ const styles = StyleSheet.create({
         marginBottom: 16,
         borderRadius: 16,
         overflow: 'hidden',
-        shadowColor: '#FF6B00',
+        shadowColor: '#8A1C22',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 8,
@@ -978,15 +978,15 @@ const styles = StyleSheet.create({
         paddingRight: 16,
     },
     buildWorkoutTitle: {
-        fontSize: 20,
+        fontSize: 21,
         fontWeight: '800',
         color: '#FFFFFF',
         marginBottom: 6,
     },
     buildWorkoutSubtitle: {
-        fontSize: 14,
+        fontSize: 16,
         color: 'rgba(255,255,255,0.85)',
-        lineHeight: 20,
+        lineHeight: 21,
         marginBottom: 14,
     },
     buildWorkoutButton: {
@@ -999,9 +999,9 @@ const styles = StyleSheet.create({
         alignSelf: 'flex-start',
     },
     buildWorkoutButtonText: {
-        color: '#FF6B00',
+        color: '#8A1C22',
         fontWeight: '700',
-        fontSize: 14,
+        fontSize: 16,
         marginRight: 6,
     },
     buildWorkoutIcon: {
@@ -1033,12 +1033,12 @@ const styles = StyleSheet.create({
         borderRadius: 12,
     },
     activePlanBadgeText: {
-        fontSize: 12,
+        fontSize: 14,
         fontWeight: '600',
         marginLeft: 4,
     },
     activePlanTitle: {
-        fontSize: 17,
+        fontSize: 18,
         fontWeight: '700',
         marginBottom: 12,
     },
@@ -1058,7 +1058,7 @@ const styles = StyleSheet.create({
         borderRadius: 3,
     },
     activePlanProgressText: {
-        fontSize: 13,
+        fontSize: 15,
         fontWeight: '500',
     },
 });

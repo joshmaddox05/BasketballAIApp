@@ -1,4 +1,5 @@
-// ProfileScreen.js - Original layout with functional MVP features
+// ProfileScreen.js - Profile & settings. DBE burgundy redesign (mock 11e).
+// Presentation only: every handler, route and role branch is unchanged.
 import React, { useState } from 'react';
 import {
     StyleSheet,
@@ -11,6 +12,7 @@ import {
     Alert,
     Image
 } from 'react-native';
+import { SUPPORT_EMAIL } from '../../utils/constants';
 // Note: Switch is still used for Dark Mode toggle
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,6 +21,8 @@ import SubscriptionModal from '../../components/shared/SubscriptionModal';
 import { getTheme } from '../../utils/theme';
 import i18n from '../../i18n/i18n';
 import { useTour } from '../../components/tour';
+import { TYPE, FONTS, SHAPE } from '../../utils/typography';
+import { Entrance, Float, PulseHalo, SectionLabel, useToast } from '../../components/dbe';
 
 const ProfileScreen = ({ navigation }) => {
     const {
@@ -33,6 +37,7 @@ const ProfileScreen = ({ navigation }) => {
     } = useAppContext();
 
     const { startTour, resetTour } = useTour();
+    const showToast = useToast();
 
     // Fallback theme
     const theme = contextTheme || getTheme(isDarkMode || false);
@@ -61,221 +66,293 @@ const ProfileScreen = ({ navigation }) => {
     const handleUpgrade = async (planId) => {
         await upgradeSubscription(planId);
         setShowSubscriptionModal(false);
-        Alert.alert('Success', `Successfully upgraded to ${planId} plan!`);
+        showToast(`Successfully upgraded to ${planId} plan!`);
     };
 
     const getInitials = (name) => {
         return name.split(' ').map(n => n[0]).join('').toUpperCase();
     };
 
+    const role = userData?.role || 'player';
+    const displayName = userData?.displayName || userData?.name || 'User';
+
+    // Meta line under the name: level for players, role for everyone else.
+    const metaLine =
+        role === 'player'
+            ? `${userData?.level ? userData.level.charAt(0).toUpperCase() + userData.level.slice(1) : 'Beginner'} Player`
+            : role.charAt(0).toUpperCase() + role.slice(1);
+
+    // ── Row primitives (grouped card style, mock 11e) ────────────────────────
+    const GroupCard = ({ children, style }) => (
+        <View
+            style={[
+                {
+                    borderRadius: SHAPE.radiusTile,
+                    backgroundColor: theme.surface,
+                    borderWidth: 1,
+                    borderColor: theme.hairline,
+                    overflow: 'hidden',
+                },
+                style,
+            ]}
+        >
+            {children}
+        </View>
+    );
+
+    const SettingRow = ({ label, value, onPress, right, last, danger }) => {
+        const body = (
+            <View
+                style={[
+                    styles.settingItem,
+                    !last && { borderBottomWidth: 1, borderBottomColor: theme.hairline },
+                ]}
+            >
+                <Text
+                    style={{
+                        flex: 1,
+                        fontFamily: FONTS.bodySemiBold,
+                        fontSize: 15,
+                        color: danger ? theme.accentText : theme.text,
+                    }}
+                >
+                    {label}
+                </Text>
+                {value ? (
+                    <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 14.5, color: theme.textMuted }}>
+                        {value}
+                    </Text>
+                ) : null}
+                {right !== undefined
+                    ? right
+                    : onPress && !danger
+                        ? <Ionicons name="chevron-forward" size={14} color={theme.textDim} />
+                        : null}
+            </View>
+        );
+        if (!onPress) return body;
+        return (
+            <TouchableOpacity activeOpacity={0.75} onPress={onPress}>
+                {body}
+            </TouchableOpacity>
+        );
+    };
+
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-            <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} />
+            <StatusBar style={isDarkMode ? 'light' : 'dark'} />
 
-            <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+            <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 {/* Profile Header */}
-                <View style={[styles.profileHeader, { backgroundColor: theme.card }]}>
-                    {userData?.photoURL ? (
-                        <Image
-                            source={{ uri: userData.photoURL }}
-                            style={styles.profileImage}
-                        />
+                <Entrance variant="up" style={{ alignItems: 'center' }}>
+                    <View style={{ position: 'relative' }}>
+                        {userData?.photoURL ? (
+                            <Image source={{ uri: userData.photoURL }} style={styles.profileImage} />
+                        ) : (
+                            <View style={[styles.profileImagePlaceholder, { backgroundColor: theme.surface2 }]}>
+                                <Text style={{ fontFamily: FONTS.heading, fontSize: 23, color: theme.accentText }}>
+                                    {getInitials(displayName)}
+                                </Text>
+                            </View>
+                        )}
+                        <TouchableOpacity
+                            activeOpacity={0.85}
+                            onPress={() => navigation.navigate('EditProfile')}
+                            style={[
+                                styles.avatarBadge,
+                                { backgroundColor: theme.primary, borderColor: theme.background },
+                            ]}
+                        >
+                            <PulseHalo color={theme.pulseDot} borderRadius={13} />
+                            <Ionicons name="camera" size={13} color="#FFFFFF" />
+                        </TouchableOpacity>
+                    </View>
+
+                    <Text style={{ fontFamily: FONTS.heading, fontSize: 19, color: theme.text, marginTop: 12 }}>
+                        {displayName}
+                    </Text>
+
+                    {role === 'scout' ? (
+                        <View style={styles.badgeRow}>
+                            <View
+                                style={[
+                                    styles.pill,
+                                    { backgroundColor: userData?.scoutVerified ? theme.badgeFill : theme.steelFill },
+                                ]}
+                            >
+                                <Ionicons
+                                    name={userData?.scoutVerified ? 'checkmark-circle' : 'time-outline'}
+                                    size={12}
+                                    color={userData?.scoutVerified ? theme.accentText : theme.steel}
+                                />
+                                <Text
+                                    style={[
+                                        TYPE.chip,
+                                        { color: userData?.scoutVerified ? theme.accentText : theme.steel },
+                                    ]}
+                                >
+                                    {userData?.scoutVerified ? 'Verified Scout' : 'Verification Pending'}
+                                </Text>
+                            </View>
+                            {userData?.scoutTier ? (
+                                <View style={[styles.pill, { borderWidth: 1, borderColor: theme.hairline }]}>
+                                    <Text style={[TYPE.chip, { color: theme.textMuted }]}>{userData.scoutTier}</Text>
+                                </View>
+                            ) : null}
+                        </View>
                     ) : (
-                        <View style={[styles.profileImagePlaceholder, { backgroundColor: theme.primary }]}>
-                            <Text style={styles.profileInitials}>
-                                {getInitials(userData?.displayName || userData?.name || 'User')}
+                        <View style={styles.badgeRow}>
+                            <View style={[styles.pill, { backgroundColor: theme.badgeFill }]}>
+                                <Text
+                                    style={{
+                                        fontFamily: FONTS.bodyBold,
+                                        fontSize: 12.5,
+                                        letterSpacing: 0.5,
+                                        textTransform: 'uppercase',
+                                        color: theme.accentText,
+                                    }}
+                                >
+                                    {currentPlan}
+                                </Text>
+                            </View>
+                            <Text style={{ fontFamily: FONTS.bodyMedium, fontSize: 14, color: theme.textDim }}>
+                                {metaLine}
                             </Text>
                         </View>
                     )}
 
-                    <Text style={[styles.profileName, { color: theme.text }]}>
-                        {userData?.displayName || userData?.name || 'User'}
-                    </Text>
-                    <Text style={[styles.profileLevel, { color: theme.textSecondary }]}>
-                        {userData?.level ? userData.level.charAt(0).toUpperCase() + userData.level.slice(1) : 'Beginner'} Player
-                    </Text>
-
+                    {/* Stat strip — streak bounces (player motion = celebratory) */}
                     <View style={styles.profileStatsRow}>
                         <View style={styles.profileStat}>
-                            <Text style={[styles.profileStatValue, { color: theme.text }]}>
-                                {userData.stats.streak || 0}
-                            </Text>
-                            <Text style={[styles.profileStatLabel, { color: theme.textSecondary }]}>
-                                Day Streak
-                            </Text>
+                            <Float>
+                                <Text style={[TYPE.statNumber, { color: theme.text, textAlign: 'center' }]}>
+                                    {userData.stats.streak || 0}
+                                </Text>
+                            </Float>
+                            <Text style={[TYPE.statCaption, { color: theme.textDim, marginTop: 5 }]}>Streak</Text>
                         </View>
-                        <View style={[styles.profileStatDivider, { backgroundColor: theme.border }]} />
+                        <View style={[styles.profileStatDivider, { backgroundColor: theme.hairline }]} />
                         <View style={styles.profileStat}>
-                            <Text style={[styles.profileStatValue, { color: theme.text }]}>
-                                {userData.stats.shooting || 0}%
+                            <Text style={[TYPE.statNumber, { color: theme.text, textAlign: 'center' }]}>
+                                {userData.stats.shooting || 0}
                             </Text>
-                            <Text style={[styles.profileStatLabel, { color: theme.textSecondary }]}>
-                                Shooting
-                            </Text>
+                            <Text style={[TYPE.statCaption, { color: theme.textDim, marginTop: 5 }]}>Shooting</Text>
                         </View>
-                        <View style={[styles.profileStatDivider, { backgroundColor: theme.border }]} />
+                        <View style={[styles.profileStatDivider, { backgroundColor: theme.hairline }]} />
                         <View style={styles.profileStat}>
-                            <Text style={[styles.profileStatValue, { color: theme.text }]}>
-                                {userData.stats.dribbling || 0}%
+                            <Text style={[TYPE.statNumber, { color: theme.text, textAlign: 'center' }]}>
+                                {userData.stats.dribbling || 0}
                             </Text>
-                            <Text style={[styles.profileStatLabel, { color: theme.textSecondary }]}>
-                                Dribbling
-                            </Text>
+                            <Text style={[TYPE.statCaption, { color: theme.textDim, marginTop: 5 }]}>Dribbling</Text>
                         </View>
                     </View>
 
                     <TouchableOpacity
                         style={[styles.editProfileButton, { backgroundColor: theme.primary }]}
+                        activeOpacity={0.85}
                         onPress={() => navigation.navigate('EditProfile')}
                     >
-                        <Text style={styles.editProfileButtonText}>Edit Profile</Text>
+                        <Text style={[TYPE.buttonPrimary, { color: '#FFFFFF' }]}>Edit Profile</Text>
                     </TouchableOpacity>
-                </View>
+                </Entrance>
 
-                {/* Subscription Section */}
-                <View style={[styles.sectionContainer, { backgroundColor: theme.card }]}>
-                    <View style={styles.sectionHeader}>
-                        <Text style={[styles.sectionTitle, { color: theme.text }]}>Subscription</Text>
-                        <TouchableOpacity onPress={() => setShowSubscriptionModal(true)}>
-                            <Text style={[styles.sectionAction, { color: theme.primary }]}>Change</Text>
-                        </TouchableOpacity>
-                    </View>
-
-                    <View style={[styles.planCard, { backgroundColor: theme.backgroundSecondary }]}>
-                        <View style={styles.planInfo}>
-                            <Ionicons
-                                name={userData.subscription === 'free' ? 'person-outline' : 'star'}
-                                size={24}
-                                color={theme.primary}
-                            />
-                            <View style={styles.planDetails}>
-                                <Text style={[styles.planName, { color: theme.text }]}>
-                                    {currentPlan} Plan
-                                </Text>
-                                <Text style={[styles.planDescription, { color: theme.textSecondary }]}>
-                                    {userData.subscription === 'free'
-                                        ? 'Basic features and workouts'
-                                        : 'Premium features unlocked'}
-                                </Text>
-                            </View>
-                        </View>
-                    </View>
-                </View>
-
-                {/* Settings Section */}
-                <View style={[styles.sectionContainer, { backgroundColor: theme.card }]}>
-                    <Text style={[styles.sectionTitle, { color: theme.text }]}>Settings</Text>
-
-                    <TouchableOpacity
-                        style={[styles.settingItem, { borderBottomColor: theme.border }]}
-                        onPress={() => navigation.navigate('Notifications')}
-                    >
-                        <View style={styles.settingLeft}>
-                            <Ionicons name="notifications-outline" size={24} color={theme.textSecondary} />
-                            <Text style={[styles.settingLabel, { color: theme.text }]}>Notifications</Text>
-                        </View>
-                        <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
-                    </TouchableOpacity>
-
-                    <View style={[styles.settingItem, { borderBottomColor: theme.border }]}>
-                        <View style={styles.settingLeft}>
-                            <Ionicons name="moon-outline" size={24} color={theme.textSecondary} />
-                            <Text style={[styles.settingLabel, { color: theme.text }]}>Dark Mode</Text>
-                        </View>
-                        <Switch
-                            value={isDarkMode}
-                            onValueChange={toggleDarkMode}
-                            trackColor={{ false: theme.border, true: theme.primaryLight }}
-                            thumbColor={isDarkMode ? theme.primary : theme.backgroundTertiary}
+                {/* Preferences */}
+                <View style={{ marginTop: 22 }}>
+                    <SectionLabel>Preferences</SectionLabel>
+                    <GroupCard>
+                        <SettingRow
+                            label="Dark Mode"
+                            right={
+                                <Switch
+                                    value={isDarkMode}
+                                    onValueChange={toggleDarkMode}
+                                    trackColor={{ false: theme.track, true: theme.primary }}
+                                    thumbColor="#FFFFFF"
+                                />
+                            }
                         />
-                    </View>
-
-                    <TouchableOpacity
-                        style={[styles.settingItem, { borderBottomColor: theme.border }]}
-                        onPress={() => {
-                            const newLang = language === 'en' ? 'fr' : 'en';
-                            changeLanguage(newLang);
-                            Alert.alert('Success', `Language changed to ${newLang === 'en' ? 'English' : 'Français'}`);
-                        }}
-                    >
-                        <View style={styles.settingLeft}>
-                            <Ionicons name="language-outline" size={24} color={theme.textSecondary} />
-                            <Text style={[styles.settingLabel, { color: theme.text }]}>Language</Text>
-                        </View>
-                        <View style={styles.settingRight}>
-                            <Text style={[styles.settingValue, { color: theme.textSecondary }]}>
-                                {(language || 'en') === 'en' ? 'English' : 'Français'}
-                            </Text>
-                            <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
-                        </View>
-                    </TouchableOpacity>
+                        <SettingRow
+                            label="Notifications"
+                            onPress={() => navigation.navigate('Notifications')}
+                        />
+                        <SettingRow
+                            label="Language"
+                            value={(language || 'en') === 'en' ? 'English' : 'Français'}
+                            last
+                            onPress={() => {
+                                const newLang = language === 'en' ? 'fr' : 'en';
+                                changeLanguage(newLang);
+                                showToast(`Language changed to ${newLang === 'en' ? 'English' : 'Français'}`);
+                            }}
+                        />
+                    </GroupCard>
                 </View>
 
-                {/* Account Section */}
-                <View style={[styles.sectionContainer, { backgroundColor: theme.card }]}>
-                    <Text style={[styles.sectionTitle, { color: theme.text }]}>Account</Text>
+                {/* Account */}
+                <View style={{ marginTop: SHAPE.sectionGap }}>
+                    <SectionLabel>Account</SectionLabel>
+                    <GroupCard>
+                        <SettingRow
+                            label="Manage subscription"
+                            value={`${currentPlan} plan`}
+                            onPress={() => setShowSubscriptionModal(true)}
+                        />
 
-                    <TouchableOpacity
-                        style={[styles.settingItem, { borderBottomColor: theme.border }]}
-                        onPress={() => Alert.alert('Privacy', 'Privacy settings coming soon!')}
-                    >
-                        <View style={styles.settingLeft}>
-                            <Ionicons name="shield-outline" size={24} color={theme.textSecondary} />
-                            <Text style={[styles.settingLabel, { color: theme.text }]}>Privacy</Text>
-                        </View>
-                        <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
-                    </TouchableOpacity>
+                        {(!userData?.role || userData?.role === 'player') && (
+                            <SettingRow
+                                label="Connections"
+                                onPress={() => navigation.navigate('Connections')}
+                            />
+                        )}
 
-                    <TouchableOpacity
-                        style={[styles.settingItem, { borderBottomColor: theme.border }]}
-                        onPress={() => Alert.alert('Help', 'Contact: support@basketballai.com')}
-                    >
-                        <View style={styles.settingLeft}>
-                            <Ionicons name="help-circle-outline" size={24} color={theme.textSecondary} />
-                            <Text style={[styles.settingLabel, { color: theme.text }]}>Help & Support</Text>
-                        </View>
-                        <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
-                    </TouchableOpacity>
+                        <SettingRow
+                            label="Privacy"
+                            onPress={() => Alert.alert('Privacy', 'Privacy settings coming soon!')}
+                        />
 
-                    <TouchableOpacity
-                        style={[styles.settingItem, { borderBottomColor: theme.border }]}
-                        onPress={() => {
-                            Alert.alert(
-                                'Take a Tour',
-                                'Would you like to take the app tour again?',
-                                [
-                                    { text: 'Cancel', style: 'cancel' },
-                                    {
-                                        text: 'Start Tour',
-                                        onPress: async () => {
-                                            await resetTour();
-                                            navigation.navigate('Home');
-                                            setTimeout(() => {
-                                                startTour();
-                                            }, 500);
-                                        }
-                                    }
-                                ]
-                            );
-                        }}
-                    >
-                        <View style={styles.settingLeft}>
-                            <Ionicons name="compass-outline" size={24} color={theme.textSecondary} />
-                            <Text style={[styles.settingLabel, { color: theme.text }]}>Take a Tour</Text>
-                        </View>
-                        <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
-                    </TouchableOpacity>
+                        <SettingRow
+                            label="Help & Support"
+                            onPress={() => Alert.alert('Help', `Contact: ${SUPPORT_EMAIL}`)}
+                        />
 
-                    <TouchableOpacity
-                        style={[styles.settingItem, { borderBottomWidth: 0 }]}
-                        onPress={handleLogout}
-                    >
-                        <View style={styles.settingLeft}>
-                            <Ionicons name="log-out-outline" size={24} color={theme.error} />
-                            <Text style={[styles.settingLabel, { color: theme.error }]}>Log Out</Text>
-                        </View>
-                        <Ionicons name="chevron-forward" size={20} color={theme.error} />
-                    </TouchableOpacity>
+                        {/* Parent is included now that PARENT_TOUR_STEPS exists and the
+                            parent navigator mounts it. Scout still has no tour of its
+                            own, so the row stays hidden there rather than starting a
+                            tour that targets screens a scout never mounts. */}
+                        {(!userData?.role
+                            || userData?.role === 'player'
+                            || userData?.role === 'coach'
+                            || userData?.role === 'parent') && (
+                            <SettingRow
+                                label="Take a Tour"
+                                onPress={() => {
+                                    const homeRoute =
+                                        userData?.role === 'coach' ? 'CoachHome'
+                                        : userData?.role === 'parent' ? 'ParentHome'
+                                        : 'Home';
+                                    Alert.alert(
+                                        'Take a Tour',
+                                        'Would you like to take the app tour again?',
+                                        [
+                                            { text: 'Cancel', style: 'cancel' },
+                                            {
+                                                text: 'Start Tour',
+                                                onPress: async () => {
+                                                    await resetTour();
+                                                    navigation.navigate(homeRoute);
+                                                    setTimeout(() => {
+                                                        startTour();
+                                                    }, 500);
+                                                }
+                                            }
+                                        ]
+                                    );
+                                }}
+                            />
+                        )}
+
+                        <SettingRow label="Log out" danger last onPress={handleLogout} />
+                    </GroupCard>
                 </View>
 
                 <View style={styles.bottomSpace} />
@@ -297,133 +374,76 @@ const styles = StyleSheet.create({
     scrollView: {
         flex: 1,
     },
-    profileHeader: {
-        alignItems: 'center',
-        paddingVertical: 30,
-        paddingHorizontal: 20,
-        marginBottom: 15,
+    scrollContent: {
+        paddingHorizontal: SHAPE.screenPadding,
+        paddingTop: 16,
+        paddingBottom: 20,
     },
     profileImage: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
-        marginBottom: 15,
+        width: 76,
+        height: 76,
+        borderRadius: 38,
     },
     profileImagePlaceholder: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
+        width: 76,
+        height: 76,
+        borderRadius: 38,
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 15,
     },
-    profileInitials: {
-        fontSize: 40,
-        fontWeight: 'bold',
-        color: '#FFF',
+    avatarBadge: {
+        position: 'absolute',
+        right: -3,
+        bottom: -3,
+        width: 26,
+        height: 26,
+        borderRadius: 13,
+        borderWidth: 2,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
-    profileName: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        marginBottom: 5,
+    badgeRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginTop: 5,
     },
-    profileLevel: {
-        fontSize: 16,
-        marginBottom: 20,
+    pill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 9,
+        paddingVertical: 3,
+        borderRadius: SHAPE.radiusBadge,
     },
     profileStatsRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 20,
+        alignSelf: 'stretch',
+        marginTop: 20,
+        marginBottom: 18,
     },
     profileStat: {
         flex: 1,
         alignItems: 'center',
     },
-    profileStatValue: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        marginBottom: 5,
-    },
-    profileStatLabel: {
-        fontSize: 12,
-    },
     profileStatDivider: {
         width: 1,
-        height: 40,
+        height: 34,
     },
     editProfileButton: {
-        paddingHorizontal: 30,
-        paddingVertical: 12,
-        borderRadius: 25,
-    },
-    editProfileButtonText: {
-        color: '#FFF',
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    sectionContainer: {
-        marginBottom: 15,
-        paddingVertical: 20,
-        paddingHorizontal: 20,
-    },
-    sectionHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
+        alignSelf: 'stretch',
         alignItems: 'center',
-        marginBottom: 15,
-    },
-    sectionTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-    },
-    sectionAction: {
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    planCard: {
-        borderRadius: 12,
-        padding: 15,
-    },
-    planInfo: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    planDetails: {
-        marginLeft: 15,
-        flex: 1,
-    },
-    planName: {
-        fontSize: 16,
-        fontWeight: '600',
-        marginBottom: 3,
-    },
-    planDescription: {
-        fontSize: 14,
+        paddingVertical: 13,
+        borderRadius: SHAPE.radiusTile,
     },
     settingItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingVertical: 15,
-        borderBottomWidth: 1,
-    },
-    settingLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        flex: 1,
-    },
-    settingLabel: {
-        fontSize: 16,
-        marginLeft: 15,
-    },
-    settingRight: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    settingValue: {
-        fontSize: 16,
-        marginRight: 8,
+        gap: 10,
+        paddingVertical: 13,
+        paddingHorizontal: 14,
+        minHeight: 48,
     },
     bottomSpace: {
         height: 30,

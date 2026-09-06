@@ -161,7 +161,7 @@ const AllWorkoutsScreen = ({ navigation }) => {
     if (loading) {
         return (
             <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#FF6B00" />
+                <ActivityIndicator size="large" color="#8A1C22" />
             </View>
         );
     }
@@ -321,7 +321,7 @@ const AllWorkoutsScreen = ({ navigation }) => {
                                     {level}
                                 </Text>
                                 {selectedLevel === level && (
-                                    <Ionicons name="checkmark" size={18} color="#FF6B00" />
+                                    <Ionicons name="checkmark" size={18} color="#8A1C22" />
                                 )}
                             </TouchableOpacity>
                         ))}
@@ -376,7 +376,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     headerTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: 'bold',
         color: '#333',
     },
@@ -406,7 +406,7 @@ const styles = StyleSheet.create({
     searchInput: {
         flex: 1,
         height: 40,
-        fontSize: 16,
+        fontSize: 17.5,
         color: '#333',
     },
     clearButton: {
@@ -430,11 +430,11 @@ const styles = StyleSheet.create({
         marginRight: 8,
     },
     activeSortButton: {
-        backgroundColor: '#FF6B00',
+        backgroundColor: '#8A1C22',
     },
     sortButtonText: {
         color: '#666',
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '500',
     },
     activeSortButtonText: {
@@ -450,7 +450,7 @@ const styles = StyleSheet.create({
         borderTopColor: '#EEE',
     },
     levelFilterText: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#333',
         fontWeight: '500',
     },
@@ -472,11 +472,11 @@ const styles = StyleSheet.create({
         // No visual difference except for the text
     },
     levelOptionText: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#333',
     },
     selectedLevelOptionText: {
-        color: '#FF6B00',
+        color: '#8A1C22',
         fontWeight: '600',
     },
     workoutsList: {
@@ -517,7 +517,7 @@ const styles = StyleSheet.create({
     },
     levelText: {
         color: '#FFF',
-        fontSize: 12,
+        fontSize: 14,
         fontWeight: '500',
     },
     featuredBadge: {
@@ -533,7 +533,7 @@ const styles = StyleSheet.create({
     },
     featuredText: {
         color: '#FFF',
-        fontSize: 12,
+        fontSize: 14,
         fontWeight: '500',
         marginLeft: 4,
     },
@@ -541,7 +541,7 @@ const styles = StyleSheet.create({
         padding: 16,
     },
     workoutTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: 'bold',
         color: '#333',
         marginBottom: 8,
@@ -556,18 +556,18 @@ const styles = StyleSheet.create({
         marginRight: 16,
     },
     metaText: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#666',
         marginLeft: 4,
     },
     workoutDescription: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#666',
-        lineHeight: 20,
+        lineHeight: 21,
         marginBottom: 16,
     },
     startButton: {
-        backgroundColor: '#FF6B00',
+        backgroundColor: '#8A1C22',
         paddingVertical: 8,
         paddingHorizontal: 16,
         borderRadius: 20,
@@ -578,7 +578,7 @@ const styles = StyleSheet.create({
     startButtonText: {
         color: '#FFF',
         fontWeight: 'bold',
-        fontSize: 14,
+        fontSize: 16,
     },
     emptyContainer: {
         alignItems: 'center',
@@ -586,14 +586,14 @@ const styles = StyleSheet.create({
         padding: 40,
     },
     emptyTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: 'bold',
         color: '#333',
         marginTop: 16,
         marginBottom: 8,
     },
     emptyMessage: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#666',
         textAlign: 'center',
     },

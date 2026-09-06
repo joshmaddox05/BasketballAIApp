@@ -248,7 +248,7 @@ const BuildWorkoutScreen = ({ navigation }) => {
     if (isGenerating) {
       return (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#FF6B00" />
+          <ActivityIndicator size="large" color="#8A1C22" />
           <Text style={styles.loadingText}>Generating your personalized plan...</Text>
         </View>
       );
@@ -289,11 +289,11 @@ const BuildWorkoutScreen = ({ navigation }) => {
         <View style={styles.planSummary}>
           <View style={styles.summaryRow}>
             <View style={styles.summaryItem}>
-              <Ionicons name="calendar-outline" size={20} color="#FF6B00" />
+              <Ionicons name="calendar-outline" size={20} color="#8A1C22" />
               <Text style={styles.summaryValue}>{generatedPlan.durationDays} Days</Text>
             </View>
             <View style={styles.summaryItem}>
-              <Ionicons name="time-outline" size={20} color="#FF6B00" />
+              <Ionicons name="time-outline" size={20} color="#8A1C22" />
               <Text style={styles.summaryValue}>
                 ~{Math.round(generatedPlan.totalEstimatedDuration / 60)}h total
               </Text>
@@ -322,7 +322,7 @@ const BuildWorkoutScreen = ({ navigation }) => {
           <View style={styles.scheduleHeader}>
             <Text style={styles.scheduleTitle}>Schedule</Text>
             <TouchableOpacity onPress={regeneratePlan} style={styles.regenerateButton}>
-              <Ionicons name="refresh" size={18} color="#FF6B00" />
+              <Ionicons name="refresh" size={18} color="#8A1C22" />
               <Text style={styles.regenerateText}>Regenerate</Text>
             </TouchableOpacity>
           </View>
@@ -449,7 +449,7 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: '700',
     color: '#FFFFFF'
   },
@@ -468,13 +468,13 @@ const styles = StyleSheet.create({
     paddingTop: 10
   },
   stepTitle: {
-    fontSize: 24,
+    fontSize: 25,
     fontWeight: '800',
     color: '#FFFFFF',
     marginBottom: 8
   },
   stepSubtitle: {
-    fontSize: 15,
+    fontSize: 16.5,
     color: '#888888',
     marginBottom: 24
   },
@@ -489,7 +489,7 @@ const styles = StyleSheet.create({
   },
   selectedText: {
     color: '#AAAAAA',
-    fontSize: 14
+    fontSize: 16
   },
   loadingContainer: {
     flex: 1,
@@ -498,7 +498,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     color: '#AAAAAA',
-    fontSize: 16,
+    fontSize: 17.5,
     marginTop: 16
   },
   errorContainer: {
@@ -508,11 +508,11 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: '#FF6B6B',
-    fontSize: 16,
+    fontSize: 17.5,
     marginBottom: 16
   },
   retryButton: {
-    backgroundColor: '#FF6B00',
+    backgroundColor: '#8A1C22',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 12
@@ -526,7 +526,7 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     color: '#888888',
-    fontSize: 13,
+    fontSize: 15,
     marginBottom: 8,
     fontWeight: '500'
   },
@@ -534,7 +534,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#1A1A1A',
     borderRadius: 12,
     padding: 14,
-    fontSize: 16,
+    fontSize: 17.5,
     color: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#2A2A2A'
@@ -556,7 +556,7 @@ const styles = StyleSheet.create({
   },
   summaryValue: {
     color: '#FFFFFF',
-    fontSize: 15,
+    fontSize: 16.5,
     fontWeight: '600',
     marginLeft: 8
   },
@@ -574,7 +574,7 @@ const styles = StyleSheet.create({
     borderRadius: 20
   },
   focusBadgeText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '600',
     marginLeft: 6
   },
@@ -589,7 +589,7 @@ const styles = StyleSheet.create({
   },
   scheduleTitle: {
     color: '#FFFFFF',
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: '700'
   },
   regenerateButton: {
@@ -597,8 +597,8 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   regenerateText: {
-    color: '#FF6B00',
-    fontSize: 14,
+    color: '#8A1C22',
+    fontSize: 16,
     fontWeight: '600',
     marginLeft: 4
   },
@@ -623,14 +623,14 @@ const styles = StyleSheet.create({
   },
   backStepButtonText: {
     color: '#AAAAAA',
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: '600'
   },
   nextButton: {
     flex: 0.6,
     height: 52,
     borderRadius: 14,
-    backgroundColor: '#FF6B00',
+    backgroundColor: '#8A1C22',
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center'
@@ -643,7 +643,7 @@ const styles = StyleSheet.create({
   },
   nextButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: '700',
     marginRight: 8
   },

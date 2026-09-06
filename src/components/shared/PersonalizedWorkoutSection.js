@@ -83,7 +83,7 @@ const PersonalizedWorkoutSection = ({ navigation, onWorkoutPress }) => {
 
         {workout.personalizedScore && (
           <View style={styles.matchBadge}>
-            <Ionicons name="sparkles" size={14} color="#FF6B00" />
+            <Ionicons name="sparkles" size={14} color="#8A1C22" />
             <Text style={styles.matchText}>
               {Math.round(workout.personalizedScore)}% Match
             </Text>
@@ -105,7 +105,7 @@ const PersonalizedWorkoutSection = ({ navigation, onWorkoutPress }) => {
       {nextWorkout && (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Ionicons name="flash" size={24} color="#FF6B00" />
+            <Ionicons name="flash" size={24} color="#8A1C22" />
             <Text style={styles.sectionTitle}>Your Next Workout</Text>
           </View>
 
@@ -121,15 +121,15 @@ const PersonalizedWorkoutSection = ({ navigation, onWorkoutPress }) => {
 
               <View style={styles.nextWorkoutMeta}>
                 <View style={styles.metaItem}>
-                  <Ionicons name="trending-up" size={16} color="#FF6B00" />
+                  <Ionicons name="trending-up" size={16} color="#8A1C22" />
                   <Text style={styles.metaText}>{nextWorkout.difficulty}</Text>
                 </View>
                 <View style={styles.metaItem}>
-                  <Ionicons name="time" size={16} color="#FF6B00" />
+                  <Ionicons name="time" size={16} color="#8A1C22" />
                   <Text style={styles.metaText}>{nextWorkout.estimatedDuration} min</Text>
                 </View>
                 <View style={styles.metaItem}>
-                  <Ionicons name="barbell" size={16} color="#FF6B00" />
+                  <Ionicons name="barbell" size={16} color="#8A1C22" />
                   <Text style={styles.metaText}>{nextWorkout.category}</Text>
                 </View>
               </View>
@@ -145,7 +145,7 @@ const PersonalizedWorkoutSection = ({ navigation, onWorkoutPress }) => {
       {/* Recommended Workouts */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Ionicons name="star" size={24} color="#FF6B00" />
+          <Ionicons name="star" size={24} color="#8A1C22" />
           <Text style={styles.sectionTitle}>Recommended for You</Text>
         </View>
 
@@ -201,7 +201,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 21,
     fontWeight: 'bold',
     color: '#333',
     marginLeft: 8,
@@ -216,8 +216,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#FF6B00',
-    shadowColor: '#FF6B00',
+    borderColor: '#8A1C22',
+    shadowColor: '#8A1C22',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
@@ -227,13 +227,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   nextWorkoutTitle: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 8,
   },
   nextWorkoutDescription: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
     marginBottom: 12,
   },
@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   metaText: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#666',
     marginLeft: 4,
   },
@@ -256,7 +256,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#FF6B00',
+    backgroundColor: '#8A1C22',
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 12,
@@ -307,8 +307,8 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   categoryBadgeText: {
-    fontSize: 11,
-    color: '#FF6B00',
+    fontSize: 13,
+    color: '#8A1C22',
     fontWeight: '600',
   },
   difficultyBadge: {
@@ -318,21 +318,21 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   difficultyBadgeText: {
-    fontSize: 11,
+    fontSize: 13,
     color: '#666',
     fontWeight: '600',
   },
   workoutTitle: {
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 8,
   },
   workoutDescription: {
-    fontSize: 13,
+    fontSize: 15,
     color: '#666',
     marginBottom: 12,
-    lineHeight: 18,
+    lineHeight: 19,
   },
   workoutFooter: {
     flexDirection: 'row',
@@ -344,7 +344,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   durationText: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#666',
     marginLeft: 4,
   },
@@ -359,8 +359,8 @@ const styles = StyleSheet.create({
     borderColor: '#FFD3B6',
   },
   matchText: {
-    fontSize: 11,
-    color: '#FF6B00',
+    fontSize: 13,
+    color: '#8A1C22',
     fontWeight: '600',
     marginLeft: 4,
   },
@@ -371,7 +371,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#EEE',
   },
   upgradeText: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#9C27B0',
     fontWeight: '600',
     textAlign: 'center',
@@ -389,7 +389,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   upgradeButtonText: {
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: 'bold',
     color: '#FFF',
     marginLeft: 8,

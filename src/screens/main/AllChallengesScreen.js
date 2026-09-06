@@ -495,12 +495,12 @@ const AllChallengesScreen = ({ navigation }) => {
 
     const getCategoryColor = (category) => {
         switch (category?.toLowerCase()) {
-            case 'shooting': return '#FF6B00';
+            case 'shooting': return '#8A1C22';
             case 'dribbling': return '#4CAF50';
             case 'physical': return '#2196F3';
             case 'defense': return '#9C27B0';
             case 'passing': return '#FF9800';
-            default: return '#FF6B00';
+            default: return '#8A1C22';
         }
     };
 
@@ -1146,7 +1146,7 @@ const styles = StyleSheet.create({
     },
     badgeText: {
         color: '#FFFFFF',
-        fontSize: 10,
+        fontSize: 12,
         fontWeight: '700',
     },
     filterButton: {
@@ -1169,7 +1169,7 @@ const styles = StyleSheet.create({
         // Additional styles handled inline
     },
     typeTabText: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '600',
     },
     content: {
@@ -1186,11 +1186,11 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
     sectionTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: '700',
     },
     sectionCount: {
-        fontSize: 14,
+        fontSize: 16,
     },
     challengeCard: {
         borderRadius: 12,
@@ -1224,7 +1224,7 @@ const styles = StyleSheet.create({
     },
     premiumBannerText: {
         color: '#FFF',
-        fontSize: 12,
+        fontSize: 14,
         fontWeight: '700',
         letterSpacing: 0.5,
     },
@@ -1239,7 +1239,7 @@ const styles = StyleSheet.create({
     },
     unlockButtonText: {
         color: '#FFF',
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '600',
     },
     cardHeader: {
@@ -1259,7 +1259,7 @@ const styles = StyleSheet.create({
         borderRadius: 6,
     },
     categoryBadgeText: {
-        fontSize: 11,
+        fontSize: 13,
         fontWeight: '600',
     },
     typeBadge: {
@@ -1271,7 +1271,7 @@ const styles = StyleSheet.create({
         gap: 4,
     },
     typeBadgeText: {
-        fontSize: 11,
+        fontSize: 13,
         fontWeight: '500',
     },
     difficultyBadge: {
@@ -1280,20 +1280,20 @@ const styles = StyleSheet.create({
         borderRadius: 6,
     },
     difficultyBadgeText: {
-        fontSize: 11,
+        fontSize: 13,
         fontWeight: '600',
     },
     premiumStar: {
         marginLeft: 8,
     },
     challengeTitle: {
-        fontSize: 17,
+        fontSize: 18,
         fontWeight: '700',
         marginBottom: 4,
     },
     challengeDescription: {
-        fontSize: 14,
-        lineHeight: 20,
+        fontSize: 16,
+        lineHeight: 21,
         marginBottom: 12,
     },
     progressSection: {
@@ -1309,7 +1309,7 @@ const styles = StyleSheet.create({
         borderRadius: 3,
     },
     progressText: {
-        fontSize: 12,
+        fontSize: 14,
     },
     completedSection: {
         flexDirection: 'row',
@@ -1318,7 +1318,7 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
     completedText: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '600',
     },
     cardFooter: {
@@ -1336,7 +1336,7 @@ const styles = StyleSheet.create({
         gap: 4,
     },
     statText: {
-        fontSize: 12,
+        fontSize: 14,
     },
     joinButton: {
         paddingHorizontal: 20,
@@ -1345,7 +1345,7 @@ const styles = StyleSheet.create({
     },
     joinButtonText: {
         color: '#FFF',
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '600',
     },
     continueButton: {
@@ -1355,7 +1355,7 @@ const styles = StyleSheet.create({
     },
     continueButtonText: {
         color: '#FFF',
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '600',
     },
     cardActions: {
@@ -1373,7 +1373,7 @@ const styles = StyleSheet.create({
         gap: 5,
     },
     inviteButtonText: {
-        fontSize: 13,
+        fontSize: 15,
         fontWeight: '600',
     },
     emptyState: {
@@ -1383,7 +1383,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     emptyStateText: {
-        fontSize: 14,
+        fontSize: 16,
         textAlign: 'center',
         marginTop: 12,
     },
@@ -1397,7 +1397,7 @@ const styles = StyleSheet.create({
         gap: 4,
     },
     addFriendText: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '600',
     },
     friendCard: {
@@ -1422,7 +1422,7 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     friendName: {
-        fontSize: 13,
+        fontSize: 15,
         fontWeight: '500',
         textAlign: 'center',
         marginBottom: 8,
@@ -1466,11 +1466,11 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     friendRequestName: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '600',
     },
     friendRequestLabel: {
-        fontSize: 12,
+        fontSize: 14,
         marginTop: 2,
     },
     friendRequestActions: {
@@ -1507,16 +1507,16 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
     findFriendsTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: '700',
         marginBottom: 8,
         textAlign: 'center',
     },
     findFriendsSubtitle: {
-        fontSize: 14,
+        fontSize: 16,
         textAlign: 'center',
         marginBottom: 16,
-        lineHeight: 20,
+        lineHeight: 21,
     },
     findFriendsButton: {
         flexDirection: 'row',
@@ -1528,7 +1528,7 @@ const styles = StyleSheet.create({
     },
     findFriendsButtonText: {
         color: '#FFF',
-        fontSize: 15,
+        fontSize: 16.5,
         fontWeight: '600',
     },
     // Daily Challenge Card Styles
@@ -1561,25 +1561,25 @@ const styles = StyleSheet.create({
     },
     dailyChallengeBadgeText: {
         color: '#FFFFFF',
-        fontSize: 12,
+        fontSize: 14,
         fontWeight: '700',
         marginLeft: 5,
     },
     dailyChallengeReward: {
         color: '#FFD700',
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '700',
     },
     dailyChallengeTitle: {
         color: '#FFFFFF',
-        fontSize: 20,
+        fontSize: 21,
         fontWeight: '800',
         marginBottom: 6,
     },
     dailyChallengeDescription: {
         color: 'rgba(255,255,255,0.85)',
-        fontSize: 14,
-        lineHeight: 20,
+        fontSize: 16,
+        lineHeight: 21,
         marginBottom: 14,
     },
     dailyChallengeFooter: {
@@ -1598,7 +1598,7 @@ const styles = StyleSheet.create({
     },
     dailyChallengeStatText: {
         color: 'rgba(255,255,255,0.8)',
-        fontSize: 13,
+        fontSize: 15,
     },
     dailyChallengeStartButton: {
         flexDirection: 'row',
@@ -1611,7 +1611,7 @@ const styles = StyleSheet.create({
     },
     dailyChallengeStartText: {
         color: '#9C27B0',
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '700',
     },
     dailyChallengeCompletedBadge: {
@@ -1625,7 +1625,7 @@ const styles = StyleSheet.create({
     },
     dailyChallengeCompletedText: {
         color: '#4CAF50',
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '700',
     },
     dailyChallengeCompletedCard: {
@@ -1648,14 +1648,14 @@ const styles = StyleSheet.create({
     },
     dailyChallengeCompletedTitle: {
         color: '#FFFFFF',
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: '700',
         marginBottom: 4,
     },
     dailyChallengeCompletedSubtitle: {
         color: 'rgba(255,255,255,0.7)',
-        fontSize: 13,
-        lineHeight: 18,
+        fontSize: 15,
+        lineHeight: 19,
     },
     dailyChallengeCompletedFooter: {
         flexDirection: 'row',
@@ -1665,7 +1665,7 @@ const styles = StyleSheet.create({
     },
     dailyChallengeCompletedCountdown: {
         color: 'rgba(255,255,255,0.5)',
-        fontSize: 12,
+        fontSize: 14,
     },
     dailyChallengeProgressContainer: {
         flexDirection: 'row',
@@ -1687,7 +1687,7 @@ const styles = StyleSheet.create({
     },
     dailyChallengeProgressText: {
         color: '#FFFFFF',
-        fontSize: 12,
+        fontSize: 14,
         fontWeight: '600',
     },
 });

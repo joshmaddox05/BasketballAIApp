@@ -97,6 +97,16 @@ export const translations = {
     exclusiveChallenges: 'Premium weekly challenges & rewards',
     prioritySupport: '24/7 priority support',
 
+    // Module features. These six render on the Pro card and are the reason to
+    // upgrade — they had no key in any locale, so i18n-js emitted its literal
+    // `[missing "en.shotDNA" translation]` placeholder onto the paywall.
+    shotDNA: 'ShotDNA — your shooting fingerprint over time',
+    evalRank: 'EvalRank — your verified player grade',
+    blueprint360: 'Blueprint360 — the plan built from your data',
+    simCoach: 'SimCoach — decision reps against real scenarios',
+    scoutLab: 'ScoutLab — get seen by verified scouts',
+    exportData: 'Export your full training history',
+
     // Plan descriptions
     freePlanDesc: 'Get started with basketball training basics',
     basicPlanDesc: 'Unlock the full workout library and remove ads',
@@ -220,6 +230,14 @@ export const translations = {
     mentorSessions: 'Sessions vidéo 1-à-1 avec coach',
     exclusiveChallenges: 'Défis premium hebdomadaires et récompenses',
     prioritySupport: 'Support prioritaire 24/7',
+
+    // Fonctionnalités des modules (voir la note dans le bloc `en`).
+    shotDNA: 'ShotDNA — l\'empreinte de votre tir au fil du temps',
+    evalRank: 'EvalRank — votre note de joueur vérifiée',
+    blueprint360: 'Blueprint360 — le plan bâti sur vos données',
+    simCoach: 'SimCoach — des répétitions de décision en situation réelle',
+    scoutLab: 'ScoutLab — soyez repéré par des recruteurs vérifiés',
+    exportData: 'Exportez tout votre historique d\'entraînement',
 
     // Plan descriptions
     freePlanDesc: 'Commencez avec les bases de l\'entraînement',

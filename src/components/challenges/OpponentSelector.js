@@ -415,11 +415,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: 'bold',
   },
   subtitle: {
-    fontSize: 13,
+    fontSize: 15,
     marginTop: 2,
   },
   tabsContainer: {
@@ -438,7 +438,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   tabLabel: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '600',
   },
   content: {
@@ -459,7 +459,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 17.5,
     paddingVertical: 0,
   },
   listContent: {
@@ -495,7 +495,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   userName: {
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: '600',
   },
   userMeta: {
@@ -510,7 +510,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   levelText: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '600',
   },
   friendBadge: {
@@ -522,7 +522,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   friendBadgeText: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '500',
   },
   lastPlayedBadge: {
@@ -534,7 +534,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   lastPlayedText: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '500',
   },
   userActions: {
@@ -560,7 +560,7 @@ const styles = StyleSheet.create({
   },
   challengeButtonText: {
     color: '#FFF',
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '600',
   },
   loadingContainer: {
@@ -571,7 +571,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 12,
-    fontSize: 14,
+    fontSize: 16,
   },
   emptyState: {
     flex: 1,
@@ -589,9 +589,9 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   emptyText: {
-    fontSize: 14,
+    fontSize: 16,
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 21,
   },
 });
 

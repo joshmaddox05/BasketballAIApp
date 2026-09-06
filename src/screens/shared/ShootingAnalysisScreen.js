@@ -1,4 +1,5 @@
-// ShootingAnalysisScreen.js
+// ShootingAnalysisScreen.js — DBE burgundy redesign (mock 11a).
+// Presentation only: camera/AI analysis pipeline untouched.
 import React, { useState, useRef, useEffect } from 'react';
 import {
     StyleSheet,
@@ -7,32 +8,128 @@ import {
     TouchableOpacity,
     ScrollView,
     Animated,
+    Easing,
     Alert,
     SafeAreaView,
     StatusBar,
-    Dimensions,
     FlatList,
     ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Video } from 'expo-av';
+import { LinearGradient } from 'expo-linear-gradient';
+import Svg from 'react-native-svg';
 import { useAppContext } from '../../context/AppContext';
 import AICameraCapture from '../../components/shared/AICameraCapture';
 import ShotAnalysisResultsSimple from '../../components/shared/ShotAnalysisResultsSimple';
 import UpgradePrompt from '../../components/shared/UpgradePrompt';
 import aiAnalysisService from '../../services/aiAnalysisService';
 import { canAccessFeature, getRequiredSubscription } from '../../utils/subscription';
-
-const { width } = Dimensions.get('window');
+import { TYPE, FONTS, SHAPE, MOTION } from '../../utils/typography';
+import {
+    ScreenHeader,
+    SectionLabel,
+    PrimaryButton,
+    OutlineButton,
+    Entrance,
+    Shimmer,
+    DrawnPath,
+} from '../../components/dbe';
+import { track, log, fmt, startSpan, EVENTS } from '../../services/analytics';
 
 // Default improvement suggestions when none are provided
 const getDefaultImprovements = () => [
     "Focus on consistent follow-through with wrist snap",
-    "Maintain balanced stance throughout your shot motion", 
+    "Maintain balanced stance throughout your shot motion",
     "Keep your shooting elbow aligned directly under the ball",
     "Work on smooth, fluid motion from set point to release",
     "Practice consistent arc for optimal shooting angle"
 ];
+
+const SCAN_TILE_HEIGHT = 164;
+
+// ScanTile — surf2 tile with a drawn pose polyline and a sweeping accent scan
+// line (mock 11a "Analyzing mechanics"). Pure chrome; no analysis logic.
+const ScanTile = ({ theme }) => {
+    const scanY = useRef(new Animated.Value(0)).current;
+    useEffect(() => {
+        const loop = Animated.loop(
+            Animated.sequence([
+                Animated.timing(scanY, {
+                    toValue: 1,
+                    duration: 1100,
+                    easing: Easing.inOut(Easing.quad),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(scanY, {
+                    toValue: 0,
+                    duration: 1100,
+                    easing: Easing.inOut(Easing.quad),
+                    useNativeDriver: true,
+                }),
+            ]),
+        );
+        loop.start();
+        return () => loop.stop();
+    }, []);
+
+    return (
+        <View
+            style={{
+                borderRadius: 20,
+                backgroundColor: theme.surface2,
+                height: SCAN_TILE_HEIGHT,
+                overflow: 'hidden',
+            }}
+        >
+            <Svg width="100%" height="100%" viewBox="0 0 300 164" style={StyleSheet.absoluteFill}>
+                <DrawnPath
+                    d="M40 136 L110 58 L170 92 L260 28"
+                    pathLength={340}
+                    stroke={theme.steel}
+                    strokeOpacity={0.45}
+                    strokeWidth={2}
+                />
+            </Svg>
+            <Animated.View
+                style={{
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    height: 2,
+                    backgroundColor: theme.primaryLight,
+                    transform: [
+                        {
+                            translateY: scanY.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: [8, SCAN_TILE_HEIGHT - 10],
+                            }),
+                        },
+                    ],
+                }}
+            />
+            <View
+                style={{
+                    position: 'absolute',
+                    left: 12,
+                    bottom: 10,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 6,
+                    backgroundColor: theme.overlay,
+                    paddingHorizontal: 9,
+                    paddingVertical: 5,
+                    borderRadius: SHAPE.radiusBadge,
+                }}
+            >
+                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: theme.primary }} />
+                <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 12.5, letterSpacing: 0.4, color: '#FFFFFF' }}>
+                    Analyzing mechanics
+                </Text>
+            </View>
+        </View>
+    );
+};
 
 const ShootingAnalysisScreen = ({ navigation }) => {
     const { updateUserStats, addActivity, userData, theme } = useAppContext();
@@ -58,6 +155,9 @@ const ShootingAnalysisScreen = ({ navigation }) => {
 
     // Animation values
     const analysisProgressAnim = useRef(new Animated.Value(0)).current;
+    // Measured width of the progress track, so the fill can be slid with translateX
+    // instead of animating `width` off the native driver.
+    const [analysisTrackW, setAnalysisTrackW] = useState(0);
 
     // Monitor stage changes for debugging
     useEffect(() => {
@@ -66,6 +166,10 @@ const ShootingAnalysisScreen = ({ navigation }) => {
 
     // Handle camera capture
     const handleCameraCapture = async (videoData) => {
+        // Declared outside the try so the catch can still report how long the
+        // attempt ran before it failed — a timeout and an immediate rejection
+        // look identical in Sentry otherwise.
+        const analysisStartedAt = Date.now();
         try {
             console.log('📹 Video captured, starting analysis...');
             console.log('📊 Video data:', {
@@ -74,26 +178,67 @@ const ShootingAnalysisScreen = ({ navigation }) => {
                 mode: videoData.analysisMode
             });
             console.log('🎯 Current stage before transition:', currentStage);
-            
+
             setCapturedVideoData(videoData);
             console.log('🔄 Setting stage to analyzing...');
             setCurrentStage('analyzing');
             console.log('✅ Stage set to analyzing');
 
-            // Start analysis progress animation
+            // Start analysis progress animation.
+            // Everything this value drives is now native-driver safe (a transform on
+            // the bar, opacity on the phase checkmarks), so it runs off the JS thread.
+            // NOTE: the 8s duration is still a fixed guess while the work it depicts
+            // (analyzeComprehensive, below) takes a variable time. Driving this from
+            // real analysis phases is a separate, product-level change.
             Animated.timing(analysisProgressAnim, {
                 toValue: 100,
                 duration: 8000, // 8 seconds for realistic analysis time
-                useNativeDriver: false,
+                easing: MOTION.linear,
+                useNativeDriver: true,
             }).start();
 
             // Perform comprehensive AI analysis with phase detection and biomechanics
             console.log('🏀 Using comprehensive analysis for feedback-based improvement');
-            const results = await aiAnalysisService.analyzeComprehensive(videoData);
-            
+            track(EVENTS.SHOT_ANALYSIS_RUN);
+            // The remote model call is the slowest, least predictable thing the
+            // app does, so it gets a log on the way in and on both ways out.
+            // fmt`` is used rather than string interpolation so analysisMode
+            // lands as its own searchable parameter — "show me every failed run
+            // in comprehensive mode" is a query, not a text search.
+            log.info(fmt`Shot analysis started in ${videoData.analysisMode || 'default'} mode`, {
+                durationSec: videoData.duration || null,
+            });
+            // A span around the slowest thing the app does. The screen already
+            // has a transaction from the navigation integration; this makes the
+            // analysis a named child of it, the upload and model requests
+            // children of that, and the logs above and below correlate to it —
+            // so "analysis felt slow" becomes a waterfall instead of a guess.
+            // op: 'http.client' is a standard operation name, which is what
+            // gets it grouped and iconed properly in the Sentry UI.
+            const results = await startSpan(
+                'shotAnalysis.comprehensive',
+                'http.client',
+                {
+                    analysisMode: videoData.analysisMode || 'default',
+                    videoDurationSec: videoData.duration || null,
+                },
+                () => aiAnalysisService.analyzeComprehensive(videoData),
+            );
+
             console.log('✅ Comprehensive analysis complete!');
             console.log('📊 Results:', results);
-            
+
+            // Attributes are queryable columns in the Logs UI, so put the
+            // numbers you would want to sort or filter by in here rather than
+            // in the message. Primitives only, and nothing identifying: the
+            // athlete is already attached as user.id by identifyUser().
+            log.info('Shot analysis completed', {
+                durationMs: Date.now() - analysisStartedAt,
+                score: results.overallScore || results.overall_score || 0,
+                phaseCount: results.phases?.length ?? 0,
+                analysisMode: videoData.analysisMode || 'default',
+            });
+
             setAnalysisResults(results);
             setCurrentStage('results');
 
@@ -130,6 +275,25 @@ const ShootingAnalysisScreen = ({ navigation }) => {
 
             // Check if this is the "Could not detect complete shooting motion" error
             const isMotionDetectionError = error.message?.includes('Could not detect complete shooting motion');
+
+            // Level is chosen by who needs to act, not by how the code got
+            // here. A video the model could not read is a normal outcome the
+            // athlete can fix by re-recording — warn. Anything else is the
+            // feature being broken for them — error, and worth a page.
+            const failureAttrs = {
+                durationMs: Date.now() - analysisStartedAt,
+                analysisMode: videoData.analysisMode || 'default',
+                reason: isMotionDetectionError ? 'motion_not_detected' : 'analysis_failed',
+                apiError: !!error.apiError,
+            };
+            if (isMotionDetectionError) {
+                log.warn('Shot analysis could not read the video', failureAttrs);
+            } else {
+                log.error('Shot analysis failed', {
+                    ...failureAttrs,
+                    errorName: error.name || null,
+                });
+            }
 
             if (isMotionDetectionError) {
                 // Show specific prompt for retaking the video
@@ -215,139 +379,164 @@ const ShootingAnalysisScreen = ({ navigation }) => {
         analysisProgressAnim.setValue(0);
     };
 
-    const renderMetricItem = ({ item }) => {
-        let statusColor;
-        let statusIcon;
+    const statusColorFor = (status) =>
+        status === 'good' ? theme.success : status === 'improve' ? theme.warning : theme.error;
 
-        switch (item.status) {
-            case 'good':
-                statusColor = '#4CAF50';
-                statusIcon = 'checkmark-circle';
-                break;
-            case 'improve':
-                statusColor = '#FF9800';
-                statusIcon = 'alert-circle';
-                break;
-            case 'poor':
-                statusColor = '#F44336';
-                statusIcon = 'close-circle';
-                break;
-            default:
-                statusColor = '#4CAF50';
-                statusIcon = 'checkmark-circle';
-        }
+    const renderMetricItem = ({ item }) => {
+        const statusColor = statusColorFor(item.status);
+        const statusIcon =
+            item.status === 'good' ? 'checkmark-circle' : item.status === 'improve' ? 'alert-circle' : 'close-circle';
 
         return (
             <View
-                style={[
-                    styles.metricItem,
-                    item.id !== analysisResults.metrics[analysisResults.metrics.length - 1].id &&
-                    styles.metricItemWithBorder
-                ]}
+                style={{
+                    backgroundColor: theme.surface,
+                    borderRadius: SHAPE.radiusTile,
+                    padding: SHAPE.cardPadding,
+                    marginBottom: SHAPE.cardGap,
+                }}
             >
-                <View style={styles.metricHeader}>
-                    <Text style={styles.metricName}>{item.name}</Text>
-                    <View style={[styles.metricScoreContainer, { backgroundColor: `${statusColor}20` }]}>
-                        <Text style={[styles.metricScore, { color: statusColor }]}>{item.score}/10</Text>
-                    </View>
-                </View>
-
-                <View style={styles.metricDetails}>
-                    <View style={styles.metricValue}>
-                        <Text style={styles.metricLabel}>Your Value</Text>
-                        <Text style={styles.metricValueText}>{item.value}</Text>
-                    </View>
-                    <View style={styles.metricIdeal}>
-                        <Text style={styles.metricLabel}>Ideal</Text>
-                        <Text style={styles.metricIdealText}>{item.ideal}</Text>
-                    </View>
-                </View>
-
-                <View style={[styles.metricFeedback, { borderLeftColor: statusColor }]}>
-                    <View style={styles.metricFeedbackHeader}>
-                        <Ionicons name={statusIcon} size={16} color={statusColor} />
-                        <Text style={[styles.metricFeedbackTitle, { color: statusColor }]}>
-                            {item.status === 'good' ? 'Good' : item.status === 'improve' ? 'Needs Improvement' : 'Needs Work'}
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Text style={[TYPE.rowTitle, { color: theme.text }]}>{item.name}</Text>
+                    <View
+                        style={{
+                            paddingHorizontal: 7,
+                            paddingVertical: 2,
+                            borderRadius: 6,
+                            backgroundColor: `${statusColor}20`,
+                        }}
+                    >
+                        <Text style={{ fontFamily: FONTS.bodyExtraBold, fontSize: 13, color: statusColor }}>
+                            {item.score}/10
                         </Text>
                     </View>
-                    <Text style={styles.metricFeedbackText}>{item.feedback}</Text>
+                </View>
+
+                <View style={{ flexDirection: 'row', marginTop: 8, gap: 14 }}>
+                    <View style={{ flex: 1 }}>
+                        <Text style={[TYPE.statCaption, { color: theme.textDim }]}>Yours</Text>
+                        <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 15, color: theme.text, marginTop: 2 }}>
+                            {item.value}
+                        </Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                        <Text style={[TYPE.statCaption, { color: theme.textDim }]}>Ideal</Text>
+                        <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 15, color: theme.text, marginTop: 2 }}>
+                            {item.ideal}
+                        </Text>
+                    </View>
+                </View>
+
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 8 }}>
+                    <Ionicons name={statusIcon} size={14} color={statusColor} style={{ marginTop: 1 }} />
+                    <Text style={[TYPE.rowMeta, { color: theme.textMuted, flex: 1, marginTop: 0, lineHeight: 16.5 }]}>
+                        {item.feedback}
+                    </Text>
                 </View>
             </View>
         );
     };
 
     return (
-        <SafeAreaView style={styles.safeArea}>
-            <StatusBar barStyle="dark-content" backgroundColor="#F8F9FA" />
+        <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }}>
+            <StatusBar barStyle={theme.statusBarStyle} backgroundColor={theme.background} />
 
             {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity
-                    style={styles.backButton}
-                    onPress={() => {
-                        if (currentStage === 'results' || currentStage === 'intro') {
-                            navigation.goBack();
-                        } else {
-                            Alert.alert(
-                                'Cancel Analysis',
-                                'Are you sure you want to cancel the current analysis?',
-                                [
-                                    { text: 'No', style: 'cancel' },
-                                    { text: 'Yes', onPress: () => navigation.goBack() }
-                                ]
-                            );
-                        }
-                    }}
-                >
-                    <Ionicons name="arrow-back" size={24} color="#333" />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Shooting Analysis</Text>
-                <View style={styles.headerRight} />
-            </View>
+            <ScreenHeader
+                title="Shot Analysis"
+                onBack={() => {
+                    if (currentStage === 'results' || currentStage === 'intro') {
+                        navigation.goBack();
+                    } else {
+                        Alert.alert(
+                            'Cancel Analysis',
+                            'Are you sure you want to cancel the current analysis?',
+                            [
+                                { text: 'No', style: 'cancel' },
+                                { text: 'Yes', onPress: () => navigation.goBack() }
+                            ]
+                        );
+                    }
+                }}
+            />
 
             {/* Introduction Screen */}
             {currentStage === 'intro' && (
-                <ScrollView style={styles.container}>
-                    <View style={styles.introContainer}>
-                        <View style={styles.introImageContainer}>
-                            <View style={styles.introImage}>
-                                <Ionicons name="analytics" size={60} color="#FFF" />
-                            </View>
-                        </View>
-
-                        <Text style={styles.introTitle}>AI Shooting Analysis</Text>
-                        <Text style={styles.introDescription}>
-                            Our AI technology analyzes your shooting form and provides personalized feedback to help you improve.
-                            Record a video of your shooting form from the side angle for best results.
-                        </Text>
-
-                        <View style={styles.tipContainer}>
-                            <View style={styles.tipHeader}>
-                                <Ionicons name="bulb" size={20} color="#FFD700" />
-                                <Text style={styles.tipTitle}>Pro Tip</Text>
-                            </View>
-                            <Text style={styles.tipText}>
-                                Make sure you're recording in a well-lit area with a clear background.
-                                Stand at a 90° angle to the camera for optimal analysis.
-                            </Text>
-                        </View>
-
-                        <TouchableOpacity
-                            style={styles.startButton}
-                            onPress={startCapture}
-                        >
-                            <Text style={styles.startButtonText}>Start Recording</Text>
-                        </TouchableOpacity>
-
-                        {historicalData.length > 0 && (
-                            <TouchableOpacity
-                                style={styles.historyButton}
-                                onPress={() => navigation.navigate('Progress', { screen: 'ShootingHistory' })}
+                <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: SHAPE.screenPadding }}>
+                    <Entrance variant="up" style={{ alignItems: 'center', marginTop: 14 }}>
+                        <View style={{ borderRadius: SHAPE.radiusHero, overflow: 'hidden' }}>
+                            <LinearGradient
+                                colors={theme.heroGradient}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={{
+                                    width: 84,
+                                    height: 84,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                }}
                             >
-                                <Text style={styles.historyButtonText}>View Analysis History</Text>
-                            </TouchableOpacity>
+                                <Ionicons name="analytics" size={40} color="#FFFFFF" />
+                                <Shimmer />
+                            </LinearGradient>
+                        </View>
+                        <Text style={[TYPE.screenTitle, { color: theme.text, marginTop: 16 }]}>
+                            AI Shot Analysis
+                        </Text>
+                        <Text
+                            style={{
+                                fontFamily: FONTS.body,
+                                fontSize: 14.5,
+                                lineHeight: 19,
+                                color: theme.textMuted,
+                                textAlign: 'center',
+                                marginTop: 8,
+                            }}
+                        >
+                            Record your shot from the side. The AI scores your form and shows what to fix.
+                        </Text>
+                    </Entrance>
+
+                    <Entrance
+                        variant="cardIn"
+                        delay={120}
+                        style={{
+                            marginTop: 22,
+                            backgroundColor: theme.surface,
+                            borderRadius: SHAPE.radiusTile,
+                            padding: SHAPE.cardPadding,
+                            flexDirection: 'row',
+                            alignItems: 'flex-start',
+                            gap: 10,
+                        }}
+                    >
+                        <View
+                            style={{
+                                width: 30,
+                                height: 30,
+                                borderRadius: 9,
+                                backgroundColor: theme.badgeFill,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                            }}
+                        >
+                            <Ionicons name="bulb" size={15} color={theme.accentText} />
+                        </View>
+                        <Text style={[TYPE.rowMeta, { color: theme.textMuted, flex: 1, marginTop: 0, lineHeight: 17.5 }]}>
+                            Well-lit space, clear background, 90° side angle. Full body in frame.
+                        </Text>
+                    </Entrance>
+
+                    <Entrance variant="cardIn" delay={220} style={{ marginTop: 18 }}>
+                        <PrimaryButton label="Start Recording" icon="videocam" onPress={startCapture} />
+                        {historicalData.length > 0 && (
+                            <OutlineButton
+                                label="Analysis History"
+                                onPress={() => navigation.navigate('Progress', { screen: 'ShootingHistory' })}
+                                style={{ marginTop: SHAPE.cardGap }}
+                            />
                         )}
-                    </View>
+                    </Entrance>
                 </ScrollView>
             )}
 
@@ -366,54 +555,62 @@ const ShootingAnalysisScreen = ({ navigation }) => {
 
             {/* Analyzing Screen */}
             {currentStage === 'analyzing' && (
-                <View style={styles.analyzingContainer}>
-                    <View style={styles.analyzingVideoContainer}>
-                        <View style={styles.userVideo}>
-                            {capturedVideoData?.videoUri && !capturedVideoData.videoUri.includes('test://') ? (
-                                <View style={styles.videoThumbnailContainer}>
-                                    <View style={styles.videoPlaceholder}>
-                                        <Ionicons name="videocam" size={40} color="#666" />
-                                        <Text style={styles.videoPlaceholderText}>Your Recording</Text>
-                                    </View>
-                                </View>
-                            ) : (
-                                <View style={styles.videoPlaceholder}>
-                                    <Ionicons name="person" size={40} color="#666" />
-                                    <Text style={styles.videoPlaceholderText}>Your Form</Text>
-                                </View>
-                            )}
-                            <Text style={styles.videoLabel}>Your Form</Text>
-                        </View>
-                    </View>
+                <View style={{ flex: 1, padding: SHAPE.screenPadding }}>
+                    <ScanTile theme={theme} />
 
-                    <View style={styles.analysisProgressContainer}>
-                        <Text style={styles.analysisText}>Analyzing your shooting form...</Text>
-                        <View style={styles.analysisProgressBar}>
+                    <View style={{ marginTop: 22 }}>
+                        <View
+                            onLayout={(e) => setAnalysisTrackW(e.nativeEvent.layout.width)}
+                            style={{
+                                height: 6,
+                                borderRadius: 3,
+                                backgroundColor: theme.track,
+                                overflow: 'hidden',
+                            }}
+                        >
+                            {/* Full-width fill slid left by the unfilled remainder, rather
+                                than an animated `width`. `width` is a layout property: it
+                                re-ran layout+paint+composite every frame, off the native
+                                driver, for eight uninterrupted seconds. */}
                             <Animated.View
-                                style={[
-                                    styles.analysisProgressFill,
-                                    {
-                                        width: analysisProgressAnim.interpolate({
+                                style={{
+                                    height: '100%',
+                                    width: '100%',
+                                    borderRadius: 3,
+                                    backgroundColor: theme.primary,
+                                    opacity: analysisTrackW ? 1 : 0,
+                                    transform: [{
+                                        translateX: analysisProgressAnim.interpolate({
                                             inputRange: [0, 100],
-                                            outputRange: ['0%', '100%']
+                                            outputRange: [-analysisTrackW, 0]
                                         })
-                                    }
-                                ]}
+                                    }]
+                                }}
                             />
                         </View>
-                        <Text style={styles.analysisSteps}>Analyzing key metrics</Text>
+                        <Text style={[TYPE.statCaption, { color: theme.textDim, marginTop: 8, textAlign: 'center' }]}>
+                            Analyzing key metrics
+                        </Text>
                     </View>
 
-                    <View style={styles.analysisDetails}>
-                        <View style={styles.analysisStep}>
-                            <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
-                            <Text style={styles.analysisStepText}>Detecting body position</Text>
+                    <View
+                        style={{
+                            marginTop: 20,
+                            backgroundColor: theme.surface,
+                            borderRadius: SHAPE.radiusTile,
+                            padding: SHAPE.cardPadding,
+                            gap: 11,
+                        }}
+                    >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <Ionicons name="checkmark-circle" size={18} color={theme.accentText} />
+                            <Text style={[TYPE.rowMeta, { color: theme.textMuted, marginTop: 0 }]}>Detecting body position</Text>
                         </View>
-                        <View style={styles.analysisStep}>
-                            <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
-                            <Text style={styles.analysisStepText}>Evaluating release angle</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <Ionicons name="checkmark-circle" size={18} color={theme.accentText} />
+                            <Text style={[TYPE.rowMeta, { color: theme.textMuted, marginTop: 0 }]}>Evaluating release angle</Text>
                         </View>
-                        <View style={styles.analysisStep}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                             <Animated.View
                                 style={{
                                     opacity: analysisProgressAnim.interpolate({
@@ -423,11 +620,11 @@ const ShootingAnalysisScreen = ({ navigation }) => {
                                     })
                                 }}
                             >
-                                <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                                <Ionicons name="checkmark-circle" size={18} color={theme.accentText} />
                             </Animated.View>
-                            <Text style={styles.analysisStepText}>Analyzing elbow alignment</Text>
+                            <Text style={[TYPE.rowMeta, { color: theme.textMuted, marginTop: 0 }]}>Analyzing elbow alignment</Text>
                         </View>
-                        <View style={styles.analysisStep}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                             <Animated.View
                                 style={{
                                     opacity: analysisProgressAnim.interpolate({
@@ -437,11 +634,11 @@ const ShootingAnalysisScreen = ({ navigation }) => {
                                     })
                                 }}
                             >
-                                <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                                <Ionicons name="checkmark-circle" size={18} color={theme.accentText} />
                             </Animated.View>
-                            <Text style={styles.analysisStepText}>Measuring follow-through</Text>
+                            <Text style={[TYPE.rowMeta, { color: theme.textMuted, marginTop: 0 }]}>Measuring follow-through</Text>
                         </View>
-                        <View style={styles.analysisStep}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                             <Animated.View
                                 style={{
                                     opacity: analysisProgressAnim.interpolate({
@@ -451,9 +648,9 @@ const ShootingAnalysisScreen = ({ navigation }) => {
                                     })
                                 }}
                             >
-                                <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                                <Ionicons name="checkmark-circle" size={18} color={theme.accentText} />
                             </Animated.View>
-                            <Text style={styles.analysisStepText}>Generating feedback</Text>
+                            <Text style={[TYPE.rowMeta, { color: theme.textMuted, marginTop: 0 }]}>Generating feedback</Text>
                         </View>
                     </View>
                 </View>
@@ -461,7 +658,7 @@ const ShootingAnalysisScreen = ({ navigation }) => {
 
             {/* Results Screen */}
             {currentStage === 'results' && analysisResults && (
-                <ScrollView style={styles.container}>
+                <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 28 }}>
                     {/* Simple Progressive Disclosure Analysis Results */}
                     <ShotAnalysisResultsSimple
                         results={analysisResults}
@@ -472,67 +669,87 @@ const ShootingAnalysisScreen = ({ navigation }) => {
 
                     {/* Visualization Video Section */}
                     {(analysisResults.overlayVideoUrl || analysisResults.visualizationVideoUrl) && (
-                        <View style={styles.visualizationContainer}>
-                            <View style={styles.visualizationHeader}>
-                                <Ionicons name="sparkles" size={20} color="#FF6B00" />
-                                <Text style={styles.visualizationTitle}>
-                                    {analysisResults.overlayVideoUrl ? 'AI Overlay Replay' : 'AI Replay: Shot Breakdown'}
-                                </Text>
-                            </View>
-                            <Text style={styles.visualizationDescription}>
-                                {analysisResults.summary || 'Watch your shot with AI overlays and use the replay to focus on one fix at a time.'}
-                            </Text>
+                        <View style={{ paddingHorizontal: SHAPE.screenPadding, marginTop: SHAPE.sectionGap }}>
+                            <SectionLabel>
+                                {analysisResults.overlayVideoUrl ? 'AI overlay replay' : 'AI replay'}
+                            </SectionLabel>
 
-                            <View style={styles.replayTipsRow}>
-                                <View style={styles.replayTipChip}>
-                                    <Ionicons name="play-circle-outline" size={14} color="#FF6B00" />
-                                    <Text style={styles.replayTipChipText}>Watch full speed first</Text>
-                                </View>
-                                <View style={styles.replayTipChip}>
-                                    <Ionicons name="pause-circle-outline" size={14} color="#FF6B00" />
-                                    <Text style={styles.replayTipChipText}>Pause on release</Text>
-                                </View>
-                                <View style={styles.replayTipChip}>
-                                    <Ionicons name="refresh-circle-outline" size={14} color="#FF6B00" />
-                                    <Text style={styles.replayTipChipText}>Replay after each cue</Text>
-                                </View>
-                            </View>
+                            {!!analysisResults.summary && (
+                                <Text style={[TYPE.rowMeta, { color: theme.textMuted, marginBottom: 10, lineHeight: 17.5 }]}>
+                                    {analysisResults.summary}
+                                </Text>
+                            )}
 
                             {!!analysisResults.quality?.warning && (
-                                <View style={styles.replayWarningBox}>
-                                    <Ionicons name="warning-outline" size={16} color="#B26A00" />
-                                    <Text style={styles.replayWarningText}>
-                                        Video quality note: {analysisResults.quality.warning}
+                                <View
+                                    style={{
+                                        flexDirection: 'row',
+                                        alignItems: 'flex-start',
+                                        gap: 7,
+                                        backgroundColor: theme.surface,
+                                        borderRadius: SHAPE.radiusBadge,
+                                        padding: 10,
+                                        marginBottom: 10,
+                                    }}
+                                >
+                                    <Ionicons name="warning-outline" size={14} color={theme.warning} />
+                                    <Text style={[TYPE.rowMeta, { color: theme.textMuted, flex: 1, marginTop: 0, lineHeight: 16.5 }]}>
+                                        {analysisResults.quality.warning}
                                     </Text>
                                 </View>
                             )}
 
                             {analysisResults.phases && Object.keys(analysisResults.phases).length > 0 && (
-                                <View style={styles.replayPhasesSection}>
-                                    <Text style={styles.replayPhasesTitle}>What to look for in the replay</Text>
-                                    <View style={styles.replayPhaseChips}>
-                                        {Object.keys(analysisResults.phases).slice(0, 4).map((phaseKey) => (
-                                            <View key={phaseKey} style={styles.replayPhaseChip}>
-                                                <Text style={styles.replayPhaseChipText}>
-                                                    {phaseKey.replace(/_/g, ' ')}
-                                                </Text>
-                                            </View>
-                                        ))}
-                                    </View>
+                                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                                    {Object.keys(analysisResults.phases).slice(0, 4).map((phaseKey) => (
+                                        <View
+                                            key={phaseKey}
+                                            style={{
+                                                backgroundColor: theme.steelFill,
+                                                borderRadius: SHAPE.radiusPill,
+                                                paddingHorizontal: 9,
+                                                paddingVertical: 4,
+                                            }}
+                                        >
+                                            <Text
+                                                style={[
+                                                    TYPE.chip,
+                                                    { color: theme.steel, textTransform: 'capitalize' },
+                                                ]}
+                                            >
+                                                {phaseKey.replace(/_/g, ' ')}
+                                            </Text>
+                                        </View>
+                                    ))}
                                 </View>
                             )}
 
-                            <View style={styles.videoPlayerContainer}>
+                            <View
+                                style={{
+                                    width: '100%',
+                                    height: 300,
+                                    backgroundColor: '#000',
+                                    borderRadius: SHAPE.radiusCard,
+                                    overflow: 'hidden',
+                                }}
+                            >
                                 {videoLoading && (
-                                    <View style={styles.videoLoadingOverlay}>
-                                        <ActivityIndicator size="large" color="#FF6B00" />
-                                        <Text style={styles.videoLoadingText}>Loading video...</Text>
+                                    <View
+                                        style={{
+                                            ...StyleSheet.absoluteFillObject,
+                                            backgroundColor: theme.surface2,
+                                            justifyContent: 'center',
+                                            alignItems: 'center',
+                                            zIndex: 10,
+                                        }}
+                                    >
+                                        <ActivityIndicator size="large" color={theme.primary} />
                                     </View>
                                 )}
                                 <Video
                                     ref={videoRef}
                                     source={{ uri: analysisResults.overlayVideoUrl || analysisResults.visualizationVideoUrl }}
-                                    style={styles.videoPlayer}
+                                    style={{ width: '100%', height: '100%' }}
                                     useNativeControls
                                     resizeMode="contain"
                                     isLooping
@@ -555,9 +772,11 @@ const ShootingAnalysisScreen = ({ navigation }) => {
                                 />
                             </View>
 
-                            <View style={styles.videoControls}>
-                                <TouchableOpacity
-                                    style={styles.videoControlButton}
+                            <View style={{ flexDirection: 'row', gap: SHAPE.cardGap, marginTop: 10 }}>
+                                <OutlineButton
+                                    icon={isVideoPlaying ? 'pause' : 'play'}
+                                    label={isVideoPlaying ? 'Pause' : 'Play'}
+                                    style={{ flex: 1 }}
                                     onPress={async () => {
                                         if (videoRef.current) {
                                             if (isVideoPlaying) {
@@ -567,105 +786,105 @@ const ShootingAnalysisScreen = ({ navigation }) => {
                                             }
                                         }
                                     }}
-                                >
-                                    <Ionicons
-                                        name={isVideoPlaying ? 'pause' : 'play'}
-                                        size={20}
-                                        color="#FFF"
-                                    />
-                                    <Text style={styles.videoControlText}>
-                                        {isVideoPlaying ? 'Pause' : 'Play'}
-                                    </Text>
-                                </TouchableOpacity>
-
-                                <TouchableOpacity
-                                    style={styles.videoControlButton}
+                                />
+                                <OutlineButton
+                                    icon="refresh"
+                                    label="Replay"
+                                    style={{ flex: 1 }}
                                     onPress={async () => {
                                         if (videoRef.current) {
                                             await videoRef.current.replayAsync();
                                         }
                                     }}
-                                >
-                                    <Ionicons name="refresh" size={20} color="#FFF" />
-                                    <Text style={styles.videoControlText}>Replay</Text>
-                                </TouchableOpacity>
+                                />
                             </View>
-
-                            <Text style={styles.replayCoachNote}>
-                                Coaching tip: pick one focus area from your feedback, watch this replay twice, then re-record.
-                            </Text>
                         </View>
                     )}
 
                     {/* Detailed Metrics */}
-                    <View style={styles.metricsContainer}>
-                        <Text style={styles.resultSectionTitle}>Detailed Analysis</Text>
-                        <FlatList
-                            data={analysisResults.metrics || []}
-                            renderItem={renderMetricItem}
-                            keyExtractor={item => item.id}
-                            scrollEnabled={false}
-                        />
-                    </View>
+                    {(analysisResults.metrics || []).length > 0 && (
+                        <View style={{ paddingHorizontal: SHAPE.screenPadding, marginTop: SHAPE.sectionGap }}>
+                            <SectionLabel>Detailed analysis</SectionLabel>
+                            <FlatList
+                                data={analysisResults.metrics || []}
+                                renderItem={renderMetricItem}
+                                keyExtractor={item => item.id}
+                                scrollEnabled={false}
+                            />
+                        </View>
+                    )}
 
                     {/* Improvement Suggestions */}
-                    <View style={styles.improvementsContainer}>
-                        <Text style={styles.resultSectionTitle}>Focus Areas for Improvement</Text>
-                        <View style={styles.improvementsList}>
+                    <View style={{ paddingHorizontal: SHAPE.screenPadding, marginTop: 9 }}>
+                        <SectionLabel>Focus areas</SectionLabel>
+                        <View style={{ gap: 10 }}>
                             {(analysisResults.improvements || getDefaultImprovements()).map((improvement, index) => (
-                                <View key={`imp-${index}`} style={styles.improvementItem}>
-                                    <View style={styles.improvementBullet}>
-                                        <Text style={styles.improvementBulletText}>{index + 1}</Text>
+                                <View key={`imp-${index}`} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+                                    <View
+                                        style={{
+                                            width: 24,
+                                            height: 24,
+                                            borderRadius: 12,
+                                            backgroundColor: index === 0 ? theme.primary : theme.badgeFill,
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                        }}
+                                    >
+                                        <Text style={[TYPE.chip, { color: index === 0 ? '#FFFFFF' : theme.accentText }]}>
+                                            {index + 1}
+                                        </Text>
                                     </View>
-                                    <View style={styles.improvementContent}>
-                                        <Text style={styles.improvementText}>{improvement}</Text>
-                                        {index === 0 && (
-                                            <Text style={styles.improvementDetail}>
-                                                Practice: Hold follow-through for 2 seconds after release
-                                            </Text>
-                                        )}
-                                        {index === 1 && (
-                                            <Text style={styles.improvementDetail}>
-                                                Drill: Square shooting stance with feet shoulder-width apart
-                                            </Text>
-                                        )}
-                                        {index === 2 && (
-                                            <Text style={styles.improvementDetail}>
-                                                Focus: Keep shooting elbow under the ball throughout motion
-                                            </Text>
-                                        )}
-                                    </View>
+                                    <Text
+                                        style={{
+                                            fontFamily: FONTS.bodySemiBold,
+                                            fontSize: 14.5,
+                                            lineHeight: 18,
+                                            color: theme.text,
+                                            flex: 1,
+                                            marginTop: 3,
+                                        }}
+                                    >
+                                        {improvement}
+                                    </Text>
                                 </View>
                             ))}
                         </View>
-                        
+
                         {/* Practice Recommendations */}
-                        <View style={styles.practiceSection}>
-                            <View style={styles.practiceTitle}>
-                                <Ionicons name="fitness" size={16} color="#FF6B35" />
-                                <Text style={styles.practiceTitleText}>Recommended Practice</Text>
+                        <View
+                            style={{
+                                marginTop: 14,
+                                backgroundColor: theme.surface,
+                                borderRadius: SHAPE.radiusTile,
+                                padding: SHAPE.cardPadding,
+                            }}
+                        >
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 8 }}>
+                                <Ionicons name="fitness" size={14} color={theme.accentText} />
+                                <Text style={[TYPE.rowTitle, { color: theme.text }]}>Practice plan</Text>
                             </View>
-                            <View style={styles.practiceItems}>
-                                <Text style={styles.practiceItem}>• 50 form shots daily focusing on follow-through</Text>
-                                <Text style={styles.practiceItem}>• Mirror work for proper elbow alignment</Text>
-                                <Text style={styles.practiceItem}>• Wall shooting to improve arc consistency</Text>
-                                <Text style={styles.practiceItem}>• Record yourself weekly to track progress</Text>
+                            <View style={{ gap: 5 }}>
+                                <Text style={[TYPE.rowMeta, { color: theme.textMuted, marginTop: 0 }]}>• 50 form shots daily focusing on follow-through</Text>
+                                <Text style={[TYPE.rowMeta, { color: theme.textMuted, marginTop: 0 }]}>• Mirror work for proper elbow alignment</Text>
+                                <Text style={[TYPE.rowMeta, { color: theme.textMuted, marginTop: 0 }]}>• Wall shooting to improve arc consistency</Text>
+                                <Text style={[TYPE.rowMeta, { color: theme.textMuted, marginTop: 0 }]}>• Record yourself weekly to track progress</Text>
                             </View>
                         </View>
                     </View>
 
                     {/* Action Buttons */}
-                    <View style={styles.actionButtonsContainer}>
-                        <TouchableOpacity
-                            style={styles.tryAgainButton}
-                            onPress={resetAnalysis}
-                        >
-                            <Ionicons name="refresh" size={18} color="#FF6B00" />
-                            <Text style={styles.tryAgainButtonText}>New Analysis</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={styles.saveButton}
+                    <View
+                        style={{
+                            flexDirection: 'row',
+                            gap: SHAPE.cardGap,
+                            paddingHorizontal: SHAPE.screenPadding,
+                            marginTop: SHAPE.sectionGap,
+                        }}
+                    >
+                        <OutlineButton icon="refresh" label="New Analysis" style={{ flex: 1 }} onPress={resetAnalysis} />
+                        <PrimaryButton
+                            label="Save & Exit"
+                            style={{ flex: 1 }}
                             onPress={() => {
                                 Alert.alert(
                                     'Analysis Saved',
@@ -673,49 +892,81 @@ const ShootingAnalysisScreen = ({ navigation }) => {
                                     [{
                                         text: 'OK',
                                         onPress: () => {
-                                            // Reset navigation to main tab with Home screen
-                                            navigation.reset({
-                                                index: 0,
-                                                routes: [{ name: 'Training', params: { screen: 'TrainingMain' } }],
-                                            });
+                                            // Land the user in the Training browser (now a pushed
+                                            // screen folded under Blueprint360, not a tab).
+                                            navigation.navigate('Training');
                                         }
                                     }]
                                 );
                             }}
-                        >
-                            <Text style={styles.saveButtonText}>Save & Exit</Text>
-                        </TouchableOpacity>
+                        />
                     </View>
 
                     {/* Suggested Drills */}
-                    <View style={styles.suggestedDrillsContainer}>
-                        <Text style={styles.resultSectionTitle}>Recommended Drills</Text>
-                        <TouchableOpacity
-                            style={styles.drillItem}
-                            onPress={() => navigation.navigate('WorkoutDetail', { workoutId: '1' })}
-                        >
-                            <View style={styles.drillIconContainer}>
-                                <Ionicons name="basketball" size={24} color="#FF6B00" />
-                            </View>
-                            <View style={styles.drillInfo}>
-                                <Text style={styles.drillTitle}>Perfect Release Drill</Text>
-                                <Text style={styles.drillDescription}>Improve your release angle and follow-through</Text>
-                            </View>
-                            <Ionicons name="chevron-forward" size={24} color="#666" />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.drillItem}
-                            onPress={() => navigation.navigate('WorkoutDetail', { workoutId: '2' })}
-                        >
-                            <View style={styles.drillIconContainer}>
-                                <Ionicons name="fitness" size={24} color="#FF6B00" />
-                            </View>
-                            <View style={styles.drillInfo}>
-                                <Text style={styles.drillTitle}>Wrist Strengthening</Text>
-                                <Text style={styles.drillDescription}>Build wrist flexibility and strength for better control</Text>
-                            </View>
-                            <Ionicons name="chevron-forward" size={24} color="#666" />
-                        </TouchableOpacity>
+                    <View style={{ paddingHorizontal: SHAPE.screenPadding, marginTop: SHAPE.sectionGap }}>
+                        <SectionLabel>Recommended drills</SectionLabel>
+                        <View style={{ gap: SHAPE.cardGap }}>
+                            <TouchableOpacity
+                                activeOpacity={0.8}
+                                onPress={() => navigation.navigate('WorkoutDetail', { workoutId: '1' })}
+                                style={{
+                                    backgroundColor: theme.surface,
+                                    borderRadius: SHAPE.radiusCard,
+                                    padding: SHAPE.cardPadding,
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    gap: 11,
+                                }}
+                            >
+                                <View
+                                    style={{
+                                        width: 38,
+                                        height: 38,
+                                        borderRadius: 11,
+                                        backgroundColor: theme.badgeFill,
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                    }}
+                                >
+                                    <Ionicons name="basketball" size={19} color={theme.accentText} />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={[TYPE.rowTitle, { color: theme.text }]}>Perfect Release Drill</Text>
+                                    <Text style={[TYPE.rowMeta, { color: theme.textDim }]}>Release angle & follow-through</Text>
+                                </View>
+                                <Ionicons name="chevron-forward" size={16} color={theme.textDim} />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                activeOpacity={0.8}
+                                onPress={() => navigation.navigate('WorkoutDetail', { workoutId: '2' })}
+                                style={{
+                                    backgroundColor: theme.surface,
+                                    borderRadius: SHAPE.radiusCard,
+                                    padding: SHAPE.cardPadding,
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    gap: 11,
+                                }}
+                            >
+                                <View
+                                    style={{
+                                        width: 38,
+                                        height: 38,
+                                        borderRadius: 11,
+                                        backgroundColor: theme.badgeFill,
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                    }}
+                                >
+                                    <Ionicons name="fitness" size={19} color={theme.accentText} />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={[TYPE.rowTitle, { color: theme.text }]}>Wrist Strengthening</Text>
+                                    <Text style={[TYPE.rowMeta, { color: theme.textDim }]}>Flexibility & control</Text>
+                                </View>
+                                <Ionicons name="chevron-forward" size={16} color={theme.textDim} />
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 </ScrollView>
             )}
@@ -732,1087 +983,5 @@ const ShootingAnalysisScreen = ({ navigation }) => {
         </SafeAreaView>
     );
 };
-
-const styles = StyleSheet.create({
-    safeArea: {
-        flex: 1,
-        backgroundColor: '#F8F9FA',
-    },
-    container: {
-        flex: 1,
-        backgroundColor: '#F8F9FA',
-    },
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        backgroundColor: '#FFF',
-        borderBottomWidth: 1,
-        borderBottomColor: '#EEE',
-    },
-    backButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    headerTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#333',
-    },
-    headerRight: {
-        width: 40,
-    },
-
-    // Introduction Screen
-    introContainer: {
-        padding: 16,
-    },
-    introImageContainer: {
-        alignItems: 'center',
-        marginVertical: 24,
-    },
-    introImage: {
-        width: 120,
-        height: 120,
-        borderRadius: 60,
-        backgroundColor: '#FF6B00',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    introTitle: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: '#333',
-        textAlign: 'center',
-        marginBottom: 16,
-    },
-    introDescription: {
-        fontSize: 16,
-        color: '#666',
-        textAlign: 'center',
-        lineHeight: 24,
-        marginBottom: 24,
-    },
-    proModelSection: {
-        marginBottom: 20,
-    },
-    proModelTitle: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#333',
-        marginBottom: 10,
-    },
-    proModelSelector: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        backgroundColor: '#FFF',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: '#EEE',
-    },
-    selectedProModel: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    selectedProModelImage: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: '#FF6B00',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 12,
-    },
-    proModelInitials: {
-        color: '#FFF',
-        fontWeight: 'bold',
-        fontSize: 16,
-    },
-    selectedProModelName: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#333',
-    },
-    selectedProModelDetails: {
-        fontSize: 14,
-        color: '#666',
-    },
-    tipContainer: {
-        backgroundColor: '#FFF8E1',
-        padding: 16,
-        borderRadius: 12,
-        marginBottom: 24,
-        borderLeftWidth: 4,
-        borderLeftColor: '#FFD700',
-    },
-    tipHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 8,
-    },
-    tipTitle: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#333',
-        marginLeft: 8,
-    },
-    tipText: {
-        fontSize: 14,
-        color: '#666',
-        lineHeight: 20,
-    },
-    startButton: {
-        backgroundColor: '#FF6B00',
-        paddingVertical: 14,
-        borderRadius: 8,
-        alignItems: 'center',
-        marginBottom: 12,
-    },
-    startButtonText: {
-        color: '#FFF',
-        fontSize: 16,
-        fontWeight: 'bold',
-    },
-    historyButton: {
-        backgroundColor: '#F0F0F0',
-        paddingVertical: 14,
-        borderRadius: 8,
-        alignItems: 'center',
-    },
-    historyButtonText: {
-        color: '#666',
-        fontSize: 16,
-        fontWeight: '600',
-    },
-
-    // Recording Screen
-    recordingContainer: {
-        flex: 1,
-        backgroundColor: '#000',
-    },
-    videoPreviewContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        position: 'relative',
-    },
-    videoPreview: {
-        width: '100%',
-        height: '100%',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    videoPreviewText: {
-        color: '#FFF',
-        fontSize: 16,
-        opacity: 0.8,
-    },
-    videoInstructions: {
-        color: '#FFF',
-        fontSize: 14,
-        backgroundColor: 'rgba(0,0,0,0.6)',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 16,
-        marginTop: 8,
-    },
-    recordingIndicatorContainer: {
-        position: 'absolute',
-        top: 20,
-        left: 0,
-        right: 0,
-        alignItems: 'center',
-    },
-    recordingIndicator: {
-        width: 16,
-        height: 16,
-        borderRadius: 8,
-        backgroundColor: '#F44336',
-        marginBottom: 8,
-    },
-    recordingText: {
-        color: '#FFF',
-        fontSize: 14,
-        marginBottom: 8,
-    },
-    recordingProgress: {
-        width: 200,
-        height: 4,
-        backgroundColor: 'rgba(255,255,255,0.3)',
-        borderRadius: 2,
-        overflow: 'hidden',
-    },
-    recordingProgressFill: {
-        height: '100%',
-        backgroundColor: '#F44336',
-    },
-    recordingControls: {
-        paddingVertical: 40,
-        alignItems: 'center',
-        backgroundColor: '#121212',
-    },
-    recordButton: {
-        width: 70,
-        height: 70,
-        borderRadius: 35,
-        borderWidth: 4,
-        borderColor: '#FFF',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    recordButtonInner: {
-        width: 54,
-        height: 54,
-        borderRadius: 27,
-        backgroundColor: '#F44336',
-    },
-    stopButton: {
-        width: 70,
-        height: 70,
-        borderRadius: 35,
-        borderWidth: 4,
-        borderColor: '#FFF',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    stopButtonInner: {
-        width: 30,
-        height: 30,
-        backgroundColor: '#F44336',
-    },
-    cameraInstructions: {
-        backgroundColor: '#121212',
-        paddingVertical: 16,
-        paddingHorizontal: 24,
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-    },
-    instructionItem: {
-        alignItems: 'center',
-    },
-    instructionText: {
-        color: '#FFF',
-        fontSize: 12,
-        marginTop: 4,
-    },
-
-    // Analyzing Screen
-    analyzingContainer: {
-        flex: 1,
-        backgroundColor: '#F8F9FA',
-        padding: 16,
-    },
-    analyzingVideoContainer: {
-        alignItems: 'center',
-        marginBottom: 24,
-    },
-    videoComparisonContainer: {
-        flexDirection: 'row',
-        marginBottom: 24,
-        height: 240,
-    },
-    userVideoContainer: {
-        flex: 1,
-        marginRight: 4,
-    },
-    userVideo: {
-        backgroundColor: '#DDD',
-        borderRadius: 12,
-        width: 200,
-        height: 200,
-        justifyContent: 'center',
-        alignItems: 'center',
-        position: 'relative',
-    },
-    proVideoContainer: {
-        flex: 1,
-        marginLeft: 4,
-    },
-    proVideo: {
-        backgroundColor: '#DDD',
-        borderRadius: 12,
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    videoLabel: {
-        position: 'absolute',
-        bottom: 10,
-        backgroundColor: 'rgba(0,0,0,0.6)',
-        color: '#FFF',
-        fontSize: 12,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 4,
-    },
-    analysisProgressContainer: {
-        alignItems: 'center',
-        marginBottom: 24,
-    },
-    analysisText: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#333',
-        marginBottom: 16,
-    },
-    analysisProgressBar: {
-        width: '100%',
-        height: 8,
-        backgroundColor: '#F0F0F0',
-        borderRadius: 4,
-        marginBottom: 8,
-        overflow: 'hidden',
-    },
-    analysisProgressFill: {
-        height: '100%',
-        backgroundColor: '#FF6B00',
-        borderRadius: 4,
-    },
-    analysisSteps: {
-        fontSize: 14,
-        color: '#666',
-    },
-    analysisDetails: {
-        backgroundColor: '#FFF',
-        borderRadius: 12,
-        padding: 16,
-    },
-    analysisStep: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 12,
-    },
-    analysisStepText: {
-        fontSize: 14,
-        color: '#333',
-        marginLeft: 8,
-    },
-
-    // Results Screen
-    scoreContainer: {
-        backgroundColor: '#FFF',
-        padding: 16,
-        flexDirection: 'row',
-        alignItems: 'center',
-        borderBottomWidth: 1,
-        borderBottomColor: '#EEE',
-    },
-    scoreCircle: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        backgroundColor: '#FF6B00',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 16,
-    },
-    scoreValue: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: '#FFF',
-    },
-    scoreLabel: {
-        fontSize: 12,
-        color: 'rgba(255,255,255,0.8)',
-    },
-    scoreDetails: {
-        flex: 1,
-    },
-    scoreTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#333',
-        marginBottom: 4,
-    },
-    scoreDescription: {
-        fontSize: 14,
-        color: '#666',
-        lineHeight: 20,
-    },
-    resultVideoContainer: {
-        padding: 16,
-        backgroundColor: '#FFF',
-        marginTop: 8,
-    },
-    resultSectionTitle: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#333',
-        marginBottom: 16,
-    },
-    videoComparisonRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-    },
-    videoThumbnail: {
-        width: '48%',
-        position: 'relative',
-    },
-    videoFrame: {
-        height: 150,
-        backgroundColor: '#EEE',
-        borderRadius: 8,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    videoFrameText: {
-        color: '#666',
-    },
-    videoTimestamp: {
-        fontSize: 12,
-        color: '#999',
-        marginTop: 4,
-    },
-    videoControls: {
-        position: 'absolute',
-        bottom: 8,
-        right: 8,
-    },
-    videoControlButton: {
-        width: 30,
-        height: 30,
-        borderRadius: 15,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    metricsContainer: {
-        backgroundColor: '#FFF',
-        padding: 16,
-        marginTop: 8,
-    },
-    metricItem: {
-        marginBottom: 16,
-    },
-    metricItemWithBorder: {
-        borderBottomWidth: 1,
-        borderBottomColor: '#F0F0F0',
-        paddingBottom: 16,
-    },
-    metricHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 8,
-    },
-    metricName: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#333',
-    },
-    metricScoreContainer: {
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 4,
-    },
-    metricScore: {
-        fontWeight: 'bold',
-        fontSize: 14,
-    },
-    metricDetails: {
-        flexDirection: 'row',
-        marginBottom: 12,
-    },
-    metricValue: {
-        flex: 1,
-        marginRight: 8,
-    },
-    metricIdeal: {
-        flex: 1,
-        marginLeft: 8,
-    },
-    metricLabel: {
-        fontSize: 12,
-        color: '#666',
-        marginBottom: 4,
-    },
-    metricValueText: {
-        fontSize: 14,
-        color: '#333',
-        fontWeight: '500',
-    },
-    metricIdealText: {
-        fontSize: 14,
-        color: '#333',
-        fontWeight: '500',
-    },
-    metricFeedback: {
-        backgroundColor: '#F5F5F5',
-        padding: 12,
-        borderRadius: 8,
-        borderLeftWidth: 4,
-    },
-    metricFeedbackHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 4,
-    },
-    metricFeedbackTitle: {
-        fontSize: 14,
-        fontWeight: '600',
-        marginLeft: 4,
-    },
-    metricFeedbackText: {
-        fontSize: 14,
-        color: '#666',
-        lineHeight: 20,
-    },
-    improvementsContainer: {
-        backgroundColor: '#FFF',
-        padding: 16,
-        marginTop: 8,
-    },
-    improvementsList: {
-        marginBottom: 8,
-    },
-    improvementItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 12,
-    },
-    improvementBullet: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-        backgroundColor: '#FF6B00',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 12,
-    },
-    improvementBulletText: {
-        color: '#FFF',
-        fontSize: 12,
-        fontWeight: 'bold',
-    },
-    improvementText: {
-        flex: 1,
-        fontSize: 14,
-        color: '#333',
-        lineHeight: 20,
-    },
-    actionButtonsContainer: {
-        flexDirection: 'row',
-        padding: 16,
-        backgroundColor: '#FFF',
-        marginTop: 8,
-    },
-    tryAgainButton: {
-        flex: 1,
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: '#FFF',
-        paddingVertical: 12,
-        borderRadius: 8,
-        marginRight: 8,
-        borderWidth: 1,
-        borderColor: '#FF6B00',
-    },
-    tryAgainButtonText: {
-        color: '#FF6B00',
-        fontWeight: 'bold',
-        marginLeft: 8,
-    },
-    saveButton: {
-        flex: 1,
-        backgroundColor: '#FF6B00',
-        paddingVertical: 12,
-        borderRadius: 8,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginLeft: 8,
-    },
-    saveButtonText: {
-        color: '#FFF',
-        fontWeight: 'bold',
-    },
-    suggestedDrillsContainer: {
-        backgroundColor: '#FFF',
-        padding: 16,
-        marginTop: 8,
-        marginBottom: 24,
-    },
-    drillItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: '#F0F0F0',
-    },
-    drillIconContainer: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: 'rgba(255,107,0,0.1)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 12,
-    },
-    drillInfo: {
-        flex: 1,
-    },
-    drillTitle: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#333',
-        marginBottom: 4,
-    },
-    drillDescription: {
-        fontSize: 14,
-        color: '#666',
-    },
-
-    // Pro Model Selection Modal
-    modalContainer: {
-        flex: 1,
-        justifyContent: 'flex-end',
-        backgroundColor: 'rgba(0,0,0,0.5)',
-    },
-    modalContent: {
-        backgroundColor: '#FFF',
-        borderTopLeftRadius: 16,
-        borderTopRightRadius: 16,
-        paddingBottom: 24,
-        maxHeight: '70%',
-    },
-    modalHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: '#EEE',
-    },
-    modalTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#333',
-    },
-    modalCloseButton: {
-        width: 30,
-        height: 30,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    proModelItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: '#F0F0F0',
-    },
-    selectedProModelItem: {
-        backgroundColor: 'rgba(255,107,0,0.05)',
-    },
-    proModelImageContainer: {
-        marginRight: 12,
-    },
-    proModelImage: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-        backgroundColor: '#DDD',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    proModelName: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#333',
-        marginBottom: 4,
-    },
-    proModelDetails: {
-        fontSize: 14,
-        color: '#666',
-    },
-
-    // Curry Comparison Styles
-    curryComparisonContainer: {
-        backgroundColor: '#FFF',
-        padding: 16,
-        marginTop: 8,
-        borderRadius: 12,
-        borderWidth: 2,
-        borderColor: '#FFD700',
-    },
-    curryComparisonHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 16,
-    },
-    curryComparisonTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#333',
-        marginLeft: 8,
-    },
-    similarityScoreCard: {
-        backgroundColor: '#F8F9FA',
-        padding: 20,
-        borderRadius: 12,
-        alignItems: 'center',
-        marginBottom: 16,
-    },
-    similarityLabel: {
-        fontSize: 14,
-        color: '#666',
-        marginBottom: 8,
-    },
-    similarityScore: {
-        fontSize: 48,
-        fontWeight: 'bold',
-        color: '#FF6B00',
-        marginBottom: 8,
-    },
-    similarityDescription: {
-        fontSize: 14,
-        color: '#666',
-        textAlign: 'center',
-        lineHeight: 20,
-    },
-    metricBreakdownContainer: {
-        marginBottom: 16,
-    },
-    metricBreakdownTitle: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#333',
-        marginBottom: 12,
-    },
-    metricComparisonRow: {
-        marginBottom: 16,
-    },
-    metricName: {
-        fontSize: 14,
-        color: '#333',
-        marginBottom: 6,
-        fontWeight: '500',
-    },
-    metricBarContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    metricBar: {
-        flex: 1,
-        height: 8,
-        backgroundColor: '#E0E0E0',
-        borderRadius: 4,
-        marginRight: 12,
-        overflow: 'hidden',
-    },
-    metricBarFill: {
-        height: '100%',
-        borderRadius: 4,
-    },
-    metricPercentage: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#333',
-        width: 45,
-        textAlign: 'right',
-    },
-    curryFeedbackContainer: {
-        marginTop: 8,
-    },
-    feedbackSection: {
-        marginBottom: 16,
-    },
-    feedbackHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 8,
-    },
-    feedbackHeaderText: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#333',
-        marginLeft: 8,
-    },
-    feedbackItem: {
-        fontSize: 14,
-        color: '#666',
-        marginLeft: 28,
-        marginBottom: 6,
-        lineHeight: 20,
-    },
-    
-    // Enhanced video display styles
-    videoIcon: {
-        marginBottom: 8,
-    },
-    videoDuration: {
-        fontSize: 12,
-        color: '#999',
-        marginTop: 4,
-    },
-    videoButtonText: {
-        color: '#FFF',
-        fontSize: 12,
-        marginLeft: 4,
-        fontWeight: '500',
-    },
-    curryVideoPlaceholder: {
-        alignItems: 'center',
-        paddingVertical: 8,
-    },
-    proVideoLabel: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#333',
-        marginTop: 8,
-    },
-    proVideoStats: {
-        fontSize: 12,
-        color: '#999',
-        marginTop: 4,
-    },
-    comparisonStats: {
-        marginTop: 12,
-        paddingTop: 12,
-        borderTopWidth: 1,
-        borderTopColor: '#F0F0F0',
-        alignItems: 'center',
-    },
-    comparisonStatsText: {
-        fontSize: 14,
-        color: '#666',
-        fontWeight: '500',
-    },
-    
-    // Enhanced improvement styles
-    improvementContent: {
-        flex: 1,
-    },
-    improvementDetail: {
-        fontSize: 12,
-        color: '#999',
-        fontStyle: 'italic',
-        marginTop: 4,
-        lineHeight: 16,
-    },
-    practiceSection: {
-        marginTop: 16,
-        padding: 16,
-        backgroundColor: 'rgba(255,107,53,0.05)',
-        borderRadius: 8,
-        borderLeftWidth: 4,
-        borderLeftColor: '#FF6B35',
-    },
-    practiceTitle: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 12,
-    },
-    practiceTitleText: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#333',
-        marginLeft: 8,
-    },
-    practiceItems: {
-        marginLeft: 8,
-    },
-    practiceItem: {
-        fontSize: 14,
-        color: '#555',
-        marginBottom: 6,
-        lineHeight: 20,
-    },
-    
-    // Video player styles
-    videoPlayer: {
-        width: '100%',
-        height: 120,
-        borderRadius: 8,
-        backgroundColor: '#000',
-    },
-    videoPlaceholder: {
-        width: '100%',
-        height: 120,
-        borderRadius: 8,
-        backgroundColor: '#F5F5F5',
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 2,
-        borderColor: '#E0E0E0',
-        borderStyle: 'dashed',
-    },
-    videoPlaceholderText: {
-        fontSize: 14,
-        color: '#999',
-        marginTop: 8,
-        fontWeight: '500',
-    },
-    videoOverlay: {
-        position: 'absolute',
-        bottom: 8,
-        left: 8,
-        right: 8,
-        backgroundColor: 'rgba(0,0,0,0.7)',
-        borderRadius: 4,
-        padding: 6,
-    },
-    curryVideoContainer: {
-        position: 'relative',
-        width: '100%',
-        height: 120,
-    },
-    videoSourceText: {
-        fontSize: 12,
-        color: '#999',
-        marginTop: 4,
-        textAlign: 'center',
-        fontStyle: 'italic',
-    },
-
-    // Visualization Video Styles
-    visualizationContainer: {
-        backgroundColor: '#FFF',
-        padding: 16,
-        marginTop: 8,
-        borderRadius: 12,
-        marginHorizontal: 16,
-    },
-    visualizationHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 8,
-    },
-    visualizationTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#333',
-        marginLeft: 8,
-    },
-    visualizationDescription: {
-        fontSize: 14,
-        color: '#666',
-        marginBottom: 16,
-        lineHeight: 20,
-    },
-    replayTipsRow: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 8,
-        marginBottom: 12,
-    },
-    replayTipChip: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: 'rgba(255,107,0,0.08)',
-        borderWidth: 1,
-        borderColor: 'rgba(255,107,0,0.16)',
-        borderRadius: 999,
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-    },
-    replayTipChipText: {
-        fontSize: 12,
-        color: '#A24D00',
-        marginLeft: 6,
-        fontWeight: '500',
-    },
-    replayWarningBox: {
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-        backgroundColor: '#FFF7E6',
-        borderRadius: 8,
-        padding: 10,
-        marginBottom: 12,
-        borderWidth: 1,
-        borderColor: '#F5D08A',
-    },
-    replayWarningText: {
-        flex: 1,
-        marginLeft: 8,
-        fontSize: 12,
-        color: '#8A5A00',
-        lineHeight: 17,
-    },
-    replayPhasesSection: {
-        marginBottom: 12,
-    },
-    replayPhasesTitle: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: '#333',
-        marginBottom: 8,
-    },
-    replayPhaseChips: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 8,
-    },
-    replayPhaseChip: {
-        backgroundColor: '#F3F4F6',
-        borderRadius: 999,
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-    },
-    replayPhaseChipText: {
-        fontSize: 12,
-        color: '#4B5563',
-        textTransform: 'capitalize',
-    },
-    videoPlayerContainer: {
-        width: '100%',
-        height: 300,
-        backgroundColor: '#000',
-        borderRadius: 12,
-        overflow: 'hidden',
-        position: 'relative',
-    },
-    videoLoadingOverlay: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.7)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        zIndex: 10,
-    },
-    videoLoadingText: {
-        color: '#FFF',
-        marginTop: 12,
-        fontSize: 14,
-    },
-    videoControls: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        gap: 12,
-        marginTop: 16,
-    },
-    videoControlButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#FF6B00',
-        paddingHorizontal: 20,
-        paddingVertical: 12,
-        borderRadius: 8,
-        gap: 8,
-    },
-    videoControlText: {
-        color: '#FFF',
-        fontSize: 14,
-        fontWeight: '600',
-    },
-    replayCoachNote: {
-        fontSize: 13,
-        color: '#666',
-        marginTop: 12,
-        lineHeight: 18,
-        fontStyle: 'italic',
-    },
-});
 
 export default ShootingAnalysisScreen;

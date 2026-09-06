@@ -23,6 +23,9 @@ export const usePersonalizedWorkouts = () => {
     return {
       level: userData?.level || 'beginner',
       goals: userData?.goals || [],
+      // The engine now weighs the archetype. This hook used to drop it (along
+      // with position and height) before the engine ever saw it.
+      archetypeId: userData?.archetypeId || null,
       preferences: {
         trainingDays: prefs.trainingDays || ['Mon', 'Wed', 'Fri'],
         preferredDuration: prefs.preferredDuration || 30,
@@ -32,8 +35,13 @@ export const usePersonalizedWorkouts = () => {
     };
   }, [userData]);
 
-  // Get user's subscription tier (default to FREE if not set)
-  const userSubscription = userData?.subscriptionTier || 'free';
+  // Get user's subscription tier (default to FREE if not set).
+  // This read `userData.subscriptionTier` — a field nothing in the app writes.
+  // Every other consumer reads `userData.subscription` (AppContext seeds it and
+  // sets it on upgrade), so this hook saw every paying user as free: their
+  // recommendations were capped at the free tier and getLocked() upsold them
+  // workouts they had already paid for.
+  const userSubscription = userData?.subscription || 'free';
 
   /**
    * Get personalized workout recommendations

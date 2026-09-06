@@ -82,15 +82,15 @@ const styles = StyleSheet.create({
     flex: 1
   },
   name: {
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: '700',
     color: '#FFFFFF',
     marginBottom: 2
   },
   description: {
-    fontSize: 13,
+    fontSize: 15,
     color: '#888888',
-    lineHeight: 18
+    lineHeight: 19
   },
   checkbox: {
     width: 26,

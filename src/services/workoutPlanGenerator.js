@@ -7,7 +7,7 @@ export const FOCUS_AREAS = {
     id: 'shooting',
     name: 'Shooting',
     icon: 'basketball-outline',
-    color: '#FF6B00',
+    color: '#8A1C22',
     description: 'Improve your shot accuracy and range'
   },
   dribbling: {
@@ -47,7 +47,7 @@ export const DURATION_TYPES = {
     name: 'Today',
     days: 1,
     icon: 'today-outline',
-    color: '#FF6B00',
+    color: '#8A1C22',
     description: 'Single focused workout session',
     estimatedTime: '30-45 min'
   },

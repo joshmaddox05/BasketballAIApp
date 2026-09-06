@@ -149,7 +149,7 @@ const VideoPlayerModal = ({ visible, video, onClose }) => {
                 <Ionicons 
                   name={isBookmarked ? "bookmark" : "bookmark-outline"} 
                   size={24} 
-                  color={isBookmarked ? "#FF6B35" : "#666"} 
+                  color={isBookmarked ? "#8A1C22" : "#666"} 
                 />
               </TouchableOpacity>
               <TouchableOpacity onPress={handleShare} style={styles.actionButton}>
@@ -204,7 +204,7 @@ const VideoPlayerModal = ({ visible, video, onClose }) => {
               {video.level && (
                 <View style={styles.levelContainer}>
                   <View style={styles.levelBadge}>
-                    <Ionicons name="trophy-outline" size={16} color="#FF6B35" />
+                    <Ionicons name="trophy-outline" size={16} color="#8A1C22" />
                     <Text style={styles.levelText}>{video.level}</Text>
                   </View>
                 </View>
@@ -251,7 +251,7 @@ const VideoPlayerModal = ({ visible, video, onClose }) => {
               {/* Tips */}
               <View style={styles.tipsContainer}>
                 <View style={styles.tipCard}>
-                  <Ionicons name="bulb-outline" size={20} color="#FF6B35" />
+                  <Ionicons name="bulb-outline" size={20} color="#8A1C22" />
                   <View style={styles.tipContent}>
                     <Text style={styles.tipTitle}>Watch & Practice</Text>
                     <Text style={styles.tipText}>
@@ -300,7 +300,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: '600',
     color: '#333',
   },
@@ -323,11 +323,11 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   title: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: '600',
     color: '#333',
     marginBottom: 12,
-    lineHeight: 24,
+    lineHeight: 25,
   },
   metaInfo: {
     marginBottom: 16,
@@ -343,7 +343,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   metaText: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
     marginLeft: 6,
   },
@@ -359,27 +359,27 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignSelf: 'flex-start',
     borderWidth: 1,
-    borderColor: '#FF6B35',
+    borderColor: '#8A1C22',
   },
   levelText: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '500',
-    color: '#FF6B35',
+    color: '#8A1C22',
     marginLeft: 4,
   },
   descriptionContainer: {
     marginBottom: 20,
   },
   descriptionTitle: {
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: '600',
     color: '#333',
     marginBottom: 8,
   },
   description: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
-    lineHeight: 20,
+    lineHeight: 21,
   },
   playerStatus: {
     marginBottom: 20,
@@ -394,7 +394,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   statusText: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
     marginLeft: 6,
   },
@@ -408,22 +408,22 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 12,
     borderLeftWidth: 4,
-    borderLeftColor: '#FF6B35',
+    borderLeftColor: '#8A1C22',
   },
   tipContent: {
     flex: 1,
     marginLeft: 12,
   },
   tipTitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
     color: '#333',
     marginBottom: 4,
   },
   tipText: {
-    fontSize: 13,
+    fontSize: 15,
     color: '#666',
-    lineHeight: 18,
+    lineHeight: 19,
   },
 });
 

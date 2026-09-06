@@ -1,0 +1,240 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-27T00:00:00.000Z",
+  "title": "Design System: DBE HoopIQ",
+  "extensions": {
+    "colorMeta": {
+      "burgundy": {
+        "role": "primary",
+        "displayName": "Dried Blood Burgundy",
+        "canonical": "#8A1C22",
+        "tonalRamp": ["#1F0508", "#3D0B0F", "#5C1116", "#7A171D", "#8A1C22", "#A83842", "#C97078", "#E8B4B9"]
+      },
+      "burgundy-pressed": {
+        "role": "primary",
+        "displayName": "Burgundy Pressed",
+        "canonical": "#6F161B"
+      },
+      "signal-rose": {
+        "role": "primary",
+        "displayName": "Signal Rose",
+        "canonical": "#D4707A",
+        "tonalRamp": ["#2E0F13", "#55212A", "#7C3540", "#A34E58", "#D4707A", "#E1969D", "#EDBCC1", "#F8E1E3"]
+      },
+      "steel": {
+        "role": "secondary",
+        "displayName": "Gymnasium Steel",
+        "canonical": "#9AA0AC",
+        "tonalRamp": ["#1A1D22", "#2E323A", "#454A54", "#5D636E", "#767D89", "#9AA0AC", "#C2C7CE", "#E6E8EC"]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Court-Dark Ink",
+        "canonical": "#101013",
+        "tonalRamp": ["#08080A", "#101013", "#1C1C21", "#242427", "#33333A", "#4D4D56", "#7C7C86", "#B4B4BB"]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Surface",
+        "canonical": "#1C1C21"
+      },
+      "surface-raised": {
+        "role": "neutral",
+        "displayName": "Raised Surface",
+        "canonical": "#242427"
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "Text",
+        "canonical": "#E9E9ED",
+        "tonalRamp": ["#101013", "#1C1C21", "#33333A", "#57575F", "#7C7C86", "#B4B4BB", "#E9E9ED", "#FAFAFC"]
+      },
+      "text-muted": { "role": "neutral", "displayName": "Text Muted", "canonical": "#B4B4BB" },
+      "text-dim": { "role": "neutral", "displayName": "Text Dim", "canonical": "#7C7C86" },
+      "hairline": { "role": "neutral", "displayName": "Hairline", "canonical": "rgba(233, 233, 237, 0.12)" },
+      "track": { "role": "neutral", "displayName": "Track", "canonical": "rgba(233, 233, 237, 0.10)" },
+      "attention-fill": { "role": "primary", "displayName": "Attention Fill", "canonical": "rgba(138, 28, 34, 0.14)" },
+      "attention-border": { "role": "primary", "displayName": "Attention Border", "canonical": "rgba(212, 112, 122, 0.28)" },
+      "badge-fill": { "role": "primary", "displayName": "Badge Fill", "canonical": "rgba(138, 28, 34, 0.18)" },
+      "avatar-fill": { "role": "primary", "displayName": "Avatar Fill", "canonical": "rgba(212, 112, 122, 0.16)" },
+      "steel-fill": { "role": "secondary", "displayName": "Steel Fill", "canonical": "rgba(154, 160, 172, 0.16)" },
+      "glow-fill": { "role": "primary", "displayName": "Consent Glow", "canonical": "rgba(212, 112, 122, 0.16)" },
+      "spot-ring": { "role": "primary", "displayName": "Spotlight Ring", "canonical": "rgba(212, 112, 122, 0.5)" },
+      "scrim": { "role": "neutral", "displayName": "Scrim", "canonical": "rgba(6, 6, 8, 0.76)" },
+      "shimmer": { "role": "neutral", "displayName": "Shimmer Band", "canonical": "rgba(255, 255, 255, 0.18)" },
+      "success": { "role": "tertiary", "displayName": "Success", "canonical": "#6DD172" },
+      "warning": { "role": "tertiary", "displayName": "Warning", "canonical": "#FFB347" },
+      "error": { "role": "tertiary", "displayName": "Error", "canonical": "#FF6B6B" },
+      "info": { "role": "tertiary", "displayName": "Info", "canonical": "#5CB8FF" }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "The big stat number — scores, counts, earnings. Archivo 800 at 24/24. A medium variant at 21 exists for denser tile rows." },
+      "headline": { "displayName": "Screen Title", "purpose": "Top-level screen titles, optionally over a 12pt Figtree Medium greeting in Text Dim." },
+      "headline-sub": { "displayName": "Sub-Screen Title", "purpose": "Detail-screen titles, the variant paired with a back chevron." },
+      "title": { "displayName": "Card Title", "purpose": "Card titles. Archivo, because a card is an object." },
+      "title-row": { "displayName": "Row Title", "purpose": "List-row titles. Figtree, because a row is language." },
+      "body": { "displayName": "Card Body", "purpose": "Body copy inside cards, in Text Muted or Text Dim." },
+      "body-large": { "displayName": "Tooltip Body", "purpose": "Tooltips and any sustained reading passage." },
+      "label": { "displayName": "Section Label", "purpose": "UPPERCASE section labels in Text Dim at 1.4 tracking — the system's most recognizable typographic gesture." },
+      "label-stat": { "displayName": "Stat Caption", "purpose": "UPPERCASE caption beneath a stat number, 1.1 tracking." },
+      "button": { "displayName": "Button Label", "purpose": "Primary button labels, always #FFFFFF. Secondary drops to Figtree 700 at 13 in Text Muted." }
+    },
+    "shadows": [
+      {
+        "name": "tour-tooltip",
+        "value": "0 18px 40px rgba(0, 0, 0, 0.5)",
+        "purpose": "The only shadow in the product. Used exclusively on the onboarding tour tooltip, which must read as physically above a 76% scrim. RN equivalent: shadowColor '#000', shadowOpacity 0.5, shadowRadius 20, shadowOffset {width:0,height:18}, elevation 12."
+      }
+    ],
+    "motion": [
+      { "name": "ease-standard", "value": "cubic-bezier(0.215, 0.61, 0.355, 1)", "purpose": "Easing.out(Easing.cubic) — the default for every entrance and draw in the system." },
+      { "name": "card-in", "value": "450ms — opacity 0→1, translateY 16→0", "purpose": "The default card/tile entrance. Stagger siblings at 80ms." },
+      { "name": "slide-in", "value": "500ms — opacity 0→1, translateX -16→0", "purpose": "Horizontal list entrance. Stagger 100–120ms." },
+      { "name": "up", "value": "500ms — opacity 0→1, translateY 18→0", "purpose": "Section-level entrance for taller blocks." },
+      { "name": "cell-in", "value": "400ms — opacity 0→1, translateY 10→0 + scale 0.95→1", "purpose": "Grid cell entrance. Stagger 80ms." },
+      { "name": "chip-pop", "value": "spring(friction: 6) — opacity 0→1, scale 0.82→1", "purpose": "Chip row entrance." },
+      { "name": "pop", "value": "spring(friction: 6) — opacity 0→1, scale 0.9→1", "purpose": "Badge and small-element entrance." },
+      { "name": "count", "value": "500ms — opacity 0→1, translateY 7→0", "purpose": "Wraps a number so a score rises into place. Delay ~300ms after its container." },
+      { "name": "bar-fill", "value": "900–1100ms — left-anchored scaleX 0→pct", "purpose": "Progress bar fill. Anchored via translateX so it stays on the native driver." },
+      { "name": "ring-draw", "value": "1250ms — strokeDashoffset circumference→target", "purpose": "The verdict gauge. JS-driven (useNativeDriver: false) because strokeDashoffset cannot ride the native driver." },
+      { "name": "line-draw", "value": "1600ms — path strokeDashoffset 420→0", "purpose": "Sparklines and drawn chart paths." },
+      { "name": "float", "value": "2400ms loop — translateY 0→-5→0, Easing.inOut(quad)", "purpose": "Gentle infinite bob. Completion moments only." },
+      { "name": "pulse-halo", "value": "1900ms loop — scale 1→2.2, opacity 0.55→0", "purpose": "Attention dot. Coach surfaces: only on athletes below 50% adherence." },
+      { "name": "consent-glow", "value": "2800ms loop — radius-16 halo, scale 0.98→1.01, opacity 0→1→0", "purpose": "The parent consent card. The only pulsing element on a parent screen." },
+      { "name": "shimmer", "value": "3600ms loop — 50dp light band sweeping at 8°", "purpose": "Hero and module tiles. Parent must have overflow: hidden." },
+      { "name": "spot-ring", "value": "2400–2600ms loop", "purpose": "The tour spotlight ring around a highlighted target." }
+    ],
+    "breakpoints": [
+      { "name": "reference", "value": "393pt", "purpose": "iPhone 15 Pro logical width. Every value in this system is authored at this width; the app is portrait-locked and has no tablet layout." }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The affirmative action. Solid burgundy, white ExtraBold label. In a consequential pair it always sits on the right.",
+      "html": "<button class=\"ds-btn-primary\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 512 512\" fill=\"none\" aria-hidden=\"true\"><path d=\"M416 128L192 384l-96-96\" stroke=\"currentColor\" stroke-width=\"44\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>Approve Access</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 7px; width: 240px; background: #8A1C22; color: #FFFFFF; border: none; border-radius: 14px; padding: 13px 16px; font-family: Figtree, -apple-system, system-ui, sans-serif; font-weight: 800; font-size: 13.5px; cursor: pointer; transition: background 160ms cubic-bezier(0.215,0.61,0.355,1), opacity 160ms; } .ds-btn-primary:hover { background: #7A171D; } .ds-btn-primary:active { background: #6F161B; opacity: 0.85; } .ds-btn-primary:focus-visible { outline: 2px solid #D4707A; outline-offset: 2px; }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "The negative or secondary action — deny, cancel, back. No fill at all; defined entirely by the hairline. Always sits left of a primary.",
+      "html": "<button class=\"ds-btn-outline\">Deny</button>",
+      "css": ".ds-btn-outline { display: inline-flex; align-items: center; justify-content: center; gap: 7px; width: 240px; background: transparent; color: #B4B4BB; border: 1px solid rgba(233,233,237,0.12); border-radius: 14px; padding: 13px 16px; font-family: Figtree, -apple-system, system-ui, sans-serif; font-weight: 700; font-size: 13px; cursor: pointer; transition: border-color 160ms cubic-bezier(0.215,0.61,0.355,1), color 160ms; } .ds-btn-outline:hover { border-color: rgba(233,233,237,0.24); color: #E9E9ED; } .ds-btn-outline:active { opacity: 0.85; } .ds-btn-outline:focus-visible { outline: 2px solid #D4707A; outline-offset: 2px; }"
+    },
+    {
+      "name": "Chip",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "Unselected filter or tag. Surface fill, hairline border, Text Muted label at pill radius.",
+      "html": "<button class=\"ds-chip\">Guard</button>",
+      "css": ".ds-chip { background: #1C1C21; color: #B4B4BB; border: 1px solid rgba(233,233,237,0.12); border-radius: 999px; padding: 6px 11px; font-family: Figtree, -apple-system, system-ui, sans-serif; font-weight: 700; font-size: 10px; cursor: pointer; transition: border-color 160ms cubic-bezier(0.215,0.61,0.355,1), color 160ms; } .ds-chip:hover { border-color: rgba(233,233,237,0.24); color: #E9E9ED; } .ds-chip:focus-visible { outline: 2px solid #D4707A; outline-offset: 2px; }"
+    },
+    {
+      "name": "Chip — Active",
+      "kind": "chip",
+      "refersTo": "chip-active",
+      "description": "Selected state. Solid burgundy, no border, white label. Enters with a chipPop spring from 0.82 scale.",
+      "html": "<button class=\"ds-chip-active\">Wing</button>",
+      "css": ".ds-chip-active { background: #8A1C22; color: #FFFFFF; border: none; border-radius: 999px; padding: 6px 11px; font-family: Figtree, -apple-system, system-ui, sans-serif; font-weight: 700; font-size: 10px; cursor: pointer; transition: background 160ms cubic-bezier(0.215,0.61,0.355,1); } .ds-chip-active:hover { background: #A83842; } .ds-chip-active:focus-visible { outline: 2px solid #D4707A; outline-offset: 2px; }"
+    },
+    {
+      "name": "Stat Tile",
+      "kind": "card",
+      "refersTo": "stat-tile",
+      "description": "Archivo number over an uppercase tracked caption on a flat surface card. Tiles enter as a staggered cardIn sequence at 80ms intervals.",
+      "html": "<div class=\"ds-stat-tile\"><div class=\"ds-stat-tile__value\">87</div><div class=\"ds-stat-tile__label\">Overall Score</div></div>",
+      "css": ".ds-stat-tile { width: 168px; background: #1C1C21; border-radius: 16px; padding: 12px; } .ds-stat-tile__value { font-family: Archivo, 'Arial Black', system-ui, sans-serif; font-weight: 800; font-size: 24px; line-height: 24px; color: #E9E9ED; } .ds-stat-tile__label { margin-top: 5px; font-family: Figtree, -apple-system, system-ui, sans-serif; font-weight: 700; font-size: 9.5px; letter-spacing: 1.1px; text-transform: uppercase; color: #7C7C86; }"
+    },
+    {
+      "name": "Stat Tile — Attention",
+      "kind": "card",
+      "refersTo": "stat-tile-accent",
+      "description": "The system's only flagged treatment: attention fill, attention border, and both number and caption in Signal Rose.",
+      "html": "<div class=\"ds-stat-tile-accent\"><div class=\"ds-stat-tile-accent__value\">3</div><div class=\"ds-stat-tile-accent__label\">Below Adherence</div></div>",
+      "css": ".ds-stat-tile-accent { width: 168px; background: rgba(138,28,34,0.14); border: 1px solid rgba(212,112,122,0.28); border-radius: 16px; padding: 12px; } .ds-stat-tile-accent__value { font-family: Archivo, 'Arial Black', system-ui, sans-serif; font-weight: 800; font-size: 24px; line-height: 24px; color: #D4707A; } .ds-stat-tile-accent__label { margin-top: 5px; font-family: Figtree, -apple-system, system-ui, sans-serif; font-weight: 700; font-size: 9.5px; letter-spacing: 1.1px; text-transform: uppercase; color: #D4707A; }"
+    },
+    {
+      "name": "Row",
+      "kind": "custom",
+      "refersTo": "row",
+      "description": "The workhorse list item: [leading avatar] [title + meta] [trailing]. Title is Figtree Bold 13.5; meta is Figtree Regular 11 in Text Dim, 2dp beneath. Both truncate to one line.",
+      "html": "<div class=\"ds-row\"><div class=\"ds-row__avatar\">MJ</div><div class=\"ds-row__text\"><div class=\"ds-row__title\">Marcus Johnson</div><div class=\"ds-row__meta\">Grade 11 · Guard · 4 of 6 sessions</div></div><svg class=\"ds-row__chevron\" width=\"16\" height=\"16\" viewBox=\"0 0 512 512\" fill=\"none\" aria-hidden=\"true\"><path d=\"M184 112l144 144-144 144\" stroke=\"currentColor\" stroke-width=\"48\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg></div>",
+      "css": ".ds-row { display: flex; align-items: center; gap: 11px; width: 340px; background: #1C1C21; border-radius: 16px; padding: 12px; cursor: pointer; transition: background 160ms cubic-bezier(0.215,0.61,0.355,1); } .ds-row:hover { background: #242427; } .ds-row__avatar { flex: none; width: 38px; height: 38px; border-radius: 19px; background: rgba(212,112,122,0.16); color: #D4707A; display: flex; align-items: center; justify-content: center; font-family: Figtree, -apple-system, system-ui, sans-serif; font-weight: 800; font-size: 12.5px; } .ds-row__text { flex: 1; min-width: 0; } .ds-row__title { font-family: Figtree, -apple-system, system-ui, sans-serif; font-weight: 700; font-size: 13.5px; color: #E9E9ED; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .ds-row__meta { margin-top: 2px; font-family: Figtree, -apple-system, system-ui, sans-serif; font-weight: 400; font-size: 11px; color: #7C7C86; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .ds-row__chevron { flex: none; color: #7C7C86; }"
+    },
+    {
+      "name": "Section Label",
+      "kind": "custom",
+      "refersTo": "label",
+      "description": "Uppercase Figtree Bold 10.5 at 1.4 tracking in Text Dim, with an optional right-aligned Signal Rose text action. Always 10dp above its content. Does more structural work than any container in the system.",
+      "html": "<div class=\"ds-section-label\"><span class=\"ds-section-label__text\">Skill Breakdown</span><button class=\"ds-section-label__action\">See all</button></div>",
+      "css": ".ds-section-label { display: flex; align-items: baseline; justify-content: space-between; width: 340px; margin-bottom: 10px; } .ds-section-label__text { font-family: Figtree, -apple-system, system-ui, sans-serif; font-weight: 700; font-size: 10.5px; letter-spacing: 1.4px; text-transform: uppercase; color: #7C7C86; } .ds-section-label__action { background: none; border: none; padding: 0; cursor: pointer; font-family: Figtree, -apple-system, system-ui, sans-serif; font-weight: 700; font-size: 11px; color: #D4707A; transition: opacity 160ms; } .ds-section-label__action:hover { opacity: 0.75; } .ds-section-label__action:focus-visible { outline: 2px solid #D4707A; outline-offset: 2px; }"
+    },
+    {
+      "name": "Avatar",
+      "kind": "custom",
+      "refersTo": "avatar",
+      "description": "Initials on a tinted disc at half-size radius. Two tones only: accent (Signal Rose on avatar-fill) and steel (Gymnasium Steel on steel-fill). Letter is 33% of the disc size. No photographic avatars exist in the DBE surfaces.",
+      "html": "<div class=\"ds-avatar-group\"><div class=\"ds-avatar ds-avatar--accent\">KF</div><div class=\"ds-avatar ds-avatar--steel\">DR</div></div>",
+      "css": ".ds-avatar-group { display: flex; gap: 10px; } .ds-avatar { width: 38px; height: 38px; border-radius: 19px; display: flex; align-items: center; justify-content: center; font-family: Figtree, -apple-system, system-ui, sans-serif; font-weight: 800; font-size: 12.5px; } .ds-avatar--accent { background: rgba(212,112,122,0.16); color: #D4707A; } .ds-avatar--steel { background: rgba(154,160,172,0.16); color: #9AA0AC; }"
+    },
+    {
+      "name": "Empty State",
+      "kind": "custom",
+      "refersTo": "card",
+      "description": "A 64×64 rounded square in badge-fill holding a 28dp Signal Rose icon, then an Archivo 16 title, a Figtree 11.5 subtitle in Text Dim, and exactly one full-width primary CTA. Empty states are restyled, never removed.",
+      "html": "<div class=\"ds-empty\"><div class=\"ds-empty__icon\"><svg width=\"28\" height=\"28\" viewBox=\"0 0 512 512\" fill=\"none\" aria-hidden=\"true\"><circle cx=\"256\" cy=\"256\" r=\"208\" stroke=\"currentColor\" stroke-width=\"32\"/><path d=\"M256 48v416M48 256h416M109 109c60 60 90 137 90 147 0 40-30 117-90 147M403 109c-60 60-90 137-90 147 0 40 30 117 90 147\" stroke=\"currentColor\" stroke-width=\"32\" stroke-linecap=\"round\"/></svg></div><div class=\"ds-empty__title\">No evaluation yet</div><div class=\"ds-empty__sub\">Complete a shot capture to generate your first EvalRank grade.</div><button class=\"ds-empty__cta\">Start Capture</button></div>",
+      "css": ".ds-empty { width: 340px; display: flex; flex-direction: column; align-items: center; text-align: center; padding: 44px 32px; } .ds-empty__icon { width: 64px; height: 64px; border-radius: 16px; background: rgba(138,28,34,0.18); color: #D4707A; display: flex; align-items: center; justify-content: center; margin-bottom: 14px; } .ds-empty__title { font-family: Archivo, 'Arial Black', system-ui, sans-serif; font-weight: 800; font-size: 16px; color: #E9E9ED; } .ds-empty__sub { margin-top: 6px; font-family: Figtree, -apple-system, system-ui, sans-serif; font-weight: 400; font-size: 11.5px; line-height: 18px; color: #7C7C86; } .ds-empty__cta { margin-top: 18px; align-self: stretch; background: #8A1C22; color: #FFFFFF; border: none; border-radius: 14px; padding: 13px 16px; font-family: Figtree, -apple-system, system-ui, sans-serif; font-weight: 800; font-size: 13.5px; cursor: pointer; transition: background 160ms cubic-bezier(0.215,0.61,0.355,1); } .ds-empty__cta:hover { background: #7A171D; } .ds-empty__cta:focus-visible { outline: 2px solid #D4707A; outline-offset: 2px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Film Room",
+    "overview": "A dark room with the tape running. The interface is near-black and recedes on purpose, so the only things that glow are the numbers, the rings, and the burgundy light falling on what matters. Everything here is evidence being reviewed. The room does not have an opinion about how you feel; it has the footage, and it plays it back.\n\nThe mood is elite, institutional, and earned. This is credentialed infrastructure for a product whose entire claim is that its evaluation is authoritative — so the surfaces carry the weight of a program with standards, not the friendliness of an app trying to be liked. Type is tight and confident (Archivo carrying every number and heading, Figtree doing all the talking). Density is high and deliberate: 10.5–13.5pt body sizes, 9–12pt padding, hairline borders instead of separations. Color is rationed severely — one burgundy voice, one steel counter-voice, and a great deal of dark.\n\nThe confirmed anti-reference is the consumer social sports app: bright multicolor category tiles, playful rounded illustration, emoji-led empty states, badge showers. Also rejected by implication is the gamified fitness idiom — confetti, streak flames, rainbow progress rings. When this product tells an athlete something, it is a verdict, and the visual system must never undercut that with applause.",
+    "keyCharacteristics": [
+      "Near-black room (#101013) with two tonal surface steps and no shadows outside the tour tooltip",
+      "Exactly two color voices: burgundy for signal, steel for the neutral second opinion",
+      "Archivo for every number and heading; Figtree for everything that is read as language",
+      "Uppercase micro-labels with wide tracking (1.1–1.4) as the system's connective tissue",
+      "Motion is measurement resolving — rings draw, bars fill, counts rise into place",
+      "Depth comes from tone and hairlines, never from lift"
+    ],
+    "rules": [
+      { "name": "The Two Voices Rule", "body": "Burgundy and steel are the entire chromatic vocabulary. Status colors (success, warning, error, info) exist in the theme for system messaging — validation, destructive confirmation, connectivity — and are never recruited for data display, category coding, or emphasis.", "section": "colors" },
+      { "name": "The Never A Rainbow Rule", "body": "Grades and scores map to the two voices, never to a red-yellow-green scale. A/B → Signal Rose on badge-fill; C → Gymnasium Steel on steel-fill; anything lower or absent → Text Dim on track. This is implemented as gradeTone() in EvalRankScreen.js; reuse it rather than re-deriving a mapping. A failing grade is rendered as dim, not as red — the system reports, it does not scold.", "section": "colors" },
+      { "name": "The Fill-Versus-Letter Rule", "body": "burgundy fills; signal-rose letters. Burgundy text on a dark surface fails contrast and reads as a bug. Any accent-colored text or icon on dark uses accentText (Signal Rose), which is why that token exists separately from primary.", "section": "colors" },
+      { "name": "The Baked Weight Rule", "body": "Never pair fontWeight with these families. Weight is carried in the family name (Figtree_700Bold, not Figtree + fontWeight: '700'). Setting both makes Android synthesize a second bold on top of the real one and the type renders double-weighted. Compose from the TYPE presets in src/utils/typography.js; do not assemble fontFamily + fontSize by hand.", "section": "typography" },
+      { "name": "The Tracked Label Rule", "body": "Every uppercase label in the system carries letter-spacing between 1.1 and 1.4. Uppercase without tracking is not part of this system.", "section": "typography" },
+      { "name": "The Archivo-Is-For-Numbers Rule", "body": "If it is a quantity, a grade, or a heading, it is Archivo. If it is a sentence, a label, or a button, it is Figtree. A number set in Figtree reads as metadata; a sentence set in Archivo reads as a mistake.", "section": "typography" },
+      { "name": "The Twenty-Twenty Rule", "body": "Screen content lives inside 20dp horizontal padding. Full-bleed elements are the exception and must earn it — currently only the header hairline and the tab bar cross that line.", "section": "layout" },
+      { "name": "The One Shadow Rule", "body": "The tour tooltip is the only shadowed surface in the product. If a new component seems to need elevation, it needs a tone step or a hairline instead. Note that roughly 154 call sites in older, pre-redesign screens still carry shadowOpacity / elevation — that is documented drift from before the burgundy system landed, not precedent to copy.", "section": "elevation" },
+      { "name": "The Two Steps Rule", "body": "There are exactly two surface levels above the room. A tooltip on a card on a background is the deepest legal stack. Nesting a third tonal step means the hierarchy is wrong, not that the palette is short a value.", "section": "elevation" },
+      { "name": "The Enumerated Radius Rule", "body": "Six radii exist: 8, 10, 14, 16, 18, 999. A new value is not a design decision, it is drift. Use SHAPE from src/utils/typography.js.", "section": "shapes" },
+      { "name": "The Approve-Right Rule", "body": "In any consequential pair, the affirmative action is the solid primary and sits on the right; the negative action is the outline and sits on the left. Deny/Cancel is never a second solid button, and never red. This originates in the parent consent card, where two solid buttons would make denial feel equally endorsed, and it holds system-wide.", "section": "components" },
+      { "name": "The Motion Intent Rule", "body": "Motion is assigned by moment, not by role. Measurement surfaces — EvalRank, ShotDNA, progress reports, prospect evaluations — stay evidentiary for every role: things draw, fill, and count into place, and nothing bounces. Completion moments — finishing a workout, clearing a gate, hitting a milestone — may celebrate for every role. Beyond that, each role has a standing register worth preserving: the coach's attention dots pulse only on athletes below 50% adherence and nothing else celebrates; the scout's 'new since last visit' rows are the only ones that animate in; and on parent surfaces the consent card is the single pulsing element on the screen.", "section": "components" }
+    ],
+    "dos": [
+      "Do compose from src/components/dbe/ and the TYPE / SHAPE presets in src/utils/typography.js. Every value in this document already exists there.",
+      "Do read colors from the theme object (theme.surface, theme.accentText, theme.hairline) so screens work in both appearances.",
+      "Do use accentText for any accent-colored text or icon, and primary only for fills.",
+      "Do route grade and score coloring through gradeTone() — Signal Rose for A/B, steel for C, dim for everything below.",
+      "Do keep uppercase labels tracked at 1.1–1.4 and dim.",
+      "Do put the affirmative action on the right as the solid primary and the negative on the left as the outline.",
+      "Do stagger sibling entrances at 80–120ms; a whole screen arriving at once looks broken.",
+      "Do verify new screens at 393pt width, in both light and dark."
+    ],
+    "donts": [
+      "Don't pair fontWeight with Archivo or Figtree. The weight is in the family name and Android will double-bold it.",
+      "Don't add a shadow. The tour tooltip is the only shadowed surface in the product.",
+      "Don't introduce a new hue. If something needs to be distinguished, use burgundy, steel, or a tone step — status colors are for system messaging only.",
+      "Don't color a failing grade red. Low grades render dim; the system reports rather than scolds.",
+      "Don't invent a radius or a spacing value outside the enumerated scales.",
+      "Don't put burgundy #8A1C22 on dark as text — it fails contrast. That is what Signal Rose is for.",
+      "Don't ship two solid buttons in a consequential pair.",
+      "Don't add confetti, streak flames, badge showers, rainbow rings, emoji-led empty states, or multicolor category tiles. That is the confirmed anti-reference.",
+      "Don't treat the ~49 swept legacy screens (hard-coded burgundy hex, fontWeight, shadows) or ModuleGrid.js (per-module accent colors, raw fontSize/fontWeight) as precedent. They are documented drift awaiting tokenization, not examples to follow."
+    ]
+  }
+}

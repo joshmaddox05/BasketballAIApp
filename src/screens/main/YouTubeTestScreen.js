@@ -196,9 +196,9 @@ const YouTubeTestScreen = ({ navigation }) => {
             disabled={testing}
           >
             {testing ? (
-              <ActivityIndicator size="small" color="#FF6B00" />
+              <ActivityIndicator size="small" color="#8A1C22" />
             ) : (
-              <Ionicons name="search" size={20} color="#FF6B00" />
+              <Ionicons name="search" size={20} color="#8A1C22" />
             )}
             <Text style={[styles.buttonText, styles.secondaryButtonText]}>
               Test Category Search
@@ -211,9 +211,9 @@ const YouTubeTestScreen = ({ navigation }) => {
             disabled={testing}
           >
             {testing ? (
-              <ActivityIndicator size="small" color="#FF6B00" />
+              <ActivityIndicator size="small" color="#8A1C22" />
             ) : (
-              <Ionicons name="trending-up" size={20} color="#FF6B00" />
+              <Ionicons name="trending-up" size={20} color="#8A1C22" />
             )}
             <Text style={[styles.buttonText, styles.secondaryButtonText]}>
               Test Popular Videos
@@ -298,7 +298,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: 'bold',
     color: '#333',
   },
@@ -313,16 +313,16 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 21,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 8,
   },
   sectionDescription: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
     marginBottom: 16,
-    lineHeight: 20,
+    lineHeight: 21,
   },
   testButton: {
     flexDirection: 'row',
@@ -334,21 +334,21 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   primaryButton: {
-    backgroundColor: '#FF6B00',
+    backgroundColor: '#8A1C22',
   },
   secondaryButton: {
     backgroundColor: 'transparent',
     borderWidth: 2,
-    borderColor: '#FF6B00',
+    borderColor: '#8A1C22',
   },
   buttonText: {
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: '600',
     marginLeft: 8,
     color: '#FFF',
   },
   secondaryButtonText: {
-    color: '#FF6B00',
+    color: '#8A1C22',
   },
   statusCard: {
     flexDirection: 'row',
@@ -372,20 +372,20 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   statusTitle: {
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: '600',
     color: '#333',
     marginBottom: 4,
   },
   statusMessage: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
-    lineHeight: 18,
+    lineHeight: 19,
   },
   resultsCount: {
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: '600',
-    color: '#FF6B00',
+    color: '#8A1C22',
     marginBottom: 12,
   },
   videoResult: {
@@ -394,21 +394,21 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 8,
     borderLeftWidth: 3,
-    borderLeftColor: '#FF6B00',
+    borderLeftColor: '#8A1C22',
   },
   videoTitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
     color: '#333',
     marginBottom: 4,
   },
   videoChannel: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#666',
     marginBottom: 2,
   },
   videoMeta: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#999',
   },
   tipCard: {
@@ -420,15 +420,15 @@ const styles = StyleSheet.create({
     borderLeftColor: '#2196F3',
   },
   tipTitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
     color: '#333',
     marginBottom: 8,
   },
   tipText: {
-    fontSize: 13,
+    fontSize: 15,
     color: '#666',
-    lineHeight: 18,
+    lineHeight: 19,
   },
   diagnosticsCard: {
     backgroundColor: '#FFF',
@@ -445,12 +445,12 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   diagnosticLabel: {
-    fontSize: 13,
+    fontSize: 15,
     color: '#666',
     flex: 1,
   },
   diagnosticValue: {
-    fontSize: 13,
+    fontSize: 15,
     color: '#333',
     fontFamily: 'monospace',
     flex: 1,

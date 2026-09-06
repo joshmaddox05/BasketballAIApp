@@ -1,5 +1,5 @@
 // WelcomeCompleteScreen.js - Dynamic welcome screen after onboarding
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
     StyleSheet,
     Text,
@@ -9,25 +9,57 @@ import {
     StatusBar,
     Dimensions,
     Animated,
-    ImageBackground,
     Platform,
     ScrollView
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAppContext } from '../../context/AppContext';
 import { getTheme } from '../../utils/theme';
-import welcomeBackground from '../../../assets/welcome-background.jpg';
+import { completionNarrationFor } from '../../config/onboardingNarration';
+import { useScreenNarration } from '../../hooks/useScreenNarration';
+import NarrationToggle from '../../components/shared/NarrationToggle';
 
 const { width, height } = Dimensions.get('window');
+
+// Role-aware welcome copy for non-player roles (players get the full training summary).
+const ROLE_WELCOME = {
+    coach: {
+        icon: 'clipboard',
+        title: 'Your coaching hub is ready',
+        message: 'Manage your athletes, build game plans, and track team progress — all in one place.',
+    },
+    scout: {
+        icon: 'search',
+        title: 'Your scouting toolkit is ready',
+        message: 'Discover prospects, build your watchlist, and generate professional scouting reports.',
+    },
+    parent: {
+        icon: 'heart',
+        title: "You're all set",
+        message: "Monitor your child's development, view progress reports, and stay connected with their coach.",
+    },
+};
 
 const WelcomeCompleteScreen = ({ navigation }) => {
     const { userData, theme: contextTheme, isDarkMode, completeOnboarding } = useAppContext();
     const theme = contextTheme || getTheme(isDarkMode || false);
 
+    const role = userData?.role || 'player';
+    const isPlayer = role === 'player';
+    const roleWelcome = ROLE_WELCOME[role];
+
     const [fadeAnim] = useState(new Animated.Value(0));
     const [slideAnim] = useState(new Animated.Value(50));
     const [scaleAnim] = useState(new Animated.Value(0.8));
     const [isCompleting, setIsCompleting] = useState(false);
+
+    // The closing line differs by role — a coach and a parent skip most of this
+    // flow and arrive here needing a different thing said to them. useMemo keeps
+    // the object identity stable so the hook does not treat a re-render as a
+    // fresh visit and restart the line.
+    const closingLine = useMemo(() => completionNarrationFor(role), [role]);
+    useScreenNarration(closingLine);
 
     useEffect(() => {
         // Animate the welcome screen
@@ -100,27 +132,33 @@ const WelcomeCompleteScreen = ({ navigation }) => {
     };
 
     const handleStartTraining = async () => {
-        if (isCompleting) return; // Prevent double-tap
-
+        if (isCompleting) return;
         setIsCompleting(true);
         try {
-            // Complete onboarding and persist to Firestore
             await completeOnboarding();
-            // AppNavigator will detect the change and navigate to main app
         } catch (error) {
-            console.error('Error completing onboarding:', error);
-            alert('There was an error saving your profile. Please try again.');
             setIsCompleting(false);
         }
     };
 
     return (
-        <ImageBackground
-            source={welcomeBackground}
+        // Was a stock JPEG under a 70%-black scrim — a grey wave shape with no
+        // relationship to the brand, dimmed until it was mostly noise. The same
+        // burgundy ramp the welcome screen and the launch reel use now carries
+        // it, so all three entry surfaces read as one product.
+        <LinearGradient
+            colors={['#0B0B0F', '#2A0A0E', '#8A1C22']}
+            locations={[0, 0.55, 1]}
             style={styles.backgroundImage}
         >
             <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
             <SafeAreaView style={styles.container}>
+                {/* Light tint: this screen sits on the burgundy gradient. */}
+                <NarrationToggle
+                    color="rgba(255,255,255,0.9)"
+                    fill="rgba(255,255,255,0.12)"
+                    border="rgba(255,255,255,0.22)"
+                />
                 <ScrollView
                     style={styles.scrollView}
                     contentContainerStyle={styles.scrollContent}
@@ -148,15 +186,18 @@ const WelcomeCompleteScreen = ({ navigation }) => {
                             {getGreeting()}, {userData.displayName || 'Champion'}! 🏀
                         </Text>
                         <Text style={styles.subtitle}>
-                            Welcome to your personalized basketball training journey
+                            {isPlayer
+                                ? 'Welcome to your personalized basketball training journey'
+                                : (roleWelcome?.message || 'Welcome to your basketball development hub')}
                         </Text>
                     </View>
 
-                    {/* User Profile Summary */}
+                    {/* User Profile Summary (player-only training breakdown) */}
+                    {isPlayer ? (
                     <View style={styles.profileSummary}>
                         <View style={styles.summaryCard}>
                             <View style={styles.summaryHeader}>
-                                <Ionicons name="person-circle" size={24} color="#FF6B00" />
+                                <Ionicons name="person-circle" size={24} color="#8A1C22" />
                                 <Text style={styles.summaryTitle}>Your Profile</Text>
                             </View>
                             <Text style={styles.summaryText}>
@@ -169,7 +210,7 @@ const WelcomeCompleteScreen = ({ navigation }) => {
 
                         <View style={styles.summaryCard}>
                             <View style={styles.summaryHeader}>
-                                <Ionicons name="flag" size={24} color="#FF6B00" />
+                                <Ionicons name="flag" size={24} color="#8A1C22" />
                                 <Text style={styles.summaryTitle}>Your Goals</Text>
                             </View>
                             <Text style={styles.summaryText}>
@@ -179,7 +220,7 @@ const WelcomeCompleteScreen = ({ navigation }) => {
 
                         <View style={styles.summaryCard}>
                             <View style={styles.summaryHeader}>
-                                <Ionicons name="fitness" size={24} color="#FF6B00" />
+                                <Ionicons name="fitness" size={24} color="#8A1C22" />
                                 <Text style={styles.summaryTitle}>Recommended Workout</Text>
                             </View>
                             <Text style={styles.summaryText}>
@@ -187,8 +228,22 @@ const WelcomeCompleteScreen = ({ navigation }) => {
                             </Text>
                         </View>
                     </View>
+                    ) : (
+                    <View style={styles.profileSummary}>
+                        <View style={styles.summaryCard}>
+                            <View style={styles.summaryHeader}>
+                                <Ionicons name={roleWelcome?.icon || 'rocket'} size={24} color="#8A1C22" />
+                                <Text style={styles.summaryTitle}>{roleWelcome?.title || "You're all set"}</Text>
+                            </View>
+                            <Text style={styles.summaryText}>
+                                {roleWelcome?.message || 'Your personalized hub is ready to go.'}
+                            </Text>
+                        </View>
+                    </View>
+                    )}
 
-                    {/* Quick Stats Preview */}
+                    {/* Quick Stats Preview (player-only) */}
+                    {isPlayer && (
                     <View style={styles.statsPreview}>
                         <Text style={styles.statsTitle}>Your Training Dashboard</Text>
                         <View style={styles.statsRow}>
@@ -206,6 +261,7 @@ const WelcomeCompleteScreen = ({ navigation }) => {
                             </View>
                         </View>
                     </View>
+                    )}
 
                     {/* Action Buttons */}
                     <View style={styles.buttonsContainer}>
@@ -216,7 +272,7 @@ const WelcomeCompleteScreen = ({ navigation }) => {
                         >
                             <Ionicons name="play" size={20} color="#FFF" />
                             <Text style={styles.startTrainingButtonText}>
-                                {isCompleting ? 'Setting up your profile...' : 'Start Training'}
+                                {isCompleting ? 'Setting up your profile...' : (isPlayer ? 'Start Training' : 'Get Started')}
                             </Text>
                         </TouchableOpacity>
 
@@ -233,7 +289,7 @@ const WelcomeCompleteScreen = ({ navigation }) => {
                     </Animated.View>
                 </ScrollView>
             </SafeAreaView>
-        </ImageBackground>
+        </LinearGradient>
     );
 };
 
@@ -245,7 +301,10 @@ const styles = StyleSheet.create({
     },
     container: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        // The 70% black scrim existed to make text legible over a photo. The
+        // gradient below is already dark and controlled, so this only needs to
+        // deepen the top where the status bar sits.
+        backgroundColor: 'rgba(0, 0, 0, 0.28)',
         paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
     },
     scrollView: {
@@ -268,20 +327,20 @@ const styles = StyleSheet.create({
         width: 80,
         height: 80,
         borderRadius: 40,
-        backgroundColor: '#FF6B00',
+        backgroundColor: '#8A1C22',
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 16,
     },
     welcomeText: {
-        fontSize: 24,
+        fontSize: 25,
         fontWeight: 'bold',
         color: '#FFF',
         textAlign: 'center',
         marginBottom: 8,
     },
     subtitle: {
-        fontSize: 16,
+        fontSize: 17.5,
         color: 'rgba(255, 255, 255, 0.8)',
         textAlign: 'center',
     },
@@ -302,25 +361,25 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
     summaryTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: 'bold',
         color: '#FFF',
         marginLeft: 8,
     },
     summaryText: {
-        fontSize: 16,
+        fontSize: 17.5,
         color: '#FFF',
-        lineHeight: 22,
+        lineHeight: 23,
         marginBottom: 8,
     },
     summaryDescription: {
-        fontSize: 14,
+        fontSize: 16,
         color: 'rgba(255, 255, 255, 0.7)',
-        lineHeight: 20,
+        lineHeight: 21,
     },
     bold: {
         fontWeight: 'bold',
-        color: '#FF6B00',
+        color: '#8A1C22',
     },
     statsPreview: {
         backgroundColor: 'rgba(255, 255, 255, 0.1)',
@@ -331,7 +390,7 @@ const styles = StyleSheet.create({
         borderColor: 'rgba(255, 255, 255, 0.2)',
     },
     statsTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: 'bold',
         color: '#FFF',
         textAlign: 'center',
@@ -345,13 +404,13 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     statNumber: {
-        fontSize: 24,
+        fontSize: 25,
         fontWeight: 'bold',
-        color: '#FF6B00',
+        color: '#8A1C22',
         marginBottom: 4,
     },
     statLabel: {
-        fontSize: 14,
+        fontSize: 16,
         color: 'rgba(255, 255, 255, 0.7)',
     },
     buttonsContainer: {
@@ -359,7 +418,7 @@ const styles = StyleSheet.create({
         paddingBottom: height * 0.05,
     },
     startTrainingButton: {
-        backgroundColor: '#FF6B00',
+        backgroundColor: '#8A1C22',
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
@@ -368,7 +427,7 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     startTrainingButtonText: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: 'bold',
         color: '#FFF',
         marginLeft: 8,
@@ -382,7 +441,7 @@ const styles = StyleSheet.create({
         borderColor: 'rgba(255, 255, 255, 0.3)',
     },
     exploreButtonText: {
-        fontSize: 16,
+        fontSize: 17.5,
         color: '#FFF',
         fontWeight: '600',
     },

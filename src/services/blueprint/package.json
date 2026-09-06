@@ -1,0 +1,4 @@
+{
+  "//": "Marks the blueprint engine as pure ES modules so it runs unchanged under Node's test runner and Cloud Functions. Metro/Babel ignore the `type` field and transform these files normally; all imports here are explicit relative file paths, so no package resolution is affected.",
+  "type": "module"
+}

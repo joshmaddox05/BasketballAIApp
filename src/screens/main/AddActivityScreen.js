@@ -490,7 +490,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: 'bold',
   },
   submitButton: {
@@ -500,7 +500,7 @@ const styles = StyleSheet.create({
   },
   submitButtonText: {
     color: '#FFF',
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: '600',
   },
   content: {
@@ -511,12 +511,12 @@ const styles = StyleSheet.create({
     marginBottom: 25,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: '600',
     marginBottom: 8,
   },
   sectionSubtitle: {
-    fontSize: 14,
+    fontSize: 16,
     marginBottom: 12,
   },
   selector: {
@@ -534,25 +534,25 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   selectorText: {
-    fontSize: 16,
+    fontSize: 17.5,
     marginLeft: 10,
   },
   selectorPlaceholder: {
-    fontSize: 16,
+    fontSize: 17.5,
   },
   input: {
     borderWidth: 1,
     borderRadius: 12,
     paddingHorizontal: 15,
     paddingVertical: 12,
-    fontSize: 16,
+    fontSize: 17.5,
   },
   textArea: {
     borderWidth: 1,
     borderRadius: 12,
     paddingHorizontal: 15,
     paddingVertical: 12,
-    fontSize: 16,
+    fontSize: 17.5,
     textAlignVertical: 'top',
     minHeight: 100,
   },
@@ -584,7 +584,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   addPhotoText: {
-    fontSize: 12,
+    fontSize: 14,
     marginTop: 4,
     textAlign: 'center',
   },
@@ -600,11 +600,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   modalCancel: {
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: '600',
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: 'bold',
   },
   placeholder: {
@@ -618,7 +618,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   typeName: {
-    fontSize: 16,
+    fontSize: 17.5,
     marginLeft: 15,
     flex: 1,
   },
@@ -639,11 +639,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   intensityName: {
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: '600',
   },
   intensityDescription: {
-    fontSize: 14,
+    fontSize: 16,
     marginTop: 2,
   },
 });

@@ -17,7 +17,10 @@ import {
     listenToFriendRequests,
     acceptFriendRequest,
     declineFriendRequest,
-    getUserActivities
+    getUserActivities,
+    listenToNotifications,
+    markNotificationRead,
+    markAllNotificationsRead
 } from '../../services/firestoreService';
 import { getTheme } from '../../utils/theme';
 
@@ -27,6 +30,41 @@ const NOTIFICATION_TYPES = {
     CHALLENGE: 'challenge',
     STREAK: 'streak',
     WORKOUT_REMINDER: 'workout_reminder',
+    // Server-written types (users/{uid}/notifications, see functions/index.js).
+    ASSIGNMENT: 'assignment',
+    ASSIGNMENT_COMPLETED: 'assignment_completed',
+    ASSIGNMENT_VERIFIED: 'assignment_verified',
+    ASSIGNMENT_RETURNED: 'assignment_returned',
+    SESSION: 'session',
+    SCOUT_REQUEST: 'scout_request',
+    SCOUT_APPROVED: 'scout_approved',
+    SCOUT_DENIED: 'scout_denied',
+    PROSPECT_MATCH: 'prospect_match',
+    SCOUT_REPORT: 'scout_report',
+};
+
+// Icon + tint per server-written type. Kept beside the type list so adding a
+// trigger is a two-line change here rather than edits in three switch blocks.
+const TYPE_PRESENTATION = {
+    [NOTIFICATION_TYPES.ASSIGNMENT]: { icon: 'clipboard', color: '#4A90E2' },
+    [NOTIFICATION_TYPES.ASSIGNMENT_COMPLETED]: { icon: 'checkmark-done', color: '#2FBF71' },
+    [NOTIFICATION_TYPES.ASSIGNMENT_VERIFIED]: { icon: 'shield-checkmark', color: '#2FBF71' },
+    [NOTIFICATION_TYPES.ASSIGNMENT_RETURNED]: { icon: 'arrow-undo', color: '#FF8C00' },
+    [NOTIFICATION_TYPES.SESSION]: { icon: 'calendar', color: '#9B6BDF' },
+    [NOTIFICATION_TYPES.SCOUT_REQUEST]: { icon: 'shield-half', color: '#FF8C00' },
+    [NOTIFICATION_TYPES.SCOUT_APPROVED]: { icon: 'lock-open', color: '#2FBF71' },
+    [NOTIFICATION_TYPES.SCOUT_DENIED]: { icon: 'lock-closed', color: '#FF6B6B' },
+    [NOTIFICATION_TYPES.PROSPECT_MATCH]: { icon: 'search', color: '#4A90E2' },
+    [NOTIFICATION_TYPES.SCOUT_REPORT]: { icon: 'document-text', color: '#9B6BDF' },
+};
+
+// Firestore Timestamp | Date | millis -> Date, tolerant of all three.
+const toDate = (value) => {
+    if (!value) return null;
+    if (typeof value.toDate === 'function') return value.toDate();
+    if (value instanceof Date) return value;
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d;
 };
 
 const NotificationsScreen = ({ navigation }) => {
@@ -34,6 +72,10 @@ const NotificationsScreen = ({ navigation }) => {
     const theme = contextTheme || getTheme(isDarkMode || false);
 
     const [notifications, setNotifications] = useState([]);
+    // Real docs from users/{uid}/notifications, written by the Cloud Function
+    // triggers. These are the primary source; `notifications` above holds the
+    // locally-synthesized achievement/streak entries as a secondary section.
+    const [serverNotifications, setServerNotifications] = useState([]);
     const [friendRequests, setFriendRequests] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
@@ -107,6 +149,28 @@ const NotificationsScreen = ({ navigation }) => {
         return () => unsubscribe();
     }, [user?.uid]);
 
+    // Listen to the real in-app notification collection. Fails soft to [] so a
+    // rules or index problem degrades to the synthesized list rather than a crash.
+    useEffect(() => {
+        if (!user?.uid) return;
+
+        const unsubscribe = listenToNotifications(user.uid, (docs) => {
+            setServerNotifications(docs.map((d) => ({
+                id: d.id,
+                type: d.type,
+                title: d.title || 'Notification',
+                message: d.body || '',
+                timestamp: toDate(d.sentAt) || new Date(),
+                isUnread: !d.readAt,
+                data: d.data || {},
+                isServer: true,
+            })));
+            setIsLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, [user?.uid]);
+
     useEffect(() => {
         loadNotifications();
     }, [loadNotifications]);
@@ -138,7 +202,37 @@ const NotificationsScreen = ({ navigation }) => {
         }
     };
 
+    // Server notifications carry their own destination in data.{route,params};
+    // the synthesized ones keep the original hardcoded routing.
+    const handleNotificationPress = useCallback((item) => {
+        if (item.isServer) {
+            if (item.isUnread) markNotificationRead(user?.uid, item.id);
+            const route = item.data?.route;
+            if (route) {
+                try {
+                    navigation.navigate(route, item.data?.params);
+                } catch (error) {
+                    console.warn(`Notification route "${route}" is not reachable from here.`);
+                }
+            }
+            return;
+        }
+        if (item.type === NOTIFICATION_TYPES.ACHIEVEMENT) {
+            navigation.navigate('Progress', { screen: 'Achievements' });
+        } else if (item.type === NOTIFICATION_TYPES.CHALLENGE) {
+            navigation.navigate('Challenges');
+        }
+    }, [navigation, user?.uid]);
+
+    const unreadCount = serverNotifications.filter((n) => n.isUnread).length;
+
+    const handleMarkAllRead = useCallback(async () => {
+        if (!user?.uid || unreadCount === 0) return;
+        await markAllNotificationsRead(user.uid);
+    }, [user?.uid, unreadCount]);
+
     const getNotificationIcon = (type, icon) => {
+        if (TYPE_PRESENTATION[type]) return TYPE_PRESENTATION[type].icon;
         switch (type) {
             case NOTIFICATION_TYPES.FRIEND_REQUEST:
                 return 'person-add';
@@ -156,6 +250,7 @@ const NotificationsScreen = ({ navigation }) => {
     };
 
     const getIconColor = (type) => {
+        if (TYPE_PRESENTATION[type]) return TYPE_PRESENTATION[type].color;
         switch (type) {
             case NOTIFICATION_TYPES.FRIEND_REQUEST:
                 return '#4A90E2';
@@ -235,15 +330,12 @@ const NotificationsScreen = ({ navigation }) => {
 
         return (
             <TouchableOpacity
-                style={[styles.notificationCard, { backgroundColor: theme.card }]}
-                onPress={() => {
-                    // Handle notification tap based on type
-                    if (item.type === NOTIFICATION_TYPES.ACHIEVEMENT) {
-                        navigation.navigate('Progress', { screen: 'Achievements' });
-                    } else if (item.type === NOTIFICATION_TYPES.CHALLENGE) {
-                        navigation.navigate('Challenges');
-                    }
-                }}
+                style={[
+                    styles.notificationCard,
+                    { backgroundColor: theme.card },
+                    item.isUnread && { borderLeftWidth: 3, borderLeftColor: theme.primary },
+                ]}
+                onPress={() => handleNotificationPress(item)}
             >
                 <View style={[styles.iconContainer, { backgroundColor: iconColor + '20' }]}>
                     <Ionicons name={iconName} size={24} color={iconColor} />
@@ -275,7 +367,10 @@ const NotificationsScreen = ({ navigation }) => {
         </View>
     );
 
+    // Server notifications lead (they are the real record), then friend requests,
+    // then the locally-derived achievement/streak entries.
     const allItems = [
+        ...serverNotifications.map(n => ({ ...n, isFriendRequest: false })),
         ...friendRequests.map(fr => ({ ...fr, isFriendRequest: true })),
         ...notifications.map(n => ({ ...n, isFriendRequest: false }))
     ];
@@ -290,7 +385,13 @@ const NotificationsScreen = ({ navigation }) => {
                     <Ionicons name="arrow-back" size={24} color={theme.text} />
                 </TouchableOpacity>
                 <Text style={[styles.headerTitle, { color: theme.text }]}>Notifications</Text>
-                <View style={styles.headerRight} />
+                {unreadCount > 0 ? (
+                    <TouchableOpacity onPress={handleMarkAllRead} style={styles.markAllButton}>
+                        <Text style={[styles.markAllText, { color: theme.primary }]}>Mark all</Text>
+                    </TouchableOpacity>
+                ) : (
+                    <View style={styles.headerRight} />
+                )}
             </View>
 
             {isLoading ? (
@@ -341,11 +442,19 @@ const styles = StyleSheet.create({
         padding: 4,
     },
     headerTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: '600',
     },
     headerRight: {
         width: 32,
+    },
+    markAllButton: {
+        paddingHorizontal: 4,
+        paddingVertical: 4,
+    },
+    markAllText: {
+        fontSize: 16,
+        fontWeight: '600',
     },
     loadingContainer: {
         flex: 1,
@@ -382,17 +491,17 @@ const styles = StyleSheet.create({
         marginBottom: 4,
     },
     notificationTitle: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: '600',
         flex: 1,
     },
     timestamp: {
-        fontSize: 12,
+        fontSize: 14,
         marginLeft: 8,
     },
     notificationMessage: {
-        fontSize: 14,
-        lineHeight: 20,
+        fontSize: 16,
+        lineHeight: 21,
     },
     actionButtons: {
         flexDirection: 'row',
@@ -409,7 +518,7 @@ const styles = StyleSheet.create({
     acceptButtonText: {
         color: '#FFF',
         fontWeight: '600',
-        fontSize: 14,
+        fontSize: 16,
     },
     declineButton: {
         paddingHorizontal: 20,
@@ -421,7 +530,7 @@ const styles = StyleSheet.create({
     },
     declineButtonText: {
         fontWeight: '600',
-        fontSize: 14,
+        fontSize: 16,
     },
     separator: {
         height: 12,
@@ -431,15 +540,15 @@ const styles = StyleSheet.create({
         paddingHorizontal: 40,
     },
     emptyTitle: {
-        fontSize: 20,
+        fontSize: 21,
         fontWeight: '600',
         marginTop: 16,
         marginBottom: 8,
     },
     emptyMessage: {
-        fontSize: 16,
+        fontSize: 17.5,
         textAlign: 'center',
-        lineHeight: 22,
+        lineHeight: 23,
     },
 });
 

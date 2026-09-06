@@ -1,12 +1,19 @@
 // subscription.js - Subscription utilities and content gating
-// Define subscription tiers
+// Two-tier model: Free + Pro. The BASIC/PREMIUM names are retained as DEPRECATED
+// aliases that resolve to 'pro' so existing user docs and the ~200 requiredTier
+// entries across the data files collapse into the single paid tier without a
+// migration. Gating is binary (see isPaidTier / hasAccess below).
 export const SUBSCRIPTION_TIERS = {
   FREE: 'free',
-  BASIC: 'basic',
-  PREMIUM: 'premium',
-  PRO: 'pro'
+  PRO: 'pro',
+  // Deprecated — kept so legacy data/values map to the paid tier.
+  BASIC: 'pro',
+  PREMIUM: 'pro'
 };
-// Define subscription plans with features
+
+// True for any paid tier value (handles literal 'basic'/'premium'/'pro' too).
+export const isPaidTier = (tier) => !!tier && tier !== SUBSCRIPTION_TIERS.FREE;
+// Define subscription plans with features (two-tier: Free + Pro)
 export const SUBSCRIPTION_PLANS = [
   {
     id: SUBSCRIPTION_TIERS.FREE,
@@ -23,27 +30,15 @@ export const SUBSCRIPTION_PLANS = [
     ]
   },
   {
-    id: SUBSCRIPTION_TIERS.BASIC,
-    name: 'Basic',
-    nameKey: 'basicPlan',
-    descriptionKey: 'basicPlanDesc',
-    price: '$4.99',
-    priceValue: 4.99,
-    billingCycle: 'month',
-    popular: false,
-    features: [
-      { key: 'unlimitedWorkouts', enabled: true },
-      { key: 'noAds', enabled: true },
-      { key: 'basicAiAnalysis', enabled: true, limit: 5 },
-      { key: 'communityAccess', enabled: true },
-      { key: 'progressTracking', enabled: true }
-    ]
-  },
-  {
-    id: SUBSCRIPTION_TIERS.PREMIUM,
-    name: 'Premium',
-    nameKey: 'premiumPlan',
-    descriptionKey: 'premiumPlanDesc',
+    id: SUBSCRIPTION_TIERS.PRO,
+    name: 'Pro',
+    nameKey: 'proPlan',
+    descriptionKey: 'proPlanDesc',
+    // WARNING: this string is the ONLY thing the paywall renders, and it is not
+    // read from Stripe. The real charge comes from the price ID in
+    // src/config/stripe.js (STRIPE_CONFIG.prices.pro). Change the price in the
+    // Stripe dashboard and this screen keeps advertising the old number — the
+    // paywall lies and the card is charged something else. Change both together.
     price: '$9.99',
     priceValue: 9.99,
     billingCycle: 'month',
@@ -52,28 +47,15 @@ export const SUBSCRIPTION_PLANS = [
       { key: 'unlimitedWorkouts', enabled: true },
       { key: 'noAds', enabled: true },
       { key: 'advancedAiAnalysis', enabled: true },
-      { key: 'mentorSessions', enabled: true, limit: 1 },
-      { key: 'exclusiveChallenges', enabled: true },
-      { key: 'communityAccess', enabled: true },
-      { key: 'progressTracking', enabled: true }
-    ]
-  },
-  {
-    id: SUBSCRIPTION_TIERS.PRO,
-    name: 'Pro',
-    nameKey: 'proPlan',
-    descriptionKey: 'proPlanDesc',
-    price: '$19.99',
-    priceValue: 19.99,
-    billingCycle: 'month',
-    popular: false,
-    features: [
-      { key: 'unlimitedWorkouts', enabled: true },
-      { key: 'noAds', enabled: true },
-      { key: 'advancedAiAnalysis', enabled: true },
       { key: 'personalizedTraining', enabled: true },
       { key: 'mentorSessions', enabled: true, limit: -1 },
       { key: 'exclusiveChallenges', enabled: true },
+      { key: 'shotDNA', enabled: true },
+      { key: 'evalRank', enabled: true },
+      { key: 'blueprint360', enabled: true },
+      { key: 'simCoach', enabled: true },
+      { key: 'scoutLab', enabled: true },
+      { key: 'exportData', enabled: true },
       { key: 'prioritySupport', enabled: true },
       { key: 'communityAccess', enabled: true },
       { key: 'progressTracking', enabled: true }
@@ -106,22 +88,24 @@ export const CONTENT_ACCESS = {
     videoLibrary: SUBSCRIPTION_TIERS.FREE,
     advancedVideoLibrary: SUBSCRIPTION_TIERS.PREMIUM,
     challenges: SUBSCRIPTION_TIERS.FREE,
-    exclusiveChallenges: SUBSCRIPTION_TIERS.PREMIUM,  // Premium feature
-    exclusiveWorkouts: SUBSCRIPTION_TIERS.BASIC,      // Basic feature - Premium workouts
+    exclusiveChallenges: SUBSCRIPTION_TIERS.PREMIUM,
+    exclusiveWorkouts: SUBSCRIPTION_TIERS.BASIC,
     leaderboard: SUBSCRIPTION_TIERS.FREE,
+    // DBE Ecosystem modules
+    shotDNA: SUBSCRIPTION_TIERS.PRO,
+    evalRank: SUBSCRIPTION_TIERS.PREMIUM,
+    blueprint360: SUBSCRIPTION_TIERS.BASIC,
+    simCoach: SUBSCRIPTION_TIERS.PREMIUM,
+    scoutLab: SUBSCRIPTION_TIERS.PRO,
+    coachMarket: SUBSCRIPTION_TIERS.PREMIUM,
+    hoopCommunity: SUBSCRIPTION_TIERS.FREE,
+    legacyVault: SUBSCRIPTION_TIERS.PREMIUM,
   }
 };
-// Check if user has access to content
+// Check if user has access to content (binary: free vs. paid)
 export const hasAccess = (userSubscription, requiredSubscription) => {
-  const tiers = [
-    SUBSCRIPTION_TIERS.FREE,
-    SUBSCRIPTION_TIERS.BASIC,
-    SUBSCRIPTION_TIERS.PREMIUM,
-    SUBSCRIPTION_TIERS.PRO
-  ];
-  const userTierIndex = tiers.indexOf(userSubscription);
-  const requiredTierIndex = tiers.indexOf(requiredSubscription);
-  return userTierIndex >= requiredTierIndex;
+  if (!isPaidTier(requiredSubscription)) return true; // free-tier content
+  return isPaidTier(userSubscription);                // paid content → user must be paid
 };
 // Check if user can access a specific workout
 export const canAccessWorkout = (workoutId, userSubscription) => {
@@ -143,9 +127,11 @@ export const getRequiredSubscription = (contentType, contentId) => {
   }
   return SUBSCRIPTION_TIERS.FREE;
 };
-// Get user's subscription plan details
+// Get user's subscription plan details. Normalizes any paid value (incl. legacy
+// 'basic'/'premium') to the Pro plan so existing subscribers don't render as Free.
 export const getUserPlan = (userSubscription) => {
-  return SUBSCRIPTION_PLANS.find(plan => plan.id === userSubscription) || SUBSCRIPTION_PLANS[0];
+  const id = isPaidTier(userSubscription) ? SUBSCRIPTION_TIERS.PRO : SUBSCRIPTION_TIERS.FREE;
+  return SUBSCRIPTION_PLANS.find(plan => plan.id === id) || SUBSCRIPTION_PLANS[0];
 };
 // Calculate usage for limited features
 export const calculateUsage = (featureKey, usage = {}) => {

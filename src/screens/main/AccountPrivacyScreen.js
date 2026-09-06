@@ -18,10 +18,15 @@ import { updateUserProfile } from '../../services/firestoreService';
 import { signOutUser } from '../../services/authService';
 import { signOutGoogle } from '../../services/googleAuthService';
 import { getTheme } from '../../utils/theme';
+import { useToast } from '../../components/dbe';
+import { SUPPORT_EMAIL } from '../../utils/constants';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
 const AccountPrivacyScreen = ({ navigation }) => {
     const { userData, user, isDarkMode, theme: contextTheme } = useAppContext();
     const theme = contextTheme || getTheme(isDarkMode || false);
+    const showToast = useToast();
+    const [deleting, setDeleting] = useState(false);
 
     // Privacy settings state
     const [profileVisibility, setProfileVisibility] = useState(
@@ -71,7 +76,7 @@ const AccountPrivacyScreen = ({ navigation }) => {
                 }
             });
             setHasChanges(false);
-            Alert.alert('Success', 'Privacy settings saved successfully.');
+            showToast('Privacy settings saved successfully.');
         } catch (error) {
             console.error('Error saving privacy settings:', error);
             Alert.alert('Error', 'Failed to save privacy settings. Please try again.');
@@ -100,17 +105,34 @@ const AccountPrivacyScreen = ({ navigation }) => {
                                     text: 'Yes, Delete My Account',
                                     style: 'destructive',
                                     onPress: async () => {
-                                        // Note: Full account deletion would need a backend function
-                                        // For now, we'll sign out and inform the user
+                                        // Real deletion: the callable removes the
+                                        // Storage objects, the copies other users
+                                        // hold of this account, every top-level
+                                        // document keyed by the uid, the whole
+                                        // user subtree, and finally the auth
+                                        // record. Sign-out happens only after it
+                                        // reports success, so a failure leaves the
+                                        // user signed in and able to retry rather
+                                        // than locked out of a half-deleted account.
+                                        setDeleting(true);
                                         try {
-                                            await signOutGoogle();
-                                            await signOutUser();
-                                            Alert.alert(
-                                                'Account Deletion Requested',
-                                                'Please contact support@basketballaitraining.com to complete your account deletion request.'
-                                            );
+                                            const fn = httpsCallable(getFunctions(), 'deleteAccount');
+                                            const { data } = await fn();
+                                            if (!data?.success) throw new Error(data?.error || 'Deletion failed');
+
+                                            await signOutGoogle().catch(() => null);
+                                            await signOutUser().catch(() => null);
+                                            // No success alert: the auth listener
+                                            // swaps the navigator back to sign-in
+                                            // the moment the user is gone, so an
+                                            // alert would land on an unmounted tree.
                                         } catch (error) {
-                                            Alert.alert('Error', 'Failed to process request. Please try again.');
+                                            Alert.alert(
+                                                'Could not delete your account',
+                                                `Nothing was deleted. Please try again, or contact ${SUPPORT_EMAIL} if this keeps happening.`
+                                            );
+                                        } finally {
+                                            setDeleting(false);
                                         }
                                     }
                                 }
@@ -305,8 +327,12 @@ const AccountPrivacyScreen = ({ navigation }) => {
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                            style={styles.actionRow}
+                            style={[styles.actionRow, deleting && { opacity: 0.5 }]}
                             onPress={handleDeleteAccount}
+                            disabled={deleting}
+                            accessibilityRole="button"
+                            accessibilityLabel="Delete account"
+                            accessibilityState={{ disabled: deleting }}
                         >
                             <View style={[styles.settingIcon, { backgroundColor: '#F44336' + '15' }]}>
                                 <Ionicons name="trash-outline" size={20} color="#F44336" />
@@ -316,10 +342,16 @@ const AccountPrivacyScreen = ({ navigation }) => {
                                     Delete Account
                                 </Text>
                                 <Text style={[styles.settingDescription, { color: theme.textSecondary }]}>
-                                    Permanently delete your account and data
+                                    {deleting
+                                        ? 'Deleting your account and data…'
+                                        : 'Permanently delete your account and data'}
                                 </Text>
                             </View>
-                            <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
+                            {deleting ? (
+                                <ActivityIndicator size="small" color="#F44336" />
+                            ) : (
+                                <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
+                            )}
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -357,7 +389,7 @@ const styles = StyleSheet.create({
         padding: 4,
     },
     headerTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: '600',
     },
     saveButton: {
@@ -368,7 +400,7 @@ const styles = StyleSheet.create({
     saveButtonText: {
         color: '#FFF',
         fontWeight: '600',
-        fontSize: 14,
+        fontSize: 16,
     },
     placeholder: {
         width: 60,
@@ -378,7 +410,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
     },
     sectionTitle: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '600',
         marginBottom: 12,
         textTransform: 'uppercase',
@@ -412,11 +444,11 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     settingTitle: {
-        fontSize: 15,
+        fontSize: 16.5,
         fontWeight: '500',
     },
     settingDescription: {
-        fontSize: 12,
+        fontSize: 14,
         marginTop: 2,
     },
     optionButton: {
@@ -429,7 +461,7 @@ const styles = StyleSheet.create({
         gap: 4,
     },
     optionText: {
-        fontSize: 13,
+        fontSize: 15,
         fontWeight: '500',
     },
     infoCard: {
@@ -441,8 +473,8 @@ const styles = StyleSheet.create({
     },
     infoText: {
         flex: 1,
-        fontSize: 13,
-        lineHeight: 18,
+        fontSize: 15,
+        lineHeight: 19,
     },
     bottomPadding: {
         height: 32,

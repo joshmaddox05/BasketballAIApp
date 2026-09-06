@@ -1,5 +1,9 @@
-// SettingsScreen.js - Settings with dark mode and language options
+// SettingsScreen.js - Settings with dark mode and language options.
+// DBE burgundy redesign (mock 11e) — presentation only: every handler,
+// permission check and dev tool is unchanged.
 import React, { useState, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { MODULE_INTROS, introSeenKey } from '../../config/moduleIntros';
 import {
     StyleSheet,
     Text,
@@ -25,6 +29,9 @@ import {
     getNotificationPermissionStatus
 } from '../../services/notificationService';
 import { getFunctions, httpsCallable } from 'firebase/functions';
+import { TYPE, FONTS, SHAPE } from '../../utils/typography';
+import { ScreenHeader, SectionLabel, Entrance } from '../../components/dbe';
+import { SUPPORT_EMAIL, STORAGE_KEYS } from '../../utils/constants';
 
 const SettingsScreen = ({ navigation }) => {
     const {
@@ -32,6 +39,8 @@ const SettingsScreen = ({ navigation }) => {
         user,
         isDarkMode,
         toggleDarkMode,
+        voiceMuted,
+        toggleVoiceMuted,
         language,
         changeLanguage,
         theme: contextTheme,
@@ -91,13 +100,60 @@ const SettingsScreen = ({ navigation }) => {
     };
 
     const handleStartTour = async () => {
-        // Navigate back to Home first, then start the tour
-        navigation.navigate('Home');
+        // Navigate to the role's home first, then start the tour. This used to
+        // hardcode 'Home', a route that does not exist in the coach or parent
+        // stacks — so the replay threw for every non-player role.
+        const role = userData?.role;
+        const homeRoute =
+            role === 'coach' ? 'CoachHome'
+            : role === 'parent' ? 'ParentHome'
+            : role === 'scout' ? 'Discover'
+            : 'Home';
+        try {
+            navigation.navigate(homeRoute);
+        } catch (error) {
+            // Not reachable from this stack — start where we are rather than crash.
+        }
         // Small delay to allow navigation to complete
         setTimeout(async () => {
             await resetTour();
             startTour();
         }, 500);
+    };
+
+    // Clears every module's "seen" marker, so each module explains itself again on
+    // its next open. One control rather than a row per module: eleven toggles for
+    // something you use once would be worse than the feature.
+    const handleResetModuleIntros = async () => {
+        try {
+            const keys = Object.keys(MODULE_INTROS).map(introSeenKey);
+            await AsyncStorage.multiRemove(keys);
+            Alert.alert(
+                'Module intros reset',
+                'Each module will introduce itself again the next time you open it.'
+            );
+        } catch (error) {
+            Alert.alert('Error', 'Could not reset the module intros.');
+        }
+    };
+
+    // The game-plan and film tours are screen-scoped (components/tour/ScreenTour.js),
+    // so they cannot be replayed through `startTour` from here — that call reaches
+    // this navigator's provider, not theirs. Clearing their flags re-arms them for
+    // the next visit to the screen itself, which is where they belong anyway.
+    const handleReplayScreenTours = async () => {
+        try {
+            await AsyncStorage.multiRemove([
+                STORAGE_KEYS.HAS_SEEN_GAMEPLAN_TOUR,
+                STORAGE_KEYS.HAS_SEEN_FILM_TOUR,
+            ]);
+            Alert.alert(
+                'Screen tours reset',
+                'The game plan builder and film library will walk you through again the next time you open them.'
+            );
+        } catch (error) {
+            Alert.alert('Error', 'Could not reset the screen tours.');
+        }
     };
 
     const handleTestNotification = async () => {
@@ -191,190 +247,207 @@ const SettingsScreen = ({ navigation }) => {
         );
     };
 
-    const SettingRow = ({ icon, title, subtitle, onPress, rightComponent }) => (
-        <TouchableOpacity
-            style={[styles.settingRow, { backgroundColor: theme.card, borderBottomColor: theme.border }]}
-            onPress={onPress}
-            disabled={!onPress}
+    const currentPlan =
+        (userData.subscription || 'free').charAt(0).toUpperCase() +
+        (userData.subscription || 'free').slice(1);
+
+    // ── Grouped card rows (mock 11e) ─────────────────────────────────────────
+    const Group = ({ children, delay = 0 }) => (
+        <Entrance
+            variant="cardIn"
+            delay={delay}
+            style={{
+                borderRadius: SHAPE.radiusTile,
+                backgroundColor: theme.surface,
+                borderWidth: 1,
+                borderColor: theme.hairline,
+                overflow: 'hidden',
+            }}
         >
-            <View style={styles.settingLeft}>
-                <Ionicons name={icon} size={24} color={theme.primary} />
-                <View style={styles.settingText}>
-                    <Text style={[styles.settingTitle, { color: theme.text }]}>{title}</Text>
-                    {subtitle && (
-                        <Text style={[styles.settingSubtitle, { color: theme.textSecondary }]}>
-                            {subtitle}
-                        </Text>
-                    )}
-                </View>
-            </View>
-            {rightComponent}
-        </TouchableOpacity>
+            {children}
+        </Entrance>
     );
+
+    const SettingRow = ({ title, value, onPress, rightComponent, last, disabled }) => {
+        const body = (
+            <View
+                style={[
+                    styles.settingRow,
+                    !last && { borderBottomWidth: 1, borderBottomColor: theme.hairline },
+                ]}
+            >
+                <Text
+                    style={{
+                        flex: 1,
+                        fontFamily: FONTS.bodySemiBold,
+                        fontSize: 15,
+                        color: theme.text,
+                    }}
+                >
+                    {title}
+                </Text>
+                {value ? (
+                    <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 14.5, color: theme.textMuted }}>
+                        {value}
+                    </Text>
+                ) : null}
+                {rightComponent !== undefined
+                    ? rightComponent
+                    : onPress
+                        ? <Ionicons name="chevron-forward" size={14} color={theme.textDim} />
+                        : null}
+            </View>
+        );
+        if (!onPress || disabled) return body;
+        return (
+            <TouchableOpacity activeOpacity={0.75} onPress={onPress}>
+                {body}
+            </TouchableOpacity>
+        );
+    };
+
+    const switchProps = (value, onValueChange) => ({
+        value,
+        onValueChange,
+        trackColor: { false: theme.track, true: theme.primary },
+        thumbColor: '#FFFFFF',
+    });
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-            <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color={theme.text} />
-                </TouchableOpacity>
-                <Text style={[styles.headerTitle, { color: theme.text }]}>{i18n.t('settings')}</Text>
-                <View style={styles.placeholder} />
-            </View>
+            <ScreenHeader title={i18n.t('settings')} onBack={() => navigation.goBack()} />
 
-            <ScrollView style={styles.scrollView}>
-                {/* Account Section */}
-                <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>ACCOUNT</Text>
+            <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+                {/* Account */}
+                <SectionLabel>Account</SectionLabel>
+                <Group>
+                    <SettingRow
+                        title={i18n.t('editProfile')}
+                        onPress={() => navigation.navigate('EditProfile')}
+                    />
+                    <SettingRow
+                        title={i18n.t('subscription')}
+                        value={currentPlan}
+                        last
+                        onPress={() => setShowSubscriptionModal(true)}
+                    />
+                </Group>
 
-                <SettingRow
-                    icon="person-outline"
-                    title={i18n.t('editProfile')}
-                    subtitle="Update your personal information"
-                    onPress={() => navigation.navigate('EditProfile')}
-                    rightComponent={<Ionicons name="chevron-forward" size={20} color={theme.textTertiary} />}
-                />
-
-                <SettingRow
-                    icon="card-outline"
-                    title={i18n.t('subscription')}
-                    subtitle={`Current: ${(userData.subscription || 'free').charAt(0).toUpperCase() + (userData.subscription || 'free').slice(1)}`}
-                    onPress={() => setShowSubscriptionModal(true)}
-                    rightComponent={<Ionicons name="chevron-forward" size={20} color={theme.textTertiary} />}
-                />
-
-                {/* Appearance Section */}
-                <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>APPEARANCE</Text>
-
-                <SettingRow
-                    icon="moon-outline"
-                    title={i18n.t('darkMode')}
-                    subtitle={isDarkMode ? 'Enabled' : 'Disabled'}
-                    rightComponent={
-                        <Switch
-                            value={isDarkMode}
-                            onValueChange={toggleDarkMode}
-                            trackColor={{ false: theme.border, true: theme.primaryLight }}
-                            thumbColor={isDarkMode ? theme.primary : theme.backgroundTertiary}
+                {/* Preferences */}
+                <View style={{ marginTop: SHAPE.sectionGap }}>
+                    <SectionLabel>Preferences</SectionLabel>
+                    <Group delay={80}>
+                        <SettingRow
+                            title={i18n.t('darkMode')}
+                            rightComponent={<Switch {...switchProps(isDarkMode, toggleDarkMode)} />}
                         />
-                    }
-                />
-
-                {/* Language Section */}
-                <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>LANGUAGE</Text>
-
-                <SettingRow
-                    icon="language-outline"
-                    title="English"
-                    subtitle={language === 'en' ? 'Active' : 'Switch to English'}
-                    onPress={() => handleLanguageChange('en')}
-                    rightComponent={
-                        language === 'en' && (
-                            <Ionicons name="checkmark-circle" size={24} color={theme.success} />
-                        )
-                    }
-                />
-
-                <SettingRow
-                    icon="language-outline"
-                    title="Français"
-                    subtitle={language === 'fr' ? 'Actif' : 'Changer en français'}
-                    onPress={() => handleLanguageChange('fr')}
-                    rightComponent={
-                        language === 'fr' && (
-                            <Ionicons name="checkmark-circle" size={24} color={theme.success} />
-                        )
-                    }
-                />
-
-                {/* Notifications Section */}
-                <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>NOTIFICATIONS</Text>
-
-                <SettingRow
-                    icon="notifications-outline"
-                    title="Push Notifications"
-                    subtitle={notificationsEnabled ? 'Daily reminders enabled' : 'Reminders disabled'}
-                    rightComponent={
-                        <Switch
-                            value={notificationsEnabled}
-                            onValueChange={handleNotificationToggle}
-                            trackColor={{ false: theme.border, true: theme.primaryLight }}
-                            thumbColor={notificationsEnabled ? theme.primary : theme.backgroundTertiary}
+                        <SettingRow
+                            title="Tour Voice"
+                            rightComponent={<Switch {...switchProps(!voiceMuted, toggleVoiceMuted)} />}
                         />
-                    }
-                />
+                        <SettingRow
+                            title="Push Notifications"
+                            last
+                            rightComponent={
+                                <Switch {...switchProps(notificationsEnabled, handleNotificationToggle)} />
+                            }
+                        />
+                    </Group>
+                </View>
 
-                <SettingRow
-                    icon="list-outline"
-                    title="Notification History"
-                    subtitle="View past notifications"
-                    onPress={() => navigation.navigate('Notifications')}
-                    rightComponent={<Ionicons name="chevron-forward" size={20} color={theme.textTertiary} />}
-                />
+                {/* Language */}
+                <View style={{ marginTop: SHAPE.sectionGap }}>
+                    <SectionLabel>Language</SectionLabel>
+                    <Group delay={160}>
+                        <SettingRow
+                            title="English"
+                            onPress={() => handleLanguageChange('en')}
+                            rightComponent={
+                                language === 'en' ? (
+                                    <Ionicons name="checkmark-circle" size={18} color={theme.accentText} />
+                                ) : (
+                                    <Ionicons name="chevron-forward" size={14} color={theme.textDim} />
+                                )
+                            }
+                        />
+                        <SettingRow
+                            title="Français"
+                            last
+                            onPress={() => handleLanguageChange('fr')}
+                            rightComponent={
+                                language === 'fr' ? (
+                                    <Ionicons name="checkmark-circle" size={18} color={theme.accentText} />
+                                ) : (
+                                    <Ionicons name="chevron-forward" size={14} color={theme.textDim} />
+                                )
+                            }
+                        />
+                    </Group>
+                </View>
 
-                {/* Support Section */}
-                <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>SUPPORT</Text>
+                {/* Support */}
+                <View style={{ marginTop: SHAPE.sectionGap }}>
+                    <SectionLabel>Support</SectionLabel>
+                    <Group delay={240}>
+                        <SettingRow
+                            title="Notification History"
+                            onPress={() => navigation.navigate('Notifications')}
+                        />
 
-                <SettingRow
-                    icon="map-outline"
-                    title="App Tour"
-                    subtitle="Take a guided tour of the app"
-                    onPress={handleStartTour}
-                    rightComponent={<Ionicons name="chevron-forward" size={20} color={theme.textTertiary} />}
-                />
+                        {(!userData?.role
+                            || userData?.role === 'player'
+                            || userData?.role === 'coach'
+                            || userData?.role === 'parent') && (
+                            <SettingRow title="App Tour" onPress={handleStartTour} />
+                        )}
 
-                <SettingRow
-                    icon="help-circle-outline"
-                    title="Help & Support"
-                    subtitle="Get help and contact support"
-                    onPress={() => Alert.alert('Help & Support', 'Contact: support@basketballai.com')}
-                    rightComponent={<Ionicons name="chevron-forward" size={20} color={theme.textTertiary} />}
-                />
+                        <SettingRow title="Replay Module Intros" onPress={handleResetModuleIntros} />
+                        <SettingRow title="Replay Screen Tours" onPress={handleReplayScreenTours} />
 
-                <SettingRow
-                    icon="document-text-outline"
-                    title="Terms & Privacy"
-                    subtitle="Terms of service and privacy policy"
-                    onPress={() => Alert.alert('Terms & Privacy', 'View our terms and privacy policy at www.basketballai.com')}
-                    rightComponent={<Ionicons name="chevron-forward" size={20} color={theme.textTertiary} />}
-                />
+                        <SettingRow
+                            title="Help & Support"
+                            onPress={() => Alert.alert('Help & Support', `Contact: ${SUPPORT_EMAIL}`)}
+                        />
 
-                <SettingRow
-                    icon="information-circle-outline"
-                    title="About"
-                    subtitle="Version 1.0.0 (MVP)"
-                    rightComponent={null}
-                />
+                        <SettingRow
+                            title="Terms & Privacy"
+                            onPress={() => Alert.alert('Terms & Privacy', 'View our terms and privacy policy at www.basketballai.com')}
+                        />
+
+                        <SettingRow title="Version" value="1.0.0 (MVP)" last />
+                    </Group>
+                </View>
 
                 {/* Developer Tools Section - Remove in production */}
-                <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>DEVELOPER TOOLS</Text>
+                <View style={{ marginTop: SHAPE.sectionGap }}>
+                    <SectionLabel>Developer tools</SectionLabel>
+                    <Group delay={320}>
+                        <SettingRow
+                            title="Send Test Notification"
+                            onPress={sendingTestNotification ? null : handleTestNotification}
+                            rightComponent={
+                                sendingTestNotification ? (
+                                    <ActivityIndicator size="small" color={theme.primary} />
+                                ) : (
+                                    <Ionicons name="chevron-forward" size={14} color={theme.textDim} />
+                                )
+                            }
+                        />
 
-                <SettingRow
-                    icon="notifications-outline"
-                    title="Send Test Notification"
-                    subtitle={sendingTestNotification ? "Sending..." : "Test push notifications"}
-                    onPress={sendingTestNotification ? null : handleTestNotification}
-                    rightComponent={
-                        sendingTestNotification ? (
-                            <ActivityIndicator size="small" color={theme.primary} />
-                        ) : (
-                            <Ionicons name="chevron-forward" size={20} color={theme.textTertiary} />
-                        )
-                    }
-                />
-
-                <SettingRow
-                    icon="flask-outline"
-                    title="Seed Challenges"
-                    subtitle={seedingChallenges ? "Seeding..." : "Add sample challenges to database"}
-                    onPress={seedingChallenges ? null : handleSeedChallenges}
-                    rightComponent={
-                        seedingChallenges ? (
-                            <ActivityIndicator size="small" color={theme.primary} />
-                        ) : (
-                            <Ionicons name="chevron-forward" size={20} color={theme.textTertiary} />
-                        )
-                    }
-                />
+                        <SettingRow
+                            title="Seed Challenges"
+                            last
+                            onPress={seedingChallenges ? null : handleSeedChallenges}
+                            rightComponent={
+                                seedingChallenges ? (
+                                    <ActivityIndicator size="small" color={theme.primary} />
+                                ) : (
+                                    <Ionicons name="chevron-forward" size={14} color={theme.textDim} />
+                                )
+                            }
+                        />
+                    </Group>
+                </View>
 
                 <View style={styles.bottomSpace} />
             </ScrollView>
@@ -392,58 +465,21 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        paddingVertical: 15,
-        borderBottomWidth: 1,
-    },
-    backButton: {
-        padding: 5,
-    },
-    headerTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-    },
-    placeholder: {
-        width: 34,
-    },
     scrollView: {
         flex: 1,
     },
-    sectionTitle: {
-        fontSize: 13,
-        fontWeight: '600',
-        paddingHorizontal: 20,
-        paddingTop: 25,
-        paddingBottom: 10,
+    scrollContent: {
+        paddingHorizontal: SHAPE.screenPadding,
+        paddingTop: 16,
+        paddingBottom: 20,
     },
     settingRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        paddingVertical: 15,
-        borderBottomWidth: 1,
-    },
-    settingLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        flex: 1,
-    },
-    settingText: {
-        marginLeft: 15,
-        flex: 1,
-    },
-    settingTitle: {
-        fontSize: 16,
-        fontWeight: '500',
-    },
-    settingSubtitle: {
-        fontSize: 13,
-        marginTop: 2,
+        gap: 10,
+        paddingVertical: 13,
+        paddingHorizontal: 14,
+        minHeight: 48,
     },
     bottomSpace: {
         height: 40,

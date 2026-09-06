@@ -30,7 +30,7 @@ const LockedFeatureCard = ({
     displayName,
     description,
     icon = 'lock-closed',
-    colors = ['#FF6B00', '#FF8E53'],
+    colors = ['#8A1C22', '#4C0F14'],
     customMessage
 }) => {
     const { userData, theme, navigation } = useAppContext();
@@ -88,7 +88,7 @@ const LockedFeatureCard = ({
                         {!hasAccess && (
                             <View style={[styles.premiumBadge, { backgroundColor: theme.warning }]}>
                                 <Ionicons name="diamond" size={12} color="#FFF" />
-                                <Text style={styles.premiumText}>Premium</Text>
+                                <Text style={styles.premiumText}>Pro</Text>
                             </View>
                         )}
                     </View>
@@ -162,7 +162,7 @@ const styles = StyleSheet.create({
         marginBottom: 6,
     },
     title: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: 'bold',
         flex: 1,
     },
@@ -176,13 +176,13 @@ const styles = StyleSheet.create({
     },
     premiumText: {
         color: '#FFF',
-        fontSize: 10,
+        fontSize: 12,
         fontWeight: 'bold',
         marginLeft: 4,
     },
     description: {
-        fontSize: 14,
-        lineHeight: 20,
+        fontSize: 16,
+        lineHeight: 21,
         marginBottom: 8,
     },
     lockedDescription: {
@@ -194,7 +194,7 @@ const styles = StyleSheet.create({
         marginTop: 4,
     },
     unlockText: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '600',
         marginRight: 6,
     },

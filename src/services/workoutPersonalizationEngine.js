@@ -4,6 +4,13 @@
 
 import { getAllWorkoutTemplates, WORKOUT_CATEGORIES, WORKOUT_DIFFICULTIES } from '../data/workoutTemplates';
 import { hasAccess } from '../utils/subscription';
+import { categoryAffinityFor } from './blueprint/archetypeAssignment';
+
+// The archetype factor's full value. Deliberately below the 30 that skill level
+// carries — the archetype says what an athlete is being built into, not what they
+// can safely train today, and a Defensive Anchor should still not be handed
+// expert drills in week one.
+const ARCHETYPE_WEIGHT = 20;
 
 /**
  * Score a workout based on how well it matches the user's profile
@@ -11,7 +18,7 @@ import { hasAccess } from '../utils/subscription';
  */
 const scoreWorkout = (workout, userProfile) => {
   let score = 0;
-  const { level, goals, preferences } = userProfile;
+  const { level, goals, preferences, archetypeId } = userProfile;
 
   // 1. SKILL LEVEL MATCHING (Weight: 30 points)
   const skillLevelMap = {
@@ -92,6 +99,17 @@ const scoreWorkout = (workout, userProfile) => {
   // Bonus for well-rounded workouts that cover multiple categories
   if (workout.category === WORKOUT_CATEGORIES.CUSTOM) {
     score += 10;
+  }
+
+  // 6. ARCHETYPE FIT (Weight: 20 points)
+  // Without this the archetype was decorative: the app would tell an athlete they
+  // are an Interior Finisher and then recommend exactly what it recommends a
+  // Movement Shooter with the same focus chips. An athlete with no archetype yet
+  // scores a flat neutral, so their ordering is unchanged rather than scrambled.
+  if (archetypeId) {
+    score += ARCHETYPE_WEIGHT * categoryAffinityFor(archetypeId, workout.category);
+  } else {
+    score += ARCHETYPE_WEIGHT * 0.5;
   }
 
   return score;

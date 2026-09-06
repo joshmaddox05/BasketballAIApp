@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
         padding: 4,
     },
     headerTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: '600',
     },
     headerRight: {
@@ -139,8 +139,8 @@ const styles = StyleSheet.create({
         paddingVertical: 16,
     },
     description: {
-        fontSize: 15,
-        lineHeight: 22,
+        fontSize: 16.5,
+        lineHeight: 23,
     },
     listContent: {
         paddingHorizontal: 16,
@@ -165,12 +165,12 @@ const styles = StyleSheet.create({
         marginLeft: 16,
     },
     categoryName: {
-        fontSize: 17,
+        fontSize: 18,
         fontWeight: '600',
         marginBottom: 4,
     },
     workoutCount: {
-        fontSize: 14,
+        fontSize: 16,
     },
     separator: {
         height: 12,

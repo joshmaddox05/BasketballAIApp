@@ -21,9 +21,11 @@ import {
   removeWorkoutFromFavorites,
 } from '../../services/firestoreService';
 import { getAllWorkoutTemplates } from '../../data/workoutTemplates';
+import { useToast } from '../../components/dbe';
 
 const MyWorkoutsScreen = ({ navigation }) => {
   const { userData } = useAppContext();
+  const showToast = useToast();
   const [activeTab, setActiveTab] = useState('custom'); // 'custom', 'favorites', 'templates'
   const [customWorkouts, setCustomWorkouts] = useState([]);
   const [favoriteWorkouts, setFavoriteWorkouts] = useState([]);
@@ -68,7 +70,7 @@ const MyWorkoutsScreen = ({ navigation }) => {
             try {
               await deleteCustomWorkout(userData.uid, workoutId);
               loadWorkouts();
-              Alert.alert('Success', 'Workout deleted successfully');
+              showToast('Workout deleted successfully');
             } catch (error) {
               Alert.alert('Error', 'Failed to delete workout');
             }
@@ -102,7 +104,7 @@ const MyWorkoutsScreen = ({ navigation }) => {
 
   const renderWorkoutCard = ({ item, showActions = true, isFavorite = false }) => {
     const categoryColors = {
-      Shooting: '#FF6B00',
+      Shooting: '#8A1C22',
       Dribbling: '#4CAF50',
       Physical: '#2196F3',
       Defense: '#9C27B0',
@@ -203,7 +205,7 @@ const MyWorkoutsScreen = ({ navigation }) => {
       >
         <View style={styles.templateHeader}>
           <View style={styles.templateIconContainer}>
-            <Ionicons name="document-text-outline" size={28} color="#FF6B00" />
+            <Ionicons name="document-text-outline" size={28} color="#8A1C22" />
           </View>
           <View style={styles.templateInfo}>
             <Text style={styles.templateName}>{item.name}</Text>
@@ -277,7 +279,7 @@ const MyWorkoutsScreen = ({ navigation }) => {
           style={styles.addButton}
           onPress={() => navigation.navigate('CustomWorkoutCreator', {})}
         >
-          <Ionicons name="add" size={28} color="#FF6B00" />
+          <Ionicons name="add" size={28} color="#8A1C22" />
         </TouchableOpacity>
       </View>
 
@@ -290,7 +292,7 @@ const MyWorkoutsScreen = ({ navigation }) => {
           <Ionicons
             name="create"
             size={20}
-            color={activeTab === 'custom' ? '#FF6B00' : '#666'}
+            color={activeTab === 'custom' ? '#8A1C22' : '#666'}
           />
           <Text style={[styles.tabText, activeTab === 'custom' && styles.tabTextActive]}>
             Custom ({customWorkouts.length})
@@ -304,7 +306,7 @@ const MyWorkoutsScreen = ({ navigation }) => {
           <Ionicons
             name="heart"
             size={20}
-            color={activeTab === 'favorites' ? '#FF6B00' : '#666'}
+            color={activeTab === 'favorites' ? '#8A1C22' : '#666'}
           />
           <Text style={[styles.tabText, activeTab === 'favorites' && styles.tabTextActive]}>
             Favorites ({favoriteWorkouts.length})
@@ -318,7 +320,7 @@ const MyWorkoutsScreen = ({ navigation }) => {
           <Ionicons
             name="document-text"
             size={20}
-            color={activeTab === 'templates' ? '#FF6B00' : '#666'}
+            color={activeTab === 'templates' ? '#8A1C22' : '#666'}
           />
           <Text style={[styles.tabText, activeTab === 'templates' && styles.tabTextActive]}>
             Templates
@@ -329,7 +331,7 @@ const MyWorkoutsScreen = ({ navigation }) => {
       {/* Content */}
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#FF6B00" />
+          <ActivityIndicator size="large" color="#8A1C22" />
         </View>
       ) : (
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -401,7 +403,7 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 21,
     fontWeight: 'bold',
     color: '#333',
     flex: 1,
@@ -427,15 +429,15 @@ const styles = StyleSheet.create({
     borderBottomColor: 'transparent',
   },
   tabActive: {
-    borderBottomColor: '#FF6B00',
+    borderBottomColor: '#8A1C22',
   },
   tabText: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
     fontWeight: '500',
   },
   tabTextActive: {
-    color: '#FF6B00',
+    color: '#8A1C22',
     fontWeight: '600',
   },
   loadingContainer: {
@@ -474,15 +476,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   workoutName: {
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: '600',
     color: '#333',
     marginBottom: 4,
   },
   workoutDescription: {
-    fontSize: 13,
+    fontSize: 15,
     color: '#666',
-    lineHeight: 18,
+    lineHeight: 19,
   },
   workoutMeta: {
     flexDirection: 'row',
@@ -496,7 +498,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   metaText: {
-    fontSize: 13,
+    fontSize: 15,
     color: '#666',
   },
   difficultyBadge: {
@@ -506,7 +508,7 @@ const styles = StyleSheet.create({
     marginLeft: 'auto',
   },
   difficultyText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '600',
   },
   workoutActions: {
@@ -522,7 +524,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   actionButtonText: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '500',
   },
   templateCard: {
@@ -531,7 +533,7 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 12,
     borderWidth: 2,
-    borderColor: '#FF6B0030',
+    borderColor: '#8A1C2230',
     borderStyle: 'dashed',
   },
   templateHeader: {
@@ -543,7 +545,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 12,
-    backgroundColor: '#FF6B0015',
+    backgroundColor: '#8A1C2215',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -551,15 +553,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   templateName: {
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: '600',
     color: '#333',
     marginBottom: 4,
   },
   templateDescription: {
-    fontSize: 13,
+    fontSize: 15,
     color: '#666',
-    lineHeight: 18,
+    lineHeight: 19,
   },
   templateMeta: {
     flexDirection: 'row',
@@ -567,18 +569,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   templateMetaText: {
-    fontSize: 13,
+    fontSize: 15,
     color: '#666',
   },
   templateBadge: {
-    backgroundColor: '#FF6B0015',
+    backgroundColor: '#8A1C2215',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
   },
   templateBadgeText: {
-    fontSize: 12,
-    color: '#FF6B00',
+    fontSize: 14,
+    color: '#8A1C22',
     fontWeight: '600',
   },
   emptyState: {
@@ -589,28 +591,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
   },
   emptyStateTitle: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: '600',
     color: '#333',
     marginTop: 16,
     marginBottom: 8,
   },
   emptyStateSubtitle: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 21,
   },
   emptyStateButton: {
     marginTop: 20,
-    backgroundColor: '#FF6B00',
+    backgroundColor: '#8A1C22',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
   },
   emptyStateButtonText: {
     color: '#FFF',
-    fontSize: 15,
+    fontSize: 16.5,
     fontWeight: '600',
   },
 });

@@ -1,9 +1,11 @@
 // AppContext.js - Global app state with Firebase integration
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import logger from '../utils/logger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useColorScheme, AppState } from 'react-native';
 import { getTheme } from '../utils/theme';
+import { STORAGE_KEYS } from '../utils/constants';
+import { identifyUser, resetUser, track, EVENTS } from '../services/analytics';
 
 // Push notification imports
 import {
@@ -13,6 +15,9 @@ import {
   addNotificationReceivedListener,
   addNotificationResponseListener,
 } from '../services/notificationService';
+
+// Navigation ref for deep-linking notification taps
+import { navigationRef } from '../navigation/AppNavigator';
 
 // Firebase imports
 import { onAuthStateChange, signOutUser, getCurrentUser } from '../services/authService';
@@ -31,12 +36,17 @@ import {
   updateChallengeProgress,
   getAIAnalysisStats,
   getWorkoutHistory,
-  setUserStats
+  setUserStats,
+  getLatestShotDNAProfile,
+  getLatestEvalRankScore,
+  getBlueprint360Plan,
+  getSimCoachIQScore
 } from '../services/firestoreService';
 
 // Import workout templates
 import { getAllWorkoutTemplates } from '../data/workoutTemplates';
 import { hasAccess } from '../utils/subscription';
+import { claimPendingInviteIfAny } from '../services/coachInviteService';
 import {
     mapLegacyCategoryToId,
     DEFAULT_CATEGORY_ID,
@@ -78,6 +88,12 @@ const convertTemplateToWorkout = (template) => {
         subCategoryId: subCategoryId,
         tags: [], // Can be populated later
         requiredTier: template.requiredTier, // Add subscription tier
+        // This map is an allowlist, so any field it does not name is silently
+        // dropped on the way to the UI. That is what happened to the read/decision
+        // layer: STEP_TEMPLATES carried `reads`/`decisions`/`stage` correctly, the
+        // merge worked, and ActiveWorkoutScreen rendered nothing, because the
+        // fields never survived this adapter. Anything added to a step template
+        // from here on has to be named here too.
         steps: template.steps.map(step => ({
             title: step.name,
             instructions: step.instructions.join(' '),
@@ -85,6 +101,23 @@ const convertTemplateToWorkout = (template) => {
             reps: step.reps || 0,
             duration: step.duration ? Math.floor(step.duration / 60) : 0,
             category: step.category || template.category.toLowerCase(),
+            // The read/decision layer from drillIntelligence.js. Spread
+            // conditionally so a step without them stays byte-identical to what
+            // this adapter produced before, which is what every custom and
+            // legacy workout relies on.
+            ...(step.stage && { stage: step.stage }),
+            ...(step.reads?.length && { reads: step.reads }),
+            ...(step.decisions?.length && { decisions: step.decisions }),
+            ...(step.coachingPoints?.length && { coachingPoints: step.coachingPoints }),
+            ...(step.commonMistakes?.length && { commonMistakes: step.commonMistakes }),
+            ...(step.gameTransfer && { gameTransfer: step.gameTransfer }),
+            ...(step.equipment?.length && { drillEquipment: step.equipment }),
+            ...(step.players != null && { players: step.players }),
+            // `tracker` was being dropped here too. The pose registry still
+            // resolved a detector via its keyword fallback on the title, so this
+            // never surfaced as a bug — but the structured field exists precisely
+            // so catalog drills do not depend on that fallback.
+            ...(step.tracker && { tracker: step.tracker }),
             ...(step.videoReference && { videoReference: step.videoReference })
         })),
         equipment: ['Basketball', 'Court space', 'Water bottle'],
@@ -128,6 +161,9 @@ const AppContext = createContext();
 export const AppProvider = ({ children }) => {
     const [userData, setUserData] = useState(initialUserData);
     const [user, setUser] = useState(null); // Firebase auth user object
+    // Active child for the parent Family Hub. Persisted so a relaunch does not
+    // silently reset a multi-child parent back to their first athlete.
+    const [selectedChildUid, setSelectedChildUidState] = useState(null);
     const [activities, setActivities] = useState(initialActivities);
     const [workouts, setWorkouts] = useState(initialWorkouts);
     const [goals, setGoals] = useState(initialGoals);
@@ -146,12 +182,21 @@ export const AppProvider = ({ children }) => {
     const [showMilestoneCelebration, setShowMilestoneCelebration] = useState(false);
     const [aiAnalysisStats, setAIAnalysisStats] = useState(null);
 
+    // DBE module state
+    const [shotDNAProfile, setShotDNAProfile] = useState(null);
+    const [evalRankScore, setEvalRankScore] = useState(null);
+    const [blueprint360Plan, setBlueprint360Plan] = useState(null);
+    const [simCoachIQScore, setSimCoachIQScore] = useState(null);
+
     // Dark mode state management
     const systemColorScheme = useColorScheme();
     const [isDarkMode, setIsDarkMode] = useState(false);
     const [useSystemTheme, setUseSystemTheme] = useState(true);
     const [theme, setTheme] = useState(getTheme(false));
     const [language, setLanguage] = useState('en');
+
+    // Tour voice narration (text-to-speech) mute preference
+    const [voiceMuted, setVoiceMuted] = useState(false);
 
     // Firebase auth state listener
     useEffect(() => {
@@ -164,6 +209,15 @@ export const AppProvider = ({ children }) => {
             if (authUser) {
                 // User is signed in
                 setIsAuthenticated(true);
+
+                // Bind telemetry to the uid ONLY — never the email or display
+                // name. Most of the pilot cohort are minors; see the privacy
+                // note in services/analytics.js.
+                identifyUser(authUser.uid, {
+                    role: profile?.role || null,
+                    gradeLevel: profile?.gradeLevel ?? null,
+                    subscription: profile?.subscription || 'free',
+                });
                 
                 if (profile) {
                     // User has a profile in Firestore
@@ -235,6 +289,19 @@ export const AppProvider = ({ children }) => {
                         setDailyChallengeProgress(dailyChallengeProgress);
                         setAIAnalysisStats(aiStats);
 
+                        // Load DBE module data in background (non-blocking)
+                        Promise.all([
+                            getLatestShotDNAProfile(authUser.uid),
+                            getLatestEvalRankScore(authUser.uid),
+                            getBlueprint360Plan(authUser.uid),
+                            getSimCoachIQScore(authUser.uid),
+                        ]).then(([dnaProfile, evalScore, bp360, iqScore]) => {
+                            setShotDNAProfile(dnaProfile);
+                            setEvalRankScore(evalScore);
+                            setBlueprint360Plan(bp360);
+                            setSimCoachIQScore(iqScore);
+                        }).catch(() => {});
+
                         // Show the challenge modal on login only if today's challenge isn't completed yet
                         // Delay slightly to ensure navigation is ready
                         if (challenge && dailyChallengeProgress?.status !== 'completed') {
@@ -269,6 +336,7 @@ export const AppProvider = ({ children }) => {
                 }
             } else {
                 // User is signed out
+                resetUser();
                 setIsAuthenticated(false);
                 setUser(null);
                 setUserData(initialUserData);
@@ -312,6 +380,34 @@ export const AppProvider = ({ children }) => {
         const notificationResponseSub = addNotificationResponseListener((response) => {
             const data = response.notification.request.content.data;
             logger.debug('Notification tapped', { type: data?.type });
+
+            // New-message push → open the thread. convId is the sorted uid pair
+            // joined by '_'; derive the other participant and reuse Messaging's
+            // otherUid direct-open path.
+            if (data?.type === 'message' && data?.convId && user?.uid && navigationRef.current) {
+                const otherUid = data.convId.split('_').find((id) => id !== user.uid);
+                if (otherUid) {
+                    navigationRef.current.navigate('Messaging', { otherUid });
+                }
+                return;
+            }
+
+            // Role-loop pushes (assignments, sessions, scout consent) carry their
+            // own destination, written by the Cloud Function that sent them. The
+            // Notifications screen is the safe fallback when a route is not
+            // reachable from the current role's navigator.
+            if (data?.route && navigationRef.current) {
+                try {
+                    navigationRef.current.navigate(data.route, data.params);
+                } catch (error) {
+                    logger.warn(`Push route "${data.route}" unreachable; opening Notifications`, error);
+                    try {
+                        navigationRef.current.navigate('Notifications');
+                    } catch (fallbackError) {
+                        // Navigator not ready — the notification is still in the inbox.
+                    }
+                }
+            }
         });
 
         return () => {
@@ -370,6 +466,12 @@ export const AppProvider = ({ children }) => {
                 const storedUseSystemTheme = await AsyncStorage.getItem('useSystemTheme');
                 const storedLanguage = await AsyncStorage.getItem('language');
                 const storedBookmarkedVideos = await AsyncStorage.getItem('bookmarkedVideos');
+                const storedVoiceMuted = await AsyncStorage.getItem('tourVoiceMuted');
+                const storedChildUid = await AsyncStorage.getItem(STORAGE_KEYS.SELECTED_CHILD_UID);
+
+                if (storedChildUid) {
+                    setSelectedChildUidState(storedChildUid);
+                }
 
                 if (storedUseSystemTheme !== null) {
                     const useSystem = JSON.parse(storedUseSystemTheme);
@@ -400,6 +502,7 @@ export const AppProvider = ({ children }) => {
 
                 if (storedLanguage) setLanguage(storedLanguage);
                 if (storedBookmarkedVideos) setBookmarkedVideos(JSON.parse(storedBookmarkedVideos));
+                if (storedVoiceMuted !== null) setVoiceMuted(JSON.parse(storedVoiceMuted));
             } catch (error) {
                 logger.error('Failed to load preferences', error);
             }
@@ -570,6 +673,32 @@ export const AppProvider = ({ children }) => {
                     onboardingCompleted: true
                 }));
 
+                track(EVENTS.ONBOARDING_COMPLETED, {
+                    role: userData?.role || null,
+                    gradeLevel: userData?.gradeLevel ?? null,
+                });
+
+                // Claim a coach invite last, and never let it block finishing.
+                // This is the earliest safe moment: the grade the server needs in
+                // order to decide between a live connection and a guardian-gated
+                // request has just been written. If it fails, the athlete still
+                // has a working account and the code stays in storage for the
+                // next app open to retry — the alternative is trapping someone on
+                // the last screen of onboarding because of a dropped request.
+                try {
+                    const result = await claimPendingInviteIfAny({
+                        guardianEmail: userData?.guardianEmail || null,
+                    });
+                    if (result?.success) {
+                        track(result.pending ? EVENTS.COACH_LINK_REQUESTED : EVENTS.COACH_LINK_APPROVED, {
+                            source: 'coachInvite',
+                            pending: !!result.pending,
+                        });
+                    }
+                } catch (error) {
+                    logger.warn('Coach invite claim deferred', error);
+                }
+
                 return true;
             } catch (error) {
                 logger.error('Error completing onboarding', error);
@@ -658,6 +787,33 @@ export const AppProvider = ({ children }) => {
             await AsyncStorage.setItem('useSystemTheme', JSON.stringify(false));
         } catch (error) {
             logger.error('Failed to save dark mode preference', error);
+        }
+    };
+
+    // Persist the parent's active-child selection alongside the state update, so
+    // every call site gets persistence for free.
+    const setSelectedChildUid = useCallback(async (uid) => {
+        setSelectedChildUidState(uid);
+        try {
+            if (uid) {
+                await AsyncStorage.setItem(STORAGE_KEYS.SELECTED_CHILD_UID, uid);
+            } else {
+                await AsyncStorage.removeItem(STORAGE_KEYS.SELECTED_CHILD_UID);
+            }
+        } catch (error) {
+            // Non-fatal — the selection still holds for this session.
+            logger.warn('Could not persist selected child', error);
+        }
+    }, []);
+
+    // Toggle the tour voice narration mute preference (persisted immediately)
+    const toggleVoiceMuted = async () => {
+        const newValue = !voiceMuted;
+        setVoiceMuted(newValue);
+        try {
+            await AsyncStorage.setItem('tourVoiceMuted', JSON.stringify(newValue));
+        } catch (error) {
+            logger.error('Failed to save tour voice preference', error);
         }
     };
 
@@ -821,6 +977,8 @@ export const AppProvider = ({ children }) => {
             isDarkMode,
             setIsDarkMode,
             toggleDarkMode,
+            voiceMuted,
+            toggleVoiceMuted,
             useSystemTheme,
             theme,
             language,
@@ -867,7 +1025,19 @@ export const AppProvider = ({ children }) => {
             triggerMilestone,
             dismissMilestone,
             refreshAIStats,
-            updateUserDataLocally
+            updateUserDataLocally,
+            // Parent Family Hub — active child selection (shared across parent screens)
+            selectedChildUid,
+            setSelectedChildUid,
+            // DBE module state
+            shotDNAProfile,
+            setShotDNAProfile,
+            evalRankScore,
+            setEvalRankScore,
+            blueprint360Plan,
+            setBlueprint360Plan,
+            simCoachIQScore,
+            setSimCoachIQScore
         }}>
             {children}
         </AppContext.Provider>

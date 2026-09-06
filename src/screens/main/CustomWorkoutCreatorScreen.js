@@ -178,7 +178,7 @@ const CustomWorkoutCreatorScreen = ({ route, navigation }) => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#FF6B00" />
+          <ActivityIndicator size="large" color="#8A1C22" />
           <Text style={styles.loadingText}>Loading workout...</Text>
         </View>
       </SafeAreaView>
@@ -262,7 +262,7 @@ const CustomWorkoutCreatorScreen = ({ route, navigation }) => {
 
         {/* Estimated Duration */}
         <View style={styles.durationCard}>
-          <Ionicons name="time-outline" size={24} color="#FF6B00" />
+          <Ionicons name="time-outline" size={24} color="#8A1C22" />
           <Text style={styles.durationText}>
             Estimated Duration: {calculateEstimatedDuration()} minutes
           </Text>
@@ -276,7 +276,7 @@ const CustomWorkoutCreatorScreen = ({ route, navigation }) => {
               style={styles.addStepButton}
               onPress={() => setShowStepPicker(true)}
             >
-              <Ionicons name="add-circle" size={24} color="#FF6B00" />
+              <Ionicons name="add-circle" size={24} color="#8A1C22" />
               <Text style={styles.addStepText}>Add Step</Text>
             </TouchableOpacity>
           </View>
@@ -420,7 +420,7 @@ const CustomWorkoutCreatorScreen = ({ route, navigation }) => {
                     </View>
                   </View>
                 </View>
-                <Ionicons name="add-circle-outline" size={24} color="#FF6B00" />
+                <Ionicons name="add-circle-outline" size={24} color="#8A1C22" />
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -458,7 +458,7 @@ const CustomWorkoutCreatorScreen = ({ route, navigation }) => {
                 >
                   {cat}
                 </Text>
-                {category === cat && <Ionicons name="checkmark" size={20} color="#FF6B00" />}
+                {category === cat && <Ionicons name="checkmark" size={20} color="#8A1C22" />}
               </TouchableOpacity>
             ))}
           </View>
@@ -496,7 +496,7 @@ const CustomWorkoutCreatorScreen = ({ route, navigation }) => {
                 >
                   {diff}
                 </Text>
-                {difficulty === diff && <Ionicons name="checkmark" size={20} color="#FF6B00" />}
+                {difficulty === diff && <Ionicons name="checkmark" size={20} color="#8A1C22" />}
               </TouchableOpacity>
             ))}
           </View>
@@ -518,7 +518,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   loadingText: {
-    fontSize: 16,
+    fontSize: 17.5,
     color: '#666',
   },
   header: {
@@ -535,14 +535,14 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: 'bold',
     color: '#333',
     flex: 1,
     textAlign: 'center',
   },
   saveButton: {
-    backgroundColor: '#FF6B00',
+    backgroundColor: '#8A1C22',
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 8,
@@ -555,7 +555,7 @@ const styles = StyleSheet.create({
   saveButtonText: {
     color: '#FFF',
     fontWeight: '600',
-    fontSize: 15,
+    fontSize: 16.5,
   },
   content: {
     flex: 1,
@@ -565,7 +565,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   label: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
     color: '#333',
     marginBottom: 8,
@@ -574,7 +574,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF',
     borderRadius: 8,
     padding: 12,
-    fontSize: 15,
+    fontSize: 16.5,
     color: '#333',
     borderWidth: 1,
     borderColor: '#E0E0E0',
@@ -601,7 +601,7 @@ const styles = StyleSheet.create({
     borderColor: '#E0E0E0',
   },
   pickerText: {
-    fontSize: 15,
+    fontSize: 16.5,
     color: '#333',
   },
   durationCard: {
@@ -613,10 +613,10 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#FF6B0030',
+    borderColor: '#8A1C2230',
   },
   durationText: {
-    fontSize: 15,
+    fontSize: 16.5,
     fontWeight: '600',
     color: '#333',
   },
@@ -627,7 +627,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: 'bold',
     color: '#333',
   },
@@ -637,9 +637,9 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   addStepText: {
-    fontSize: 15,
+    fontSize: 16.5,
     fontWeight: '600',
-    color: '#FF6B00',
+    color: '#8A1C22',
   },
   emptySteps: {
     backgroundColor: '#FFF',
@@ -649,12 +649,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   emptyStepsText: {
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: '600',
     color: '#666',
   },
   emptyStepsSubtext: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#999',
     textAlign: 'center',
   },
@@ -675,26 +675,26 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#FF6B00',
+    backgroundColor: '#8A1C22',
     justifyContent: 'center',
     alignItems: 'center',
   },
   stepNumberText: {
     color: '#FFF',
     fontWeight: 'bold',
-    fontSize: 14,
+    fontSize: 16,
   },
   stepInfo: {
     flex: 1,
   },
   stepName: {
-    fontSize: 15,
+    fontSize: 16.5,
     fontWeight: '600',
     color: '#333',
     marginBottom: 2,
   },
   stepMeta: {
-    fontSize: 13,
+    fontSize: 15,
     color: '#666',
   },
   stepActions: {
@@ -719,7 +719,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#E0E0E0',
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: 'bold',
     color: '#333',
   },
@@ -743,16 +743,16 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   filterChipActive: {
-    backgroundColor: '#FF6B0015',
-    borderColor: '#FF6B00',
+    backgroundColor: '#8A1C2215',
+    borderColor: '#8A1C22',
   },
   filterChipText: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
     fontWeight: '500',
   },
   filterChipTextActive: {
-    color: '#FF6B00',
+    color: '#8A1C22',
     fontWeight: '600',
   },
   stepTemplateList: {
@@ -774,13 +774,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   stepTemplateName: {
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: '600',
     color: '#333',
     marginBottom: 4,
   },
   stepTemplateDescription: {
-    fontSize: 13,
+    fontSize: 15,
     color: '#666',
     marginBottom: 8,
   },
@@ -796,18 +796,18 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   metaText: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#666',
   },
   categoryBadge: {
-    backgroundColor: '#FF6B0015',
+    backgroundColor: '#8A1C2215',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
   },
   categoryBadgeText: {
-    fontSize: 11,
-    color: '#FF6B00',
+    fontSize: 13,
+    color: '#8A1C22',
     fontWeight: '600',
   },
   modalOverlay: {
@@ -824,7 +824,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   pickerModalTitle: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 16,
@@ -838,11 +838,11 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F0F0F0',
   },
   pickerOptionText: {
-    fontSize: 16,
+    fontSize: 17.5,
     color: '#333',
   },
   pickerOptionTextActive: {
-    color: '#FF6B00',
+    color: '#8A1C22',
     fontWeight: '600',
   },
 });

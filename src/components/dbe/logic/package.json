@@ -1,0 +1,4 @@
+{
+  "//": "Pure ES modules so the sheet state machine runs under Node's test runner, mirroring src/services/blueprint and src/services/gamePlan. Nothing here may import React or React Native.",
+  "type": "module"
+}

@@ -282,7 +282,7 @@ const styles = StyleSheet.create({
         marginRight: 8,
     },
     headerTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: '600',
     },
     headerRight: {
@@ -302,7 +302,7 @@ const styles = StyleSheet.create({
     },
     searchInput: {
         flex: 1,
-        fontSize: 16,
+        fontSize: 17.5,
         marginLeft: 8,
     },
     chipsContainer: {
@@ -322,7 +322,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
     },
     chipText: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '500',
     },
     chipIcon: {
@@ -333,7 +333,7 @@ const styles = StyleSheet.create({
         paddingVertical: 8,
     },
     resultsCount: {
-        fontSize: 14,
+        fontSize: 16,
     },
     listContent: {
         paddingHorizontal: 16,
@@ -363,7 +363,7 @@ const styles = StyleSheet.create({
         gap: 6,
     },
     workoutTitle: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: '600',
         flex: 1,
     },
@@ -379,7 +379,7 @@ const styles = StyleSheet.create({
         gap: 4,
     },
     metaText: {
-        fontSize: 13,
+        fontSize: 15,
     },
     levelBadge: {
         paddingHorizontal: 8,
@@ -387,14 +387,14 @@ const styles = StyleSheet.create({
         borderRadius: 4,
     },
     levelText: {
-        fontSize: 11,
+        fontSize: 13,
         fontWeight: '600',
         color: '#FFFFFF',
     },
     workoutDescription: {
-        fontSize: 13,
+        fontSize: 15,
         marginTop: 6,
-        lineHeight: 18,
+        lineHeight: 19,
     },
     separator: {
         height: 10,
@@ -405,15 +405,15 @@ const styles = StyleSheet.create({
         paddingHorizontal: 32,
     },
     emptyTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: '600',
         marginTop: 16,
     },
     emptyDescription: {
-        fontSize: 14,
+        fontSize: 16,
         textAlign: 'center',
         marginTop: 8,
-        lineHeight: 20,
+        lineHeight: 21,
     },
     clearButton: {
         marginTop: 20,
@@ -424,7 +424,7 @@ const styles = StyleSheet.create({
     clearButtonText: {
         color: '#FFFFFF',
         fontWeight: '600',
-        fontSize: 14,
+        fontSize: 16,
     },
 });
 

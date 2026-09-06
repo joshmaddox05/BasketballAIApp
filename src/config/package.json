@@ -1,0 +1,4 @@
+{
+  "//": "Marks this directory's files as ES modules so the pure ones (onboardingNarration.js) run unchanged under Node's test runner, mirroring src/utils and src/data. Metro and Babel ignore the `type` field, so the React Native build is unaffected. This directory is NOT uniformly pure — env.js and firebaseConfig.js reach native modules — but Node only loads what a test imports.",
+  "type": "module"
+}

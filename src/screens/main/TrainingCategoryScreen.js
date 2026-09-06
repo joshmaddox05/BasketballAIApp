@@ -13,6 +13,7 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
+import { EmptyState } from '../../components/dbe';
 import { hasAccess, SUBSCRIPTION_TIERS } from '../../utils/subscription';
 import SubscriptionModal from '../../components/shared/SubscriptionModal';
 
@@ -40,14 +41,9 @@ const TrainingCategoryScreen = ({ route, navigation }) => {
         return !hasAccess(userSubscription, requiredTier);
     };
 
-    // Get display name for required tier
+    // Get display name for required tier (two-tier model: Free or Pro)
     const getTierDisplayName = (tier) => {
-        switch (tier) {
-            case SUBSCRIPTION_TIERS.BASIC: return 'Basic';
-            case SUBSCRIPTION_TIERS.PREMIUM: return 'Premium';
-            case SUBSCRIPTION_TIERS.PRO: return 'Pro';
-            default: return 'Premium';
-        }
+        return tier === SUBSCRIPTION_TIERS.FREE ? 'Free' : 'Pro';
     };
 
     // Check if a workout is recommended for the current user
@@ -75,7 +71,7 @@ const TrainingCategoryScreen = ({ route, navigation }) => {
     const getCategoryColor = () => {
         switch(category.toLowerCase()) {
             case 'shooting':
-                return '#FF6B00';
+                return '#8A1C22';
             case 'dribbling':
                 return '#4CAF50';
             case 'physical':
@@ -87,7 +83,7 @@ const TrainingCategoryScreen = ({ route, navigation }) => {
             case 'nutrition':
                 return '#00BCD4';
             default:
-                return '#FF6B00';
+                return '#8A1C22';
         }
     };
     
@@ -270,20 +266,14 @@ const TrainingCategoryScreen = ({ route, navigation }) => {
                     contentContainerStyle={styles.workoutsList}
                 />
             ) : (
-                <View style={styles.emptyState}>
-                    <Ionicons name={getCategoryIcon()} size={60} color={theme.textTertiary} />
-                    <Text style={[styles.emptyStateTitle, { color: theme.text }]}>No Workouts Available</Text>
-                    <Text style={[styles.emptyStateDescription, { color: theme.textSecondary }]}>
-                        There are currently no {category.toLowerCase()} workouts available.
-                        Check back later or explore other categories.
-                    </Text>
-                    <TouchableOpacity
-                        style={[styles.exploreButton, { backgroundColor: theme.primary }]}
-                        onPress={() => navigation.goBack()}
-                    >
-                        <Text style={styles.exploreButtonText}>Explore Categories</Text>
-                    </TouchableOpacity>
-                </View>
+                <EmptyState
+                    icon={getCategoryIcon()}
+                    title="No Workouts Available"
+                    sub={`There are currently no ${category.toLowerCase()} workouts available. Check back later or explore other categories.`}
+                    ctaLabel="Explore Categories"
+                    onPress={() => navigation.goBack()}
+                    style={{ flex: 1, justifyContent: 'center' }}
+                />
             )}
         </SafeAreaView>
         <SubscriptionModal
@@ -319,7 +309,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     headerTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: 'bold',
     },
     filterButton: {
@@ -347,12 +337,12 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     categoryTitle: {
-        fontSize: 20,
+        fontSize: 21,
         fontWeight: 'bold',
         marginBottom: 4,
     },
     workoutCount: {
-        fontSize: 14,
+        fontSize: 16,
     },
     workoutsList: {
         padding: 16,
@@ -388,7 +378,7 @@ const styles = StyleSheet.create({
     },
     premiumBannerText: {
         color: '#FFF',
-        fontSize: 12,
+        fontSize: 14,
         fontWeight: '700',
         letterSpacing: 0.5,
     },
@@ -403,7 +393,7 @@ const styles = StyleSheet.create({
     },
     unlockButtonText: {
         color: '#FFF',
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '600',
     },
     workoutImageContainer: {
@@ -429,7 +419,7 @@ const styles = StyleSheet.create({
     },
     levelBadgeText: {
         color: '#FFF',
-        fontSize: 12,
+        fontSize: 14,
         fontWeight: '600',
     },
     recommendedBadge: {
@@ -446,20 +436,20 @@ const styles = StyleSheet.create({
     },
     recommendedBadgeText: {
         color: '#FFF',
-        fontSize: 11,
+        fontSize: 13,
         fontWeight: '600',
     },
     workoutContent: {
         padding: 16,
     },
     workoutTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: '700',
         marginBottom: 8,
     },
     workoutDescription: {
-        fontSize: 14,
-        lineHeight: 20,
+        fontSize: 16,
+        lineHeight: 21,
         marginBottom: 16,
     },
     workoutFooter: {
@@ -473,7 +463,7 @@ const styles = StyleSheet.create({
     },
     workoutDurationText: {
         marginLeft: 6,
-        fontSize: 14,
+        fontSize: 16,
     },
     startButton: {
         flexDirection: 'row',
@@ -485,35 +475,8 @@ const styles = StyleSheet.create({
     },
     startButtonText: {
         color: '#FFF',
-        fontSize: 14,
-        fontWeight: '600',
-    },
-    emptyState: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 24,
-    },
-    emptyStateTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        marginTop: 16,
-        marginBottom: 8,
-    },
-    emptyStateDescription: {
-        fontSize: 14,
-        textAlign: 'center',
-        marginBottom: 24,
-    },
-    exploreButton: {
-        paddingHorizontal: 24,
-        paddingVertical: 12,
-        borderRadius: 8,
-    },
-    exploreButtonText: {
-        color: '#FFF',
-        fontWeight: 'bold',
         fontSize: 16,
+        fontWeight: '600',
     },
 });
 

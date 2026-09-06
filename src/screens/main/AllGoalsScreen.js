@@ -384,7 +384,7 @@ const styles = StyleSheet.create({
         padding: 4,
     },
     headerTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: '600',
     },
     addButton: {
@@ -404,11 +404,11 @@ const styles = StyleSheet.create({
         borderRadius: 8,
     },
     statValue: {
-        fontSize: 24,
+        fontSize: 25,
         fontWeight: 'bold',
     },
     statLabel: {
-        fontSize: 12,
+        fontSize: 14,
         marginTop: 4,
     },
     statDivider: {
@@ -429,7 +429,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     filterText: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '500',
     },
     listContent: {
@@ -460,11 +460,11 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     goalTitle: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: '600',
     },
     goalCategory: {
-        fontSize: 12,
+        fontSize: 14,
         marginTop: 2,
         textTransform: 'capitalize',
     },
@@ -480,11 +480,11 @@ const styles = StyleSheet.create({
         marginBottom: 6,
     },
     progressText: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '500',
     },
     progressPercent: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '600',
     },
     progressBar: {
@@ -497,8 +497,8 @@ const styles = StyleSheet.create({
         borderRadius: 4,
     },
     goalDescription: {
-        fontSize: 14,
-        lineHeight: 20,
+        fontSize: 16,
+        lineHeight: 21,
         marginBottom: 12,
     },
     actionRow: {
@@ -517,7 +517,7 @@ const styles = StyleSheet.create({
     actionButtonText: {
         color: '#FFF',
         fontWeight: '600',
-        fontSize: 14,
+        fontSize: 16,
     },
     deleteButton: {
         backgroundColor: 'transparent',
@@ -529,7 +529,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
     },
     dateText: {
-        fontSize: 11,
+        fontSize: 13,
     },
     separator: {
         height: 12,
@@ -539,15 +539,15 @@ const styles = StyleSheet.create({
         paddingHorizontal: 40,
     },
     emptyTitle: {
-        fontSize: 20,
+        fontSize: 21,
         fontWeight: '600',
         marginTop: 16,
         marginBottom: 8,
     },
     emptyMessage: {
-        fontSize: 16,
+        fontSize: 17.5,
         textAlign: 'center',
-        lineHeight: 22,
+        lineHeight: 23,
         marginBottom: 24,
     },
     addGoalButton: {
@@ -561,7 +561,7 @@ const styles = StyleSheet.create({
     addGoalButtonText: {
         color: '#FFF',
         fontWeight: '600',
-        fontSize: 16,
+        fontSize: 17.5,
     },
 });
 

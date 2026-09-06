@@ -1,0 +1,4 @@
+{
+  "//": "Marks this directory's files as ES modules so the pure ones (tacticalGlossary.js) run unchanged under Node's test runner, mirroring src/utils and src/services/blueprint. Metro and Babel ignore the `type` field and transform these files normally, so the React Native build is unaffected. This directory is NOT uniformly pure, but Node only loads what a test imports.",
+  "type": "module"
+}

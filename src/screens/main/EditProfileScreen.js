@@ -20,8 +20,9 @@ import * as ImagePicker from 'expo-image-picker';
 import { useAppContext } from '../../context/AppContext';
 import { updateUserProfile, getUserProfile } from '../../services/firestoreService';
 import { getTheme } from '../../utils/theme';
-import { auth } from '../../config/firebaseConfig';
-import * as FileSystem from 'expo-file-system/legacy';
+import { uploadProfileImage } from '../../utils/profileImage';
+import { composeHeight, splitHeight } from '../../services/blueprint/archetypeAssignment';
+import { GRADE_LEVELS, POSITIONS, FEET_OPTIONS, INCH_OPTIONS } from '../../utils/constants';
 
 const EditProfileScreen = ({ navigation }) => {
     const { userData, user, isDarkMode, theme: contextTheme, updateUserDataLocally } = useAppContext();
@@ -35,7 +36,21 @@ const EditProfileScreen = ({ navigation }) => {
     // Training preferences
     const [trainingDays, setTrainingDays] = useState(userData?.preferences?.trainingDays || []);
     const [preferredDuration, setPreferredDuration] = useState(userData?.preferences?.preferredDuration || 30);
+    const [gradeLevel, setGradeLevel] = useState(userData?.gradeLevel ?? null);
+    // Position and height were previously parent-write-only (EditAthleteProfileScreen),
+    // so a solo player could never supply the archetype engine's strongest signal.
+    const [position, setPosition] = useState(userData?.position || null);
+    const [heightFeet, setHeightFeet] = useState(() => splitHeight(userData?.height).feet);
+    const [heightInches, setHeightInches] = useState(() => splitHeight(userData?.height).inches);
+    const [coachType, setCoachType] = useState(userData?.coachType || 'org');
+    const [bio, setBio] = useState(userData?.bio || '');
 
+    const isPlayer = !userData?.role || userData?.role === 'player';
+    const isCoach = userData?.role === 'coach';
+    const COACH_TYPES = [
+        { value: 'org', label: 'Organization Coach' },
+        { value: 'trainer', label: 'Skills Trainer' },
+    ];
     const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     const DURATION_OPTIONS = [15, 30, 45, 60, 90];
 
@@ -47,9 +62,21 @@ const EditProfileScreen = ({ navigation }) => {
         const imageChanged = currentImageUri !== (userData?.photoURL || null);
         const daysChanged = JSON.stringify(trainingDays) !== JSON.stringify(userData?.preferences?.trainingDays || []);
         const durationChanged = preferredDuration !== (userData?.preferences?.preferredDuration || 30);
+        const gradeChanged = gradeLevel !== (userData?.gradeLevel ?? null);
+        const positionChanged = position !== (userData?.position || null);
+        const heightChanged = composeHeight(heightFeet, heightInches) !== (userData?.height || null);
+        const coachTypeChanged = coachType !== (userData?.coachType || 'org');
+        const bioChanged = bio !== (userData?.bio || '');
 
-        setHasChanges(nameChanged || imageChanged || daysChanged || durationChanged);
-    }, [displayName, profileImage, trainingDays, preferredDuration, userData]);
+        // positionChanged and heightChanged were computed and then left out of this
+        // disjunction, so Save stayed disabled for anyone whose only edit was their
+        // position or height — the two fields the archetype engine weighs most, and
+        // the two this screen exists to collect.
+        setHasChanges(
+            nameChanged || imageChanged || daysChanged || durationChanged || gradeChanged
+            || positionChanged || heightChanged || coachTypeChanged || bioChanged
+        );
+    }, [displayName, profileImage, trainingDays, preferredDuration, gradeLevel, position, heightFeet, heightInches, coachType, bio, userData]);
 
     const pickImage = async () => {
         try {
@@ -88,57 +115,6 @@ const EditProfileScreen = ({ navigation }) => {
         }
     };
 
-    // Upload profile image using expo-file-system (reliable in React Native/Expo)
-    const uploadProfileImage = async (uid, imageUri) => {
-        try {
-            console.log('Starting image upload...');
-            console.log('Image URI:', imageUri.substring(0, 50) + '...');
-
-            const timestamp = Date.now();
-            const fileName = `profile_${timestamp}.jpg`;
-            const storagePath = `users/${uid}/profile/${fileName}`;
-
-            // Get the current user's ID token for authentication
-            const idToken = await auth.currentUser.getIdToken();
-
-            // Firebase Storage bucket name
-            const bucket = 'basketball-ai-app-db000.firebasestorage.app';
-
-            // Upload URL for Firebase Storage REST API
-            const uploadUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o?uploadType=media&name=${encodeURIComponent(storagePath)}`;
-
-            console.log('Uploading to:', storagePath);
-
-            // Use expo-file-system to upload the file directly
-            const uploadResult = await FileSystem.uploadAsync(uploadUrl, imageUri, {
-                httpMethod: 'POST',
-                uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
-                headers: {
-                    'Authorization': `Bearer ${idToken}`,
-                    'Content-Type': 'image/jpeg',
-                },
-            });
-
-            console.log('Upload response status:', uploadResult.status);
-
-            if (uploadResult.status !== 200) {
-                console.error('Upload failed:', uploadResult.body);
-                throw new Error(`Upload failed: ${uploadResult.status}`);
-            }
-
-            const responseData = JSON.parse(uploadResult.body);
-            console.log('Upload complete, constructing download URL...');
-
-            // Construct the download URL
-            const downloadURL = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodeURIComponent(storagePath)}?alt=media&token=${responseData.downloadTokens}`;
-
-            console.log('Download URL obtained');
-            return downloadURL;
-        } catch (error) {
-            console.error('Error uploading profile image:', error);
-            throw error;
-        }
-    };
 
     const handleSave = async () => {
         if (!displayName.trim()) {
@@ -178,6 +154,26 @@ const EditProfileScreen = ({ navigation }) => {
                     preferredDuration,
                 }
             };
+
+            // Grade level is a player attribute that drives scout discoverability
+            if (isPlayer && gradeLevel != null) {
+                profileUpdate.gradeLevel = gradeLevel;
+            }
+
+            // Archetype inputs. Height is written in the same `6'2"` free-text format
+            // EditAthleteProfileScreen uses, so a parent edit and a player edit agree
+            // and archetypeAssignment.parseHeightToInches only has one format to read.
+            if (isPlayer) {
+                if (position) profileUpdate.position = position;
+                const composed = composeHeight(heightFeet, heightInches);
+                if (composed) profileUpdate.height = composed;
+            }
+
+            // Coach sub-type (organization vs skills trainer) + public bio
+            if (isCoach) {
+                profileUpdate.coachType = coachType;
+                profileUpdate.bio = bio.trim();
+            }
 
             // Update profile in Firestore
             await updateUserProfile(user.uid, profileUpdate);
@@ -284,6 +280,186 @@ const EditProfileScreen = ({ navigation }) => {
                             maxLength={50}
                         />
                     </View>
+
+                    {/* Position & Height (player only — the archetype engine's strongest
+                        signals, and previously only a linked parent could set them) */}
+                    {isPlayer && (
+                        <View style={[styles.section, { backgroundColor: theme.card }]}>
+                            <Text style={[styles.sectionTitle, { color: theme.text }]}>Position & Size</Text>
+                            <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
+                                These sharpen your archetype, which sets your shot menu and drill volume
+                            </Text>
+
+                            <View style={styles.durationContainer}>
+                                {POSITIONS.map((p) => (
+                                    <TouchableOpacity
+                                        key={p.value}
+                                        style={[
+                                            styles.durationButton,
+                                            {
+                                                backgroundColor: position === p.value
+                                                    ? theme.primary
+                                                    : theme.backgroundSecondary,
+                                                borderColor: position === p.value
+                                                    ? theme.primary
+                                                    : theme.border
+                                            }
+                                        ]}
+                                        onPress={() => setPosition(position === p.value ? null : p.value)}
+                                    >
+                                        <Text style={[
+                                            styles.durationText,
+                                            { color: position === p.value ? '#FFF' : theme.text }
+                                        ]}>
+                                            {p.label}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+
+                            <Text style={[styles.sectionSubtitle, { color: theme.textSecondary, marginTop: 14 }]}>
+                                Height
+                            </Text>
+                            <View style={styles.durationContainer}>
+                                {FEET_OPTIONS.map((f) => (
+                                    <TouchableOpacity
+                                        key={`ft-${f}`}
+                                        style={[
+                                            styles.durationButton,
+                                            {
+                                                backgroundColor: heightFeet === f
+                                                    ? theme.primary
+                                                    : theme.backgroundSecondary,
+                                                borderColor: heightFeet === f ? theme.primary : theme.border
+                                            }
+                                        ]}
+                                        onPress={() => setHeightFeet(heightFeet === f ? null : f)}
+                                    >
+                                        <Text style={[
+                                            styles.durationText,
+                                            { color: heightFeet === f ? '#FFF' : theme.text }
+                                        ]}>
+                                            {f}'
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                            {heightFeet != null && (
+                                <View style={styles.durationContainer}>
+                                    {INCH_OPTIONS.map((i) => (
+                                        <TouchableOpacity
+                                            key={`in-${i}`}
+                                            style={[
+                                                styles.durationButton,
+                                                {
+                                                    backgroundColor: heightInches === i
+                                                        ? theme.primary
+                                                        : theme.backgroundSecondary,
+                                                    borderColor: heightInches === i ? theme.primary : theme.border
+                                                }
+                                            ]}
+                                            onPress={() => setHeightInches(i)}
+                                        >
+                                            <Text style={[
+                                                styles.durationText,
+                                                { color: heightInches === i ? '#FFF' : theme.text }
+                                            ]}>
+                                                {i}"
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            )}
+                        </View>
+                    )}
+
+                    {/* Grade Level Section (player only — drives recruiting eligibility) */}
+                    {isPlayer && (
+                        <View style={[styles.section, { backgroundColor: theme.card }]}>
+                            <Text style={[styles.sectionTitle, { color: theme.text }]}>Grade Level</Text>
+                            <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
+                                Recruiting eligibility is high-school only (grades 9–12)
+                            </Text>
+                            <View style={styles.durationContainer}>
+                                {GRADE_LEVELS.map((grade) => (
+                                    <TouchableOpacity
+                                        key={grade.value}
+                                        style={[
+                                            styles.durationButton,
+                                            {
+                                                backgroundColor: gradeLevel === grade.value
+                                                    ? theme.primary
+                                                    : theme.backgroundSecondary,
+                                                borderColor: gradeLevel === grade.value
+                                                    ? theme.primary
+                                                    : theme.border
+                                            }
+                                        ]}
+                                        onPress={() => setGradeLevel(grade.value)}
+                                    >
+                                        <Text style={[
+                                            styles.durationText,
+                                            { color: gradeLevel === grade.value ? '#FFF' : theme.text }
+                                        ]}>
+                                            {grade.label}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        </View>
+                    )}
+
+                    {/* Coach Sub-type Section (coach only) */}
+                    {isCoach && (
+                        <View style={[styles.section, { backgroundColor: theme.card }]}>
+                            <Text style={[styles.sectionTitle, { color: theme.text }]}>Coach Type</Text>
+                            <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
+                                Organization coaches run teams; skills trainers develop individuals
+                            </Text>
+                            <View style={styles.durationContainer}>
+                                {COACH_TYPES.map((ct) => (
+                                    <TouchableOpacity
+                                        key={ct.value}
+                                        style={[
+                                            styles.durationButton,
+                                            {
+                                                backgroundColor: coachType === ct.value ? theme.primary : theme.backgroundSecondary,
+                                                borderColor: coachType === ct.value ? theme.primary : theme.border,
+                                            },
+                                        ]}
+                                        onPress={() => setCoachType(ct.value)}
+                                    >
+                                        <Text style={[
+                                            styles.durationText,
+                                            { color: coachType === ct.value ? '#FFF' : theme.text },
+                                        ]}>
+                                            {ct.label}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+
+                            <Text style={[styles.sectionTitle, { color: theme.text, marginTop: 16 }]}>Public Bio</Text>
+                            <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
+                                Shown on your public coach profile in CoachMarket
+                            </Text>
+                            <TextInput
+                                style={[styles.textInput, {
+                                    backgroundColor: theme.backgroundSecondary,
+                                    color: theme.text,
+                                    borderColor: theme.border,
+                                    minHeight: 80,
+                                    textAlignVertical: 'top',
+                                }]}
+                                value={bio}
+                                onChangeText={setBio}
+                                placeholder="Tell athletes about your coaching background…"
+                                placeholderTextColor={theme.textSecondary}
+                                multiline
+                                maxLength={300}
+                            />
+                        </View>
+                    )}
 
                     {/* Training Preferences Section */}
                     <View style={[styles.section, { backgroundColor: theme.card }]}>
@@ -393,7 +569,7 @@ const styles = StyleSheet.create({
         padding: 4,
     },
     headerTitle: {
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: '600',
     },
     saveButton: {
@@ -402,7 +578,7 @@ const styles = StyleSheet.create({
         alignItems: 'flex-end',
     },
     saveText: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: '600',
     },
     keyboardView: {
@@ -452,7 +628,7 @@ const styles = StyleSheet.create({
     },
     changePhotoText: {
         marginTop: 12,
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: '500',
     },
     section: {
@@ -462,16 +638,16 @@ const styles = StyleSheet.create({
         padding: 16,
     },
     sectionTitle: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: '600',
         marginBottom: 4,
     },
     sectionSubtitle: {
-        fontSize: 14,
+        fontSize: 16,
         marginBottom: 12,
     },
     textInput: {
-        fontSize: 16,
+        fontSize: 17.5,
         paddingHorizontal: 16,
         paddingVertical: 12,
         borderRadius: 8,
@@ -492,7 +668,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
     },
     dayText: {
-        fontSize: 12,
+        fontSize: 14,
         fontWeight: '600',
     },
     durationContainer: {
@@ -507,7 +683,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
     },
     durationText: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '500',
     },
     infoRow: {
@@ -519,10 +695,10 @@ const styles = StyleSheet.create({
         borderBottomColor: 'rgba(0,0,0,0.1)',
     },
     infoLabel: {
-        fontSize: 14,
+        fontSize: 16,
     },
     infoValue: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '500',
     },
     bottomSpace: {

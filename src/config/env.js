@@ -59,6 +59,15 @@ const ENV = {
         process.env.API_BASE_URL ||
         TEST_KEYS.API_BASE_URL,
 
+    // Telemetry. Both are OPTIONAL by design: an absent key disables that SDK
+    // rather than throwing, so a contributor without the secrets still gets a
+    // working app. There is no test-mode fallback the way Stripe has one —
+    // pointing a dev build at the real Sentry/PostHog project would pollute
+    // pilot data with simulator noise.
+    SENTRY_DSN: expoExtra.sentryDsn || process.env.SENTRY_DSN || null,
+    POSTHOG_API_KEY: expoExtra.posthogApiKey || process.env.POSTHOG_API_KEY || null,
+    POSTHOG_HOST: expoExtra.posthogHost || process.env.POSTHOG_HOST || 'https://us.i.posthog.com',
+
     // Environment flags
     IS_DEVELOPMENT: isDev,
     IS_PREVIEW: isPreview,
@@ -89,6 +98,9 @@ export const {
     STRIPE_PUBLISHABLE_KEY,
     YOUTUBE_API_KEY,
     API_BASE_URL,
+    SENTRY_DSN,
+    POSTHOG_API_KEY,
+    POSTHOG_HOST,
     IS_DEVELOPMENT,
     IS_PREVIEW,
     IS_PRODUCTION,

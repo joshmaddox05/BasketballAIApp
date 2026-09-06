@@ -1,0 +1,4 @@
+{
+  "//": "Marks the game-plan schema as pure ES modules so it runs unchanged under Node's test runner, mirroring src/services/blueprint. Metro/Babel ignore the `type` field and transform these files normally. Nothing here may import React Native — all imports are explicit relative file paths with extensions.",
+  "type": "module"
+}

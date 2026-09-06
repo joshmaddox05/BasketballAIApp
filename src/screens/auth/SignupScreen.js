@@ -22,6 +22,7 @@ import { registerWithEmail } from '../../services/authService';
 import { signInWithGoogle } from '../../services/googleAuthService';
 import { signInWithApple, isAppleSignInAvailable } from '../../services/appleAuthService';
 import { getTheme } from '../../utils/theme';
+import { track, EVENTS } from '../../services/analytics';
 
 const SignupScreen = ({ navigation }) => {
     const [name, setName] = useState(''); // Remove demo data for production
@@ -107,6 +108,8 @@ const SignupScreen = ({ navigation }) => {
             if (result.user && result.profile) {
                 console.log('Registration successful!', result.user.email);
                 
+                track(EVENTS.SIGNUP_COMPLETED, { method: 'email' });
+
                 Alert.alert(
                     'Account Created!',
                     'Your account has been created successfully. Please check your email to verify your account.',
@@ -355,10 +358,18 @@ const SignupScreen = ({ navigation }) => {
                                 </Text>
                             </TouchableOpacity>
 
+                            {/*
+                              sentry-label opts this tap into interaction
+                              tracing: the account creation, the profile write
+                              and every request they make become one transaction
+                              named SignupScreen.signup_submit. Labels are
+                              snake_case and stable, like the EVENTS names.
+                            */}
                             <TouchableOpacity
                                 style={[styles.signupButton, { backgroundColor: theme.primary }]}
                                 onPress={handleSignup}
                                 disabled={isLoading}
+                                sentry-label="signup_submit"
                             >
                                 {isLoading ? (
                                     <ActivityIndicator color="#FFF" />
@@ -375,6 +386,7 @@ const SignupScreen = ({ navigation }) => {
                                 <TouchableOpacity
                                     style={[styles.socialButton, { borderColor: theme.border, backgroundColor: theme.card }]}
                                     onPress={handleGoogleSignIn}
+                                    sentry-label="signup_google"
                                 >
                                     <Ionicons name="logo-google" size={20} color="#DB4437" />
                                 </TouchableOpacity>
@@ -387,6 +399,7 @@ const SignupScreen = ({ navigation }) => {
                                     <TouchableOpacity
                                         style={[styles.socialButton, { borderColor: theme.border, backgroundColor: theme.card }]}
                                         onPress={handleAppleSignIn}
+                                        sentry-label="signup_apple"
                                     >
                                         <Ionicons name="logo-apple" size={20} color={isDarkMode ? '#FFF' : '#000'} />
                                     </TouchableOpacity>
@@ -436,7 +449,7 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     subtitle: {
-        fontSize: 16,
+        fontSize: 17.5,
         color: '#666',
     },
     form: {
@@ -456,7 +469,7 @@ const styles = StyleSheet.create({
     input: {
         flex: 1,
         height: 50,
-        fontSize: 16,
+        fontSize: 17.5,
         color: '#333',
     },
     visibilityToggle: {
@@ -467,7 +480,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 4,
     },
     passwordRequirementsTitle: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#666',
         marginBottom: 8,
     },
@@ -477,7 +490,7 @@ const styles = StyleSheet.create({
         marginBottom: 6,
     },
     passwordRequirementText: {
-        fontSize: 12,
+        fontSize: 14,
         color: '#999',
         marginLeft: 6,
     },
@@ -501,22 +514,22 @@ const styles = StyleSheet.create({
     },
     termsText: {
         flex: 1,
-        fontSize: 14,
+        fontSize: 16,
         color: '#666',
-        lineHeight: 20,
+        lineHeight: 21,
     },
     termsLink: {
-        color: '#FF6B00',
+        color: '#8A1C22',
         fontWeight: '500',
     },
     signupButton: {
-        backgroundColor: '#FF6B00',
+        backgroundColor: '#8A1C22',
         paddingVertical: 16,
         borderRadius: 12,
         alignItems: 'center',
     },
     signupButtonText: {
-        fontSize: 16,
+        fontSize: 17.5,
         fontWeight: 'bold',
         color: '#FFF',
     },
@@ -525,7 +538,7 @@ const styles = StyleSheet.create({
         marginBottom: 30,
     },
     orText: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#999',
         marginBottom: 16,
     },
@@ -549,13 +562,13 @@ const styles = StyleSheet.create({
         marginBottom: 30,
     },
     loginPromptText: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#666',
     },
     loginPromptLink: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: 'bold',
-        color: '#FF6B00',
+        color: '#8A1C22',
     },
 });
 

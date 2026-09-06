@@ -69,3 +69,5 @@ backend/.env
 firebase-debug.log
 firebase-debug.*.log
 .firebase/
+
+.env.local

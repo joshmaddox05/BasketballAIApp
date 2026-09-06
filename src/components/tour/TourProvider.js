@@ -3,14 +3,33 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { InteractionManager, Dimensions } from 'react-native';
 import { TOUR_STEPS } from './tourConfig';
+import { useAppContext } from '../../context/AppContext';
+
+import narration from '../../services/narrationService';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
 const TourContext = createContext(null);
 
-const TOUR_STORAGE_KEY = 'hasSeenTour';
+const DEFAULT_TOUR_STORAGE_KEY = 'hasSeenTour';
 
-export const TourProvider = ({ children, navigationRef }) => {
+// Stop any in-progress narration. narrationService owns both backends (generated
+// ElevenLabs audio, and the OS voice as a fallback) and its own lazy native-module
+// guards, so this cannot throw on a dev client that has not been rebuilt.
+const stopSpeech = () => {
+    narration.stop().catch(() => {});
+};
+
+// `steps` and `storageKey` let each role mount its own tour on the same engine.
+// Defaults preserve the original player tour behavior.
+export const TourProvider = ({
+    children,
+    navigationRef,
+    steps = TOUR_STEPS,
+    storageKey = DEFAULT_TOUR_STORAGE_KEY,
+}) => {
+    const { voiceMuted } = useAppContext();
+
     const [isTourActive, setIsTourActive] = useState(false);
     const [currentStepIndex, setCurrentStepIndex] = useState(0);
     const [hasSeenTour, setHasSeenTour] = useState(true); // Default to true to prevent flash
@@ -29,7 +48,7 @@ export const TourProvider = ({ children, navigationRef }) => {
     useEffect(() => {
         const loadTourPreference = async () => {
             try {
-                const storedValue = await AsyncStorage.getItem(TOUR_STORAGE_KEY);
+                const storedValue = await AsyncStorage.getItem(storageKey);
                 const hasSeen = storedValue === 'true';
                 setHasSeenTour(hasSeen);
             } catch (error) {
@@ -41,7 +60,7 @@ export const TourProvider = ({ children, navigationRef }) => {
         };
 
         loadTourPreference();
-    }, []);
+    }, [storageKey]);
 
     // Handle tab change notification from MainNavigator
     const handleTabChange = useCallback((tabName) => {
@@ -52,7 +71,7 @@ export const TourProvider = ({ children, navigationRef }) => {
     useEffect(() => {
         if (!isTourActive || isTransitioning) return;
 
-        const currentStepData = TOUR_STEPS[currentStepIndex];
+        const currentStepData = steps[currentStepIndex];
         if (!currentStepData?.isTabStep || !currentStepData?.waitForTab) return;
 
         // User navigated to the expected tab - advance to next step
@@ -61,7 +80,7 @@ export const TourProvider = ({ children, navigationRef }) => {
                 setIsTransitioning(true);
 
                 const nextIndex = currentStepIndex + 1;
-                if (nextIndex >= TOUR_STEPS.length) {
+                if (nextIndex >= steps.length) {
                     await endTour(true);
                     return;
                 }
@@ -70,7 +89,7 @@ export const TourProvider = ({ children, navigationRef }) => {
                 await new Promise(resolve => setTimeout(resolve, 800));
 
                 setCurrentStepIndex(nextIndex);
-                const nextStep = TOUR_STEPS[nextIndex];
+                const nextStep = steps[nextIndex];
 
                 // Measure the next target
                 await measureTarget(nextStep.id);
@@ -79,7 +98,24 @@ export const TourProvider = ({ children, navigationRef }) => {
 
             advanceToNextStep();
         }
-    }, [currentTab, isTourActive, currentStepIndex, isTransitioning]);
+    }, [currentTab, isTourActive, currentStepIndex, isTransitioning, steps]);
+
+    // Narrate the current step (unless muted); stop when the tour ends or the step
+    // changes. Prefers the generated ElevenLabs asset for `step.narrationId`; a
+    // step with no asset yet falls back to the OS voice, speaking `step.script`
+    // when one is authored and the old title+description concatenation otherwise —
+    // so no step ever goes silent just because narration has not been generated.
+    useEffect(() => {
+        stopSpeech();
+        if (isTourActive && !voiceMuted && currentStepIndex != null) {
+            const step = steps[currentStepIndex];
+            if (step) {
+                const spoken = step.script || `${step.title}. ${step.description}`;
+                narration.play(step.narrationId, spoken).catch(() => {});
+            }
+        }
+        return () => stopSpeech();
+    }, [currentStepIndex, isTourActive, voiceMuted, steps]);
 
     // Register a target ref for a tour step
     const registerTarget = useCallback((stepId, ref) => {
@@ -141,7 +177,7 @@ export const TourProvider = ({ children, navigationRef }) => {
                         const isBelowFold = y + height > SCREEN_HEIGHT - 150;
                         if (isBelowFold) {
                             // Find the step's tab to look up its scroll ref
-                            const step = TOUR_STEPS.find(s => s.id === stepId);
+                            const step = steps.find(s => s.id === stepId);
                             const tabEntry = step?.tab ? scrollRefs.current[step.tab] : null;
                             if (tabEntry?.ref?.current) {
                                 const delta = (y + height) - (SCREEN_HEIGHT - 200);
@@ -179,7 +215,7 @@ export const TourProvider = ({ children, navigationRef }) => {
 
             InteractionManager.runAfterInteractions(tryMeasure);
         });
-    }, []);
+    }, [steps]);
 
     // Navigate to the correct tab for a step
     const navigateToStep = useCallback(async (step) => {
@@ -200,7 +236,7 @@ export const TourProvider = ({ children, navigationRef }) => {
 
         // Mark tour as seen immediately so mid-tour app kills don't re-trigger it
         try {
-            await AsyncStorage.setItem(TOUR_STORAGE_KEY, 'true');
+            await AsyncStorage.setItem(storageKey, 'true');
             setHasSeenTour(true);
         } catch (error) {
             console.error('Error saving tour preference:', error);
@@ -210,7 +246,7 @@ export const TourProvider = ({ children, navigationRef }) => {
         setIsTransitioning(true);
         setIsTourActive(true);
 
-        const firstStep = TOUR_STEPS[0];
+        const firstStep = steps[0];
 
         // Check if first step is a tab step (user needs to tap tab)
         if (firstStep.isTabStep) {
@@ -239,7 +275,7 @@ export const TourProvider = ({ children, navigationRef }) => {
         }
 
         setIsTransitioning(false);
-    }, [isTourActive, navigateToStep, measureTarget]);
+    }, [isTourActive, navigateToStep, measureTarget, steps, storageKey]);
 
     // Go to next step
     const goToNextStep = useCallback(async () => {
@@ -247,14 +283,14 @@ export const TourProvider = ({ children, navigationRef }) => {
 
         const nextIndex = currentStepIndex + 1;
 
-        if (nextIndex >= TOUR_STEPS.length) {
+        if (nextIndex >= steps.length) {
             // Tour complete
             await endTour(true);
             return;
         }
 
         setIsTransitioning(true);
-        const nextStep = TOUR_STEPS[nextIndex];
+        const nextStep = steps[nextIndex];
 
         // Check if next step is a tab step (user needs to tap tab)
         if (nextStep.isTabStep) {
@@ -267,7 +303,7 @@ export const TourProvider = ({ children, navigationRef }) => {
         }
 
         // Navigate if needed (different tab)
-        const currentStepData = TOUR_STEPS[currentStepIndex];
+        const currentStepData = steps[currentStepIndex];
         if (nextStep.tab && nextStep.tab !== currentStepData?.tab) {
             await navigateToStep(nextStep);
             // Extra delay after tab change for screen mount
@@ -286,7 +322,7 @@ export const TourProvider = ({ children, navigationRef }) => {
             setIsTransitioning(false);
 
             // If this was the last step, end tour
-            if (nextIndex >= TOUR_STEPS.length - 1) {
+            if (nextIndex >= steps.length - 1) {
                 await endTour(true);
                 return;
             }
@@ -297,7 +333,7 @@ export const TourProvider = ({ children, navigationRef }) => {
         }
 
         setIsTransitioning(false);
-    }, [currentStepIndex, isTransitioning, navigateToStep, measureTarget, endTour]);
+    }, [currentStepIndex, isTransitioning, navigateToStep, measureTarget, endTour, steps]);
 
     // Go to previous step
     const goToPreviousStep = useCallback(async () => {
@@ -305,10 +341,10 @@ export const TourProvider = ({ children, navigationRef }) => {
 
         setIsTransitioning(true);
         const prevIndex = currentStepIndex - 1;
-        const prevStep = TOUR_STEPS[prevIndex];
+        const prevStep = steps[prevIndex];
 
         // Navigate to previous step's tab if different
-        const currentStep = TOUR_STEPS[currentStepIndex];
+        const currentStep = steps[currentStepIndex];
         if (prevStep.tab !== currentStep.tab) {
             await navigateToStep(prevStep);
         }
@@ -317,10 +353,11 @@ export const TourProvider = ({ children, navigationRef }) => {
         await measureTarget(prevStep.id);
 
         setIsTransitioning(false);
-    }, [currentStepIndex, isTransitioning, navigateToStep, measureTarget]);
+    }, [currentStepIndex, isTransitioning, navigateToStep, measureTarget, steps]);
 
     // End the tour
     const endTour = useCallback(async (completed = true) => {
+        stopSpeech();
         setIsTourActive(false);
         setCurrentStepIndex(0);
         setTargetMeasurement(null);
@@ -328,32 +365,37 @@ export const TourProvider = ({ children, navigationRef }) => {
 
         if (completed) {
             try {
-                await AsyncStorage.setItem(TOUR_STORAGE_KEY, 'true');
+                await AsyncStorage.setItem(storageKey, 'true');
                 setHasSeenTour(true);
             } catch (error) {
                 console.error('Error saving tour preference:', error);
             }
         }
-    }, []);
+    }, [storageKey]);
 
     // Reset tour (for retaking)
     const resetTour = useCallback(async () => {
         try {
-            await AsyncStorage.removeItem(TOUR_STORAGE_KEY);
+            await AsyncStorage.removeItem(storageKey);
             setHasSeenTour(false);
         } catch (error) {
             console.error('Error resetting tour preference:', error);
         }
-    }, []);
+    }, [storageKey]);
 
     // Skip tour
     const skipTour = useCallback(async () => {
         await endTour(true); // Mark as seen even when skipped
     }, [endTour]);
 
+    // Stop any narration if the provider unmounts mid-tour
+    useEffect(() => {
+        return () => stopSpeech();
+    }, []);
+
     // Get current step data
-    const currentStep = TOUR_STEPS[currentStepIndex] || null;
-    const totalSteps = TOUR_STEPS.length;
+    const currentStep = steps[currentStepIndex] || null;
+    const totalSteps = steps.length;
 
     const value = {
         // State
