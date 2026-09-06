@@ -1,5 +1,6 @@
 // Workout templates for custom workout creation
 import { SUBSCRIPTION_TIERS } from '../utils/subscription';
+import { DRILL_INTELLIGENCE, TRAINING_STAGES, STAGE_ORDER } from './drillIntelligence';
 
 export const WORKOUT_CATEGORIES = {
   SHOOTING: 'Shooting',
@@ -26,7 +27,7 @@ export const WORKOUT_DIFFICULTIES = {
 //   (absent)                         -> manual rep entry
 // Keyword matching remains as a fallback so user-authored custom workouts, which
 // have no tracker field, still behave exactly as before.
-export const STEP_TEMPLATES = {
+const BASE_STEP_TEMPLATES = {
   // Shooting steps
   FORM_SHOOTING: {
     name: 'Form Shooting',
@@ -535,7 +536,188 @@ export const STEP_TEMPLATES = {
       'Accurate timing is crucial',
     ],
   },
+
+  // ─── Decision-training drills ────────────────────────────────────────────
+  // Everything above this line is closed work: a rep count, a movement, and no
+  // defender. That is the whole catalog a player had access to, which meant the
+  // app could train execution but never the read that tells you when to execute.
+  // These require a partner and sit at the Guided Read / Random Read / Live /
+  // Competitive end of the progression. See drillIntelligence.js for the reads
+  // and decisions attached to each.
+  //
+  // None of these names appear in inputMappers.STEP_TITLE_TO_SHOT or
+  // STEP_TITLE_TO_SKILL, so they add no new evidence to the EvalRank pillars —
+  // they are training content, not measurement, and adding them there would be
+  // claiming a partner-graded decision as an observed one.
+  CLOSEOUT_ATTACK_READS: {
+    name: 'Closeout Attack Reads',
+    category: WORKOUT_CATEGORIES.SHOOTING,
+    tracker: 'shooting',
+    description: 'Read the closeout, then choose shoot, drive or attack the angle',
+    duration: 480,
+    reps: 24,
+    instructions: [
+      'Partner starts in a help position and passes you the ball',
+      'He closes out randomly: short, long, or to one shoulder',
+      'Short and controlled means shoot it',
+      'Long and fast means shot fake and drive the momentum',
+      'To one shoulder means drive the other way',
+    ],
+  },
+  SHOOT_OR_DRIVE: {
+    name: 'Shoot or Drive',
+    category: WORKOUT_CATEGORIES.SHOOTING,
+    tracker: 'shooting',
+    description: 'A live defender decides which shot you get',
+    duration: 420,
+    reps: 20,
+    instructions: [
+      'Catch on the wing with a defender playing live',
+      'If he plays up on the catch, drive past him',
+      'If he sags into the gap, shoot it',
+      'Score the DECISION, not just the make',
+    ],
+  },
+  ADVANTAGE_FINISHING: {
+    name: 'Advantage Finishing',
+    category: WORKOUT_CATEGORIES.SHOOTING,
+    tracker: 'shooting',
+    description: 'Finish 2-on-1 by making the rim protector wrong',
+    duration: 480,
+    reps: 16,
+    instructions: [
+      'Start at half court with one teammate against one defender',
+      'Attack the defender until he commits to you or to your teammate',
+      'If he steps up, deliver the pass late',
+      'If he stays with your teammate, finish through the rim',
+      'Do not pick up your dribble before he commits',
+    ],
+  },
+  BALL_SCREEN_READS: {
+    name: 'Ball Screen Reads',
+    category: WORKOUT_CATEGORIES.DRIBBLING,
+    description: 'One action, four coverages, four different answers',
+    duration: 600,
+    reps: 20,
+    instructions: [
+      'Partner sets a ball screen; a second partner plays the coverage',
+      'Coverage is called out at first, then hidden so you have to read it',
+      'Drop: take the pull-up or attack the space',
+      'Under: shoot behind the screen',
+      'Blitz: hit the short roll',
+      'Switch: attack the mismatch immediately',
+    ],
+  },
+  ONE_ON_ONE_LIVE: {
+    name: 'Live One-on-One',
+    category: WORKOUT_CATEGORIES.DRIBBLING,
+    description: 'Two dribbles from a closeout, scored by possession',
+    duration: 600,
+    reps: 10,
+    instructions: [
+      'Start from a closeout, not a standstill',
+      'Maximum two dribbles, so the first move has to be the right one',
+      'Play to 5 possessions, then switch',
+      'Offense keeps the ball on a score, defense gets it on a stop',
+    ],
+  },
+  TWO_ON_TWO_ADVANTAGE: {
+    name: 'Two-on-Two Advantage',
+    category: WORKOUT_CATEGORIES.CUSTOM,
+    description: 'Small-sided game constrained to reward paint touches',
+    duration: 720,
+    reps: 8,
+    instructions: [
+      'Play 2-on-2 in the half court from a live start',
+      'A basket that follows a paint touch is worth 2 points',
+      'Any other basket is worth 1 point',
+      'First to 11 wins, then rotate',
+    ],
+  },
+  TRANSITION_DECISIONS: {
+    name: 'Transition Decisions',
+    category: WORKOUT_CATEGORIES.PASSING,
+    description: '2-on-1 and 3-on-2 breaks decided by when the defender commits',
+    duration: 540,
+    reps: 14,
+    instructions: [
+      'Start from a rebound and outlet, wings filled wide',
+      'Attack the front defender until he has to choose',
+      'Deliver the pass only once he commits',
+      'A turnover or a settled jump shot ends the possession',
+    ],
+  },
+  PASSING_UNDER_PRESSURE: {
+    name: 'Passing Under Pressure',
+    category: WORKOUT_CATEGORIES.PASSING,
+    description: 'Pick the pass the defender\'s hands leave open',
+    duration: 360,
+    reps: 30,
+    instructions: [
+      'A live defender plays the passing lane between you and your partner',
+      'Hands high means bounce it underneath',
+      'Hands low means throw over the top',
+      'Body in the lane means move the angle with a dribble first',
+    ],
+  },
+  HELP_AND_RECOVER: {
+    name: 'Help and Recover',
+    category: WORKOUT_CATEGORIES.DEFENSE,
+    description: 'Live 3-on-3 stunting, tagging and x-out rotations',
+    duration: 720,
+    reps: 12,
+    instructions: [
+      'Play 3-on-3 live in the half court',
+      'On any drive, decide in the moment: stunt or fully commit',
+      'If you commit, the next defender has to x-out behind you',
+      'Talk on every pass and every rotation',
+    ],
+  },
+  CUTTING_READS: {
+    name: 'Cutting Reads',
+    category: WORKOUT_CATEGORIES.CUSTOM,
+    description: 'Let the defender choose your cut for you',
+    duration: 420,
+    reps: 20,
+    instructions: [
+      'Start on the wing with a live defender guarding you off the ball',
+      'If he denies over the top, back-cut behind him',
+      'If he trails you, come off the screen and catch',
+      'If he shoots the gap, curl or flare away from where he went',
+    ],
+  },
 };
+
+// Each step carries its own read/decision layer, merged on at load. Keeping the
+// basketball content in drillIntelligence.js means the templates above stay a
+// plain, reviewable list of names/durations/reps — and, critically, that every
+// `name` string stays byte-identical, because inputMappers.STEP_TITLE_TO_SHOT,
+// STEP_TITLE_TO_SKILL and the pose movement registry all key on them.
+//
+// The merge is additive and one-directional: nothing here can remove or overwrite
+// a field the template already declares. A template with no entry in the
+// intelligence map passes through untouched, which is also what happens to every
+// user-authored custom workout — those have never had these fields and still
+// render exactly as before.
+const withIntelligence = (template, key) => {
+  const intel = DRILL_INTELLIGENCE[key];
+  if (!intel) return template;
+  return { ...intel, ...template, templateKey: key };
+};
+
+export const STEP_TEMPLATES = Object.fromEntries(
+  Object.entries(BASE_STEP_TEMPLATES).map(([key, template]) => [key, withIntelligence(template, key)])
+);
+
+export { TRAINING_STAGES, STAGE_ORDER };
+
+/** Steps that develop a read rather than only a movement. */
+export const getDecisionTrainingSteps = () =>
+  Object.values(STEP_TEMPLATES).filter((s) => Array.isArray(s.reads) && s.reads.length > 0);
+
+/** Steps at a given point in the Teach -> Competitive progression. */
+export const getStepTemplatesByStage = (stage) =>
+  Object.values(STEP_TEMPLATES).filter((s) => s.stage === stage);
 
 // Complete workout templates users can use as starting points
 export const WORKOUT_TEMPLATES = {
@@ -1006,6 +1188,107 @@ export const WORKOUT_TEMPLATES = {
       STEP_TEMPLATES.FREE_THROWS,
       STEP_TEMPLATES.DEFENSIVE_SLIDES,
       STEP_TEMPLATES.CHEST_PASS,
+    ],
+  },
+
+  // ─── Decision-training workouts ─────────────────────────────────────────
+  // Built on the Teach -> Guided Read -> Random Read -> Live -> Competitive
+  // progression rather than on a category. Each one opens with closed work to
+  // warm the movement up, then puts that same movement in front of a defender who
+  // supplies information — which is the step every workout above this line skips.
+  //
+  // All of them require at least one partner, which is stated in each step's
+  // `equipment`. They are deliberately filed under existing WORKOUT_CATEGORIES
+  // values so nothing downstream has to learn a new category.
+  READ_THE_CLOSEOUT: {
+    id: 'decision_1',
+    name: 'Read the Closeout',
+    category: WORKOUT_CATEGORIES.SHOOTING,
+    difficulty: WORKOUT_DIFFICULTIES.INTERMEDIATE,
+    description: 'Shoot, drive or attack the angle — the defender decides',
+    estimatedDuration: 35,
+    requiredTier: SUBSCRIPTION_TIERS.FREE,
+    steps: [
+      STEP_TEMPLATES.FORM_SHOOTING,
+      STEP_TEMPLATES.CATCH_AND_SHOOT,
+      STEP_TEMPLATES.CLOSEOUT_ATTACK_READS,
+      STEP_TEMPLATES.SHOOT_OR_DRIVE,
+    ],
+  },
+  BALL_SCREEN_LAB: {
+    id: 'decision_2',
+    name: 'Ball Screen Lab',
+    category: WORKOUT_CATEGORIES.DRIBBLING,
+    difficulty: WORKOUT_DIFFICULTIES.ADVANCED,
+    description: 'One action, four coverages, four answers',
+    estimatedDuration: 45,
+    requiredTier: SUBSCRIPTION_TIERS.BASIC,
+    steps: [
+      STEP_TEMPLATES.STATIONARY_DRIBBLING,
+      STEP_TEMPLATES.OFF_DRIBBLE_SHOOTING,
+      STEP_TEMPLATES.BALL_SCREEN_READS,
+      STEP_TEMPLATES.MID_RANGE_SHOOTING,
+      STEP_TEMPLATES.ONE_ON_ONE_LIVE,
+    ],
+  },
+  ADVANTAGE_BASKETBALL: {
+    id: 'decision_3',
+    name: 'Advantage Basketball',
+    category: WORKOUT_CATEGORIES.PASSING,
+    difficulty: WORKOUT_DIFFICULTIES.INTERMEDIATE,
+    description: 'Create a numbers advantage, then convert it',
+    estimatedDuration: 40,
+    requiredTier: SUBSCRIPTION_TIERS.BASIC,
+    steps: [
+      STEP_TEMPLATES.OUTLET_PASS,
+      STEP_TEMPLATES.TRANSITION_DECISIONS,
+      STEP_TEMPLATES.ADVANTAGE_FINISHING,
+      STEP_TEMPLATES.PASSING_UNDER_PRESSURE,
+    ],
+  },
+  TEAM_DEFENSE_LIVE: {
+    id: 'decision_4',
+    name: 'Live Team Defense',
+    category: WORKOUT_CATEGORIES.DEFENSE,
+    difficulty: WORKOUT_DIFFICULTIES.ADVANCED,
+    description: 'Stunt, tag, rotate and recover against live offense',
+    estimatedDuration: 45,
+    requiredTier: SUBSCRIPTION_TIERS.PREMIUM,
+    steps: [
+      STEP_TEMPLATES.DEFENSIVE_SLIDES,
+      STEP_TEMPLATES.CLOSEOUT_DRILL,
+      STEP_TEMPLATES.SHELL_DRILL,
+      STEP_TEMPLATES.HELP_AND_RECOVER,
+    ],
+  },
+  GETTING_OPEN: {
+    id: 'decision_5',
+    name: 'Getting Open',
+    category: WORKOUT_CATEGORIES.CUSTOM,
+    difficulty: WORKOUT_DIFFICULTIES.INTERMEDIATE,
+    description: 'Off-ball reads — let the defender pick your cut',
+    estimatedDuration: 35,
+    requiredTier: SUBSCRIPTION_TIERS.BASIC,
+    steps: [
+      STEP_TEMPLATES.MOVEMENT_SHOOTING,
+      STEP_TEMPLATES.CUTTING_READS,
+      STEP_TEMPLATES.CATCH_AND_SHOOT,
+      STEP_TEMPLATES.DENY_DEFENSE,
+    ],
+  },
+  SMALL_SIDED_COMPETITIVE: {
+    id: 'decision_6',
+    name: 'Small-Sided Competitive',
+    category: WORKOUT_CATEGORIES.CUSTOM,
+    difficulty: WORKOUT_DIFFICULTIES.EXPERT,
+    description: 'Everything live, with a score and a constraint',
+    estimatedDuration: 50,
+    requiredTier: SUBSCRIPTION_TIERS.PREMIUM,
+    steps: [
+      STEP_TEMPLATES.SHOOT_OR_DRIVE,
+      STEP_TEMPLATES.ONE_ON_ONE_LIVE,
+      STEP_TEMPLATES.TWO_ON_TWO_ADVANTAGE,
+      STEP_TEMPLATES.HELP_AND_RECOVER,
     ],
   },
 };

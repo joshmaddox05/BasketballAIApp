@@ -686,7 +686,18 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
           logger.info('Assignment submitted for coach review', { id: closed.id, status: closed.status });
           track(EVENTS.ASSIGNMENT_SUBMITTED, { type: 'workout', status: closed.status, completionPercentage: pct });
         }
-      })().catch((error) => logger.error('Assignment completion update failed', error));
+      })().catch((error) =>
+        // No new logging API needed at this call site: logger.error now
+        // forwards to Sentry Logs, and any plain object passed alongside the
+        // error becomes structured attributes. Which matters here — this is
+        // fire-and-forget, so a coach silently never seeing a submitted
+        // assignment used to leave no trace at all off-device.
+        logger.error('Assignment completion update failed', error, {
+          assignmentType: 'workout',
+          completionPercentage: Math.round(avgCompletion),
+          matchedByTemplate: !assignmentRefId,
+        })
+      );
 
       // ==================== GAMIFICATION ====================
       // Initialize gamification if needed
@@ -1156,6 +1167,62 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
               ? currentStepData.instructions.join('\n• ')
               : currentStepData.instructions}
           </Text>
+
+          {/* The read/decision layer from drillIntelligence.js. Instructions tell
+              you HOW to do the drill; these tell you what to be looking at while
+              you do it and what that should make you choose. Every field is
+              optional — user-authored custom workouts and legacy saved workouts
+              carry none of them and render exactly as they did before. */}
+          {currentStepData.stage ? (
+            <View style={[styles.stageChip, { backgroundColor: theme.surface2, borderColor: theme.divider }]}>
+              <Ionicons name="eye-outline" size={12} color={theme.accentText} />
+              <Text style={[styles.stageChipText, { color: theme.accentText }]}>
+                {currentStepData.stage}
+              </Text>
+            </View>
+          ) : null}
+
+          {currentStepData.reads?.length ? (
+            <View style={styles.intelBlock}>
+              <Text style={[styles.intelLabel, { color: theme.textMuted }]}>WHAT TO READ</Text>
+              {currentStepData.reads.map((r, i) => (
+                <Text key={`read-${i}`} style={[styles.intelItem, { color: theme.text }]}>
+                  {'\u2022  '}{r}
+                </Text>
+              ))}
+            </View>
+          ) : null}
+
+          {currentStepData.decisions?.length ? (
+            <View style={styles.intelBlock}>
+              <Text style={[styles.intelLabel, { color: theme.textMuted }]}>WHAT TO DECIDE</Text>
+              {currentStepData.decisions.map((d, i) => (
+                <Text key={`decision-${i}`} style={[styles.intelItem, { color: theme.text }]}>
+                  {'\u2022  '}{d}
+                </Text>
+              ))}
+            </View>
+          ) : null}
+
+          {currentStepData.coachingPoints?.length ? (
+            <View style={styles.intelBlock}>
+              <Text style={[styles.intelLabel, { color: theme.textMuted }]}>COACHING POINTS</Text>
+              {currentStepData.coachingPoints.map((c, i) => (
+                <Text key={`cp-${i}`} style={[styles.intelItem, { color: theme.textMuted }]}>
+                  {'\u2022  '}{c}
+                </Text>
+              ))}
+            </View>
+          ) : null}
+
+          {currentStepData.gameTransfer ? (
+            <View style={[styles.transferBlock, { borderLeftColor: theme.accentText }]}>
+              <Text style={[styles.intelLabel, { color: theme.textMuted }]}>WHERE THIS SHOWS UP</Text>
+              <Text style={[styles.intelItem, { color: theme.textMuted }]}>
+                {currentStepData.gameTransfer}
+              </Text>
+            </View>
+          ) : null}
         </View>
 
         {/* Video Reference */}
@@ -1405,11 +1472,19 @@ const ActiveWorkoutScreen = ({ route, navigation }) => {
           <Text style={[styles.skipButtonText, { color: theme.textMuted }]}>Skip</Text>
         </TouchableOpacity>
 
+        {/*
+          Safe to label even though this button is tapped once per drill: a
+          mid-workout tap only moves local state, produces no child spans, and
+          the SDK drops empty interaction transactions. Only the final tap —
+          the one that runs completeWorkout's Firestore writes and EvalRank
+          recompute — has children to keep, so that is the one you get.
+        */}
         <TouchableOpacity
           style={[styles.completeButton, { backgroundColor: theme.primary }]}
           onPress={handleStepComplete}
           disabled={targetReps > 0 && currentReps < targetReps}
           activeOpacity={0.85}
+          sentry-label="workout_step_complete"
         >
           <Text style={styles.completeButtonText}>
             {currentStep < workout.steps.length - 1 ? 'Next drill' : 'Finish'}
@@ -1513,6 +1588,22 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginTop: 6,
   },
+  stageChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 5,
+    marginTop: 10,
+    paddingVertical: 4,
+    paddingHorizontal: 9,
+    borderRadius: SHAPE.radiusPill,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  stageChipText: { fontFamily: FONTS.bodyBold, fontSize: 11.5, letterSpacing: 0.3 },
+  intelBlock: { marginTop: 12 },
+  intelLabel: { fontFamily: FONTS.bodyBold, fontSize: 11, letterSpacing: 0.7 },
+  intelItem: { fontFamily: FONTS.body, fontSize: 13.5, lineHeight: 19, marginTop: 5 },
+  transferBlock: { marginTop: 14, paddingLeft: 10, borderLeftWidth: 2 },
   timerWrapper: {
     alignItems: 'center',
     marginBottom: 6,

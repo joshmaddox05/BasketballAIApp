@@ -24,7 +24,7 @@ import {
 } from '../../services/firestoreService';
 import { MIN_SIMCOACH_SCENARIOS } from '../../services/blueprint/inputMappers';
 import FilmSummary from '../../components/features/FilmSummary';
-import { SIM_COACH_SCENARIOS } from '../../data/simCoachScenarios';
+import { SIM_COACH_SCENARIOS, SIM_COACH_SCENARIO_LIST } from '../../data/simCoachScenarios';
 import LockedFeatureCard from '../../components/features/LockedFeatureCard';
 
 // A placeholder IQ of 74 used to stand in here whenever the athlete had no real
@@ -49,6 +49,10 @@ const mapScenarioAssignment = (a) => {
     status: a.status === 'completed' ? 'completed' : 'pending',
   };
 };
+
+// Kept to the two `category` values the catalog actually uses, so a new scenario
+// can never introduce a filter the UI does not render.
+const LIBRARY_FILTERS = ['All', 'Offense', 'Defense'];
 
 const IQ_CLASSIFICATION = (score) => {
   if (score >= 95) return 'Elite Decision Maker';
@@ -241,14 +245,84 @@ function CoachView({ navigation, theme, coachUid }) {
             </View>
           </>
         )}
-        <View style={{ height: 32 }} />
+        {/* Scenario library.
+
+          Before this existed the athlete view rendered assignments and nothing
+          else, so a player whose coach had not assigned anything saw an empty
+          screen — and 17 of the 20 catalog scenarios were unreachable from the
+          app entirely. Decision IQ is a core skill for most archetypes and the IQ
+          score needs completed scenarios to become measured at all, so the
+          catalog has to be reachable without waiting for a coach. */}
+      <Text style={[styles.sectionTitle, { color: theme.text }]}>Scenario Library</Text>
+      <Text style={[styles.librarySubtitle, { color: theme.textSecondary }]}>
+        Train on your own. Every scenario you complete counts toward your IQ score.
+      </Text>
+
+      <View style={styles.filterRow}>
+        {LIBRARY_FILTERS.map((f) => {
+          const active = libraryFilter === f;
+          return (
+            <TouchableOpacity
+              key={f}
+              onPress={() => setLibraryFilter(f)}
+              activeOpacity={0.8}
+              style={[
+                styles.filterChip,
+                {
+                  backgroundColor: active ? theme.primary : theme.card,
+                  borderColor: active ? theme.primary : theme.border,
+                },
+              ]}
+            >
+              <Text style={[styles.filterChipText, { color: active ? '#FFFFFF' : theme.textSecondary }]}>
+                {f}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {SIM_COACH_SCENARIO_LIST.filter(
+        (s) => libraryFilter === 'All' || s.category === libraryFilter
+      ).map((s) => {
+        const done = completedIds?.has(s.id);
+        return (
+          <TouchableOpacity
+            key={s.id}
+            style={[styles.scenarioCard, { backgroundColor: theme.card, borderColor: theme.border }]}
+            onPress={() => navigation.navigate('SimCoachScenario', { scenario: { id: s.id } })}
+            activeOpacity={0.8}
+          >
+            <View style={styles.scenarioTop}>
+              <View style={[styles.scenarioIcon, { backgroundColor: done ? '#22C55E18' : theme.primary + '18' }]}>
+                <Ionicons
+                  name={done ? 'checkmark-circle' : 'bulb-outline'}
+                  size={20}
+                  color={done ? '#22C55E' : theme.primary}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.scenarioTitle, { color: theme.text }]}>{s.title}</Text>
+                <Text style={[styles.scenarioMeta, { color: theme.textSecondary }]}>
+                  {s.subcategory || s.category} · {s.difficulty} · {s.steps} play steps
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
+            </View>
+          </TouchableOpacity>
+        );
+      })}
+
+      <View style={{ height: 32 }} />
       </ScrollView>
     </View>
   );
 }
 
 // ─── Athlete View ─────────────────────────────────────────────────────────────
-function AthleteView({ navigation, theme, score, completedCount, scenarios, sessions }) {
+function AthleteView({ navigation, theme, score, completedCount, completedIds, scenarios, sessions }) {
+  // Category filter for the self-serve library below the assigned work.
+  const [libraryFilter, setLibraryFilter] = useState('All');
   const measured = score != null;
   const classification = measured ? IQ_CLASSIFICATION(score) : 'Not yet measured';
   // Measured: the bar IS the score, on its own 0–100 scale. Unmeasured: it is
@@ -327,7 +401,8 @@ function AthleteView({ navigation, theme, score, completedCount, scenarios, sess
         <View style={styles.emptyState}>
           <Ionicons name="map-outline" size={36} color={theme.textSecondary} />
           <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-            No scenarios yet. Your coach will assign game plans here.
+            Nothing assigned yet. Your coach's game plans appear here — until then,
+            pick anything from the library below.
           </Text>
         </View>
       ) : (
@@ -382,6 +457,9 @@ export default function SimCoachScreen({ navigation }) {
   const [scenarios, setScenarios] = useState([]);
   const [sessions, setSessions] = useState([]);
   const [completedCount, setCompletedCount] = useState(0);
+  // Which catalog scenarios have been played, so the library can mark them without
+  // a second round of reads. Derived from the same result documents as the count.
+  const [completedIds, setCompletedIds] = useState(() => new Set());
 
   useFocusEffect(
     useCallback(() => {
@@ -395,7 +473,10 @@ export default function SimCoachScreen({ navigation }) {
         // getSimCoachIQScore averages, so the progress line and the score can
         // never disagree about whether the threshold has been met.
         const results = await getSimCoachResults(user.uid, 50).catch(() => []);
-        if (active) setCompletedCount(results.length);
+        if (active) {
+          setCompletedCount(results.length);
+          setCompletedIds(new Set(results.map((r) => r.scenarioId).filter(Boolean)));
+        }
 
         const shared = await getSharedSimulationSessions(user.uid);
         // Cheap "have I already responded" flag per session — a few extra
@@ -465,6 +546,7 @@ export default function SimCoachScreen({ navigation }) {
         <CoachView navigation={navigation} theme={theme} coachUid={user?.uid} />
       ) : (
         <AthleteView
+          completedIds={completedIds}
           navigation={navigation}
           theme={theme}
           score={iqScore}
@@ -479,6 +561,10 @@ export default function SimCoachScreen({ navigation }) {
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
+  librarySubtitle: { fontSize: 13, lineHeight: 18, marginTop: -4, marginBottom: 10 },
+  filterRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  filterChip: { paddingVertical: 6, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1 },
+  filterChipText: { fontSize: 13, fontWeight: '600' },
   container: { flex: 1 },
 
   header: {

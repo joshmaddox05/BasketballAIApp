@@ -35,7 +35,7 @@ import {
     Shimmer,
     DrawnPath,
 } from '../../components/dbe';
-import { track, EVENTS } from '../../services/analytics';
+import { track, log, fmt, startSpan, EVENTS } from '../../services/analytics';
 
 // Default improvement suggestions when none are provided
 const getDefaultImprovements = () => [
@@ -166,6 +166,10 @@ const ShootingAnalysisScreen = ({ navigation }) => {
 
     // Handle camera capture
     const handleCameraCapture = async (videoData) => {
+        // Declared outside the try so the catch can still report how long the
+        // attempt ran before it failed — a timeout and an immediate rejection
+        // look identical in Sentry otherwise.
+        const analysisStartedAt = Date.now();
         try {
             console.log('📹 Video captured, starting analysis...');
             console.log('📊 Video data:', {
@@ -196,10 +200,44 @@ const ShootingAnalysisScreen = ({ navigation }) => {
             // Perform comprehensive AI analysis with phase detection and biomechanics
             console.log('🏀 Using comprehensive analysis for feedback-based improvement');
             track(EVENTS.SHOT_ANALYSIS_RUN);
-            const results = await aiAnalysisService.analyzeComprehensive(videoData);
+            // The remote model call is the slowest, least predictable thing the
+            // app does, so it gets a log on the way in and on both ways out.
+            // fmt`` is used rather than string interpolation so analysisMode
+            // lands as its own searchable parameter — "show me every failed run
+            // in comprehensive mode" is a query, not a text search.
+            log.info(fmt`Shot analysis started in ${videoData.analysisMode || 'default'} mode`, {
+                durationSec: videoData.duration || null,
+            });
+            // A span around the slowest thing the app does. The screen already
+            // has a transaction from the navigation integration; this makes the
+            // analysis a named child of it, the upload and model requests
+            // children of that, and the logs above and below correlate to it —
+            // so "analysis felt slow" becomes a waterfall instead of a guess.
+            // op: 'http.client' is a standard operation name, which is what
+            // gets it grouped and iconed properly in the Sentry UI.
+            const results = await startSpan(
+                'shotAnalysis.comprehensive',
+                'http.client',
+                {
+                    analysisMode: videoData.analysisMode || 'default',
+                    videoDurationSec: videoData.duration || null,
+                },
+                () => aiAnalysisService.analyzeComprehensive(videoData),
+            );
 
             console.log('✅ Comprehensive analysis complete!');
             console.log('📊 Results:', results);
+
+            // Attributes are queryable columns in the Logs UI, so put the
+            // numbers you would want to sort or filter by in here rather than
+            // in the message. Primitives only, and nothing identifying: the
+            // athlete is already attached as user.id by identifyUser().
+            log.info('Shot analysis completed', {
+                durationMs: Date.now() - analysisStartedAt,
+                score: results.overallScore || results.overall_score || 0,
+                phaseCount: results.phases?.length ?? 0,
+                analysisMode: videoData.analysisMode || 'default',
+            });
 
             setAnalysisResults(results);
             setCurrentStage('results');
@@ -237,6 +275,25 @@ const ShootingAnalysisScreen = ({ navigation }) => {
 
             // Check if this is the "Could not detect complete shooting motion" error
             const isMotionDetectionError = error.message?.includes('Could not detect complete shooting motion');
+
+            // Level is chosen by who needs to act, not by how the code got
+            // here. A video the model could not read is a normal outcome the
+            // athlete can fix by re-recording — warn. Anything else is the
+            // feature being broken for them — error, and worth a page.
+            const failureAttrs = {
+                durationMs: Date.now() - analysisStartedAt,
+                analysisMode: videoData.analysisMode || 'default',
+                reason: isMotionDetectionError ? 'motion_not_detected' : 'analysis_failed',
+                apiError: !!error.apiError,
+            };
+            if (isMotionDetectionError) {
+                log.warn('Shot analysis could not read the video', failureAttrs);
+            } else {
+                log.error('Shot analysis failed', {
+                    ...failureAttrs,
+                    errorName: error.name || null,
+                });
+            }
 
             if (isMotionDetectionError) {
                 // Show specific prompt for retaking the video

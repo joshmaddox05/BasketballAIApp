@@ -358,10 +358,18 @@ const SignupScreen = ({ navigation }) => {
                                 </Text>
                             </TouchableOpacity>
 
+                            {/*
+                              sentry-label opts this tap into interaction
+                              tracing: the account creation, the profile write
+                              and every request they make become one transaction
+                              named SignupScreen.signup_submit. Labels are
+                              snake_case and stable, like the EVENTS names.
+                            */}
                             <TouchableOpacity
                                 style={[styles.signupButton, { backgroundColor: theme.primary }]}
                                 onPress={handleSignup}
                                 disabled={isLoading}
+                                sentry-label="signup_submit"
                             >
                                 {isLoading ? (
                                     <ActivityIndicator color="#FFF" />
@@ -378,6 +386,7 @@ const SignupScreen = ({ navigation }) => {
                                 <TouchableOpacity
                                     style={[styles.socialButton, { borderColor: theme.border, backgroundColor: theme.card }]}
                                     onPress={handleGoogleSignIn}
+                                    sentry-label="signup_google"
                                 >
                                     <Ionicons name="logo-google" size={20} color="#DB4437" />
                                 </TouchableOpacity>
@@ -390,6 +399,7 @@ const SignupScreen = ({ navigation }) => {
                                     <TouchableOpacity
                                         style={[styles.socialButton, { borderColor: theme.border, backgroundColor: theme.card }]}
                                         onPress={handleAppleSignIn}
+                                        sentry-label="signup_apple"
                                     >
                                         <Ionicons name="logo-apple" size={20} color={isDarkMode ? '#FFF' : '#000'} />
                                     </TouchableOpacity>

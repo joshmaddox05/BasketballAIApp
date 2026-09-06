@@ -53,6 +53,7 @@ export const NARRATION_ASSETS = {
   'onboarding.personalization': require('./onboarding.personalization.mp3'),
   'onboarding.role': require('./onboarding.role.mp3'),
   'onboarding.skill': require('./onboarding.skill.mp3'),
+  'onboarding.skill-invited': require('./onboarding.skill-invited.mp3'),
   'tour.ai-analysis': require('./tour.ai-analysis.mp3'),
   'tour.build-workout': require('./tour.build-workout.mp3'),
   'tour.coach-middle-tab': require('./tour.coach-middle-tab.mp3'),

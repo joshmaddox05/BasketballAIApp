@@ -577,11 +577,13 @@ export default function CoachSessionsScreen({ navigation }) {
             keyboardType="decimal-pad"
           />
 
+          {/* The shared buttons take the label as a `sentryLabel` prop. */}
           <PrimaryButton
             label={saving ? 'Creating…' : 'Create Session'}
             onPress={handleCreate}
             disabled={saving}
             style={{ marginTop: 20 }}
+            sentryLabel="coach_session_create"
           />
           <View style={{ height: 24 }} />
         </ScrollView>

@@ -7,6 +7,7 @@ import { capturePendingInviteFromUrl } from '../services/coachInviteService';
 import OnboardingNavigator from './OnboardingNavigator';
 import MainNavigator, { CoachMainNavigator, ScoutMainNavigator, ParentMainNavigator } from "./MainNavigator";
 import AuthNavigator from './AuthNavigator';
+import { registerNavigation } from '../services/analytics';
 
 // Export navigation ref for programmatic navigation
 export const navigationRef = React.createRef();
@@ -74,7 +75,15 @@ export default function AppNavigator() {
 
     return (
         <View style={styles.root}>
-            <NavigationContainer ref={navigationRef}>
+            {/*
+              onReady is the only correct moment to hand the container to
+              Sentry: earlier and the ref is still null, later and the first
+              screen's transaction has already been missed.
+            */}
+            <NavigationContainer
+                ref={navigationRef}
+                onReady={() => registerNavigation(navigationRef)}
+            >
                 {isAuthenticated ? (
                     userData?.onboardingCompleted ? (
                         <RoleNavigator />

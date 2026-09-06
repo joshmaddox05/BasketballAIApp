@@ -96,13 +96,18 @@ export default function SimCoachScenarioScreen({ navigation, route }) {
             { completionPercentage: 100, score }
           );
         } else {
-          await submitAssignmentForCompletion(user.uid, {
+          // Scenarios opened from the library have no assignment behind them, and
+          // submitAssignmentForCompletion returns null when it finds nothing open.
+          // Only report a submission when one actually closed — otherwise every
+          // self-serve rep would count as an assignment turned in, which is now
+          // the common case rather than the rare one.
+          const closed = await submitAssignmentForCompletion(user.uid, {
             refId: result.scenarioId,
             type: 'scenario',
             completionPercentage: 100,
             score,
           });
-          track(EVENTS.ASSIGNMENT_SUBMITTED, { type: 'scenario', score });
+          if (closed) track(EVENTS.ASSIGNMENT_SUBMITTED, { type: 'scenario', score });
         }
       }
     } catch (_) {}
@@ -395,6 +400,38 @@ export default function SimCoachScenarioScreen({ navigation, route }) {
             >
               {scenarioData.explanation}
             </Text>
+
+            {/* The rationale for the option they actually picked. One shared
+                explanation can say why the right answer is right, but it cannot
+                tell a player why THEIR read failed — and that is the part that
+                changes the next decision. Guarded so scenarios authored before
+                optionNotes existed, and coach-authored game plans that embed their
+                own payload, render exactly as they did. */}
+            {!isRight && scenarioData.optionNotes?.[selectedAnswer] ? (
+              <View style={[styles.noteBlock, { borderTopColor: theme.divider }]}>
+                <Text style={[styles.noteLabel, { color: theme.textMuted }]}>
+                  WHY {scenarioData.options?.[selectedAnswer]?.label} DOESN'T WORK
+                </Text>
+                <Text style={[styles.noteBody, { color: theme.textMuted }]}>
+                  {scenarioData.optionNotes[selectedAnswer]}
+                </Text>
+              </View>
+            ) : null}
+
+            {scenarioData.coachingCue ? (
+              <Text style={[styles.coachingCue, { color: theme.text }]}>
+                “{scenarioData.coachingCue}”
+              </Text>
+            ) : null}
+
+            {/* Basketball rarely has universal answers. Where the correct read
+                depends on the scheme a team plays, the scenario says so rather
+                than teaching a rule that is wrong for half its readers. */}
+            {scenarioData.assumptions ? (
+              <Text style={[styles.assumptions, { color: theme.textMuted }]}>
+                {scenarioData.assumptions}
+              </Text>
+            ) : null}
           </Entrance>
         )}
 
@@ -458,6 +495,15 @@ const styles = StyleSheet.create({
   },
 
   optionsSection: { gap: SHAPE.cardGap, marginTop: 14 },
+  noteBlock: {
+    marginTop: 12,
+    paddingTop: 11,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  noteLabel: { fontFamily: FONTS.heading, fontSize: 11.5, letterSpacing: 0.6 },
+  noteBody: { fontFamily: FONTS.body, fontSize: 14, lineHeight: 19, marginTop: 5 },
+  coachingCue: { fontFamily: FONTS.heading, fontSize: 14.5, lineHeight: 19, marginTop: 12 },
+  assumptions: { fontFamily: FONTS.body, fontSize: 12.5, lineHeight: 17, marginTop: 9, fontStyle: 'italic' },
   optionBtn: {
     flexDirection: 'row',
     alignItems: 'center',

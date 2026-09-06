@@ -20,7 +20,8 @@
     "test:scouting": "node --test \"tests/scouting/*.test.mjs\"",
     "test:narration": "node --test \"tests/narration/*.test.mjs\"",
     "test:onboarding": "node --test \"tests/onboarding/*.test.mjs\"",
-    "test:invites": "node --test \"tests/invites/*.test.mjs\""
+    "test:invites": "node --test \"tests/invites/*.test.mjs\"",
+    "test:content": "node --test \"tests/content/*.test.mjs\""
   },
   "dependencies": {
     "@expo-google-fonts/archivo": "^0.4.2",

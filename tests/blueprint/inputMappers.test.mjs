@@ -398,7 +398,7 @@ const trackedWorkout = (steps) => ({
 test('SRS stays unmeasured below the tracked-step threshold', () => {
   const { meta, measuredPillars } = buildPillarComponents({
     ...EMPTY,
-    workouts: [trackedWorkout([['Crossovers', 100], ['Crossovers', 90]])], // only 2
+    workouts: [trackedWorkout([['Crossover Dribbles', 100], ['Crossover Dribbles', 90]])], // only 2
   });
   assert.equal(meta.srs.ballHandlingEfficiency.measured, false);
   assert.equal(measuredPillars.SRS, false);
@@ -409,9 +409,9 @@ test('camera-tracked ball-handling drills measure ballHandlingEfficiency', () =>
     ...EMPTY,
     workouts: [
       trackedWorkout([
-        ['Crossovers', 100],
+        ['Crossover Dribbles', 100],
         ['Stationary Dribbling', 80],
-        ['Two-Ball Dribbling', 90],
+        ['Two Ball Dribbling', 90],
       ]),
     ],
   });
@@ -430,10 +430,10 @@ test('manual reps are never treated as execution evidence', () => {
     ...EMPTY,
     workouts: [
       trackedWorkout([
-        ['Crossovers', 100, 'manual'],
+        ['Crossover Dribbles', 100, 'manual'],
         ['Stationary Dribbling', 100, 'manual'],
-        ['Two-Ball Dribbling', 100, 'manual'],
-        ['Crossovers', 100, 'manual'],
+        ['Two Ball Dribbling', 100, 'manual'],
+        ['Crossover Dribbles', 100, 'manual'],
       ]),
     ],
   });
@@ -462,9 +462,9 @@ test('passing and finishing stay unmeasured — they still have no producer', ()
     ...EMPTY,
     workouts: [
       trackedWorkout([
-        ['Crossovers', 100],
+        ['Crossover Dribbles', 100],
         ['Stationary Dribbling', 100],
-        ['Two-Ball Dribbling', 100],
+        ['Two Ball Dribbling', 100],
       ]),
     ],
   });
@@ -479,9 +479,9 @@ test('a partially measured SRS is not a low SRS', () => {
     ...EMPTY,
     workouts: [
       trackedWorkout([
-        ['Crossovers', 100],
+        ['Crossover Dribbles', 100],
         ['Stationary Dribbling', 100],
-        ['Two-Ball Dribbling', 100],
+        ['Two Ball Dribbling', 100],
         ['Defensive Slides', 100],
         ['Zigzag Defense', 100],
         ['Mirror Drill', 100],
@@ -498,9 +498,9 @@ test('an over-counting detector cannot push a component above 100', () => {
     ...EMPTY,
     workouts: [
       trackedWorkout([
-        ['Crossovers', 250],
-        ['Crossovers', 300],
-        ['Crossovers', 400],
+        ['Crossover Dribbles', 250],
+        ['Crossover Dribbles', 300],
+        ['Crossover Dribbles', 400],
       ]),
     ],
   });
@@ -513,7 +513,7 @@ test('unknown or malformed tracked steps are ignored, not counted as zero', () =
     workouts: [
       trackedWorkout([
         ['Some Custom Drill', 100],
-        ['Crossovers', NaN],
+        ['Crossover Dribbles', NaN],
         ['Free Throws', 100],
       ]),
     ],

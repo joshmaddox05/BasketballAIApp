@@ -88,6 +88,12 @@ const convertTemplateToWorkout = (template) => {
         subCategoryId: subCategoryId,
         tags: [], // Can be populated later
         requiredTier: template.requiredTier, // Add subscription tier
+        // This map is an allowlist, so any field it does not name is silently
+        // dropped on the way to the UI. That is what happened to the read/decision
+        // layer: STEP_TEMPLATES carried `reads`/`decisions`/`stage` correctly, the
+        // merge worked, and ActiveWorkoutScreen rendered nothing, because the
+        // fields never survived this adapter. Anything added to a step template
+        // from here on has to be named here too.
         steps: template.steps.map(step => ({
             title: step.name,
             instructions: step.instructions.join(' '),
@@ -95,6 +101,23 @@ const convertTemplateToWorkout = (template) => {
             reps: step.reps || 0,
             duration: step.duration ? Math.floor(step.duration / 60) : 0,
             category: step.category || template.category.toLowerCase(),
+            // The read/decision layer from drillIntelligence.js. Spread
+            // conditionally so a step without them stays byte-identical to what
+            // this adapter produced before, which is what every custom and
+            // legacy workout relies on.
+            ...(step.stage && { stage: step.stage }),
+            ...(step.reads?.length && { reads: step.reads }),
+            ...(step.decisions?.length && { decisions: step.decisions }),
+            ...(step.coachingPoints?.length && { coachingPoints: step.coachingPoints }),
+            ...(step.commonMistakes?.length && { commonMistakes: step.commonMistakes }),
+            ...(step.gameTransfer && { gameTransfer: step.gameTransfer }),
+            ...(step.equipment?.length && { drillEquipment: step.equipment }),
+            ...(step.players != null && { players: step.players }),
+            // `tracker` was being dropped here too. The pose registry still
+            // resolved a detector via its keyword fallback on the title, so this
+            // never surfaced as a bug — but the structured field exists precisely
+            // so catalog drills do not depend on that fallback.
+            ...(step.tracker && { tracker: step.tracker }),
             ...(step.videoReference && { videoReference: step.videoReference })
         })),
         equipment: ['Basketball', 'Court space', 'Water bottle'],

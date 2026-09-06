@@ -300,13 +300,21 @@ export function Chip({ label, active, onPress, style, small }) {
  * PrimaryButton / OutlineButton — the only two button voices in the system.
  * Deny/cancel is ALWAYS the outline; approve/confirm the solid primary.
  */
-export function PrimaryButton({ label, onPress, disabled, style, icon, iconRight, accessibilityLabel, accessibilityHint }) {
+/**
+ * `sentryLabel` (both buttons): opts this tap into Sentry interaction tracing.
+ * Snake_case, stable, named like the values in services/analytics.js EVENTS —
+ * it becomes part of the transaction name, so it must never contain anything a
+ * user typed. Omit it and the tap is simply not traced, which is the default
+ * for most buttons.
+ */
+export function PrimaryButton({ label, onPress, disabled, style, icon, iconRight, accessibilityLabel, accessibilityHint, sentryLabel }) {
   const { theme } = useAppContext();
   return (
     <TouchableOpacity
       onPress={onPress}
       disabled={disabled}
       activeOpacity={0.85}
+      sentry-label={sentryLabel}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel || label}
       accessibilityHint={accessibilityHint}
@@ -331,7 +339,7 @@ export function PrimaryButton({ label, onPress, disabled, style, icon, iconRight
   );
 }
 
-export function OutlineButton({ label, onPress, disabled, style, icon, accessibilityLabel, accessibilityHint }) {
+export function OutlineButton({ label, onPress, disabled, style, icon, accessibilityLabel, accessibilityHint, sentryLabel }) {
   const { theme } = useAppContext();
   // The outline voice carries disabled the same way the primary one does. Without it,
   // callers that gate an action had to hand-roll the guard — and one that forgot let a
@@ -344,6 +352,7 @@ export function OutlineButton({ label, onPress, disabled, style, icon, accessibi
       onPress={onPress}
       disabled={disabled}
       activeOpacity={0.85}
+      sentry-label={sentryLabel}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel || label}
       accessibilityHint={accessibilityHint}

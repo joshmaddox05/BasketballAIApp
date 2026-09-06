@@ -92,10 +92,16 @@ export const STEP_TITLE_TO_SHOT = {
 // carries LOW confidence, and its note says so. Nothing here should be read as
 // technique grading; genuine technique measurement still waits on ShotDNA / a real
 // CV pipeline (readiness C-2).
+//
+// These keys are EXACT drill names, and a key that matches none is silent: the
+// lookup misses, the step is skipped, and the component quietly loses a producer.
+// 'Crossovers' and 'Two-Ball Dribbling' were exactly that for as long as this table
+// has existed, leaving ballHandlingEfficiency fed by one drill. tests/blueprint/
+// mappingKeys.test.mjs now fails if any key drifts off the catalog again.
 export const STEP_TITLE_TO_SKILL = {
-  Crossovers: 'ballHandlingEfficiency',
+  'Crossover Dribbles': 'ballHandlingEfficiency',
   'Stationary Dribbling': 'ballHandlingEfficiency',
-  'Two-Ball Dribbling': 'ballHandlingEfficiency',
+  'Two Ball Dribbling': 'ballHandlingEfficiency',
   'Defensive Slides': 'defensiveTechnique',
   'Zigzag Defense': 'defensiveTechnique',
   'Mirror Drill': 'defensiveTechnique',

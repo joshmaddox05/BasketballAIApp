@@ -26,9 +26,13 @@ const VALID_TRACKERS = [...MOVEMENT_TRACKERS, 'shooting'];
  * reuses the same key names) cannot contribute duplicates.
  */
 function parseStepTemplates() {
-  const start = source.indexOf('export const STEP_TEMPLATES = {');
-  const end = source.indexOf('export const WORKOUT_TEMPLATES');
-  assert.ok(start > -1 && end > start, 'could not locate the STEP_TEMPLATES block');
+  // The literal is named BASE_STEP_TEMPLATES: the exported STEP_TEMPLATES is that
+  // object with the drillIntelligence read/decision layer merged onto it. The
+  // authored `tracker` fields this test asserts on live in the base literal, and
+  // the merge cannot overwrite them, so scanning the base is still correct.
+  const start = source.indexOf('const BASE_STEP_TEMPLATES = {');
+  const end = source.indexOf('const withIntelligence');
+  assert.ok(start > -1 && end > start, 'could not locate the BASE_STEP_TEMPLATES block');
   const block = source.slice(start, end);
 
   const entryRe =

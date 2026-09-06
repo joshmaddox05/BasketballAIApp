@@ -118,6 +118,7 @@ export default function LinkAccountScreen({ navigation, route }) {
             onPress={handleRedeem}
             disabled={submitting}
             activeOpacity={0.85}
+            sentry-label="coach_link_redeem"
           >
             {submitting ? (
               <ActivityIndicator color="#FFFFFF" />
