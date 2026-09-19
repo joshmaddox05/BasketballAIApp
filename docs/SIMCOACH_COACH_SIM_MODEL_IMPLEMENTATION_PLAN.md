@@ -45,12 +45,81 @@ The new document is a more detailed restatement of the spec this repo was alread
 
 These are derived from patterns already proven in this repo, not invented here. Every work package below conforms to them.
 
-1. **The engine is a pure ES module, no React Native and no Firebase imports.** New directory `src/services/simCoach/`, with a `package.json` containing `{"type": "module"}` — exactly mirroring `src/services/blueprint/package.json` and `src/services/gamePlan/package.json`. This is what makes it runnable unchanged under Node's test runner *and* inside Cloud Functions, and it is the reason the blueprint engine is the most testable code in this project.
+1. **The engine is a pure ES module, no React Native and no Firebase imports** (rationale: ADR-001, §2.1). New directory `src/services/simCoach/`, with a `package.json` containing `{"type": "module"}` — exactly mirroring `src/services/blueprint/package.json` and `src/services/gamePlan/package.json`. This is what makes it runnable unchanged under Node's test runner *and* inside Cloud Functions, and it is the reason the blueprint engine is the most testable code in this project.
 2. **Tests are `node --test` `.test.mjs` files** under `tests/simCoach/`, with an `npm run test:simcoach` script alongside the existing ten. No Jest, no RN test renderer.
 3. **Firestore stays owner-scoped by default.** New collections use the `isOwner(uid)` one-liner. The role/permission-checked pattern introduced for `simulationSessions` is reused only where another user genuinely needs access (WP13).
 4. **Every new collection-group query needs an explicit `fieldOverrides` entry** in `firestore.indexes.json`. This bit the project once already (companion spec §9) — the plan calls it out per work package rather than leaving it to first-run discovery.
 5. **New screens register in `src/navigation/SharedStackNavigator.js`** in the coach-gated block (lines ~191–205), following the existing `SimCoach*` entries.
 6. **The four evidence tiers stay distinguishable end to end** (doc §62, §48; companion spec §1): evidence → tactical events → tactical model → simulation. The existing `TierTag` component is the UI expression; the engine must carry the tier through its output so `TierTag` has something honest to read.
+
+
+### 2.1 ADR-001 — The engine is a module in this repo, not a separate service
+
+**Decision:** build the simulation engine as a dependency-free pure ES module inside `BasketballAIApp`, at `src/services/simCoach/`, running on-device. Do **not** start a separate project or service for it. Keep the boundary clean enough that extracting it later is a `git mv` plus a package publish, not a rewrite.
+
+**Status:** accepted, 2026-09-19. Revisit only if the triggers below fire.
+
+#### Evidence
+
+The question turns on whether the workload needs a server. It does not. `scripts/benchSimEngineFeasibility.mjs` (in this repo, reproducible) models the real workload shape — seeded PRNG, sampling from conditional distributions, full game-state updates including score, clock, fouls, fatigue and substitutions, and bounded trace capture — at both fidelity levels:
+
+| Fidelity | 100 games | 1,000 games | 10,000 games |
+|---|---|---|---|
+| Level 1 (outcome) | **28 ms** | 77 ms | 489 ms |
+| Level 2 (sequence chain) | **18 ms** | 74 ms | 531 ms |
+
+The document's headline workload (§27, "100 simulated games") is ~15,000 possessions and completes in **under 30 ms on desktop V8**, including JIT warm-up — the marginal cost once warm is ~0.05 ms per simulated game. Level 2 is not measurably more expensive than Level 1, because the cost is dominated by the possession loop rather than the chain depth.
+
+React Native runs Hermes, which compiles to bytecode and is optimised for startup rather than sustained numeric throughput, so a hot arithmetic loop pays a penalty there that these numbers do not show. Assume **5–10x** as a planning figure: 100 games lands at roughly 150–300 ms on a mid-range device. That is a brief spinner, not a server job. **WP4 must verify this on a real device** rather than inherit the assumption.
+
+#### Rationale
+
+1. **The engine is a pure function.** `(opponentModel, teamModel, strategy, gameState, seed, n) → distribution`. No I/O, no persistent state, no shared resource, no concurrency requirement. The reasons to make something a service — I/O fan-out, shared mutable state, independent scaling, a language the client can't run — none apply.
+2. **A service would weaken the governance work that just shipped.** Server-side simulation means reading `opponentModels`/`teamModels`/`filmEvents` through the Firebase Admin SDK, which **bypasses `firestore.rules` entirely**. The access-control pass documented in the companion spec §9 (including a real film-read hole that was found and closed) is enforced *in those rules*. Moving reads behind Admin credentials re-opens that surface and requires reimplementing the checks in application code. On-device, the existing rules keep doing their job unchanged.
+3. **The precedent already exists and works.** `src/services/blueprint/` is exactly this pattern, and its own `package.json` comment states the intent: pure ES modules "so it runs unchanged under Node's test runner **and Cloud Functions**." A module built this way can later run server-side *without moving* — which is precisely the optionality a separate service would be bought to obtain.
+4. **Coaches work in gyms.** On-device simulation works on bad arena wifi. A service does not, and the feature's peak usage is exactly where connectivity is worst.
+5. **The overhead is the real cost.** A separate service needs hosting, CI/CD, secrets, monitoring, an auth boundary (Firebase ID token verification), API versioning against a mobile client that updates on App Store timelines, and a network failure path in every calling screen. That is weeks of work before a single possession is simulated, spent on infrastructure rather than on basketball.
+
+#### The seam that *is* worth separating: fitting vs. sampling
+
+The useful decomposition is not app-versus-service, it is:
+
+- **Sampling** (runtime, per-run): draw from the fitted distributions and advance game state. Trivial arithmetic, measured above → **on-device JS**. This is "the simulation engine" and it is WP4.
+- **Fitting** (batch, per-model): estimate the transition probabilities from tagged evidence, apply shrinkage, and recalibrate after games. Today `generateOpponentModel` does this crudely and inline, which is adequate through Level 1.
+
+Keeping these separate costs nothing now — the engine consumes a fitted-parameters object and does not care who produced it — and it is what makes future sophistication cheap. If WP10/WP11 ever need genuine hierarchical Bayesian fitting, that becomes an **offline batch job** producing a fitted-parameter document the on-device sampler reads unchanged. That job is where Python (PyMC/Stan) would earn its place, and it can live in a Cloud Function or alongside the existing Python service. **Fitting is a plausible future service; sampling is not.**
+
+#### Where a separate service genuinely is right
+
+**Computer vision** (§7 of this plan). Long-running jobs, GPU, a Python ecosystem with no JS equivalent, real I/O, and work that must not run on a phone. That is a service — either the existing `BasketballAIAppApi` or a sibling — and it was already scoped that way. This ADR does not contradict that; it distinguishes the two cases.
+
+#### Triggers to revisit
+
+Move sampling server-side if any of these become true — none are today:
+
+- Run counts rise into the tens of thousands per coach interaction, or Level 3 interactive simulation needs precomputed trees.
+- On-device measurement in WP4 comes back worse than ~1 s for 100 games on target hardware.
+- Simulation output must be computed once and shared across many viewers rather than per-coach.
+- Fitting genuinely requires a numerical stack that cannot run in JS — at which point move **fitting only**, per the seam above.
+
+#### Modelling approach — use the published method, don't invent one
+
+The document's §23 "state-transition model" is a **possession-based Markov chain**, and this is well-trodden ground in basketball analytics: transition matrices estimated from play-by-play (here, tagged `filmEvents`), with possession-ending events as absorbing states. Published work reports forecast quality comparable to other statistical approaches *while giving more insight into the basketball* — which is exactly the §34 explainability property this system needs and a pure score-predictor would not provide. The literature also documents the **absorbing-state pitfall** (simulations getting stuck in or terminating early at possession-ending states) and the standard handling; WP4 should adopt that rather than rediscover it.
+
+#### Technology choices
+
+| Concern | Choice | Why |
+|---|---|---|
+| Language | **Plain JS + JSDoc types**, checked in CI with `tsc --checkJs --noEmit` | The repo has zero TypeScript and no `tsconfig.json`; JSDoc is already the house style in `firestoreService.js`. This gets real type checking on the shapes that matter (distributions, game state, traces) with no build-step, Metro, or Cloud Functions changes. Adopt TS properly later if the repo does generally — not for one module. |
+| PRNG | **sfc32 inline (~10 lines)** | Must be seeded (ADR WP4.1) and `Math.random()` cannot be. A dependency for ten lines of arithmetic is supply-chain risk for nothing. The benchmark script has the implementation. |
+| Statistics | **None** | Dirichlet/Laplace shrinkage and distribution sampling are arithmetic. `simple-statistics`/`jStat` would add weight and buy nothing at Level 1–2. |
+| Tests | **`node --test` `.test.mjs`** under `tests/simCoach/`, `npm run test:simcoach` | Matches the ten existing suites; the pure-module shape is what makes it possible. |
+| Keeping the UI responsive | Chunk batches and yield via `InteractionManager` | At ~150–300 ms on device it is borderline for a single blocking call; chunking removes the question. |
+
+#### What is *not* separable
+
+The rest of SimCoach Coach stays in this app and is not a candidate for extraction: the screens are bound to the navigation stack, `AppContext` auth, the `canAccessFeature('simCoach')` premium gate, `users/{coachUid}/*` collections, and the linked-player graph. Splitting that would be a rewrite of working code for no benefit.
+
 
 ---
 
@@ -155,6 +224,8 @@ Doc §16 and §10 require the own-team model to carry tactical identity (offensi
 **Effort: 3 weeks. Depends on: WP3 (needs a second team); WP0 for calibration. Unblocks: WP5–WP11. This is the critical path.**
 
 The core deliverable. Doc §13 Level 1, §21–§23, §46.
+
+**Where it runs and why it is a module rather than a service: see ADR-001 (§2.1).** The first task in this work package is to reproduce `scripts/benchSimEngineFeasibility.mjs` on target hardware under Hermes — the ADR assumes a 5-10x penalty over the measured desktop numbers, and that assumption should be replaced with a real figure before the rest of the package is built on it.
 
 **Module layout** — `src/services/simCoach/` (pure, testable, no RN/Firebase):
 
@@ -372,7 +443,7 @@ One engineer, sequential. Tracks B and C genuinely parallelise, so with two engi
 | 1 | Tagging unit: coach (~40 possessions) or analyst (full games)? | WP4 calibration, WP10 go/no-go | Kassoum/Josh |
 | 2 | Minimum evidence floor below which the engine refuses to produce a number (proposed: 10 events in the conditioned bucket) | WP4.3 | Kassoum |
 | 3 | Default run count — 100 per §27, or coach-selectable? | WP5 | Product |
-| 4 | Do simulations run on-device or in a Cloud Function? (Level 1 is fine on-device; WP10 may not be) | WP4 persistence shape | Engineering |
+| 4 | ~~On-device or Cloud Function?~~ **Resolved by ADR-001 (§2.1)** — on-device, on measured evidence. Remaining sub-task: confirm the Hermes figure on target hardware during WP4. | — | Engineering |
 | 5 | Does post-game actual data arrive as tagged film or box-score entry? | WP11 | Kassoum/Josh |
 | 6 | CV: vendor or in-house? | Nothing in this plan — parallel track only | Kassoum/Josh |
 
