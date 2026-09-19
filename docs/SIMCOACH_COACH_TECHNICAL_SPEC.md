@@ -5,6 +5,8 @@
 **Not yet done:** Phase 4 onward (§8) — fidelity progression past "outcome," post-game learning, automated film analysis, interactive simulation — plus the two round-2 refinements deferred alongside Phase 3 (Coach override on Team Model, Multi-variable What-If) and staff/assistant-coach participation in Team Simulation Collaboration. Nothing in §8 past Phase 3 should be treated as implemented until marked complete in the repo.
 **Film & data governance (§6) is now enforced, not just schema'd** — access control, real deletion (video included), and a scheduled retention job all shipped in a dedicated pass after Phase 3; that pass also closed a genuine access hole in `storage.rules` where any signed-in user could read any coach's film. Remaining governance limits — download-token URLs, no org entity for `dataGovernancePolicy`, derived `opponentModels` outliving purged film — are listed explicitly in §9.
 
+**Simulation scope is now planned separately.** A later source document — `BbalAapAcad_DBESimCoachCoachSimModelDetail.docx` (the detailed operating & simulation model) — specifies the simulation half of this system in far more detail than this spec did, and made one gap explicit: what shipped as "outcome-level simulation" in Phase 2 is a tendency *lookup* (`SimCoachWhatIfScreen.js` reads the aggregated distribution off the opponent model), not a probabilistic engine. Everything that document requires and this codebase lacks is planned in **`docs/SIMCOACH_COACH_SIM_MODEL_IMPLEMENTATION_PLAN.md`** — read that for simulation-engine, post-game-learning and staff-collaboration scope. This spec remains the record of Phases 0–3 as built.
+
 ---
 
 ## 1. What the source document is asking for
