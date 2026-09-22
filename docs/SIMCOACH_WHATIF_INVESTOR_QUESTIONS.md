@@ -4,6 +4,8 @@
 **Scope:** SimCoach Coach, Layer 4 (What-If Laboratory) and the layers it directly depends on (3, 5, 6, 7).
 **Companion docs:** `SIMCOACH_COACH_TECHNICAL_SPEC.md` (§3.5, §8, §9, §10b), `SIMCOACH_COACH_OPEN_QUESTIONS.md` (the earlier 5 questions — all **resolved**, see spec §3).
 
+> **Status update, 2026-09-22:** the Detailed Operating & Simulation Model docx answers A1, A2, A3, C1 and C2, partially answers B1 and C3, and leaves B2, B3 and B4 open. See `SIMCOACH_WHATIF_QUESTIONS_VS_OPERATING_MODEL.md` for the question-by-question mapping and the new scope that document introduces.
+
 This is not a re-ask of the original five. Those were answered and are now standing architectural principles. These are the questions that surfaced *after* building the thing, and every one of them is a business or product call that engineering cannot make on its own.
 
 ---
