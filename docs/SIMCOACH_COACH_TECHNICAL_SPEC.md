@@ -261,6 +261,13 @@ Feature gating: `src/utils/subscription.js` gates `simCoach` at `SUBSCRIPTION_TI
 
 ## 8. Phased roadmap
 
+> **Superseded for unbuilt work, 2026-09-27.** Phases 4–6 below are replaced by
+> `SIMCOACH_COACH_IMPLEMENTATION_PLAN.md`, which reflects Kassoum's harmonized
+> final position (team workspace first, five-level confidence model, controlled
+> repeated simulation, authored basketball-logic catalogue, staff inside
+> SimCoach). Phases 0–3 below remain the accurate record of what shipped.
+
+
 **Phase 0 — Cleanup, foundation & governance fields (small, do first)**
 Reconcile the stale "Coming Soon" Film Library placeholder with the real `SimCoachFilmLibraryScreen`. Add `processingStatus` **and the governance fields from §5/§6** to the film schema — these need to exist before any film flows through the new pipeline, not retrofitted later.
 
