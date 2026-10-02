@@ -823,6 +823,97 @@ const expo = new Expo();
  * Test Push Notification - Callable function to send a test notification
  * Call this from the app to test push notifications work correctly
  */
+// ─── SimCoach Coach: workspace invite redemption ─────────────────────────────
+//
+// This has to be privileged. A workspace's members/ subcollection and its denormalized
+// memberUids array are owner-only in firestore.rules, because adding people is
+// manageMembers, which is head-coach-only by design. But redemption is precisely the
+// case where somebody who is NOT the owner must be added — so a client-side redeem
+// would require loosening both of those rules to let any signed-in user write a
+// membership for themselves, gated on an invite code the rule would have to chase
+// through a get(). That is a wide hole to open for one flow.
+//
+// Doing it here keeps the rules strict: the client proves nothing, the function checks
+// everything, and the write happens with admin rights.
+exports.redeemWorkspaceInvite = onCall(async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) return { success: false, reason: 'unauthenticated' };
+
+  const code = String(request.data?.code || '').trim().toUpperCase();
+  if (!code) return { success: false, reason: 'missing-code' };
+
+  const db = admin.firestore();
+  const codeRef = db.collection('workspaceInviteCodes').doc(code);
+
+  try {
+    // A transaction, because two people redeeming the same code at once would
+    // otherwise both read `used: false` and both join.
+    const outcome = await db.runTransaction(async (tx) => {
+      const snap = await tx.get(codeRef);
+      if (!snap.exists) return { success: false, reason: 'not-found' };
+
+      const invite = snap.data();
+      if (invite.used) return { success: false, reason: 'already-used' };
+      if (invite.coachUid === uid) return { success: false, reason: 'own-workspace' };
+
+      const workspaceRef = db
+        .collection('users').doc(invite.coachUid)
+        .collection('teamWorkspaces').doc(invite.workspaceId);
+      const workspaceSnap = await tx.get(workspaceRef);
+      if (!workspaceSnap.exists) return { success: false, reason: 'workspace-gone' };
+
+      // The role is taken from the CODE, never from the request: a redeemer must not
+      // be able to name the role they arrive as.
+      const role = invite.role;
+      if (!role || role === 'headCoach') return { success: false, reason: 'invalid-role' };
+
+      const profile = await tx.get(db.collection('users').doc(uid));
+      const displayName = request.data?.displayName || profile.data()?.name || null;
+
+      tx.update(codeRef, {
+        used: true,
+        usedBy: uid,
+        usedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      tx.set(workspaceRef.collection('members').doc(uid), {
+        uid,
+        role,
+        displayName,
+        invitedBy: invite.coachUid,
+        viaInviteCode: code,
+        // Permissions are deliberately NOT copied from the request. The client-side
+        // role table (src/services/simcoach/workspaceSchema.js) is a mirror for the UI;
+        // this is the authority. Leaving it unset means "role defaults", which
+        // effectivePermissions() resolves.
+        joinedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      tx.update(workspaceRef, {
+        memberUids: admin.firestore.FieldValue.arrayUnion(uid),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      // merge-set, not update: this mirror doc is written client-side, and a missing
+      // one must not abort an otherwise valid redemption.
+      tx.set(
+        workspaceRef.collection('invitations').doc(code),
+        { used: true, usedBy: uid, usedAt: admin.firestore.FieldValue.serverTimestamp() },
+        { merge: true },
+      );
+
+      return {
+        success: true,
+        coachUid: invite.coachUid,
+        workspaceId: invite.workspaceId,
+        role,
+      };
+    });
+
+    return outcome;
+  } catch (error) {
+    console.error('redeemWorkspaceInvite failed:', error);
+    return { success: false, reason: 'error' };
+  }
+});
+
 exports.sendTestNotification = onCall(async (request) => {
   // Verify user is authenticated
   if (!request.auth) {

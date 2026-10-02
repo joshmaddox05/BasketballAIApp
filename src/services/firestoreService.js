@@ -17,9 +17,11 @@ import {
   increment,
   arrayUnion,
   arrayRemove,
-  collectionGroup
+  collectionGroup,
+  writeBatch
 } from 'firebase/firestore';
-import { db } from '../config/firebaseConfig';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '../config/firebaseConfig';
 // Storage cleanup for film deletion/retention (spec §6) — deleting the video
 // object is what actually revokes access to footage, since playback uses a
 // rules-bypassing download-token URL. See deleteFilm below.
@@ -35,6 +37,23 @@ import { deleteFile } from './storageService';
 import { ACHIEVEMENTS, getLevelFromXP } from '../data/achievements';
 import { isHighSchoolGrade, requiresGuardianConsent, SESSION_STATUS } from '../utils/constants';
 import { MIN_SIMCOACH_SCENARIOS } from './blueprint/inputMappers';
+// SimCoach Coach team workspace (docs/SIMCOACH_COACH_IMPLEMENTATION_PLAN.md §3-4).
+// Role table, lifecycle and migration planning are pure modules so the same logic runs
+// under `npm run test:simcoach` without Firebase.
+import {
+  canTransition,
+  newGamePreparation,
+  newMember,
+  newTeamWorkspace,
+  permissionsForRole,
+  WORKSPACE_ROLES,
+} from './simcoach/workspaceSchema';
+import {
+  isNoOp,
+  MIGRATED_COLLECTIONS,
+  MIGRATION_FLAG,
+  planMigration,
+} from './simcoach/migration';
 
 /**
  * Recursively remove `undefined` values from an object/array so it is safe to
@@ -5398,6 +5417,345 @@ export const getSessionResponses = async (coachUid, sessionId) => {
   } catch (error) {
     console.error('Error fetching session responses:', error);
     return [];
+  }
+};
+
+// ==================== COACH: Team Workspace (SimCoach Coach — Step 1) ====================
+//
+// One coach/team workspace holding season context and MANY game preparations, per
+// Kassoum's harmonized position: a per-game silo would forbid the cross-game analysis
+// the workspace exists to enable. See docs/SIMCOACH_COACH_IMPLEMENTATION_PLAN.md §4.
+//
+// Note on invitations: every other invite in this app runs player → role-holder, with
+// the PLAYER generating the code (generateInviteCode/redeemInviteCode above). Staff
+// invitations reverse that — the coach owns the space and admits people to it — so they
+// use a separate /workspaceInviteCodes lookup rather than being bolted onto the
+// player-centric primitive, where a coach would have to ask an assistant to invite him
+// to his own workspace. This is the coach-to-coach linking gap the spec recorded as a
+// prerequisite (§9, §10b-3); this is it being closed.
+
+/**
+ * Create a team workspace. The creating coach is its owner and head coach.
+ * @returns {Promise<string>} the new workspace id
+ */
+export const createTeamWorkspace = async (coachUid, { name, season = null, level = null } = {}) => {
+  try {
+    const ref = await addDoc(collection(db, 'users', coachUid, 'teamWorkspaces'), removeUndefined({
+      ...newTeamWorkspace({ ownerUid: coachUid, name, season, level }),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }));
+    // The owner is a member like anyone else, so one code path reads permissions.
+    await setDoc(doc(db, 'users', coachUid, 'teamWorkspaces', ref.id, 'members', coachUid), removeUndefined({
+      ...newMember({ uid: coachUid, role: 'headCoach' }),
+      joinedAt: serverTimestamp(),
+    }));
+    return ref.id;
+  } catch (error) {
+    console.error('Error creating team workspace:', error);
+    throw error;
+  }
+};
+
+export const getTeamWorkspace = async (coachUid, workspaceId) => {
+  try {
+    const snap = await getDoc(doc(db, 'users', coachUid, 'teamWorkspaces', workspaceId));
+    return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+  } catch (error) {
+    console.error('Error getting team workspace:', error);
+    return null;
+  }
+};
+
+/** Workspaces this coach owns. */
+export const getCoachWorkspaces = async (coachUid) => {
+  try {
+    const snap = await getDocs(collection(db, 'users', coachUid, 'teamWorkspaces'));
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  } catch (error) {
+    console.error('Error listing coach workspaces:', error);
+    return [];
+  }
+};
+
+/**
+ * Workspaces this user belongs to but does not own — the staff/player view.
+ * A workspace lives under its COACH, so there is no owner-path to query and this has to
+ * be a collectionGroup query against the denormalized `memberUids` array (the same
+ * reason `participantUids` exists on simulationSessions: Firestore cannot index a
+ * dynamic per-user field path). Requires the COLLECTION_GROUP override on
+ * teamWorkspaces.memberUids in firestore.indexes.json — without it this throws
+ * "requires an index" on first real use, exactly as getSharedSimulationSessions did.
+ */
+export const getMemberWorkspaces = async (uid) => {
+  try {
+    const snap = await getDocs(query(
+      collectionGroup(db, 'teamWorkspaces'),
+      where('memberUids', 'array-contains', uid),
+    ));
+    return snap.docs
+      .map((d) => ({ id: d.id, ownerUid: d.ref.parent.parent?.id || null, ...d.data() }))
+      .filter((w) => w.ownerUid !== uid);
+  } catch (error) {
+    console.error('Error listing member workspaces:', error);
+    return [];
+  }
+};
+
+export const getWorkspaceMembers = async (coachUid, workspaceId) => {
+  try {
+    const snap = await getDocs(collection(db, 'users', coachUid, 'teamWorkspaces', workspaceId, 'members'));
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  } catch (error) {
+    console.error('Error listing workspace members:', error);
+    return [];
+  }
+};
+
+/**
+ * Add someone to the workspace. `memberUids` on the parent is updated in the same
+ * breath — the two must not drift, since rules read the array and the app reads the
+ * subcollection.
+ */
+export const addWorkspaceMember = async (coachUid, workspaceId, { uid, role, displayName = null }) => {
+  if (!WORKSPACE_ROLES[role]) throw new Error(`Unknown workspace role: ${role}`);
+  try {
+    const batch = writeBatch(db);
+    batch.set(
+      doc(db, 'users', coachUid, 'teamWorkspaces', workspaceId, 'members', uid),
+      removeUndefined({ ...newMember({ uid, role, displayName, invitedBy: coachUid }), joinedAt: serverTimestamp() }),
+    );
+    batch.update(doc(db, 'users', coachUid, 'teamWorkspaces', workspaceId), {
+      memberUids: arrayUnion(uid),
+      updatedAt: serverTimestamp(),
+    });
+    await batch.commit();
+  } catch (error) {
+    console.error('Error adding workspace member:', error);
+    throw error;
+  }
+};
+
+export const removeWorkspaceMember = async (coachUid, workspaceId, uid) => {
+  if (uid === coachUid) throw new Error('The head coach cannot be removed from their own workspace.');
+  try {
+    const batch = writeBatch(db);
+    batch.delete(doc(db, 'users', coachUid, 'teamWorkspaces', workspaceId, 'members', uid));
+    batch.update(doc(db, 'users', coachUid, 'teamWorkspaces', workspaceId), {
+      memberUids: arrayRemove(uid),
+      updatedAt: serverTimestamp(),
+    });
+    await batch.commit();
+  } catch (error) {
+    console.error('Error removing workspace member:', error);
+    throw error;
+  }
+};
+
+/** Re-role an existing member, resetting their permissions to that role's defaults. */
+export const setWorkspaceMemberRole = async (coachUid, workspaceId, uid, role) => {
+  if (!WORKSPACE_ROLES[role]) throw new Error(`Unknown workspace role: ${role}`);
+  if (uid === coachUid) throw new Error('The head coach\'s own role cannot be changed.');
+  try {
+    await updateDoc(doc(db, 'users', coachUid, 'teamWorkspaces', workspaceId, 'members', uid), {
+      role,
+      permissions: permissionsForRole(role),
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error('Error setting workspace member role:', error);
+    throw error;
+  }
+};
+
+/**
+ * Create a redeemable invitation to this workspace for a given role.
+ * The code is a top-level document because an invitee cannot read a path inside a
+ * workspace they have not joined yet — same shape as /inviteCodes, opposite direction.
+ */
+export const createWorkspaceInvite = async (coachUid, workspaceId, { role, note = null } = {}) => {
+  if (!WORKSPACE_ROLES[role]) throw new Error(`Unknown workspace role: ${role}`);
+  try {
+    let code = null;
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const candidate = generateRandomInviteCode(6);
+      const existing = await getDoc(doc(db, 'workspaceInviteCodes', candidate));
+      if (!existing.exists()) { code = candidate; break; }
+    }
+    if (!code) throw new Error('Could not generate a unique invite code. Please try again.');
+
+    const payload = removeUndefined({
+      code, coachUid, workspaceId, role, note,
+      used: false, usedBy: null, usedAt: null,
+      createdAt: serverTimestamp(),
+    });
+    await setDoc(doc(db, 'workspaceInviteCodes', code), payload);
+    await setDoc(doc(db, 'users', coachUid, 'teamWorkspaces', workspaceId, 'invitations', code), payload);
+    return code;
+  } catch (error) {
+    console.error('Error creating workspace invite:', error);
+    throw error;
+  }
+};
+
+/**
+ * Redeem a workspace invite.
+ *
+ * Delegates to the `redeemWorkspaceInvite` Cloud Function rather than writing from the
+ * client, and that is a security decision rather than a convenience one. A workspace's
+ * members/ subcollection and its memberUids array are owner-only in firestore.rules,
+ * because adding people is manageMembers and that is head-coach-only. Redemption is the
+ * one case where a NON-owner has to be added — doing it client-side would mean
+ * loosening both rules to let any signed-in user write themselves a membership, gated
+ * on a code the rule would have to chase through a get(). The function keeps the rules
+ * strict, runs the check-and-join in a transaction so two people cannot burn the same
+ * code at once, and takes the role from the code rather than from the caller.
+ */
+export const redeemWorkspaceInvite = async (code, { displayName = null } = {}) => {
+  try {
+    const fn = httpsCallable(functions, 'redeemWorkspaceInvite');
+    const result = await fn({ code: (code || '').trim().toUpperCase(), displayName });
+    const data = result.data || {};
+    return data.success
+      ? { ok: true, coachUid: data.coachUid, workspaceId: data.workspaceId, role: data.role }
+      : { ok: false, reason: data.reason || 'error' };
+  } catch (error) {
+    console.error('Error redeeming workspace invite:', error);
+    return { ok: false, reason: 'error' };
+  }
+};
+
+// ─── Game preparations ───────────────────────────────────────────────────────
+
+export const createGamePreparation = async (coachUid, workspaceId, details = {}) => {
+  try {
+    const ref = await addDoc(
+      collection(db, 'users', coachUid, 'teamWorkspaces', workspaceId, 'gamePreparations'),
+      removeUndefined({
+        ...newGamePreparation(details),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }),
+    );
+    return ref.id;
+  } catch (error) {
+    console.error('Error creating game preparation:', error);
+    throw error;
+  }
+};
+
+export const getGamePreparations = async (coachUid, workspaceId) => {
+  try {
+    const snap = await getDocs(
+      collection(db, 'users', coachUid, 'teamWorkspaces', workspaceId, 'gamePreparations'),
+    );
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  } catch (error) {
+    console.error('Error listing game preparations:', error);
+    return [];
+  }
+};
+
+/**
+ * Move a game preparation along its lifecycle. The transition is validated against
+ * workspaceSchema's table rather than accepting any status the caller names — skipping
+ * from draft straight to postGame would leave a fixture claiming a comparison it never
+ * had the evidence to make.
+ */
+export const advanceGamePreparation = async (coachUid, workspaceId, gameId, nextStatus) => {
+  try {
+    const ref = doc(db, 'users', coachUid, 'teamWorkspaces', workspaceId, 'gamePreparations', gameId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return { ok: false, reason: 'not-found' };
+
+    const current = snap.data().status;
+    if (!canTransition(current, nextStatus)) {
+      return { ok: false, reason: 'invalid-transition', from: current, to: nextStatus };
+    }
+    await updateDoc(ref, { status: nextStatus, updatedAt: serverTimestamp() });
+    return { ok: true, from: current, to: nextStatus };
+  } catch (error) {
+    console.error('Error advancing game preparation:', error);
+    return { ok: false, reason: 'error' };
+  }
+};
+
+// ─── Legacy migration ────────────────────────────────────────────────────────
+
+/**
+ * Move a coach's flat SimCoach data into a workspace.
+ *
+ * COPIES rather than moves: each document is written to its new home and the legacy
+ * document is stamped with MIGRATION_FLAG, never deleted. A coach interrupted halfway
+ * must not lose a season of scouting, and the old rules stay in place so the flat paths
+ * remain readable throughout. Deleting the originals is a separate decision for once no
+ * account reads them.
+ *
+ * Idempotent: the stamp makes a second run a no-op (see planMigration).
+ *
+ * @returns {Promise<{ok, workspaceId, moved, skipped, warnings}>}
+ */
+export const migrateCoachToWorkspace = async (coachUid, { workspaceId = null, workspaceName = 'My Team' } = {}) => {
+  try {
+    const inventory = {};
+    await Promise.all(MIGRATED_COLLECTIONS.map(async (name) => {
+      const snap = await getDocs(collection(db, 'users', coachUid, name));
+      inventory[name] = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    }));
+
+    let targetId = workspaceId;
+    if (!targetId) {
+      const existing = await getCoachWorkspaces(coachUid);
+      targetId = existing[0]?.id || (await createTeamWorkspace(coachUid, { name: workspaceName }));
+    }
+
+    const plan = planMigration(inventory, { workspaceId: targetId });
+    if (isNoOp(plan)) {
+      return { ok: true, workspaceId: targetId, moved: 0, skipped: plan.skipped.length, warnings: plan.warnings };
+    }
+
+    // Fixtures first — a game-scoped document cannot land under one that does not exist.
+    for (const game of plan.gamePreparations) {
+      const { id, ...data } = game;
+      await setDoc(
+        doc(db, 'users', coachUid, 'teamWorkspaces', targetId, 'gamePreparations', id),
+        removeUndefined({ ...newGamePreparation(data), ...data, createdAt: serverTimestamp(), updatedAt: serverTimestamp() }),
+        { merge: true },
+      );
+    }
+
+    // Two writes per document (the copy, and the stamp on the original), so chunk at
+    // 250 to stay inside Firestore's 500-operation batch limit.
+    const byId = Object.fromEntries(
+      MIGRATED_COLLECTIONS.map((c) => [c, Object.fromEntries((inventory[c] || []).map((d) => [d.id, d]))]),
+    );
+    const CHUNK = 250;
+    for (let i = 0; i < plan.moves.length; i += CHUNK) {
+      const batch = writeBatch(db);
+      for (const move of plan.moves.slice(i, i + CHUNK)) {
+        const { id, ...data } = byId[move.collection][move.id];
+        batch.set(
+          doc(db, 'users', coachUid, ...move.to, move.id),
+          removeUndefined({ ...data, migratedFrom: `users/${coachUid}/${move.collection}/${move.id}` }),
+          { merge: true },
+        );
+        batch.update(doc(db, 'users', coachUid, move.collection, move.id), {
+          [MIGRATION_FLAG]: targetId,
+        });
+      }
+      await batch.commit();
+    }
+
+    return {
+      ok: true,
+      workspaceId: targetId,
+      moved: plan.moves.length,
+      skipped: plan.skipped.length,
+      warnings: plan.warnings,
+    };
+  } catch (error) {
+    console.error('Error migrating coach to workspace:', error);
+    return { ok: false, reason: 'error', error: error.message };
   }
 };
 

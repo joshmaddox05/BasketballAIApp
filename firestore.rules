@@ -251,6 +251,12 @@ service cloud.firestore {
         allow read, write: if isOwner(uid);
       }
 
+      // DEPRECATED (kept readable during and after migration): these flat
+      // per-coach collections are superseded by the workspace-scoped copies
+      // under teamWorkspaces/{workspaceId}. migrateCoachToWorkspace copies
+      // forward and marks the legacy doc, but does not delete it — a coach
+      // mid-migration must never lose a scouting report. Remove these rules
+      // only once no account reads the flat paths.
       // SimCoach Coach Phase 2: opponent models aggregated from filmEvents,
       // what-if simulation runs against them, and practice priorities
       // flagged from those runs. All owner-only, matching films/filmEvents.
@@ -335,6 +341,27 @@ service cloud.firestore {
           allow write: if isOwner(uid) || memberHas('editTeamModel');
         }
 
+        // Film and the evidence drawn from it live at WORKSPACE level, not
+        // under a game: a film of West High informs every meeting with West
+        // High, and the opponent model is meant to accumulate across the
+        // season rather than restart each fixture.
+        match /films/{filmId} {
+          allow read: if isOwner(uid) || isMemberOfParent();
+          allow create, update: if isOwner(uid) || memberHas('uploadFilm');
+          allow delete: if isOwner(uid);
+        }
+        match /filmEvents/{eventId} {
+          allow read: if isOwner(uid) || isMemberOfParent();
+          // This is the mutation that makes staff more than viewers: an
+          // assistant validating tags, an analyst correcting them.
+          allow create, update: if isOwner(uid) || memberHas('tagEvents') || memberHas('validateEvents');
+          allow delete: if isOwner(uid) || memberHas('validateEvents');
+        }
+        match /opponentModels/{opponentModelId} {
+          allow read: if isOwner(uid) || isMemberOfParent();
+          allow write: if isOwner(uid) || memberHas('maintainOpponentModel');
+        }
+
         // Game preparations. Creating and advancing one is staff-capable;
         // approving the game plan is not, and is enforced as isOwner above
         // rather than via a permission a membership could claim.
@@ -344,14 +371,46 @@ service cloud.firestore {
           allow update: if isOwner(uid) || memberHas('advanceGamePrep');
           allow delete: if isOwner(uid);
 
-          // NOTE: film, filmEvents, simulationRuns and practicePriorities are
-          // NOT nested here yet — they still live at users/{uid}/... and are
-          // migrated in the next step. When they move, do NOT gate them on a
-          // memberHas() get() per document: a 200-event filmEvents query would
-          // fire 200 rule reads against the per-request access-call cap. The
-          // established fix in this file is denormalization (see
-          // simulationSessions.participantUids) — copy memberUids onto the
-          // bulk-queried documents instead.
+          // Runs and priorities belong to ONE game; film and the opponent model
+          // sit at workspace level (below), because the same opponent recurs
+          // across a season and Kassoum wants evidence to accumulate rather
+          // than fragment per fixture.
+          //
+          // On cost: gating these on memberHas() is safe even for large
+          // queries, and an earlier note here claimed otherwise. The
+          // distinction is whether the get() path VARIES per document.
+          // Firestore caches duplicate access calls within a request, so a
+          // constant path — this requester's own member doc — is one billed
+          // call however many documents the query returns. What blew the cap
+          // in the filmEvents/accessScope case (§9 of the spec) was a get() on
+          // each event's PARENT FILM: a different path per document, so
+          // nothing deduplicates. Keep gates pointed at the member doc.
+          // Unverified here — no emulator in this environment; confirm with
+          // the rules emulator before deploying.
+          match /simulationRuns/{runId} {
+            allow read: if isOwner(uid) || isMemberOfParent();
+            allow create, update: if isOwner(uid) || memberHas('runSimulation');
+            allow delete: if isOwner(uid);
+          }
+          match /practicePriorities/{priorityId} {
+            allow read: if isOwner(uid) || isMemberOfParent();
+            allow write: if isOwner(uid) || memberHas('proposeStrategy');
+          }
+          // Scenario sharing, re-parented from users/{uid}/simulationSessions.
+          // Participants are workspace members now, so membership is the read
+          // gate and submitResponse the write gate — but the response rule
+          // still re-reads the member doc rather than trusting anything on the
+          // response itself, exactly as the Phase 3 rule does.
+          match /simulationSessions/{sessionId} {
+            allow read: if isOwner(uid) || isMemberOfParent();
+            allow create, update, delete: if isOwner(uid) || memberHas('proposeStrategy');
+
+            match /responses/{responseId} {
+              allow read: if isOwner(uid) || isMemberOfParent();
+              allow create: if isOwner(uid) || memberHas('submitResponse');
+              allow update, delete: if isOwner(uid);
+            }
+          }
         }
       }
 
