@@ -26,6 +26,9 @@ import ProgressReportScreen from '../screens/main/ProgressReportScreen';
 import SimCoachFilmLibraryScreen from '../screens/main/SimCoachFilmLibraryScreen';
 import SimCoachFilmTaggingScreen from '../screens/main/SimCoachFilmTaggingScreen';
 import SimCoachTeamModelScreen from '../screens/main/SimCoachTeamModelScreen';
+import SimCoachWorkspaceScreen from '../screens/main/SimCoachWorkspaceScreen';
+import SimCoachWorkspaceDetailScreen from '../screens/main/SimCoachWorkspaceDetailScreen';
+import SimCoachGamePrepScreen from '../screens/main/SimCoachGamePrepScreen';
 import SimCoachGamePlanBuilderScreen from '../screens/main/SimCoachGamePlanBuilderScreen';
 import SimCoachOpponentsScreen from '../screens/main/SimCoachOpponentsScreen';
 import SimCoachOpponentModelScreen from '../screens/main/SimCoachOpponentModelScreen';
@@ -195,6 +198,9 @@ export const sharedScreens = [
     { name: 'SimCoachFilmLibrary', component: SimCoachFilmLibraryScreen, options: { headerShown: false } },
     { name: 'SimCoachFilmTagging', component: SimCoachFilmTaggingScreen, options: { headerShown: false } },
     { name: 'SimCoachTeamModel', component: SimCoachTeamModelScreen, options: { headerShown: false } },
+    { name: 'SimCoachWorkspace', component: SimCoachWorkspaceScreen, options: { headerShown: false } },
+    { name: 'SimCoachWorkspaceDetail', component: SimCoachWorkspaceDetailScreen, options: { headerShown: false } },
+    { name: 'SimCoachGamePrep', component: SimCoachGamePrepScreen, options: { headerShown: false } },
     { name: 'SimCoachGamePlanBuilder', component: SimCoachGamePlanBuilderScreen, options: { headerShown: false } },
     { name: 'SimCoachOpponents', component: SimCoachOpponentsScreen, options: { headerShown: false } },
     { name: 'SimCoachOpponentModel', component: SimCoachOpponentModelScreen, options: { headerShown: false } },

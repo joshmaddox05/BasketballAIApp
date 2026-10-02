@@ -93,7 +93,7 @@ function CoachView({ navigation, theme, coachUid }) {
     <View style={{ flex: 1 }}>
       {/* Tab bar */}
       <View style={[styles.tabBar, { borderBottomColor: theme.border }]}>
-        {[{ id: 'plans', label: 'Game Plans' }, { id: 'films', label: 'Film Library' }, { id: 'team', label: 'My Team' }, { id: 'scouting', label: 'Scouting' }].map((t) => (
+        {[{ id: 'teams', label: 'Teams' }, { id: 'plans', label: 'Game Plans' }, { id: 'films', label: 'Film Library' }, { id: 'team', label: 'My Team' }, { id: 'scouting', label: 'Scouting' }].map((t) => (
           <TouchableOpacity
             key={t.id}
             style={[styles.tabBtn, tab === t.id && styles.tabBtnActive, tab === t.id && { borderBottomColor: theme.primary }]}
@@ -107,7 +107,34 @@ function CoachView({ navigation, theme, coachUid }) {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {tab === 'plans' ? (
+        {tab === 'teams' ? (
+          <>
+            {/* The team workspace is the container every other tab now sits inside:
+                staff, roster, film, scouting and one game preparation per fixture.
+                See docs/SIMCOACH_COACH_IMPLEMENTATION_PLAN.md §4. */}
+            <TouchableOpacity
+              style={[styles.ctaCard, { backgroundColor: theme.primary }]}
+              onPress={() => navigation.navigate('SimCoachWorkspace')}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="people-outline" size={22} color="#fff" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.ctaCardTitle}>Open Teams</Text>
+                <Text style={styles.ctaCardSub}>Your staff, your roster and every game you are preparing for</Text>
+              </View>
+              <Ionicons name="arrow-forward" size={18} color="#fff" />
+            </TouchableOpacity>
+            <View style={styles.emptyState}>
+              <Ionicons name="people-outline" size={40} color={theme.textSecondary} />
+              <Text style={[styles.ctaBlurbTitle, { color: theme.text }]}>One space, every game</Text>
+              <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+                A team space holds your staff and players with the access you give them, and a
+                preparation for each opponent. Film and scouting carry across games, so what you
+                learn about an opponent builds up instead of starting over.
+              </Text>
+            </View>
+          </>
+        ) : tab === 'plans' ? (
           <>
             <TouchableOpacity
               style={[styles.ctaCard, { backgroundColor: theme.primary }]}
