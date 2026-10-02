@@ -40,6 +40,7 @@ import {
   can,
 } from '../../services/simcoach/workspaceSchema';
 import { BACKFILLED_FLAG } from '../../services/simcoach/migration';
+import { scopeParams } from '../../services/simcoach/scope';
 
 const STATUS_COLORS = {
   draft: '#94A3B8',
@@ -250,7 +251,7 @@ function GamePrepScreen({ navigation, route }) {
         </Text>
         <TouchableOpacity
           style={[styles.linkRow, { backgroundColor: theme.card, borderColor: theme.border }]}
-          onPress={() => navigation.navigate('SimCoachFilmLibrary')}
+          onPress={() => navigation.navigate('SimCoachFilmLibrary', scopeParams(ownerUid, { workspaceId }))}
           activeOpacity={0.85}
         >
           <Ionicons name="videocam-outline" size={19} color={theme.primary} />
@@ -278,6 +279,7 @@ function GamePrepScreen({ navigation, route }) {
               return;
             }
             navigation.navigate('SimCoachOpponentModel', {
+              ...scopeParams(ownerUid, { workspaceId, gameId }),
               opponentModelId: opponentModel.id,
               opponentName: game.opponentName,
             });
@@ -306,6 +308,9 @@ function GamePrepScreen({ navigation, route }) {
               return;
             }
             navigation.navigate('SimCoachWhatIf', {
+              // Carries the gameId: a simulation run belongs to one fixture, so this is
+              // what puts it under this game rather than on the flat legacy path.
+              ...scopeParams(ownerUid, { workspaceId, gameId }),
               opponentModelId: opponentModel.id,
               opponentName: game.opponentName,
             });

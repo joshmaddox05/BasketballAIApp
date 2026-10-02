@@ -30,6 +30,7 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
+import { scopeFromParams, scopeParams } from '../../services/simcoach/scope';
 import { BottomSheet } from '../../components/dbe';
 import { Explain, ExplainNote, ExplainProvider } from '../../components/features/Explain';
 import TierTag from '../../components/features/TierTag';
@@ -168,8 +169,15 @@ function ShareSessionModal({ visible, onClose, onShared, coachUid, run, coverage
 function WhatIfScreen({ navigation, route }) {
   const { user, userData, theme, isDarkMode } = useAppContext();
   const { opponentModelId, opponentName } = route.params || {};
+  const scope = scopeFromParams(route.params);
+  // A simulation run belongs to one fixture. Inside a team workspace with no game named
+  // there is nowhere to save it — the path resolver refuses rather than silently writing
+  // to the flat legacy path — so the lab stays readable and the run button explains why.
+  const needsGame = !!scope && !scope.gameId;
   const isCoach = userData?.role === 'coach';
-  const coachUid = user?.uid;
+  // When scoped to a team workspace this is the workspace OWNER, not the viewer:
+  // staff read and write a coach's data in place, so paths are rooted at the coach.
+  const coachUid = route?.params?.ownerUid || user?.uid;
 
   const [loading, setLoading] = useState(true);
   const [model, setModel] = useState(null);
@@ -188,8 +196,8 @@ function WhatIfScreen({ navigation, route }) {
     (async () => {
       if (!coachUid || !opponentModelId) { setLoading(false); return; }
       const [m, { events }] = await Promise.all([
-        getOpponentModel(coachUid, opponentModelId),
-        getOpponentFilmEvents(coachUid, opponentName),
+        getOpponentModel(coachUid, opponentModelId, scope),
+        getOpponentFilmEvents(coachUid, opponentName, scope),
       ]);
       setModel(m);
       setRawEvents(events);
@@ -219,6 +227,13 @@ function WhatIfScreen({ navigation, route }) {
 
   const handleRun = useCallback(async () => {
     if (!coachUid || !model || !coverage || !distribution || !Object.keys(distribution).length) return;
+    if (needsGame) {
+      Alert.alert(
+        'Pick a game first',
+        'A simulation belongs to one game, so it can be saved against the preparation for it. Open this opponent from a game in your team space.',
+      );
+      return;
+    }
     setRunning(true);
     setRun(null);
     setFlagOpen(false);
@@ -232,14 +247,14 @@ function WhatIfScreen({ navigation, route }) {
         fidelityLevel: 'outcome',
         outcomeDistribution: distribution,
         sampleSize: sampleSize || 0,
-      });
+      }, scope);
       setRun({ id: runId, coverage, quarter, distribution, sampleSize });
     } catch (error) {
       Alert.alert('Simulation failed', 'Please try again.');
     } finally {
       setRunning(false);
     }
-  }, [coachUid, model, coverage, quarter, distribution, sampleSize, opponentName]);
+  }, [coachUid, model, coverage, quarter, distribution, sampleSize, opponentName, scope, needsGame]);
 
   const handleOpenFlag = useCallback(() => {
     if (!topAction) return;
@@ -259,7 +274,7 @@ function WhatIfScreen({ navigation, route }) {
         opponentName,
         vulnerability: `${topAction[0]} vs ${coverage === 'any' ? 'no specific' : coverage} coverage${situationPhrase} — ${Math.round(topAction[1] * 100)}% of ${run.sampleSize} tagged possession${run.sampleSize === 1 ? '' : 's'}`,
         recommendedFocus: focus.trim(),
-      });
+      }, scope);
       Alert.alert('Flagged', 'Added to Practice Priorities on this opponent’s scouting report.', [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
@@ -344,7 +359,7 @@ function WhatIfScreen({ navigation, route }) {
           <TouchableOpacity
             style={[styles.runBtn, { backgroundColor: theme.primary }]}
             onPress={handleRun}
-            disabled={running || !coverage || !distribution || !Object.keys(distribution).length}
+            disabled={running || needsGame || !coverage || !distribution || !Object.keys(distribution).length}
             activeOpacity={0.85}
           >
             {running ? <ActivityIndicator color="#fff" size="small" /> : (
@@ -354,6 +369,11 @@ function WhatIfScreen({ navigation, route }) {
               </>
             )}
           </TouchableOpacity>
+          {needsGame && (
+            <Text style={[styles.emptySub, { color: theme.textSecondary, marginTop: 8 }]}>
+              Open this opponent from a game in your team space to save a simulation against it.
+            </Text>
+          )}
           <ExplainNote theme={theme}>
             This re-weights the possessions you already tagged for the coverage and game state you
             picked. It does not play out a game or invent plays — if you have not tagged it, it is

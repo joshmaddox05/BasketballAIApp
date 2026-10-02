@@ -22,6 +22,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Video } from 'expo-av';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAppContext } from '../../context/AppContext';
+import { scopeFromParams, scopeParams } from '../../services/simcoach/scope';
 import { BottomSheet } from '../../components/dbe';
 import { getFilmEvents, saveFilmEvent, deleteFilmEvent, markFilmTaggingComplete } from '../../services/firestoreService';
 import { track, EVENTS } from '../../services/analytics';
@@ -89,7 +90,10 @@ function FilmTaggingScreen({ navigation, route }) {
   const explain = useExplain();
   const { user, userData, theme, isDarkMode } = useAppContext();
   const { filmId, videoUrl, opponentName } = route.params || {};
-  const uid = user?.uid;
+  const scope = scopeFromParams(route.params);
+  // When scoped to a team workspace this is the workspace OWNER, not the viewer:
+  // staff read and write a coach's data in place, so paths are rooted at the coach.
+  const uid = route?.params?.ownerUid || user?.uid;
   const isCoach = userData?.role === 'coach';
 
   const videoRef = useRef(null);
@@ -120,7 +124,7 @@ function FilmTaggingScreen({ navigation, route }) {
   const loadEvents = useCallback(async () => {
     if (!uid || !filmId) return;
     setLoading(true);
-    const list = await getFilmEvents(uid, filmId);
+    const list = await getFilmEvents(uid, filmId, scope);
     setEvents(list);
     setLoading(false);
   }, [uid, filmId]);
@@ -158,7 +162,7 @@ function FilmTaggingScreen({ navigation, route }) {
         },
         outcome: outcome.trim() || null,
         extractionMethod: 'manual',
-      });
+      }, scope);
       setComposeOpen(false);
       await loadEvents();
     } catch (error) {
@@ -175,7 +179,7 @@ function FilmTaggingScreen({ navigation, route }) {
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
-          await deleteFilmEvent(uid, filmId, event.id);
+          await deleteFilmEvent(uid, filmId, event.id, scope);
           setEvents((prev) => prev.filter((e) => e.id !== event.id));
         },
       },
@@ -192,7 +196,7 @@ function FilmTaggingScreen({ navigation, route }) {
     if (!uid || !filmId) return;
     setFinishing(true);
     try {
-      await markFilmTaggingComplete(uid, filmId);
+      await markFilmTaggingComplete(uid, filmId, scope);
       navigation.goBack();
     } catch (error) {
       Alert.alert('Could not update film', 'Please try again.');

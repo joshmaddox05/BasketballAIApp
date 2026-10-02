@@ -18,6 +18,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAppContext } from '../../context/AppContext';
+import { scopeFromParams, scopeParams } from '../../services/simcoach/scope';
 import { BottomSheet } from '../../components/dbe';
 import { Explain, ExplainNote, ExplainProvider } from '../../components/features/Explain';
 import TierTag from '../../components/features/TierTag';
@@ -134,8 +135,11 @@ function LinkPracticeModal({ visible, onClose, onSave, theme }) {
 function OpponentModelScreen({ navigation, route }) {
   const { user, userData, theme, isDarkMode } = useAppContext();
   const { opponentModelId, opponentName } = route.params || {};
+  const scope = scopeFromParams(route.params);
   const isCoach = userData?.role === 'coach';
-  const coachUid = user?.uid;
+  // When scoped to a team workspace this is the workspace OWNER, not the viewer:
+  // staff read and write a coach's data in place, so paths are rooted at the coach.
+  const coachUid = route?.params?.ownerUid || user?.uid;
 
   const [loading, setLoading] = useState(true);
   const [model, setModel] = useState(null);
@@ -146,8 +150,8 @@ function OpponentModelScreen({ navigation, route }) {
     if (!coachUid || !opponentModelId) { setLoading(false); return; }
     setLoading(true);
     const [m, p] = await Promise.all([
-      getOpponentModel(coachUid, opponentModelId),
-      getPracticePriorities(coachUid, opponentModelId),
+      getOpponentModel(coachUid, opponentModelId, scope),
+      getPracticePriorities(coachUid, opponentModelId, scope),
     ]);
     setModel(m);
     setPriorities(p);
@@ -159,7 +163,7 @@ function OpponentModelScreen({ navigation, route }) {
   const handleSaveLink = useCallback(async (workoutIds) => {
     if (!coachUid || !linkingPriorityId) return;
     try {
-      await linkWorkoutsToPracticePriority(coachUid, linkingPriorityId, workoutIds);
+      await linkWorkoutsToPracticePriority(coachUid, linkingPriorityId, workoutIds, scope);
       setLinkingPriorityId(null);
       await load();
     } catch (error) {
@@ -226,7 +230,7 @@ function OpponentModelScreen({ navigation, route }) {
 
           <TouchableOpacity
             style={[styles.ctaCard, { backgroundColor: theme.primary }]}
-            onPress={() => navigation.navigate('SimCoachWhatIf', { opponentModelId: model.id, opponentName })}
+            onPress={() => navigation.navigate('SimCoachWhatIf', { ...scopeParams(coachUid, scope), opponentModelId: model.id, opponentName })}
             activeOpacity={0.85}
           >
             <Ionicons name="flask-outline" size={22} color="#fff" />
@@ -239,7 +243,7 @@ function OpponentModelScreen({ navigation, route }) {
 
           <TouchableOpacity
             style={[styles.ctaCardSecondary, { borderColor: theme.primary }]}
-            onPress={() => navigation.navigate('SimCoachCompare', { opponentModelId: model.id, opponentName })}
+            onPress={() => navigation.navigate('SimCoachCompare', { ...scopeParams(coachUid, scope), opponentModelId: model.id, opponentName })}
             activeOpacity={0.85}
           >
             <Ionicons name="git-compare-outline" size={20} color={theme.primary} />
@@ -252,7 +256,7 @@ function OpponentModelScreen({ navigation, route }) {
 
           <TouchableOpacity
             style={[styles.ctaCardSecondary, { borderColor: theme.primary }]}
-            onPress={() => navigation.navigate('SimCoachSessions', { opponentModelId: model.id, opponentName })}
+            onPress={() => navigation.navigate('SimCoachSessions', { ...scopeParams(coachUid, scope), opponentModelId: model.id, opponentName })}
             activeOpacity={0.85}
           >
             <Ionicons name="people-outline" size={20} color={theme.primary} />

@@ -21,6 +21,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAppContext } from '../../context/AppContext';
+import { scopeFromParams, scopeParams } from '../../services/simcoach/scope';
 import { getFilms, getOpponentModels, generateOpponentModel } from '../../services/firestoreService';
 import { Explain, ExplainNote, ExplainProvider } from '../../components/features/Explain';
 
@@ -89,10 +90,13 @@ function OpponentCard({ opponent, theme, building, onBuild, onView }) {
   );
 }
 
-function OpponentsScreen({ navigation }) {
+function OpponentsScreen({ navigation, route }) {
+  const scope = scopeFromParams(route?.params);
   const { user, userData, theme, isDarkMode } = useAppContext();
   const isCoach = userData?.role === 'coach';
-  const coachUid = user?.uid;
+  // When scoped to a team workspace this is the workspace OWNER, not the viewer:
+  // staff read and write a coach's data in place, so paths are rooted at the coach.
+  const coachUid = route?.params?.ownerUid || user?.uid;
 
   const [loading, setLoading] = useState(true);
   const [films, setFilms] = useState([]);
@@ -102,7 +106,7 @@ function OpponentsScreen({ navigation }) {
   const load = useCallback(async () => {
     if (!coachUid) { setLoading(false); return; }
     setLoading(true);
-    const [filmList, modelList] = await Promise.all([getFilms(coachUid), getOpponentModels(coachUid)]);
+    const [filmList, modelList] = await Promise.all([getFilms(coachUid, scope), getOpponentModels(coachUid, scope)]);
     setFilms(filmList);
     setModels(modelList);
     setLoading(false);
@@ -127,7 +131,7 @@ function OpponentsScreen({ navigation }) {
     if (!coachUid) return;
     setBuildingFor(opponentName);
     try {
-      await generateOpponentModel(coachUid, opponentName);
+      await generateOpponentModel(coachUid, opponentName, scope);
       await load();
     } catch (error) {
       Alert.alert('Could not build report', 'Please try again.');
@@ -138,6 +142,7 @@ function OpponentsScreen({ navigation }) {
 
   const handleView = useCallback((opponent) => {
     navigation.navigate('SimCoachOpponentModel', {
+      ...scopeParams(coachUid, scope),
       opponentModelId: opponent.model.id,
       opponentName: opponent.opponentName,
     });
@@ -179,7 +184,7 @@ function OpponentsScreen({ navigation }) {
           </Text>
           <TouchableOpacity
             style={[styles.emptyButton, { backgroundColor: theme.primary }]}
-            onPress={() => navigation.navigate('SimCoachFilmLibrary')}
+            onPress={() => navigation.navigate('SimCoachFilmLibrary', scopeParams(coachUid, scope))}
             activeOpacity={0.85}
           >
             <Ionicons name="videocam-outline" size={18} color="#fff" />

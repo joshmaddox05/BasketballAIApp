@@ -48,6 +48,7 @@ import {
   can,
 } from '../../services/simcoach/workspaceSchema';
 import { BACKFILLED_FLAG } from '../../services/simcoach/migration';
+import { scopeParams } from '../../services/simcoach/scope';
 
 const STATUS_COLORS = {
   draft: '#94A3B8',
@@ -279,7 +280,7 @@ function WorkspaceDetailScreen({ navigation, route }) {
         <View style={styles.quickRow}>
           <TouchableOpacity
             style={[styles.quickBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
-            onPress={() => navigation.navigate('SimCoachFilmLibrary')}
+            onPress={() => navigation.navigate('SimCoachFilmLibrary', scopeParams(ownerUid, { workspaceId }))}
             activeOpacity={0.85}
             disabled={!mayUploadFilm}
           >
@@ -288,7 +289,7 @@ function WorkspaceDetailScreen({ navigation, route }) {
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.quickBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
-            onPress={() => navigation.navigate('SimCoachOpponents')}
+            onPress={() => navigation.navigate('SimCoachOpponents', scopeParams(ownerUid, { workspaceId }))}
             activeOpacity={0.85}
           >
             <Ionicons name="shield-outline" size={18} color={theme.primary} />

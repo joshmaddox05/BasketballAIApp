@@ -54,6 +54,11 @@ import {
   MIGRATION_FLAG,
   planMigration,
 } from './simcoach/migration';
+// Resolves whether a read/write addresses the legacy flat path or a workspace copy.
+// Both are live during the rollout — the migration copies rather than moves — so every
+// SimCoach function below takes an optional trailing `scope`. Omitted means legacy,
+// which keeps every existing caller working unchanged.
+import { collectionPath, docPath } from './simcoach/scope';
 
 /**
  * Recursively remove `undefined` values from an object/array so it is safe to
@@ -4623,9 +4628,9 @@ export const deleteGamePlan = async (coachUid, planId) => {
  * @param {Object} meta - { opponentName, note, videoUrl, storagePath, durationSec?, authorizedBy?, retentionPolicy?, accessScope? }
  * @returns {Promise<string>} the film id
  */
-export const saveFilm = async (coachUid, meta) => {
+export const saveFilm = async (coachUid, meta, scope = null) => {
   try {
-    const ref = await addDoc(collection(db, 'users', coachUid, 'films'), {
+    const ref = await addDoc(collection(db, ...collectionPath(coachUid, 'films', scope)), {
       opponentName: meta.opponentName || 'Untitled Film',
       note: meta.note || '',
       videoUrl: meta.videoUrl || '',
@@ -4653,9 +4658,9 @@ export const saveFilm = async (coachUid, meta) => {
   }
 };
 
-export const getFilms = async (coachUid) => {
+export const getFilms = async (coachUid, scope = null) => {
   try {
-    const snapshot = await getDocs(collection(db, 'users', coachUid, 'films'));
+    const snapshot = await getDocs(collection(db, ...collectionPath(coachUid, 'films', scope)));
     const items = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
     // A doc read back before its serverTimestamp resolves has createdAt === null.
     // Coalescing that to 0 sorted the film the coach JUST uploaded to the bottom
@@ -4694,9 +4699,9 @@ export const getFilms = async (coachUid) => {
  * @param {string} coachUid
  * @param {string} filmId
  */
-export const deleteFilm = async (coachUid, filmId) => {
+export const deleteFilm = async (coachUid, filmId, scope = null) => {
   try {
-    const snap = await getDoc(doc(db, 'users', coachUid, 'films', filmId));
+    const snap = await getDoc(doc(db, ...docPath(coachUid, 'films', filmId, scope)));
     const storagePath = snap.exists() ? snap.data().storagePath : null;
 
     if (storagePath) {
@@ -4709,11 +4714,11 @@ export const deleteFilm = async (coachUid, filmId) => {
     }
 
     const events = await getDocs(
-      query(collection(db, 'users', coachUid, 'filmEvents'), where('filmId', '==', filmId))
+      query(collection(db, ...collectionPath(coachUid, 'filmEvents', scope)), where('filmId', '==', filmId))
     );
     await Promise.all(events.docs.map((d) => deleteDoc(d.ref)));
 
-    await deleteDoc(doc(db, 'users', coachUid, 'films', filmId));
+    await deleteDoc(doc(db, ...docPath(coachUid, 'films', filmId, scope)));
   } catch (error) {
     console.error('Error deleting film:', error);
     throw error;
@@ -4733,9 +4738,9 @@ export const deleteFilm = async (coachUid, filmId) => {
  * @param {string} filmId
  * @param {Object} policy - { expiresAt: number|null (epoch ms), autoDelete: boolean }
  */
-export const setFilmRetention = async (coachUid, filmId, policy) => {
+export const setFilmRetention = async (coachUid, filmId, policy, scope = null) => {
   try {
-    await updateDoc(doc(db, 'users', coachUid, 'films', filmId), {
+    await updateDoc(doc(db, ...docPath(coachUid, 'films', filmId, scope)), {
       retentionPolicy: {
         expiresAt: typeof policy?.expiresAt === 'number' ? policy.expiresAt : null,
         autoDelete: !!policy?.autoDelete,
@@ -4767,7 +4772,7 @@ export const setFilmRetention = async (coachUid, filmId, policy) => {
  * }
  * @returns {Promise<string>} the filmEvent id
  */
-export const saveFilmEvent = async (coachUid, filmId, event) => {
+export const saveFilmEvent = async (coachUid, filmId, event, scope = null) => {
   try {
     if (!filmId) throw new Error('Missing filmId.');
     const data = removeUndefined({
@@ -4784,11 +4789,11 @@ export const saveFilmEvent = async (coachUid, filmId, event) => {
       confidence: typeof event.confidence === 'number' ? event.confidence : null,
       createdAt: serverTimestamp(),
     });
-    const ref = await addDoc(collection(db, 'users', coachUid, 'filmEvents'), data);
+    const ref = await addDoc(collection(db, ...collectionPath(coachUid, 'filmEvents', scope)), data);
 
     // Keep the parent film doc's own event list/status in sync so the Film
     // Library list can show tagging progress without a second query.
-    await updateDoc(doc(db, 'users', coachUid, 'films', filmId), {
+    await updateDoc(doc(db, ...docPath(coachUid, 'films', filmId, scope)), {
       taggedEventIds: arrayUnion(ref.id),
       processingStatus: 'tagging',
     });
@@ -4806,10 +4811,10 @@ export const saveFilmEvent = async (coachUid, filmId, event) => {
  * @param {string} filmId
  * @returns {Promise<Array>}
  */
-export const getFilmEvents = async (coachUid, filmId) => {
+export const getFilmEvents = async (coachUid, filmId, scope = null) => {
   try {
     const snapshot = await getDocs(
-      query(collection(db, 'users', coachUid, 'filmEvents'), where('filmId', '==', filmId))
+      query(collection(db, ...collectionPath(coachUid, 'filmEvents', scope)), where('filmId', '==', filmId))
     );
     const items = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
     items.sort((a, b) => (a.timestampSec || 0) - (b.timestampSec || 0));
@@ -4820,10 +4825,10 @@ export const getFilmEvents = async (coachUid, filmId) => {
   }
 };
 
-export const deleteFilmEvent = async (coachUid, filmId, eventId) => {
+export const deleteFilmEvent = async (coachUid, filmId, eventId, scope = null) => {
   try {
-    await deleteDoc(doc(db, 'users', coachUid, 'filmEvents', eventId));
-    await updateDoc(doc(db, 'users', coachUid, 'films', filmId), {
+    await deleteDoc(doc(db, ...docPath(coachUid, 'filmEvents', eventId, scope)));
+    await updateDoc(doc(db, ...docPath(coachUid, 'films', filmId, scope)), {
       taggedEventIds: arrayRemove(eventId),
     });
   } catch (error) {
@@ -4840,9 +4845,9 @@ export const deleteFilmEvent = async (coachUid, filmId, eventId) => {
  * @param {string} coachUid
  * @param {string} filmId
  */
-export const markFilmTaggingComplete = async (coachUid, filmId) => {
+export const markFilmTaggingComplete = async (coachUid, filmId, scope = null) => {
   try {
-    await updateDoc(doc(db, 'users', coachUid, 'films', filmId), {
+    await updateDoc(doc(db, ...docPath(coachUid, 'films', filmId, scope)), {
       processingStatus: 'tagged',
     });
   } catch (error) {
@@ -4922,12 +4927,12 @@ const countsToProbabilities = (counts) => {
  * @param {string} opponentName - matched against films.opponentName
  * @returns {Promise<{events: Array, filmIds: Array<string>}>}
  */
-export const getOpponentFilmEvents = async (coachUid, opponentName) => {
+export const getOpponentFilmEvents = async (coachUid, opponentName, scope = null) => {
   const filmsSnap = await getDocs(
-    query(collection(db, 'users', coachUid, 'films'), where('opponentName', '==', opponentName))
+    query(collection(db, ...collectionPath(coachUid, 'films', scope)), where('opponentName', '==', opponentName))
   );
   const filmIds = filmsSnap.docs.map((d) => d.id);
-  const eventLists = await Promise.all(filmIds.map((filmId) => getFilmEvents(coachUid, filmId)));
+  const eventLists = await Promise.all(filmIds.map((filmId) => getFilmEvents(coachUid, filmId, scope)));
   return { events: eventLists.flat(), filmIds };
 };
 
@@ -4991,9 +4996,9 @@ export const computeSituationTendency = (events, { coverage, quarter } = {}) => 
   return { distribution: countsToProbabilities(counts), sampleSize: filtered.length };
 };
 
-export const generateOpponentModel = async (coachUid, opponentName) => {
+export const generateOpponentModel = async (coachUid, opponentName, scope = null) => {
   try {
-    const { events, filmIds } = await getOpponentFilmEvents(coachUid, opponentName);
+    const { events, filmIds } = await getOpponentFilmEvents(coachUid, opponentName, scope);
 
     // tendencies: coverage faced -> distribution over the actions run against
     // it ('any' buckets events with no coverage tagged). actionFrequency is
@@ -5053,19 +5058,19 @@ export const generateOpponentModel = async (coachUid, opponentName) => {
       version: increment(1),
     });
 
-    await setDoc(doc(db, 'users', coachUid, 'opponentModels', modelId), data, { merge: true });
+    await setDoc(doc(db, ...docPath(coachUid, 'opponentModels', modelId, scope)), data, { merge: true });
 
     // Mark every contributing film as analyzed and point it at this model.
     await Promise.all(
       filmIds.map((filmId) =>
-        updateDoc(doc(db, 'users', coachUid, 'films', filmId), {
+        updateDoc(doc(db, ...docPath(coachUid, 'films', filmId, scope)), {
           processingStatus: 'analyzed',
           opponentModelId: modelId,
         })
       )
     );
 
-    const snap = await getDoc(doc(db, 'users', coachUid, 'opponentModels', modelId));
+    const snap = await getDoc(doc(db, ...docPath(coachUid, 'opponentModels', modelId, scope)));
     return { id: snap.id, ...snap.data() };
   } catch (error) {
     console.error('Error generating opponent model:', error);
@@ -5073,9 +5078,9 @@ export const generateOpponentModel = async (coachUid, opponentName) => {
   }
 };
 
-export const getOpponentModel = async (coachUid, opponentModelId) => {
+export const getOpponentModel = async (coachUid, opponentModelId, scope = null) => {
   try {
-    const snap = await getDoc(doc(db, 'users', coachUid, 'opponentModels', opponentModelId));
+    const snap = await getDoc(doc(db, ...docPath(coachUid, 'opponentModels', opponentModelId, scope)));
     return snap.exists() ? { id: snap.id, ...snap.data() } : null;
   } catch (error) {
     console.error('Error fetching opponent model:', error);
@@ -5083,9 +5088,9 @@ export const getOpponentModel = async (coachUid, opponentModelId) => {
   }
 };
 
-export const getOpponentModels = async (coachUid) => {
+export const getOpponentModels = async (coachUid, scope = null) => {
   try {
-    const snapshot = await getDocs(collection(db, 'users', coachUid, 'opponentModels'));
+    const snapshot = await getDocs(collection(db, ...collectionPath(coachUid, 'opponentModels', scope)));
     const items = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
     items.sort((a, b) => (b.sampleSize || 0) - (a.sampleSize || 0));
     return items;
@@ -5116,9 +5121,9 @@ export const getOpponentModels = async (coachUid) => {
  * }
  * @returns {Promise<string>} the simulationRun id
  */
-export const saveSimulationRun = async (coachUid, run) => {
+export const saveSimulationRun = async (coachUid, run, scope = null) => {
   try {
-    const ref = await addDoc(collection(db, 'users', coachUid, 'simulationRuns'), removeUndefined({
+    const ref = await addDoc(collection(db, ...collectionPath(coachUid, 'simulationRuns', scope)), removeUndefined({
       opponentModelId: run.opponentModelId,
       opponentName: run.opponentName || null,
       variables: run.variables || {},
@@ -5135,10 +5140,10 @@ export const saveSimulationRun = async (coachUid, run) => {
   }
 };
 
-export const getSimulationRuns = async (coachUid, opponentModelId) => {
+export const getSimulationRuns = async (coachUid, opponentModelId, scope = null) => {
   try {
     const snapshot = await getDocs(
-      query(collection(db, 'users', coachUid, 'simulationRuns'), where('opponentModelId', '==', opponentModelId))
+      query(collection(db, ...collectionPath(coachUid, 'simulationRuns', scope)), where('opponentModelId', '==', opponentModelId))
     );
     const items = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
     items.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
@@ -5158,9 +5163,9 @@ export const getSimulationRuns = async (coachUid, opponentModelId) => {
  * @param {string} runId - the run being marked as having a comparison
  * @param {string} comparedAgainstRunId - the run it was compared against
  */
-export const linkComparedSimulationRuns = async (coachUid, runId, comparedAgainstRunId) => {
+export const linkComparedSimulationRuns = async (coachUid, runId, comparedAgainstRunId, scope = null) => {
   try {
-    await updateDoc(doc(db, 'users', coachUid, 'simulationRuns', runId), {
+    await updateDoc(doc(db, ...docPath(coachUid, 'simulationRuns', runId, scope)), {
       comparedAgainstRunId,
     });
   } catch (error) {
@@ -5181,9 +5186,9 @@ export const linkComparedSimulationRuns = async (coachUid, runId, comparedAgains
  * @param {Object} priority - { sourceRunId, opponentModelId, opponentName, vulnerability, recommendedFocus? }
  * @returns {Promise<string>} the practicePriority id
  */
-export const savePracticePriority = async (coachUid, priority) => {
+export const savePracticePriority = async (coachUid, priority, scope = null) => {
   try {
-    const ref = await addDoc(collection(db, 'users', coachUid, 'practicePriorities'), removeUndefined({
+    const ref = await addDoc(collection(db, ...collectionPath(coachUid, 'practicePriorities', scope)), removeUndefined({
       sourceRunId: priority.sourceRunId || null,
       opponentModelId: priority.opponentModelId,
       opponentName: priority.opponentName || null,
@@ -5199,10 +5204,10 @@ export const savePracticePriority = async (coachUid, priority) => {
   }
 };
 
-export const getPracticePriorities = async (coachUid, opponentModelId) => {
+export const getPracticePriorities = async (coachUid, opponentModelId, scope = null) => {
   try {
     const snapshot = await getDocs(
-      query(collection(db, 'users', coachUid, 'practicePriorities'), where('opponentModelId', '==', opponentModelId))
+      query(collection(db, ...collectionPath(coachUid, 'practicePriorities', scope)), where('opponentModelId', '==', opponentModelId))
     );
     const items = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
     items.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
@@ -5229,10 +5234,10 @@ export const getPracticePriorities = async (coachUid, opponentModelId) => {
  * @param {string} priorityId
  * @param {Array<string>} workoutIds - ids from `workouts` and/or the coach's `customWorkouts`
  */
-export const linkWorkoutsToPracticePriority = async (coachUid, priorityId, workoutIds) => {
+export const linkWorkoutsToPracticePriority = async (coachUid, priorityId, workoutIds, scope = null) => {
   try {
     if (!workoutIds?.length) return;
-    await updateDoc(doc(db, 'users', coachUid, 'practicePriorities', priorityId), {
+    await updateDoc(doc(db, ...docPath(coachUid, 'practicePriorities', priorityId, scope)), {
       linkedBlueprintDrillIds: arrayUnion(...workoutIds),
     });
   } catch (error) {

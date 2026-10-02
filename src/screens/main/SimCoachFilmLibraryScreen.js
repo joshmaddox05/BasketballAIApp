@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { useAppContext } from '../../context/AppContext';
+import { scopeFromParams, scopeParams } from '../../services/simcoach/scope';
 import { BottomSheet, EmptyState } from '../../components/dbe';
 import { uploadFilm } from '../../utils/filmUpload';
 import { saveFilm, getFilms, deleteFilm, setFilmRetention } from '../../services/firestoreService';
@@ -95,7 +96,10 @@ function FilmCard({ film, theme, onCreateGamePlan, onTagFilm, onDelete, onSetRet
   );
 }
 
-function FilmLibrary({ navigation, onFilmCountChange }) {
+function FilmLibrary({ navigation, route, onFilmCountChange }) {
+  // Reached from a team workspace (carrying a scope) or the legacy hub tab (carrying
+  // none). No scope means the flat path, which keeps the old entry point working.
+  const scope = scopeFromParams(route?.params);
   const scrollRef = useRef(null);
   const { registerScrollRef, unregisterScrollRef, updateScrollY } = useTour();
   useEffect(() => {
@@ -105,7 +109,9 @@ function FilmLibrary({ navigation, onFilmCountChange }) {
 
   const { user, userData, theme, isDarkMode } = useAppContext();
   const isCoach = userData?.role === 'coach';
-  const uid = user?.uid;
+  // When scoped to a team workspace this is the workspace OWNER, not the viewer:
+  // staff read and write a coach's data in place, so paths are rooted at the coach.
+  const uid = route?.params?.ownerUid || user?.uid;
 
   const [films, setFilms] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -127,7 +133,7 @@ function FilmLibrary({ navigation, onFilmCountChange }) {
       return;
     }
     setLoading(true);
-    const list = await getFilms(uid);
+    const list = await getFilms(uid, scope);
     setFilms(list);
     setLoading(false);
     // Two of the three tour steps anchor to a film card, which does not exist on
@@ -200,7 +206,7 @@ function FilmLibrary({ navigation, onFilmCountChange }) {
         videoUrl,
         storagePath,
         durationSec: pickedVideo.durationSec,
-      });
+      }, scope);
       setPickedVideo(null);
       await loadFilms();
     } catch (error) {
@@ -227,7 +233,7 @@ function FilmLibrary({ navigation, onFilmCountChange }) {
           style: 'destructive',
           onPress: async () => {
             try {
-              await deleteFilm(uid, film.id);
+              await deleteFilm(uid, film.id, scope);
               setFilms((prev) => prev.filter((f) => f.id !== film.id));
             } catch (error) {
               Alert.alert('Error', 'Could not delete this film.');
@@ -246,7 +252,7 @@ function FilmLibrary({ navigation, onFilmCountChange }) {
       try {
         await setFilmRetention(uid, film.id, days
           ? { expiresAt: Date.now() + days * 24 * 60 * 60 * 1000, autoDelete: true }
-          : { expiresAt: null, autoDelete: false });
+          : { expiresAt: null, autoDelete: false }, scope);
         await loadFilms();
       } catch (error) {
         Alert.alert('Error', 'Could not update retention for this film.');
@@ -265,11 +271,11 @@ function FilmLibrary({ navigation, onFilmCountChange }) {
   }, [uid, loadFilms]);
 
   const handleCreateGamePlan = useCallback((film) => {
-    navigation.navigate('SimCoachGamePlanBuilder', { filmId: film.id, opponentName: film.opponentName });
+    navigation.navigate('SimCoachGamePlanBuilder', { ...scopeParams(uid, scope), filmId: film.id, opponentName: film.opponentName });
   }, [navigation]);
 
   const handleTagFilm = useCallback((film) => {
-    navigation.navigate('SimCoachFilmTagging', { filmId: film.id, videoUrl: film.videoUrl, opponentName: film.opponentName });
+    navigation.navigate('SimCoachFilmTagging', { ...scopeParams(uid, scope), filmId: film.id, videoUrl: film.videoUrl, opponentName: film.opponentName });
   }, [navigation]);
 
   if (!isCoach) {
