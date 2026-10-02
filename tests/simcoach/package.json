@@ -1,0 +1,4 @@
+{
+  "//": "Marks these test files as ES modules, mirroring tests/consent.",
+  "type": "module"
+}

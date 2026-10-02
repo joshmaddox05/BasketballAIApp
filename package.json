@@ -18,6 +18,7 @@
     "test:consent": "node --test \"tests/consent/*.test.mjs\"",
     "test:sessions": "node --test \"tests/sessions/*.test.mjs\"",
     "test:scouting": "node --test \"tests/scouting/*.test.mjs\"",
+    "test:simcoach": "node --test \"tests/simcoach/*.test.mjs\"",
     "test:narration": "node --test \"tests/narration/*.test.mjs\"",
     "test:onboarding": "node --test \"tests/onboarding/*.test.mjs\"",
     "test:invites": "node --test \"tests/invites/*.test.mjs\"",
