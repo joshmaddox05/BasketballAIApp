@@ -272,73 +272,6 @@ function CoachView({ navigation, theme, coachUid }) {
             </View>
           </>
         )}
-        {/* Scenario library.
-
-          Before this existed the athlete view rendered assignments and nothing
-          else, so a player whose coach had not assigned anything saw an empty
-          screen — and 17 of the 20 catalog scenarios were unreachable from the
-          app entirely. Decision IQ is a core skill for most archetypes and the IQ
-          score needs completed scenarios to become measured at all, so the
-          catalog has to be reachable without waiting for a coach. */}
-      <Text style={[styles.sectionTitle, { color: theme.text }]}>Scenario Library</Text>
-      <Text style={[styles.librarySubtitle, { color: theme.textSecondary }]}>
-        Train on your own. Every scenario you complete counts toward your IQ score.
-      </Text>
-
-      <View style={styles.filterRow}>
-        {LIBRARY_FILTERS.map((f) => {
-          const active = libraryFilter === f;
-          return (
-            <TouchableOpacity
-              key={f}
-              onPress={() => setLibraryFilter(f)}
-              activeOpacity={0.8}
-              style={[
-                styles.filterChip,
-                {
-                  backgroundColor: active ? theme.primary : theme.card,
-                  borderColor: active ? theme.primary : theme.border,
-                },
-              ]}
-            >
-              <Text style={[styles.filterChipText, { color: active ? '#FFFFFF' : theme.textSecondary }]}>
-                {f}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
-      {SIM_COACH_SCENARIO_LIST.filter(
-        (s) => libraryFilter === 'All' || s.category === libraryFilter
-      ).map((s) => {
-        const done = completedIds?.has(s.id);
-        return (
-          <TouchableOpacity
-            key={s.id}
-            style={[styles.scenarioCard, { backgroundColor: theme.card, borderColor: theme.border }]}
-            onPress={() => navigation.navigate('SimCoachScenario', { scenario: { id: s.id } })}
-            activeOpacity={0.8}
-          >
-            <View style={styles.scenarioTop}>
-              <View style={[styles.scenarioIcon, { backgroundColor: done ? '#22C55E18' : theme.primary + '18' }]}>
-                <Ionicons
-                  name={done ? 'checkmark-circle' : 'bulb-outline'}
-                  size={20}
-                  color={done ? '#22C55E' : theme.primary}
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.scenarioTitle, { color: theme.text }]}>{s.title}</Text>
-                <Text style={[styles.scenarioMeta, { color: theme.textSecondary }]}>
-                  {s.subcategory || s.category} · {s.difficulty} · {s.steps} play steps
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
-            </View>
-          </TouchableOpacity>
-        );
-      })}
 
       <View style={{ height: 32 }} />
       </ScrollView>
@@ -468,6 +401,74 @@ function AthleteView({ navigation, theme, score, completedCount, completedIds, s
           );
         })
       )}
+
+        {/* Scenario library.
+
+          Before this existed the athlete view rendered assignments and nothing
+          else, so a player whose coach had not assigned anything saw an empty
+          screen — and 17 of the 20 catalog scenarios were unreachable from the
+          app entirely. Decision IQ is a core skill for most archetypes and the IQ
+          score needs completed scenarios to become measured at all, so the
+          catalog has to be reachable without waiting for a coach. */}
+      <Text style={[styles.sectionTitle, { color: theme.text }]}>Scenario Library</Text>
+      <Text style={[styles.librarySubtitle, { color: theme.textSecondary }]}>
+        Train on your own. Every scenario you complete counts toward your IQ score.
+      </Text>
+
+      <View style={styles.filterRow}>
+        {LIBRARY_FILTERS.map((f) => {
+          const active = libraryFilter === f;
+          return (
+            <TouchableOpacity
+              key={f}
+              onPress={() => setLibraryFilter(f)}
+              activeOpacity={0.8}
+              style={[
+                styles.filterChip,
+                {
+                  backgroundColor: active ? theme.primary : theme.card,
+                  borderColor: active ? theme.primary : theme.border,
+                },
+              ]}
+            >
+              <Text style={[styles.filterChipText, { color: active ? '#FFFFFF' : theme.textSecondary }]}>
+                {f}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {SIM_COACH_SCENARIO_LIST.filter(
+        (s) => libraryFilter === 'All' || s.category === libraryFilter
+      ).map((s) => {
+        const done = completedIds?.has(s.id);
+        return (
+          <TouchableOpacity
+            key={s.id}
+            style={[styles.scenarioCard, { backgroundColor: theme.card, borderColor: theme.border }]}
+            onPress={() => navigation.navigate('SimCoachScenario', { scenario: { id: s.id } })}
+            activeOpacity={0.8}
+          >
+            <View style={styles.scenarioTop}>
+              <View style={[styles.scenarioIcon, { backgroundColor: done ? '#22C55E18' : theme.primary + '18' }]}>
+                <Ionicons
+                  name={done ? 'checkmark-circle' : 'bulb-outline'}
+                  size={20}
+                  color={done ? '#22C55E' : theme.primary}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.scenarioTitle, { color: theme.text }]}>{s.title}</Text>
+                <Text style={[styles.scenarioMeta, { color: theme.textSecondary }]}>
+                  {s.subcategory || s.category} · {s.difficulty} · {s.steps} play steps
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
+            </View>
+          </TouchableOpacity>
+        );
+      })}
 
       <View style={{ height: 32 }} />
     </ScrollView>
