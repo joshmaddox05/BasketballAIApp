@@ -238,3 +238,71 @@ test('a game preparation forwards its gameId, and team-level surfaces do not', (
     'the team screen forwards a gameId it does not have',
   );
 });
+
+// ───────────────────────────────────── Step 2: coach-editable team model
+//
+// The trap hit while building this: mapPlayer keys roster players by `id`, not `uid`.
+// Handlers written against `p.uid` parsed, rendered, and silently did nothing — the
+// lineup picker listed nobody and constraints were written under the key `undefined`.
+
+test('the team model screen addresses roster players by the key mapPlayer returns', () => {
+  const src = read('src/screens/main/SimCoachTeamModelScreen.js');
+  const mapper = src.match(/const mapPlayer = [\s\S]*?\n\};/);
+  assert.ok(mapper, 'could not find mapPlayer');
+  assert.match(mapper[0], /\n\s*id: linked\.uid,/, 'mapPlayer no longer returns `id`');
+
+  // Nothing may reach for `.uid` on a roster player object.
+  for (const m of src.matchAll(/\b(p|player|editingPlayer)\.uid\b/g)) {
+    assert.fail(`'${m[0]}' — roster players are keyed by .id, so this resolves to undefined`);
+  }
+});
+
+test('the team model screen persists through the validating service function', () => {
+  // Writing the document directly would skip validateTeamModelOverride, and a
+  // contradiction would be saved with output that looks as confident as any other.
+  const src = read('src/screens/main/SimCoachTeamModelScreen.js');
+  assert.match(src, /saveTeamModelOverride\(coachUid, next, scope\)/);
+  assert.match(src, /getTeamModelOverride\(coachUid, scope\)/);
+  assert.ok(!/setDoc\(|updateDoc\(/.test(src), 'the screen writes Firestore directly');
+});
+
+test('marking a player out removes them from the lineup before saving', () => {
+  // Otherwise the validator refuses the write and the coach sees a failure for
+  // something the app could have reconciled itself.
+  const src = read('src/screens/main/SimCoachTeamModelScreen.js');
+  const handler = src.match(/const setAvailability = useCallback\([\s\S]*?\}, \[override, persist\]\);/);
+  assert.ok(handler, 'setAvailability not found');
+  assert.match(handler[0], /next\.starters = \(next\.starters \|\| \[\]\)\.filter/);
+  assert.match(handler[0], /next\.closingFive = \(next\.closingFive \|\| \[\]\)\.filter/);
+});
+
+test('the team model screen is scope-aware and owner-rooted', () => {
+  const src = read('src/screens/main/SimCoachTeamModelScreen.js');
+  assert.match(src, /const scope = scopeFromParams\(route\?\.params\)/);
+  assert.match(src, /route\?\.params\?\.ownerUid \|\| user\?\.uid/);
+});
+
+test('the flat team-model path has a rule, since the screen is reachable without a workspace', () => {
+  // Reached from the legacy hub tab there is no scope, so the resolver addresses
+  // users/{uid}/teamModelOverrides — which would be denied with no rule for it.
+  const rules = read('firestore.rules');
+  const flat = rules.match(/match \/teamModelOverrides\/\{docId\}[\s\S]*?\n      \}/);
+  assert.ok(flat, 'no flat-path rule for teamModelOverrides');
+  assert.match(flat[0], /isOwner\(uid\)/);
+});
+
+test('every assumption field the screen offers has a vocabulary behind it', async () => {
+  const { TACTICAL_FIELDS } = await import('../../src/services/simcoach/teamModel.js');
+  const src = read('src/screens/main/SimCoachTeamModelScreen.js');
+  const block = src.match(/const ASSUMPTION_FIELDS = \[([\s\S]*?)\n\];/);
+  assert.ok(block, 'ASSUMPTION_FIELDS not found');
+  const keys = [...block[1].matchAll(/key: '(\w+)'/g)].map((m) => m[1]);
+  assert.ok(keys.length > 0);
+  for (const k of keys) {
+    assert.ok(TACTICAL_FIELDS[k], `the screen offers '${k}', which has no vocabulary in teamModel.js`);
+  }
+  // And the reverse: a vocabulary with no row is unreachable to the coach.
+  for (const k of Object.keys(TACTICAL_FIELDS)) {
+    assert.ok(keys.includes(k), `'${k}' has a vocabulary but no row on the screen`);
+  }
+});

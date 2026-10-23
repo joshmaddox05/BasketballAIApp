@@ -251,6 +251,13 @@ service cloud.firestore {
         allow read, write: if isOwner(uid);
       }
 
+      // The coach's own tactical assumptions (Step 2). Reachable without a
+      // workspace from the legacy hub tab, so the flat path needs a rule too —
+      // owner-only, matching the other SimCoach collections below.
+      match /teamModelOverrides/{docId} {
+        allow read, write: if isOwner(uid);
+      }
+
       // DEPRECATED (kept readable during and after migration): these flat
       // per-coach collections are superseded by the workspace-scoped copies
       // under teamWorkspaces/{workspaceId}. migrateCoachToWorkspace copies

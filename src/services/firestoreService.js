@@ -59,6 +59,7 @@ import {
 // SimCoach function below takes an optional trailing `scope`. Omitted means legacy,
 // which keeps every existing caller working unchanged.
 import { collectionPath, docPath } from './simcoach/scope';
+import { newTeamModelOverride, validateTeamModelOverride } from './simcoach/teamModel';
 
 /**
  * Recursively remove `undefined` values from an object/array so it is safe to
@@ -5682,6 +5683,75 @@ export const advanceGamePreparation = async (coachUid, workspaceId, gameId, next
   } catch (error) {
     console.error('Error advancing game preparation:', error);
     return { ok: false, reason: 'error' };
+  }
+};
+
+// ─── Your-Team Model overrides (Step 2) ──────────────────────────────────────
+//
+// The coach's own tactical assumptions: rotation, matchups, pace, coverage rules and
+// per-player constraints. SimCoachTeamModelScreen has only ever rendered derived data
+// (EvalRank grades, archetypes, a training-load proxy), which is half of what the
+// operating model asks for — Kassoum's principle is that DBE data informs the coach's
+// assumptions and never dictates them, and until now there was no surface where a coach
+// could disagree with the data and have it stick.
+//
+// One document per workspace, id 'current'. A single doc rather than a collection
+// because a team has one set of standing assumptions at a time; a what-if that varies
+// them does not rewrite this, it layers a scenario on top (Step 5).
+
+const TEAM_MODEL_DOC_ID = 'current';
+
+/**
+ * Read the coach's overrides. Returns a fresh, empty override rather than null when
+ * none exists, so callers never have to distinguish "no document" from "nothing
+ * stated" — both mean the same thing to a simulation.
+ */
+export const getTeamModelOverride = async (coachUid, scope = null) => {
+  try {
+    const snap = await getDoc(doc(db, ...docPath(coachUid, 'teamModelOverrides', TEAM_MODEL_DOC_ID, scope)));
+    return snap.exists()
+      ? { id: snap.id, ...snap.data() }
+      : { id: TEAM_MODEL_DOC_ID, ...newTeamModelOverride({ authoredBy: coachUid }) };
+  } catch (error) {
+    console.error('Error getting team model override:', error);
+    return { id: TEAM_MODEL_DOC_ID, ...newTeamModelOverride({ authoredBy: coachUid }) };
+  }
+};
+
+/**
+ * Save the coach's overrides.
+ *
+ * Validated before writing, and REFUSED on error rather than saved-and-flagged: the
+ * states validateTeamModelOverride treats as errors are contradictions a simulation
+ * cannot honestly run on (six starters, a closing five built on a player who is out),
+ * and its output would carry no sign that its inputs were impossible. Warnings — a
+ * half-filled lineup — pass through, because a coach filling this in over several
+ * sittings must not be blocked.
+ *
+ * @returns {Promise<{ok: boolean, errors?: string[], warnings?: string[]}>}
+ */
+export const saveTeamModelOverride = async (coachUid, override, scope = null) => {
+  const result = validateTeamModelOverride(override);
+  if (!result.ok) return { ok: false, errors: result.errors, warnings: result.warnings };
+
+  try {
+    const { id, ...data } = override;
+    await setDoc(
+      doc(db, ...docPath(coachUid, 'teamModelOverrides', TEAM_MODEL_DOC_ID, scope)),
+      removeUndefined({
+        ...data,
+        // Stamped here rather than trusted from the client: provenance is what lets the
+        // confidence model tell a coach's stated intention from film evidence.
+        source: 'coach',
+        authoredBy: data.authoredBy || coachUid,
+        updatedAt: serverTimestamp(),
+      }),
+      { merge: true },
+    );
+    return { ok: true, warnings: result.warnings };
+  } catch (error) {
+    console.error('Error saving team model override:', error);
+    return { ok: false, errors: ['Could not save. Please try again.'] };
   }
 };
 
